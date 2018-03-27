@@ -124,6 +124,9 @@ Section Phoas.
   | ReadArray n k: Expr (SyntaxKind (Array n k)) ->
                    Expr (SyntaxKind (Bit (Nat.log2_up n))) ->
                    Expr (SyntaxKind k)
+  | ReadArrayConst n k: Expr (SyntaxKind (Array n k)) ->
+                        Fin.t n ->
+                        Expr (SyntaxKind k)
   | BuildArray n k: (Fin.t n -> Expr (SyntaxKind k)) -> Expr (SyntaxKind (Array n k)).
 
   Definition UpdateArray n k (e: Expr (SyntaxKind (Array n k)))
@@ -132,6 +135,15 @@ Section Phoas.
     BuildArray (fun i' : Fin.t n =>
                   ITE (Eq i (Const (natToWord _ (proj1_sig (Fin.to_nat i'))))) v
                       (ReadArray e (Const (natToWord _ (proj1_sig (Fin.to_nat i')))))).
+
+  Definition UpdateArrayConst n k (e: Expr (SyntaxKind (Array n k)))
+             (i: Fin.t n)
+             (v: Expr (SyntaxKind k)) :=
+    BuildArray (fun i' : Fin.t n =>
+                  match Fin.eq_dec i i' with
+                  | left _ => v
+                  | right _ => ReadArray e (Const (natToWord _ (proj1_sig (Fin.to_nat i'))))
+                  end).
 
   Definition UpdateStruct n (fk: Fin.t n -> Kind) (fs: Fin.t n -> string)
              (e: Expr (SyntaxKind (Struct fk fs))) i (v: Expr (SyntaxKind (fk i))) :=
@@ -1028,11 +1040,11 @@ Section Semantics.
         | 0 => fun _ => evalConstT (getDefaultConst k)
         | S m => fun fv => fv (natToFin m (wordToNat (@evalExpr _ i)))
         end (@evalExpr _ fv)
+      | ReadArrayConst n k fv i =>
+        (@evalExpr _ fv) i
       | BuildArray n k fv => fun i => @evalExpr _ (fv i)
     end.
 
-  Eval compute in evalExpr (UniBit (TruncMsb 3 2) (Const type WO~1~0~0~1~1)).
-  
   Variable o: RegsT.
 
   Inductive SemAction:

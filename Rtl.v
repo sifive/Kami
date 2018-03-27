@@ -33,6 +33,9 @@ Inductive RtlExpr: Kind -> Type :=
 | RtlReadArray n k: RtlExpr (Array n k) ->
                     RtlExpr (Bit (Nat.log2_up n)) ->
                     RtlExpr k
+| RtlReadArrayConst n k: RtlExpr (Array n k) ->
+                         Fin.t n ->
+                         RtlExpr k
 | RtlBuildArray n k: (Fin.t n -> RtlExpr k) -> RtlExpr (Array n k).
 
 Inductive RtlSysT : Type :=
