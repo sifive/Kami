@@ -466,9 +466,8 @@ Local Definition testStructVal ty: testStruct @# ty :=
        "a" ::= $ 23 ;
        "b" ::= $ 5 ;
        "test" ::= $$ true })%kami_expr.
-                                                         
 
-Notation "!" := (UniBool Neg) : kami_expr_scope.
+Notation "! v" := (UniBool Neg v) (at level 35): kami_expr_scope.
 Notation "e1 && e2" := (CABool And (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 || e2" := (CABool Or (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 ^^ e2" := (CABool Xor (e1 :: e2 :: nil)) (at level 50): kami_expr_scope.
