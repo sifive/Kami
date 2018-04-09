@@ -23,7 +23,7 @@ Inductive Kind :=
 
 Inductive FullKind: Type :=
 | SyntaxKind: Kind -> FullKind
-| NativeKind (t: Type) (c: t) : FullKind.
+| NativeKind (t: Type): FullKind.
 
 Inductive ConstT: Kind -> Type :=
 | ConstBool: bool -> ConstT Bool
@@ -33,7 +33,7 @@ Inductive ConstT: Kind -> Type :=
 
 Inductive ConstFullT: FullKind -> Type :=
 | SyntaxConst k: ConstT k -> ConstFullT (SyntaxKind k)
-| NativeConst t (c c': t): ConstFullT (NativeKind c).
+| NativeConst t (c': t): ConstFullT (NativeKind t).
 
 Coercion ConstBool : bool >-> ConstT.
 Coercion ConstBit : word >-> ConstT.
@@ -45,12 +45,6 @@ Fixpoint getDefaultConst (k: Kind): ConstT k :=
     | Struct n fk fs =>
       ConstStruct fk fs (fun i => getDefaultConst (fk i))
     | Array n k => ConstArray (fun _ => getDefaultConst k)
-  end.
-
-Definition getDefaultConstFull (k: FullKind): ConstFullT k :=
-  match k with
-    | SyntaxKind k' => SyntaxConst (getDefaultConst k')
-    | NativeKind t c => NativeConst c c
   end.
 
 Inductive UniBoolOp: Set :=
