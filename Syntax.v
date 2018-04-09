@@ -89,7 +89,7 @@ Section Phoas.
   Variable ty: Kind -> Type.
   Definition fullType k := match k with
                              | SyntaxKind k' => ty k'
-                             | NativeKind k' _ => k'
+                             | NativeKind k' => k'
                            end.
 
   (* Definition lgCeil i := S (Nat.log2_iter (pred (pred i)) 0 1 0). *)
@@ -931,7 +931,7 @@ Fixpoint evalConstT k (e: ConstT k): type k :=
 Definition evalConstFullT k (e: ConstFullT k) :=
   match e in ConstFullT k return fullType type k with
     | SyntaxConst k' c' => evalConstT c'
-    | NativeConst t c c' => c'
+    | NativeConst t c' => c'
   end.
 
 (* maps register names to the values which they currently hold *)

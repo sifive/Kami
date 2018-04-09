@@ -25,10 +25,7 @@ Definition getActionEn r := (r ++ "#_enable", nil_nat).
 
 Close Scope string.
 
-Local Notation cast k' v := match k' with
-                            | SyntaxKind k => v
-                            | NativeKind _ c => c
-                            end.
+Local Notation cast k' v := v.
 
 
 Section Compile.
@@ -40,11 +37,11 @@ Section Compile.
                              (forall x,
                                 match k' return (Expr (fun _ => list nat) k' -> Set) with
                                   | SyntaxKind k => fun _ => RtlExpr k
-                                  | NativeKind _ _ => fun _ => IDProp
+                                  | NativeKind _ => fun _ => IDProp
                                 end (Var (fun _ => list nat) k' x))
                        with
                          | SyntaxKind k => fun x => RtlReadWire k (name, x)
-                         | NativeKind t c => fun _ => idProp
+                         | NativeKind t => fun _ => idProp
                        end x'
       | Const k x => RtlConst x
       | UniBool x x0 => RtlUniBool x (@convertExprToRtl _ x0)
@@ -64,11 +61,11 @@ Section Compile.
               (forall x0 x1,
                  match k' return (Expr (fun _ => list nat) k' -> Set) with
                    | SyntaxKind k => fun _ => RtlExpr k
-                   | NativeKind _ _ => fun _ => IDProp
+                   | NativeKind _ => fun _ => IDProp
                  end (ITE x x0 x1))
         with
           | SyntaxKind k => fun x0 x1 => RtlITE (@convertExprToRtl _ x) (@convertExprToRtl _ x0) (@convertExprToRtl _ x1)
-          | NativeKind t c => fun _ _ => idProp
+          | NativeKind t => fun _ _ => idProp
         end x0' x1'
     end.
 
@@ -88,32 +85,37 @@ Section Compile.
         convertActionToRtl_noGuard (cont startList) enable (inc startList) retList
       | Return x => (name, retList, existT _ k (convertExprToRtl x)) :: nil
       | LetExpr k' expr cont =>
-        let wires := convertActionToRtl_noGuard (cont (cast k' startList)) enable (inc startList) retList in
-        match k' return Expr (fun _ => list nat) k' -> list (string * list nat * sigT RtlExpr) with
-          | SyntaxKind k => fun expr => (name, startList, existT _ k (convertExprToRtl expr)) :: wires
-          | _ => fun _ => wires
-        end expr
+        match k' return Expr (fun _ => list nat) k' ->
+                        (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                        list (string * list nat * sigT RtlExpr) with
+        | SyntaxKind k => fun expr cont => (name, startList, existT _ k (convertExprToRtl expr))
+                                             ::
+                                             convertActionToRtl_noGuard (cont startList) enable (inc startList)
+                                             retList
+        | _ => fun _ _ => nil
+        end expr cont
       | LetAction k' a' cont =>
         convertActionToRtl_noGuard a' enable (0 :: startList) startList ++
         convertActionToRtl_noGuard (cont startList) enable (inc startList) retList
       | ReadNondet k' cont =>
-        let wires := convertActionToRtl_noGuard (cont (cast k' startList))
-                                                enable (inc startList)
-                                                retList in
-        match k' return list (string * list nat * sigT RtlExpr) with
-        | SyntaxKind k => (name, startList, existT _ k (convertExprToRtl
-                                                          (Const _ (getDefaultConst _)))) ::
-                                                                                          wires
-        | _ => wires
-        end
+        match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                        list (string * list nat * sigT RtlExpr) with
+        | SyntaxKind k => fun cont => (name, startList, existT _ k (convertExprToRtl
+                                                                      (Const _ (getDefaultConst _))))
+                                        ::
+                                        convertActionToRtl_noGuard (cont startList) enable (inc startList) retList
+        | _ => fun _ => nil
+        end cont
       | ReadReg r k' cont =>
-        let wires := convertActionToRtl_noGuard (cont (cast k' startList)) enable
-                                                (inc startList) retList in
-        match k' return list (string * list nat * sigT RtlExpr) with
-          | SyntaxKind k => (name, startList,
-                             existT _ k (RtlReadWire k (getRegActionRead name r))) :: wires
-          | _ => wires
-        end
+        match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                        list (string * list nat * sigT RtlExpr) with
+          | SyntaxKind k => fun cont => (name, startList,
+                                         existT _ k (RtlReadWire k (getRegActionRead name r)))
+                                          ::
+                                          convertActionToRtl_noGuard (cont startList) enable
+                                          (inc startList) retList
+          | _ => fun _ => nil
+        end cont
       | WriteReg r k' expr cont =>
         let wires := convertActionToRtl_noGuard cont enable startList retList in
         match k' return Expr (fun _ => list nat) k' -> list (string * list nat * sigT RtlExpr) with
@@ -139,11 +141,26 @@ Section Compile.
         RtlReadWire Bool (getActionGuard meth) ::
                     (convertActionToRtl_guard (cont startList) (inc startList))
       | LetExpr k' expr cont =>
-        convertActionToRtl_guard (cont (cast k' startList)) (inc startList)
+        match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                        list (RtlExpr Bool) with
+        | SyntaxKind k => fun cont =>
+                            convertActionToRtl_guard (cont startList) (inc startList)
+        | _ => fun _ => nil
+        end cont
       | ReadNondet k' cont =>
-        convertActionToRtl_guard (cont (cast k' startList)) (inc startList)
+        match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                        list (RtlExpr Bool) with
+        | SyntaxKind k => fun cont =>
+                            convertActionToRtl_guard (cont startList) (inc startList)
+        | _ => fun _ => nil
+        end cont
       | ReadReg r k' cont =>
-        convertActionToRtl_guard (cont (cast k' startList)) (inc startList)
+        match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                        list (RtlExpr Bool) with
+        | SyntaxKind k => fun cont =>
+                            convertActionToRtl_guard (cont startList) (inc startList)
+        | _ => fun _ => nil
+        end cont
       | WriteReg r k' expr cont =>
         convertActionToRtl_guard cont startList
       | Assertion pred cont => convertExprToRtl pred ::
@@ -179,14 +196,29 @@ Section Compile.
     | MCall meth k argExpr cont =>
       getRtlSys (cont startList) enable (inc startList)
     | LetExpr k' expr cont =>
-      getRtlSys (cont (cast k' startList)) enable (inc startList)
+      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                      list (RtlExpr Bool * list RtlSysT) with
+      | SyntaxKind k => fun cont =>
+                          getRtlSys (cont startList) enable (inc startList)
+      | _ => fun _ => nil
+      end cont
     | LetAction k' a' cont =>
       getRtlSys a' enable (0 :: startList) ++
                 getRtlSys (cont startList) enable (inc startList)
     | ReadNondet k' cont =>
-      getRtlSys (cont (cast k' startList)) enable (inc startList)
+      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                      list (RtlExpr Bool * list RtlSysT) with
+      | SyntaxKind k => fun cont =>
+                          getRtlSys (cont startList) enable (inc startList)
+      | _ => fun _ => nil
+      end cont
     | ReadReg r k' cont =>
-      getRtlSys (cont (cast k' startList)) enable (inc startList)
+      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                      list (RtlExpr Bool * list RtlSysT) with
+      | SyntaxKind k => fun cont =>
+                          getRtlSys (cont startList) enable (inc startList)
+      | _ => fun _ => nil
+      end cont
     | WriteReg r k' expr cont =>
       getRtlSys cont enable startList
     | Assertion pred cont => getRtlSys cont (RtlCABool And
@@ -206,14 +238,29 @@ Section Compile.
       (meth, k) :: getCallsSign (cont startList) (inc startList) 
     | Return x => nil
     | LetExpr k' expr cont =>
-      getCallsSign (cont (cast k' startList)) (inc startList)
+      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                      list (string * (Kind * Kind)) with
+      | SyntaxKind k => fun cont =>
+                          getCallsSign (cont startList) (inc startList)
+      | _ => fun _ => nil
+      end cont
     | LetAction k' a' cont =>
       getCallsSign a' (0 :: startList) ++
                    getCallsSign (cont startList) (inc startList)
     | ReadNondet k' cont =>
-      getCallsSign (cont (cast k' startList)) (inc startList)
+      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                      list (string * (Kind * Kind)) with
+      | SyntaxKind k => fun cont =>
+                          getCallsSign (cont startList) (inc startList)
+      | _ => fun _ => nil
+      end cont
     | ReadReg r k' cont =>
-      getCallsSign (cont (cast k' startList)) (inc startList)
+      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                      list (string * (Kind * Kind)) with
+      | SyntaxKind k => fun cont =>
+                          getCallsSign (cont startList) (inc startList)
+      | _ => fun _ => nil
+      end cont
     | WriteReg r k' expr cont =>
       getCallsSign cont startList
     | Assertion pred cont => getCallsSign cont startList
@@ -228,14 +275,29 @@ Section Compile.
       getWrites (cont startList) (inc startList) 
     | Return x => nil
     | LetExpr k' expr cont =>
-      getWrites (cont (cast k' startList)) (inc startList)
+      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                      list string with
+      | SyntaxKind k => fun cont =>
+                          getWrites (cont startList) (inc startList)
+      | _ => fun _ => nil
+      end cont
     | LetAction k' a' cont =>
       getWrites a' (0 :: startList) ++
                    getWrites (cont startList) (inc startList)
     | ReadNondet k' cont =>
-      getWrites (cont (cast k' startList)) (inc startList)
+      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                      list string with
+      | SyntaxKind k => fun cont =>
+                          getWrites (cont startList) (inc startList)
+      | _ => fun _ => nil
+      end cont
     | ReadReg r k' cont =>
-      getWrites (cont (cast k' startList)) (inc startList)
+      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
+                      list string with
+      | SyntaxKind k => fun cont =>
+                          getWrites (cont startList) (inc startList)
+      | _ => fun _ => nil
+      end cont
     | WriteReg r k' expr cont =>
       r :: getWrites cont startList
     | Assertion pred cont => getWrites cont startList
@@ -340,4 +402,3 @@ Definition getRtl (bm: BaseModule) :=
             wires := nil;
             sys := nil|}
   end.
-                      
