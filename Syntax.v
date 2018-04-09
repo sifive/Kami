@@ -449,7 +449,7 @@ Notation Default := (getDefaultConst _).
 
 Notation "k @# ty" := (Expr ty (SyntaxKind k)) (no associativity, at level 98, only parsing).
 
-Notation "# v" := (Var _ (SyntaxKind _) v) (at level 0) : kami_expr_scope.
+Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (at level 0) : kami_expr_scope.
 Notation "$ n" := (Const _ (natToWord _ n)) (at level 0): kami_expr_scope.
 Notation "$$ e" := (Const ltac:(assumption) e) (at level 8) : kami_expr_scope.
 
