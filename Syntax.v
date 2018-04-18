@@ -150,15 +150,6 @@ Section Phoas.
                                  end).
 
   Section BitOps.
-    Fixpoint nat_cast (P : nat -> Type) {n m} : n = m -> P n -> P m.
-      refine match n, m return n = m -> P n -> P m with
-             | O, O => fun _ => id
-             | S n, S m => fun pf => @nat_cast (fun n => P (S n)) n m (f_equal pred pf)
-             | _, _ => fun pf => match _ pf : False with end
-             end;
-        clear; abstract congruence.
-    Defined.
-
     Definition castBits ni no (pf: ni = no) (e: Expr (SyntaxKind (Bit ni))) :=
       nat_cast (fun n => Expr (SyntaxKind (Bit n))) pf e.
 
@@ -1535,15 +1526,6 @@ Section evalExpr.
     reflexivity.
   Qed.
 
-  Fixpoint countLeadingZerosWord ni no: word ni -> word no :=
-  match ni return word ni -> word no with
-  | 0 => fun _ => $ 0
-  | S m => fun e =>
-             if getBool (weq (split2 m 1 (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e)) WO~0)
-             then $ 1 ^+ @countLeadingZerosWord m no (split1 m 1 (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e))
-             else $ 0
-  end.
-
   Lemma evalExpr_Void (e: Expr type (SyntaxKind (Bit 0))):
     evalExpr e = WO.
   Proof.
@@ -1566,44 +1548,6 @@ Section evalExpr.
     simpl.
     rewrite evalExpr_castBits.
     repeat f_equal.
-  Qed.
-
-  Lemma countLeadingZerosWord_le_len no ni:
-    ni < pow2 no ->
-    forall w: word ni, (countLeadingZerosWord no w <= natToWord _ ni)%word.
-  Proof.
-    induction ni; simpl; auto; intros.
-    - word_omega.
-    - match goal with
-      | |- ((if getBool ?P then _ else _) <= _)%word => destruct P; simpl; auto
-      end; [| word_omega].
-      assert (sth: ni < pow2 no) by lia.
-      specialize (IHni sth).
-      assert (sth1: natToWord no (S ni) = natToWord no (1 + ni)) by auto.
-      rewrite sth1.
-      rewrite natToWord_plus.
-      match goal with
-      | |- ((_ ^+ countLeadingZerosWord no ?P) <= _)%word => specialize (IHni P)
-      end.
-      match goal with
-      | |- (?a ^+ ?b <= ?c ^+ ?d)%word =>
-        rewrite (wplus_comm a b); rewrite (wplus_comm c d)
-      end.
-      pre_word_omega.
-      assert (sth2: no > 0). {
-        destruct no; [|lia].
-        destruct ni; simpl in *; try lia.
-      }
-      rewrite <- ?(@natplus1_wordplus1_eq _ _ (wones no)); auto.
-      + lia.
-      + pre_word_omega.
-        rewrite wordToNat_natToWord_eqn.
-        rewrite Nat.mod_small; auto.
-        lia.
-      + pre_word_omega.
-        rewrite wordToNat_natToWord_eqn in IHni.
-        rewrite Nat.mod_small in IHni; auto.
-        lia.
   Qed.
 
 
