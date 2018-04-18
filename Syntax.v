@@ -1,5 +1,5 @@
 Require Export Bool String List FunctionalExtensionality Psatz PeanoNat.
-Require Export bbv.Word Lib.VectorFacts Lib.EclecticLib Lib.WordProps.
+Require Export bbv.Word bbv.WordProps Lib.VectorFacts Lib.EclecticLib.
 
 Require Vector.
 
@@ -1541,7 +1541,7 @@ Section evalExpr.
     unfold wzero at 2.
     rewrite wzero_wplus.
     match goal with
-    | |- (if ?P then _ else _) = (if ?P then _ else _) => destruct P; auto
+    | |- (if getBool ?P then _ else _) = (if ?P then _ else _) => destruct P; auto
     end.
     repeat f_equal.
     rewrite IHni.
