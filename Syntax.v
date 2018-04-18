@@ -3962,7 +3962,6 @@ Qed.
  * PUAR: Linux/Certikos
  *)
 
-
 Lemma WfMod_createHide l: forall m, WfMod (createHide m l) <-> SubList l (map fst (getMethods m)).
 Proof.
   split.
@@ -3999,5 +3998,49 @@ Proof.
 Admitted.
 
 
+
+
+Section inlineSingle.
+  Variable ty: Kind -> Type.
+  Variable f: DefMethT.
+  Variable cheat: forall t, t.
+  
+  Fixpoint inlineSingle k (a: ActionT ty k): ActionT ty k :=
+    match a with
+    | MCall g sign arg cont =>
+      match string_dec (fst f) g with
+      | left _ =>
+        match Signature_dec sign (projT1 (snd f)) with
+        | left isEq =>
+          LetAction (LetExpr match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with
+                             | eq_refl => arg
+                             end (projT2 (snd f) ty))
+                    (fun ret => inlineSingle (match isEq in _ = Y return ty (snd Y) -> ActionT ty k with
+                                              | eq_refl => cont
+                                              end ret))
+        | right _ => MCall g sign arg (fun ret => inlineSingle (cont ret))
+        end
+      | right _ => MCall g sign arg (fun ret => inlineSingle (cont ret))
+      end
+    | LetExpr _ e cont =>
+      LetExpr e (fun ret => inlineSingle (cont ret))
+    | LetAction _ a cont =>
+      LetAction a (fun ret => inlineSingle (cont ret))
+    | ReadNondet k c =>
+      ReadNondet k (fun ret => inlineSingle (c ret))
+    | ReadReg r k c =>
+      ReadReg r k (fun ret => inlineSingle (c ret))
+    | WriteReg r k e a =>
+      WriteReg r e (inlineSingle a)
+    | IfElse p _ aT aF c =>
+      IfElse p (inlineSingle aT) (inlineSingle aF) (fun ret => inlineSingle (c ret))
+    | Assertion e c =>
+      Assertion e (inlineSingle c)
+    | Sys ls c =>
+      Sys ls (inlineSingle c)
+    | Return e =>
+      Return e
+    end.
+End inlineSingle.
 
 
