@@ -160,7 +160,7 @@ ppRtlExpr who e =
         let xidx = finToInt idx
         xvec <- ppRtlExpr who vec
         new <- optionAddToTrunc (Array n k) vec
-        return $ new ++ '[' : xidx ++ "]"
+        return $ new ++ '[' : show xidx ++ "]"
     RtlBuildArray n k fv ->
       do
         strs <- mapM (ppRtlExpr who) (reverse $ Data.List.map fv (getFins n))
