@@ -1,4 +1,4 @@
-Require Import Syntax String Rtl.
+Require Import Syntax Rtl.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
