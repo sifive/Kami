@@ -331,17 +331,18 @@ Definition getInputs (calls: list (Attribute (Kind * Kind))) := map (fun x => (g
 Definition getOutputs (calls: list (Attribute (Kind * Kind))) := map (fun x => (getMethArg (fst x), fst (snd x))) calls ++
                                                                      map (fun x => (getMethEn (fst x), Bool)) calls.
 
-Definition getRegInit (y: {x : FullKind & ConstFullT x}): {x: Kind & ConstT x} :=
-  existT ConstT match projT1 y with
-                | SyntaxKind k => k
-                | _ => Void
-                end match projT2 y in ConstFullT k return ConstT match k with
-                                                                 | SyntaxKind k' => k'
-                                                                 | _ => Void
-                                                                 end with
-                    | SyntaxConst k c => c
-                    | _ => WO
-                    end.
+Definition getRegInit (y: {x : FullKind & option (ConstFullT x)}): {x: Kind & option (ConstT x)} :=
+  existT _ _
+         match projT2 y with
+         | None => None
+         | Some y' => Some match y' in ConstFullT k return ConstT match k with
+                                                                  | SyntaxKind k' => k'
+                                                                  | _ => Void
+                                                                  end with
+                           | SyntaxConst k c => c
+                           | _ => WO
+                           end
+         end.
 
 Fixpoint finalWrites (a: Attribute (Action Void)) (regs: list RegInitT) : list (string * list nat * {x : Kind & RtlExpr x}) :=
   match regs with

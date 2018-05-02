@@ -55,7 +55,7 @@ Record RtlModule :=
     (* syncRegFilesAddr: list (string * list (string * bool) * string * sigT (fun x: (nat * Kind) => ConstT (Array (fst x) (snd x)))); *)
     inputs: list (string * list nat * Kind);
     outputs: list (string * list nat * Kind);
-    regInits: list (string * sigT (fun x => ConstT x));
+    regInits: list (string * sigT (fun x => option (ConstT x)));
     regWrites: list (string * sigT RtlExpr);
     wires: list (string * list nat * sigT RtlExpr);
     sys: list (RtlExpr Bool * list RtlSysT)

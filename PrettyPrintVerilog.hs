@@ -293,10 +293,10 @@ ppRtlSys (RtlDispBit _ e f) = do
   return $ "        $write(\"" ++ ppFullBitFormat f ++ "\", " ++ s ++ ");\n"
 ppRtlSys (RtlDispStruct n fk fs fv ff) = do
   rest <- mapM (\i -> ppRtlExpr "sys" (RtlReadStruct n fk fs fv i)) (getFins n)
-  return $ "        $write(\"{" ++ concat (Data.List.map (\i -> fs i ++ ":=" ++ ppFullBitFormat (ff i) ++ "; ") (getFins n)) ++ "}\", " ++ concat rest ++ ");\n"
+  return $ "        $write(\"{" ++ Data.List.concat (Data.List.map (\i -> fs i ++ ":=" ++ ppFullBitFormat (ff i) ++ "; ") (getFins n)) ++ "}\", " ++ Data.List.concat rest ++ ");\n"
 ppRtlSys (RtlDispArray n k v f) = do
   rest <- mapM (\i -> ppRtlExpr "sys" (RtlReadArray n k v (RtlConst k (ConstBit (log2_up n) (natToWord (log2_up n) i))))) [0 .. (n-1)]
-  return $ "        $write(\"[" ++ concat (Data.List.map (\i -> show i ++ ":=" ++ ppFullBitFormat f ++ "; ") [0 .. (n-1)]) ++ "]\", " ++ concat rest ++ ");\n"
+  return $ "        $write(\"[" ++ Data.List.concat (Data.List.map (\i -> show i ++ ":=" ++ ppFullBitFormat f ++ "; ") [0 .. (n-1)]) ++ "]\", " ++ Data.List.concat rest ++ ");\n"
   
   
 ppRtlModule :: RtlModule -> String
@@ -323,7 +323,9 @@ ppRtlModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sy
   
   "  always @(posedge CLK) begin\n" ++
   "    if(!RESET_N) begin\n" ++
-  concatMap (\(nm, (ty, init)) -> "      " ++ ppName nm ++ " <= " ++ ppConst init ++ ";\n") regInits ++
+  concatMap (\(nm, (ty, init)) -> case init of
+                                    Nothing -> ""
+                                    Just init' -> "      " ++ ppName nm ++ " <= " ++ ppConst init' ++ ";\n") regInits ++
   "    end\n" ++
   "    else begin\n" ++
   concatMap (\(nm, (ty, sexpr)) -> "      " ++ ppName nm ++ " <= " ++ sexpr ++ ";\n") regExprs ++
@@ -355,7 +357,7 @@ ppRtlModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sy
                       do
                         predExpr <- ppRtlExpr "sys" pred
                         s <- mapM ppRtlSys listSys
-                        return $ (predExpr, concat s)) sys'
+                        return $ (predExpr, Data.List.concat s)) sys'
     (sys, sysTruncs') = runState convSys H.empty
     sysTruncs = H.toList sysTruncs'
 

@@ -538,6 +538,135 @@ Proof.
     tauto.
 Qed.
  
+Lemma Forall2_impl A B (P Q: A -> B -> Prop):
+  (forall a b, P a b -> Q a b) ->
+  forall la lb,
+    Forall2 P la lb ->
+    Forall2 Q la lb.
+Proof.
+  induction la; destruct lb; simpl; auto; intros.
+  - inv H0; tauto.
+  - inv H0; tauto.
+  - inv H0; constructor; firstorder fail.
+Qed.
+
+Lemma Forall2_map_eq A B C (f: A -> C) (g: B -> C):
+  forall la lb,
+    Forall2 (fun a b => f a = g b) la lb ->
+    map f la = map g lb.
+Proof.
+  induction la; destruct lb; simpl; auto; intros.
+  - inv H.
+  - inv H.
+  - inv H.
+    f_equal; firstorder fail.
+Qed.
+
+Lemma Forall2_app_eq_length A B (P: A -> B -> Prop) :
+  forall l1a l2a l1b l2b,
+    Forall2 P (l1a ++ l2a) (l1b ++ l2b) ->
+    length l1a = length l1b ->
+    Forall2 P l1a l1b /\
+    Forall2 P l2a l2b.
+Proof.
+  induction l1a; simpl; auto; intros.
+  - apply eq_sym in H0.
+    rewrite length_zero_iff_nil in H0.
+    subst; simpl in *.
+    split; auto.
+  - destruct l1b; simpl in *; [discriminate|].
+    split; inv H; [| eapply IHl1a; eauto].
+    constructor; auto.
+    specialize (IHl1a _ _ _ H6).
+    destruct IHl1a; auto.
+Qed.
+
+Lemma same_length_map_DisjKey A B (o: list (Attribute A)):
+  forall (l1 l2: list (Attribute B)),
+    map fst o = map fst l1 ++ map fst l2 ->
+    DisjKey l1 l2 ->
+    o = filter (fun x => getBool (in_dec string_dec (fst x) (map fst l1))) o ++
+               filter (fun x => getBool (in_dec string_dec (fst x) (map fst l2))) o ->
+    length (map fst l1) = length (filter (fun x => getBool (in_dec string_dec (fst x) (map fst l1))) o).
+Proof.
+  induction o; simpl; auto; intros.
+  - apply eq_sym in H.
+    apply app_eq_nil in H; subst; dest; subst.
+    rewrite H; auto.
+  - destruct l1; simpl; rewrite ?filter_false; auto; simpl in *.
+    inv H; subst.
+    rewrite H3 in *.
+    destruct (string_dec (fst p) (fst p)); [simpl in *| exfalso; clear - n; tauto].
+    inv H1.
+    assert (sth: DisjKey l1 l2) by (clear - H0; firstorder fail).
+    specialize (IHo _ _ H4 sth).
+    destruct (in_dec string_dec (fst p) (map fst l2)); simpl in *.
+    + unfold DisjKey in *.
+      specialize (H0 (fst p)); simpl in *.
+      destruct H0; tauto.
+    + rewrite <- H2.
+      simpl in *.
+      assert (sth2:
+                (fun x : string * A =>
+                   getBool
+                     match string_dec (fst p) (fst x) with
+                     | left e => left (or_introl e)
+                     | right n =>
+                       match in_dec string_dec (fst x) (map fst l1) with
+                       | left i => left (or_intror i)
+                       | right n0 => right (fun H0 : fst p = fst x \/ In (fst x) (map fst l1) => match H0 with
+                                                                                                 | or_introl Hc1 => n Hc1
+                                                                                                 | or_intror Hc2 => n0 Hc2
+                                                                                                 end)
+                       end
+                     end) = (fun x : string * A =>
+                               match string_dec (fst p) (fst x) with
+                               | left _ => true
+                               | right _ =>
+                                 getBool (in_dec string_dec (fst x) (map fst l1))
+                               end)). {
+        extensionality x.
+        destruct (string_dec (fst p) (fst x)); auto.
+        destruct (in_dec string_dec (fst x) (map fst l1)); auto.
+      }
+      setoid_rewrite sth2 in H2.
+      setoid_rewrite sth2.
+      clear sth2.
+      destruct (in_dec string_dec (fst p) (map fst l1)).
+      * assert (sth3: (fun x: string * A => if string_dec (fst p) (fst x) then true else getBool (in_dec string_dec (fst x) (map fst l1))) =
+                      fun x => getBool (in_dec string_dec (fst x) (map fst l1))). {
+          extensionality x.
+          destruct (string_dec (fst p) (fst x)); auto.
+          rewrite <- e0.
+          destruct (in_dec string_dec (fst p) (map fst l1)); auto.
+          exfalso; tauto.
+        }
+        rewrite sth3 in *.
+        specialize (IHo H2).
+        auto.
+      * assert (sth2: ~ In (fst p) (map fst o)). {
+          rewrite H4.
+          rewrite in_app_iff.
+          intro.
+          tauto.
+        }
+        assert (sth3: filter (fun x: string * A => if string_dec (fst p) (fst x) then true else getBool (in_dec string_dec (fst x) (map fst l1))) o =
+                      filter (fun x => getBool (in_dec string_dec (fst x) (map fst l1))) o). {
+          clear - sth2.
+          generalize p sth2; clear p sth2.
+          induction o; simpl; auto; intros.
+          assert (sth4: ~ In (fst p) (map fst o)) by tauto.
+          assert (sth5: fst a <> fst p) by tauto.
+          specialize (IHo _ sth4).
+          rewrite IHo.
+          destruct (string_dec (fst p) (fst a)); try tauto.
+          rewrite e in *; tauto.
+        }
+        rewrite sth3 in *.
+        specialize (IHo H2).
+        auto.
+Qed.
+  
 Section SplitJoin.
   Variable m1 m2: Mod.
 
@@ -620,6 +749,8 @@ Section SplitJoin.
     pose proof (Step_upd_SubList_key H _ _ _ H1 H2) as sth.
     firstorder fail.
   Qed.
+
+  Local Notation optFullType := (fun fk => option (fullType type fk)).
   
   Lemma SplitTrace o ls:
     Trace (ConcatMod m1 m2) o ls ->
@@ -649,27 +780,23 @@ Section SplitJoin.
     - unfold filterRegs, filterExecs; simpl.
       rewrite ?map_app, ?filter_app.
       unfold id in *.
-      pose proof (filter_In_map_same string_dec
-                                     (fun x => existT _ _ (evalConstFullT (projT2 x)))
-                                     (getAllRegisters m1)) as sth1.
-      pose proof (filter_DisjKeys string_dec
-                                  (fun x => existT _ _ (evalConstFullT (projT2 x)))
-                                  DisjRegs) as sth2.
-      pose proof (filter_In_map_same string_dec
-                                     (fun x => existT _ _ (evalConstFullT (projT2 x)))
-                                     (getAllRegisters m2)) as sth3.
+      assert (sth: Forall2 (fun o' r => fst o' = fst r) o' (getAllRegisters (ConcatMod m1 m2))) by
+          (eapply Forall2_impl; eauto; intros; simpl in *; tauto).
+      apply Forall2_map_eq in sth.
+      simpl in sth.
+      rewrite map_app in sth.
       assert (DisjRegs': DisjKey (getAllRegisters m2) (getAllRegisters m1)) by
           (clear - DisjRegs; firstorder).
-      pose proof (filter_DisjKeys string_dec
-                                  (fun x => existT _ _ (evalConstFullT (projT2 x)))
-                                  DisjRegs') as sth4.
+      match goal with
+      | |- _ /\ _ /\ ?P /\ _ /\ _ => assert P by (eapply filter_map_app_sameKey; eauto)
+      end.
       simpl in *.
-      rewrite ?sth1, ?sth2, ?sth3, ?sth4, ?app_nil_r.
-      simpl.
-      repeat split; try constructor; auto.
-      rewrite ?map_map, ?map_app.
-      simpl.
-      rewrite ?sth5; auto.
+      pose proof (same_length_map_DisjKey sth DisjRegs H) as sth2.
+      rewrite H in HUpdRegs.
+      apply Forall2_app_eq_length in HUpdRegs; auto; dest.
+      repeat split; auto; constructor; auto; subst; rewrite ?filter_app in *.
+      rewrite map_length in *.
+      congruence.
     - pose proof HStep as HStep'.
       apply SplitStep in HStep.
       dest.
@@ -786,8 +913,7 @@ Section SplitJoin.
     - inversion H; inversion H0; subst; try discriminate.
       constructor; auto.
       simpl.
-      rewrite map_app.
-      reflexivity.
+      eapply Forall2_app in HUpdRegs0; eauto.
     - destruct a; simpl in *; dest.
       inv H; [discriminate| ]; inv H0; [discriminate|].
       inv HTrace; inv HTrace0.
@@ -1527,8 +1653,12 @@ Lemma Trace_NoDup m o l:
   NoDup (map fst o).
 Proof.
   induction 1; subst.
-  - rewrite map_map; simpl.
-    setoid_rewrite (functional_extensionality (fun x => fst x) fst); intros; tauto.
+  - intros.
+    assert (sth: Forall2 (fun o' r => fst o' = fst r) o' (getAllRegisters m)) by
+        (eapply Forall2_impl; eauto; intros; simpl in *; tauto).
+    clear HUpdRegs.
+    apply Forall2_map_eq in sth.
+    congruence.
   - unfold UpdRegs in *; intros; dest.
     apply (f_equal (map fst)) in H1.
     rewrite ?map_map in *; simpl in *.
@@ -1541,7 +1671,14 @@ Lemma Trace_sameRegs m o l:
   getKindAttr o = getKindAttr (getAllRegisters m).
 Proof.
   induction 1; subst; auto.
-  - rewrite map_map; simpl; auto.
+  - assert (sth: Forall2 (fun o' r => (fun x => (fst x, projT1 (snd x))) o' = (fun x => (fst x, projT1 (snd x))) r) o' (getAllRegisters m)). {
+      eapply Forall2_impl; eauto; intro; simpl in *.
+      intros; dest.
+      f_equal; auto.
+    }
+    clear HUpdRegs.
+    apply Forall2_map_eq in sth.
+    congruence.
   - unfold UpdRegs in *; dest. congruence.
 Qed.
 
@@ -1588,7 +1725,7 @@ Qed.
 Section StepSimulation.
   Variable imp spec: Mod.
   Variable simRel: RegsT -> RegsT -> Prop.
-  Variable initRel: simRel (map regInit (getAllRegisters imp)) (map regInit (getAllRegisters spec)).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getAllRegisters imp) -> exists rspec, Forall2 regInit rspec (getAllRegisters spec) /\ simRel rimp rspec.
   Variable NoDupRegs: NoDup (map fst (getAllRegisters imp)).
   
   Variable stepSimulationNonZero:
@@ -1624,7 +1761,8 @@ Section StepSimulation.
         simRel oImp oSpec.
   Proof.
     induction 1; subst; simpl; auto; intros.
-    - exists (map regInit (getAllRegisters spec)), []; repeat split; auto.
+    - pose proof (initRel HUpdRegs) as [rspec rspecProp].
+      exists rspec, []; repeat split; dest; auto.
       + econstructor 1; eauto.
       + unfold nthProp2; intros.
         destruct (nth_error [] i); auto.
@@ -1689,7 +1827,7 @@ Qed.
 Section DecompositionZero.
   Variable imp spec: BaseModule.
   Variable simRel: RegsT -> RegsT -> Prop.
-  Variable initRel: simRel (map regInit (getRegisters imp)) (map regInit (getRegisters spec)).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) -> exists rspec, Forall2 regInit rspec (getRegisters spec) /\ simRel rimp rspec.
   Variable NoDupRegs: NoDup (map fst (getRegisters imp)).
 
   Variable NoMeths: getMethods imp = [].
@@ -1850,7 +1988,6 @@ Section DecompositionZero.
   Qed.
 End DecompositionZero.
 
-
 Lemma createHide_hides: forall hides m, getHidden (createHide m hides) = hides.
 Proof.
   induction hides; simpl; auto; intros; f_equal; auto.
@@ -1878,6 +2015,13 @@ Lemma getFlat_Hide m s:
   getFlat (HideMeth m s) = getFlat m.
 Proof.
   unfold getFlat; auto.
+Qed.
+
+Lemma getAllRegisters_flatten: forall m, getAllRegisters (flatten m) = getAllRegisters m.
+Proof.
+  unfold flatten, getFlat; intros.
+  rewrite createHide_Regs.
+  auto.
 Qed.
 
 Lemma WfMod_Hidden m:
@@ -2310,10 +2454,8 @@ Section TraceSubstitute.
       auto.
     - apply Step_substitute in HStep; auto.
       econstructor 2; eauto.
-    - constructor 1; auto.
-      unfold flatten.
-      rewrite createHide_Regs.
-      auto.
+    - rewrite getAllRegisters_flatten in *.
+      constructor 1; auto.
     - apply substitute_Step in HStep; auto.
       econstructor 2; eauto.
   Qed.

@@ -365,17 +365,18 @@ Definition MethodT (sig : Signature) := forall ty, ty (fst sig) -> ActionT ty (s
 Notation Void := (Bit 0).
 
 Notation Attribute A := (string * A)%type (only parsing).
-Definition RegInitT := Attribute (sigT ConstFullT).
+Notation optConstFullT := (fun x => option (ConstFullT x)).
+Definition RegInitT := Attribute (sigT optConstFullT).
 Definition DefMethT := Attribute (sigT MethodT).
 Definition RuleT := Attribute (Action Void).
 
 Inductive BaseModule: Type :=
 | RegFile (dataArray: string) (read: list string) (write: string) (IdxNum: nat) (Data: Kind)
-          (init: ConstT Data): BaseModule
+          (init: option (ConstT Data)): BaseModule
 | SyncRegFileAddr (dataArray: string) (read: list (string * string * string)) (write: string)
-                  (IdxNum: nat) (Data: Kind) (init: ConstT Data): BaseModule
+                  (IdxNum: nat) (Data: Kind) (init: option (ConstT Data)): BaseModule
 | SyncRegFileData (dataArray: string) (read: list (string * string * string)) (write: string)
-                  (IdxNum: nat) (Data: Kind) (init: ConstT Data): BaseModule
+                  (IdxNum: nat) (Data: Kind) (init: option (ConstT Data)): BaseModule
 | BaseMod (regs: list RegInitT) (rules: list RuleT) (dms: list DefMethT): BaseModule.
 
 Inductive Mod: Type :=
@@ -664,11 +665,15 @@ Definition makeModule (im : InModule) :=
 Definition makeConst k (c: ConstT k): ConstFullT (SyntaxKind k) := SyntaxConst c.
 
 Notation "'RegisterN' name : type <- init" :=
-  (MERegister (name%string, existT ConstFullT type init))
+  (MERegister (name%string, existT optConstFullT type (Some init)))
     (at level 12, name at level 99) : kami_scope.
 
 Notation "'Register' name : type <- init" :=
-  (MERegister (name%string, existT ConstFullT (SyntaxKind type) (makeConst init)))
+  (MERegister (name%string, existT optConstFullT (SyntaxKind type) (Some (makeConst init))))
+    (at level 12, name at level 99) : kami_scope.
+
+Notation "'RegisterU' name : type" :=
+  (MERegister (name%string, existT optConstFullT (SyntaxKind type) None))
     (at level 12, name at level 99) : kami_scope.
 
 Notation "'Method' name () : retT := c" :=
@@ -928,18 +933,35 @@ Notation getKindAttr ls := (map (fun x => (fst x, projT1 (snd x))) ls).
 Fixpoint getRegisters m :=
   match m with
   | RegFile dataArray read write IdxNum Data init =>
-    (dataArray, existT ConstFullT (SyntaxKind (Array IdxNum Data))
-                       (SyntaxConst (ConstArray (fun _ => init)))) :: nil
+    (dataArray, existT optConstFullT (SyntaxKind (Array IdxNum Data))
+                       match init with
+                       | None => None
+                       | Some init' => Some (SyntaxConst (ConstArray (fun _ => init')))
+                       end) :: nil
   | SyncRegFileAddr dataArray read write IdxNum Data init =>
-    (dataArray, existT ConstFullT (SyntaxKind (Array IdxNum Data))
-                       (SyntaxConst (ConstArray (fun _ => init))))
+    (dataArray, existT optConstFullT (SyntaxKind (Array IdxNum Data))
+                       match init with
+                       | None => None
+                       | Some init' => Some (SyntaxConst (ConstArray (fun _ => init')))
+                       end)
       ::
-      map (fun x => (snd x, existT ConstFullT (SyntaxKind Data) (SyntaxConst init))) read
+      map (fun x => (snd x, existT optConstFullT (SyntaxKind Data)
+                                   match init with
+                                   | None => None
+                                   | Some init' => Some (SyntaxConst init')
+                                   end)) read
   | SyncRegFileData dataArray read write IdxNum Data init =>
-    (dataArray, existT ConstFullT (SyntaxKind (Array IdxNum Data))
-                       (SyntaxConst (ConstArray (fun _ => init))))
+    (dataArray, existT optConstFullT (SyntaxKind (Array IdxNum Data))
+                       match init with
+                       | None => None
+                       | Some init' => Some (SyntaxConst (ConstArray (fun _ => init')))
+                       end)
       ::
-      map (fun x => (snd x, existT ConstFullT (SyntaxKind Data) (SyntaxConst init))) read
+      map (fun x => (snd x, existT optConstFullT (SyntaxKind Data)
+                                   match init with
+                                   | None => None
+                                   | Some init' => Some (SyntaxConst init')
+                                   end)) read
   | BaseMod regs rules dms => regs
   end.
 
@@ -1397,13 +1419,21 @@ Definition UpdRegs (u: list RegsT) (o o': RegsT)
      (forall s v, In (s, v) o' -> ((exists x, In x u /\ In (s, v) x) \/
                                    ((~ exists x, In x u /\ In s (map fst x)) /\ In (s, v) o))).
 
-Notation regInit := (fun r => (fst r, existT _ _ (evalConstFullT (projT2 (snd r))))).
+Notation regInit := (fun o' r => fst o' = fst r /\
+                                 exists (pf: projT1 (snd o') = projT1 (snd r)),
+                                   match projT2 (snd r) with
+                                   | None => True
+                                   | Some x =>
+                                     match pf in _ = Y return _ Y with
+                                     | eq_refl => projT2 (snd o')
+                                     end = evalConstFullT x
+                                   end).
 
 Section Trace.
   Variable m: Mod.
   Inductive Trace: RegsT -> list (list FullLabel) -> Prop :=
-  | InitTrace o' ls'
-              (HUpdRegs: o' = (map regInit (getAllRegisters m)))
+  | InitTrace (o': RegsT) ls'
+              (HUpdRegs: (Forall2 regInit o' (getAllRegisters m)))
               (HTrace: ls' = nil):
       Trace o' ls'
   | ContinueTrace o ls l o' ls'
