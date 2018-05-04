@@ -16,6 +16,9 @@ deriving instance Show CABitOp
 
 deriving instance Eq T
 
+ppDealSize0 :: Kind -> String -> String -> String
+ppDealSize0 ty def str = if size ty == 0 then def else str
+
 ppVecLen :: Int -> String
 ppVecLen n = "[" ++ show (n-1) ++ ":0]"
 
@@ -65,16 +68,17 @@ ppName s = intercalate "$" (Data.List.map (\x -> ppDottedName x) (splitOneOf "$#
 
 ppType :: Kind -> String
 ppType Bool = ""
-ppType (Bit i) = if i > 0
-                      then "[" ++ show (i-1) ++ ":0]"
-                      else ""
+ppType (Bit i) = "[" ++ show (i-1) ++ ":0]"
+  -- if i > 0
+  -- then "[" ++ show (i-1) ++ ":0]"
+  -- else ""
 ppType v@(Array i k) =
   let (k', is) = ppTypeVec k i
   in case k' of
        Struct _ _ _ -> ppType k' ++ concatMap ppVecLen is
        _ -> concatMap ppVecLen is ++ ppType k'
 ppType (Struct n fk fs) =
-  "{" ++ concatMap (\i -> ' ' : ppDeclType (ppName $ fs i) (fk i) ++ ";") (getFins n) ++ "}"
+  "{" ++ concatMap (\i -> ppDealSize0 (fk i) "" (' ' : ppDeclType (ppName $ fs i) (fk i) ++ ";")) (getFins n) ++ "}"
 
 ppDottedName :: String -> String
 ppDottedName s =
@@ -92,16 +96,16 @@ ppWord (b : bs) = (if b then '1' else '0') : ppWord bs
 
 ppConst :: ConstT -> String
 ppConst (ConstBool b) = if b then "1'b1" else "1'b0"
-ppConst (ConstBit sz w) = if sz == 0 then "1'b0" else show sz ++ "\'b" ++ ppWord (reverse $ wordToList w)
+ppConst (ConstBit sz w) = show sz ++ "\'b" ++ ppWord (reverse $ wordToList w)
 ppConst (ConstArray n k fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (getFins n))) ++ "}"
 ppConst (ConstStruct n fk fs fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (getFins n))) ++ "}"
 
 ppRtlExpr :: String -> RtlExpr -> State (H.HashMap String (Int, Kind)) String
 ppRtlExpr who e =
   case e of
-    RtlReadReg k s -> return (ppName s)
-    RtlReadWire k var -> return $ ppPrintVar var
-    RtlConst k c -> return $ ppConst c
+    RtlReadReg k s -> return $ ppDealSize0 k "0" (ppName s)
+    RtlReadWire k var -> return $ ppDealSize0 k "0" (ppPrintVar var)
+    RtlConst k c -> return $ ppDealSize0 k "0" (ppConst c)
     RtlUniBool Neg e -> uniExpr "~" e
     RtlCABool And es -> listExpr "&" es "1'b1"
     RtlCABool Or es -> listExpr "|" es "1'b0"
@@ -169,8 +173,12 @@ ppRtlExpr who e =
     optionAddToTrunc :: Kind -> RtlExpr -> State (H.HashMap String (Int, Kind)) String
     optionAddToTrunc k e =
       case e of
-        RtlReadReg k s -> return $ ppName s
-        RtlReadWire k var -> return $ ppPrintVar var
+        RtlReadReg k s -> return $ case k of
+                                     Bit 0 -> "0"
+                                     _ -> ppName s
+        RtlReadWire k var -> return $ case k of
+                                        Bit 0 -> "0"
+                                        _ -> ppPrintVar var
         _ -> do
           x <- ppRtlExpr who e
           new <- addToTrunc k x
@@ -220,29 +228,30 @@ ppRtlExpr who e =
 ppRfInstance :: (((String, [(String, Bool)]), String), (((Int, Kind)), ConstT)) -> String
 ppRfInstance (((name, reads), write), ((idxType, dataType), _)) =
   "  " ++ ppName name ++ " " ++
-  ppName name ++ "$inst(.CLK(CLK), .RESET_N(RESET_N), ." ++
+  ppName name ++ "$inst(.CLK(CLK), .RESET_N(RESET_N), " ++
   concatMap (\(read, _) ->
-               ppName read ++ "$_guard(" ++ ppName read ++ "$_guard), ." ++
-               ppName read ++ "$_enable(" ++ ppName read ++ "$_enable), ." ++
-               ppName read ++ "$_argument(" ++ ppName read ++ "$_argument), ." ++
-               ppName read ++ "$_return(" ++ ppName read ++ "$_return), .") reads ++
-  ppName write ++ "$_guard(" ++ ppName write ++ "$_guard), ." ++
-  ppName write ++ "$_enable(" ++ ppName write ++ "$_enable), ." ++
-  ppName write ++ "$_argument(" ++ ppName write ++ "$_argument));\n\n"
+               ("." ++ ppName read ++ "$_guard(" ++ ppName read ++ "$_guard), ") ++
+               ("." ++ ppName read ++ "$_enable(" ++ ppName read ++ "$_enable), ") ++
+               ("." ++ ppName read ++ "$_argument(" ++ ppName read ++ "$_argument), ") ++
+               ppDealSize0 dataType "" ("." ++ ppName read ++ "$_return(" ++ ppName read ++ "$_return), ")) reads ++
+  ("." ++ ppName write ++ "$_guard(" ++ ppName write ++ "$_guard), ") ++
+  ("." ++ ppName write ++ "$_enable(" ++ ppName write ++ "$_enable), ") ++
+  ("." ++ ppName write ++ "$_argument(" ++ ppName write ++ "$_argument)") ++
+  ");\n\n"
 
 
 ppRfModule :: (((String, [(String, Bool)]), String), ((Int, Kind), ConstT)) -> String
 ppRfModule (((name, reads), write), ((idxType, dataType), init)) =
   "module " ++ ppName name ++ "(\n" ++
   concatMap (\(read, _) ->
-               "  output " ++ ppDeclType (ppName read ++ "$_guard") Bool ++ ",\n" ++
-              "  input " ++ ppDeclType (ppName read ++ "$_enable") Bool ++ ",\n" ++
-              "  input " ++ ppDeclType (ppName read ++ "$_argument") (Bit idxType) ++ ",\n" ++
-              "  output " ++ ppDeclType (ppName read ++ "$_return") dataType ++ ",\n") reads ++
-  "  output " ++ ppDeclType (ppName write ++ "$_guard") Bool ++ ",\n" ++
-  "  input " ++ ppDeclType (ppName write ++ "$_enable") Bool ++ ",\n" ++
-  "  input " ++ ppDeclType (ppName write ++ "$_argument")
-  (Struct 2 (\i -> if i == F1 1 then (Bit idxType) else if i == FS 1 (F1 0) then dataType else (Bit 0)) (\i -> if i == F1 1 then "addr" else if i == FS 1 (F1 0) then "data" else "")) ++ ",\n" ++
+               ("  output " ++ ppDeclType (ppName read ++ "$_guard") Bool ++ ",\n") ++
+               ("  input " ++ ppDeclType (ppName read ++ "$_enable") Bool ++ ",\n") ++
+               ("  input " ++ ppDeclType (ppName read ++ "$_argument") (Bit idxType) ++ ",\n") ++
+               ppDealSize0 dataType "" ("  output " ++ ppDeclType (ppName read ++ "$_return") dataType ++ ",\n")) reads ++
+  ("  output " ++ ppDeclType (ppName write ++ "$_guard") Bool ++ ",\n") ++
+  ("  input " ++ ppDeclType (ppName write ++ "$_enable") Bool ++ ",\n") ++
+  ("  input " ++ ppDeclType (ppName write ++ "$_argument")
+    (Struct 2 (\i -> if i == F1 1 then (Bit idxType) else if i == FS 1 (F1 0) then dataType else (Bit 0)) (\i -> if i == F1 1 then "addr" else if i == FS 1 (F1 0) then "data" else "")) ++ ",\n") ++
   "  input logic CLK,\n" ++
   "  input logic RESET_N\n" ++
   ");\n" ++
@@ -254,15 +263,15 @@ ppRfModule (((name, reads), write), ((idxType, dataType), init)) =
   "  end\n" ++
   concatMap (\(read, bypass) ->
                "  assign " ++ ppName read ++ "$_guard = 1'b1;\n" ++
-              "  assign " ++ ppName read ++ "$_return = " ++
-              if bypass
-              then ppName write ++ "$_enable && " ++ ppName write ++ "$_argument.addr == " ++
-                   ppName read ++ "$_argument ? " ++ ppName write ++ "$_data : "
-              else "" ++ ppName name ++ "$_data[" ++ ppName read ++ "$_argument];\n") reads ++
+               ppDealSize0 dataType "" ("  assign " ++ ppName read ++ "$_return = " ++
+                                        if bypass
+                                        then ppName write ++ "$_enable && " ++ ppName write ++ "$_argument.addr == " ++
+                                        ppName read ++ "$_argument ? " ++ ppName write ++ "$_data : "
+                                        else "" ++ ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ ppName read ++ "$_argument];\n"))) reads ++
   "  assign " ++ ppName write ++ "$_guard = 1'b1;\n" ++
   "  always@(posedge CLK) begin\n" ++
   "    if(" ++ ppName write ++ "$_enable) begin\n" ++
-  "      " ++ ppName name ++ "$_data[" ++ ppName write ++ "$_argument.addr] <= " ++ ppName write ++ "$_argument.data;\n" ++
+  ppDealSize0 dataType "" ("      " ++ ppName name ++ "$_data[" ++ ppName write ++ "$_argument.addr] <= " ++ ppName write ++ "$_argument.data;\n") ++
   "    end\n" ++
   "  end\n" ++
   "endmodule\n\n"
@@ -273,7 +282,7 @@ removeDups = nubBy (\(a, _) (b, _) -> a == b)
 ppRtlInstance :: RtlModule -> String
 ppRtlInstance m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sys') =
   "  _design _designInst(.CLK(CLK), .RESET_N(RESET_N)" ++
-  concatMap (\(nm, ty) -> ", ." ++ ppPrintVar nm ++ '(' : ppPrintVar nm ++ ")") (removeDups ins' ++ removeDups outs') ++ ");\n"
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ '(' : ppPrintVar nm ++ ")")) (removeDups ins' ++ removeDups outs') ++ ");\n"
 
 ppBitFormat :: BitFormat -> String
 ppBitFormat Binary = "b"
@@ -297,38 +306,37 @@ ppRtlSys (RtlDispStruct n fk fs fv ff) = do
 ppRtlSys (RtlDispArray n k v f) = do
   rest <- mapM (\i -> ppRtlExpr "sys" (RtlReadArray n k v (RtlConst k (ConstBit (log2_up n) (natToWord (log2_up n) i))))) [0 .. (n-1)]
   return $ "        $write(\"[" ++ Data.List.concat (Data.List.map (\i -> show i ++ ":=" ++ ppFullBitFormat f ++ "; ") [0 .. (n-1)]) ++ "]\", " ++ Data.List.concat rest ++ ");\n"
-  
-  
+
 ppRtlModule :: RtlModule -> String
 ppRtlModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sys') =
   "module _design(\n" ++
-  concatMap (\(nm, ty) -> "  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n") ins ++ "\n" ++
-  concatMap (\(nm, ty) -> "  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n") outs ++ "\n" ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) ins ++ "\n" ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) outs ++ "\n" ++
   "  input CLK,\n" ++
   "  input RESET_N\n" ++
   ");\n" ++
-  concatMap (\(nm, (ty, init)) -> "  " ++ ppDeclType (ppName nm) ty ++ ";\n") regInits ++ "\n" ++
+  concatMap (\(nm, (ty, init)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppName nm) ty ++ ";\n")) regInits ++ "\n" ++
 
-  concatMap (\(nm, (ty, expr)) -> "  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n") assigns ++ "\n" ++
+  concatMap (\(nm, (ty, expr)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) assigns ++ "\n" ++
 
-  concatMap (\(sexpr, (pos, ty)) -> "  " ++ ppDeclType ("_trunc$wire$" ++ show pos) ty ++ ";\n") assignTruncs ++ "\n" ++
-  concatMap (\(sexpr, (pos, ty)) -> "  " ++ ppDeclType ("_trunc$reg$" ++ show pos) ty ++ ";\n") regTruncs ++ "\n" ++
-  concatMap (\(sexpr, (pos, ty)) -> "  " ++ ppDeclType ("_trunc$sys$" ++ show pos) ty ++ ";\n") sysTruncs ++ "\n" ++
+  concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$wire$" ++ show pos) ty ++ ";\n")) assignTruncs ++ "\n" ++
+  concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$reg$" ++ show pos) ty ++ ";\n")) regTruncs ++ "\n" ++
+  concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$sys$" ++ show pos) ty ++ ";\n")) sysTruncs ++ "\n" ++
 
-  concatMap (\(sexpr, (pos, ty)) -> "  assign " ++ "_trunc$wire$" ++ show pos ++ " = " ++ sexpr ++ ";\n") assignTruncs ++ "\n" ++
-  concatMap (\(sexpr, (pos, ty)) -> "  assign " ++ "_trunc$reg$" ++ show pos ++ " = " ++ sexpr ++ ";\n") regTruncs ++ "\n" ++
-  concatMap (\(sexpr, (pos, ty)) -> "  assign " ++ "_trunc$sys$" ++ show pos ++ " = " ++ sexpr ++ ";\n") sysTruncs ++ "\n" ++
+  concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  assign " ++ "_trunc$wire$" ++ show pos ++ " = " ++ sexpr ++ ";\n")) assignTruncs ++ "\n" ++
+  concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  assign " ++ "_trunc$reg$" ++ show pos ++ " = " ++ sexpr ++ ";\n")) regTruncs ++ "\n" ++
+  concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  assign " ++ "_trunc$sys$" ++ show pos ++ " = " ++ sexpr ++ ";\n")) sysTruncs ++ "\n" ++
   
-  concatMap (\(nm, (ty, sexpr)) -> "  assign " ++ ppPrintVar nm ++ " = " ++ sexpr ++ ";\n") assignExprs ++ "\n" ++
+  concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("  assign " ++ ppPrintVar nm ++ " = " ++ sexpr ++ ";\n")) assignExprs ++ "\n" ++
   
   "  always @(posedge CLK) begin\n" ++
   "    if(!RESET_N) begin\n" ++
   concatMap (\(nm, (ty, init)) -> case init of
                                     Nothing -> ""
-                                    Just init' -> "      " ++ ppName nm ++ " <= " ++ ppConst init' ++ ";\n") regInits ++
+                                    Just init' -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ ppConst init' ++ ";\n")) regInits ++
   "    end\n" ++
   "    else begin\n" ++
-  concatMap (\(nm, (ty, sexpr)) -> "      " ++ ppName nm ++ " <= " ++ sexpr ++ ";\n") regExprs ++
+  concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ sexpr ++ ";\n")) regExprs ++
   concatMap (\(pred, sys) -> "      if(" ++ pred ++ ") begin\n" ++ sys ++ "      end\n") sys ++
   "    end\n" ++
   "  end\n" ++
@@ -381,13 +389,13 @@ ppTopModule :: RtlModule -> String
 ppTopModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sys') =
   concatMap ppRfModule regFs ++ ppRtlModule m ++
   "module top(\n" ++
-  concatMap (\(nm, ty) -> "  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n") ins ++ "\n" ++
-  concatMap (\(nm, ty) -> "  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n") outs ++ "\n" ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) ins ++ "\n" ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) outs ++ "\n" ++
   "  input CLK,\n" ++
   "  input RESET_N\n" ++
   ");\n" ++
-  concatMap (\(nm, ty) -> "  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n") insAll ++ "\n" ++
-  concatMap (\(nm, ty) -> "  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n") outsAll ++ "\n" ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) insAll ++ "\n" ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) outsAll ++ "\n" ++
   concatMap ppRfInstance regFs ++
   ppRtlInstance m ++
   "endmodule\n"
@@ -396,20 +404,20 @@ ppTopModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sy
     outsAll = removeDups outs'
     ins = Data.List.filter filtCond insAll
     outs = Data.List.filter filtCond outsAll
-    badRead x read = x == read ++ "#_g" || x == read ++ "#_en" || x == read ++ "#_arg" || x == read ++ "#_ret"
+    badRead x read = x == read ++ "#_guard" || x == read ++ "#_enable" || x == read ++ "#_argument" || x == read ++ "#_return"
     badReads x reads = foldl (\accum (v, _) -> badRead x v || accum) False reads
     filtCond ((x, _), _) = case Data.List.find (\((((_, reads), write), (_, _))) ->
                                                   badReads x reads ||
                                                   {-
-                                                  x == read ++ "#_g" ||
-                                                  x == read ++ "#_en" ||
-                                                  x == read ++ "#_arg" ||
-                                                  x == read ++ "#_ret" ||
+                                                  x == read ++ "#_guard" ||
+                                                  x == read ++ "#_enable" ||
+                                                  x == read ++ "#_argument" ||
+                                                  x == read ++ "#_return" ||
                                                   -}
-                                                  x == write ++ "#_g" ||
-                                                  x == write ++ "#_en" ||
-                                                  x == write ++ "#_arg" ||
-                                                  x == write ++ "#_ret") regFs of
+                                                  x == write ++ "#_guard" ||
+                                                  x == write ++ "#_enable" ||
+                                                  x == write ++ "#_argument" ||
+                                                  x == write ++ "#_return") regFs of
                           Nothing -> True
                           _ -> False
 
