@@ -151,10 +151,7 @@ Section Phoas.
       nat_cast (fun n => Expr (SyntaxKind (Bit n))) pf e.
 
     Definition Slt n (e1 e2: Expr (SyntaxKind (Bit (n + 1)))) :=
-      ITE (Eq (UniBit (TruncMsb n 1) e1) (Const WO~0))
-          (ITE (Eq (UniBit (TruncMsb n 1) e2) (Const WO~0)) (BinBitBool (LessThan _) e1 e2) (Const false))
-          (ITE (Eq (UniBit (TruncMsb n 1) e2) (Const WO~1)) (BinBitBool (LessThan _) e1 e2) (Const true)).
-      
+      Eq (Eq (UniBit (TruncMsb n 1) e1) (UniBit (TruncMsb n 1) e2)) (BinBitBool (LessThan _) e1 e2).
 
     (* Definition TruncMsb lsb msb (e: Expr (SyntaxKind (Bit (lsb + msb)))): Expr (SyntaxKind (Bit msb)). *)
     (*   refine *)

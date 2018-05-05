@@ -2526,5 +2526,57 @@ Proof.
 Admitted.
 
 
+Lemma word0_neq: forall w : word 1, w <> WO~0 -> w = WO~1.
+Proof.
+  intros.
+  shatter_word w.
+  destruct x; auto.
+  tauto.
+Qed.
 
+Section test.
+  Variable ty: Kind -> Type.
+  Definition Slt2 n (e1 e2: Expr ty (SyntaxKind (Bit (n + 1)))) :=
+    ITE (Eq (UniBit (TruncMsb n 1) e1) (Const ty WO~0))
+        (ITE (Eq (UniBit (TruncMsb n 1) e2) (Const ty WO~0)) (BinBitBool (LessThan _) e1 e2) (Const ty false))
+        (ITE (Eq (UniBit (TruncMsb n 1) e2) (Const ty WO~1)) (BinBitBool (LessThan _) e1 e2) (Const ty true)).
+End test.
 
+Lemma Slt_same n e1 e2: evalExpr (Slt2 n e1 e2) = evalExpr (Slt n e1 e2).
+Proof.
+  unfold Slt2, Slt.
+  simpl.
+  destruct (weq (split2 n 1 (evalExpr e1)) WO~0); simpl; auto.
+  - rewrite e.
+    destruct (weq (split2 n 1 (evalExpr e2)) WO~0); simpl; auto.
+    + rewrite e0.
+      destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
+    + destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
+      * destruct (weq WO~0 (split2 n 1 (evalExpr e2))); simpl; auto.
+      * destruct (weq WO~0 (split2 n 1 (evalExpr e2))); simpl; auto.
+        apply word0_neq in n0.
+        pre_word_omega.
+        rewrite wordToNat_split2 in *.
+        pose proof (pow2_zero n) as sth0.
+        rewrite Nat.div_small_iff in e by lia.
+        assert (sth: 0 < #(evalExpr e2) / pow2 n) by lia.
+        rewrite Nat.div_str_pos_iff in sth; lia.
+  - destruct (weq (split2 n 1 (evalExpr e2)) WO~0); simpl; auto.
+    + rewrite e.
+      destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
+      * destruct (weq (split2 n 1 (evalExpr e1)) WO~0); simpl; auto.
+        apply word0_neq in n1.
+        pre_word_omega.
+        rewrite wordToNat_split2 in *.
+        pose proof (pow2_zero n) as sth0.
+        rewrite Nat.div_small_iff in e by lia.
+        assert (sth: 0 < #(evalExpr e1) / pow2 n) by lia.
+        rewrite Nat.div_str_pos_iff in sth; lia.
+      * destruct (weq (split2 n 1 (evalExpr e1)) WO~0); simpl; auto.
+        tauto.
+    + apply word0_neq in n0.
+      apply word0_neq in n1.
+      rewrite ?n0, ?n1.
+      simpl.
+      destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
+Qed.
