@@ -7,12 +7,59 @@ import Control.Monad.State.Lazy
 import qualified Data.HashMap.Lazy as H
 
 
-deriving instance Show T
-deriving instance Show Target.Word
+instance Show Target.Word where
+  show WO = "0"
+  show (WS b _ w) = show (2*w + if b then 1 else 0)
+
 deriving instance Show UniBoolOp
 deriving instance Show CABoolOp
 deriving instance Show UniBitOp
 deriving instance Show CABitOp
+
+instance Show Kind where
+  show Bool = "Bool"
+  show (Bit n) = "Bit " ++ show n
+  show (Array n k) = "Array " ++ show n ++ " " ++ show k
+  show (Struct n fk fs) = "Struct {" ++ concatMap (\i -> show (fs i) ++ ": " ++ show (fk i) ++ "; ") (getFins n) ++ "}"
+
+instance Show ConstT where
+  show (ConstBool b) = "ConstBool " ++ show b
+  show (ConstBit n w) = "ConstBit " ++ show n ++ " " ++ show w
+  show (ConstStruct n fk fs fv) = "ConstStruct {" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
+  show (ConstArray n k fv) = "ConstArray " ++ "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
+
+
+deriving instance Show BinBitOp
+
+instance Show RtlExpr where
+  show (RtlReadReg k s) = "RtlReadReg " ++ show k ++ " " ++ show s
+  show (RtlReadWire k s) = "RtlReadWire" ++ show k ++ " " ++ show s
+  show (RtlConst k c) = "RtlConst " ++ show k ++ " " ++ show c
+  show (RtlUniBool op e) = "RtlUniBool " ++ show op ++ " " ++ show e
+  show (RtlCABool op e) = "RtlCABool " ++ show op ++ " " ++ show e
+  show (RtlUniBit _ _ op e) = "RtlUniBit " ++ show op ++ " " ++ show e
+  show (RtlCABit _ op e) = "RtlCABit " ++ show op ++ " " ++ show e
+  show (RtlBinBit _ _ _ op e1 e2) = "RtlCABool " ++ show op ++ " " ++ show e1 ++ " " ++ show e2
+  show (RtlBinBitBool _ _ op e1 e2) = "RtlCABool " ++ show op ++ " " ++ show e1 ++ " " ++ show e2
+  show (RtlITE k p e1 e2) = "RtlITE " ++ show k ++ " " ++ show p ++ " " ++ show e1 ++ " " ++ show e2
+  show (RtlEq k e1 e2) = "RtlEq " ++ show k ++ " " ++ show e1 ++ " " ++ show e2
+  show (RtlBuildStruct n fk fs fv) = "RtlBuildStruct " ++ show n ++ "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
+  show (RtlBuildArray n k fv) = "RtlBuildArray " ++ show n ++ " " ++ show k ++ "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
+  show (RtlReadStruct n fk fs e i) = "RtlReadStruct " ++ show e ++ " " ++ show i
+  show (RtlReadArray n k e i) = "RtlReadArray " ++ show e ++ " " ++ show i
+  show (RtlReadArrayConst n k e i) = "RtlReadArrayConst " ++ show e ++ " " ++ show i
+
+deriving instance Show BitFormat
+instance Show RtlSysT where
+  show (RtlDispString s) = "RtlDispString " ++ show s
+  show (RtlDispBool e f) = "RtlDispBool " ++ show e ++ " " ++ show f
+  show (RtlDispBit _ e f) = "RtlDispBool " ++ show e ++ " " ++ show f
+  show (RtlDispStruct n fk fs e ff) = "RtlDispStruct " ++ show e ++  "{" ++ concatMap (\i -> show (ff i) ++ "; ") (getFins n) ++ "}"
+  show (RtlDispArray n k fv ff) = "RtlDispArray " ++ show fv ++ " " ++ show ff
+
+deriving instance Show RtlModule
+
+
 
 deriving instance Eq T
 
@@ -25,6 +72,9 @@ ppVecLen n = "[" ++ show (n-1) ++ ":0]"
 finToInt :: T -> Int
 finToInt (F1 _) = 0
 finToInt (FS _ x) = Prelude.succ (finToInt x)
+
+instance Show T where
+  show f = show (finToInt f)
 
 intToFin :: Int -> Int -> T
 intToFin m 0 = F1 (m-1)
