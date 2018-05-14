@@ -6,34 +6,43 @@ import Data.List.Split
 import Control.Monad.State.Lazy
 import qualified Data.HashMap.Lazy as H
 
+wordToNat :: Target.Word -> Int
+wordToNat WO = 0
+wordToNat (WS b _ w) = 2*(wordToNat w) + if b then 1 else 0
 
 instance Show Target.Word where
-  show WO = "0"
-  show (WS b _ w) = show (2*w + if b then 1 else 0)
+  show w = show (wordToNat w)
 
 deriving instance Show UniBoolOp
 deriving instance Show CABoolOp
 deriving instance Show UniBitOp
 deriving instance Show CABitOp
 
+intToFin :: Int -> Int -> T
+intToFin m 0 = F1 (m-1)
+intToFin m n = FS (m-1) (intToFin (m-1) (n-1))
+
+getFins :: Int -> [T]
+getFins m = foldr (\n l -> intToFin m n : l) [] [0 .. (m-1)]
+
 instance Show Kind where
   show Bool = "Bool"
   show (Bit n) = "Bit " ++ show n
   show (Array n k) = "Array " ++ show n ++ " " ++ show k
-  show (Struct n fk fs) = "Struct {" ++ concatMap (\i -> show (fs i) ++ ": " ++ show (fk i) ++ "; ") (getFins n) ++ "}"
+  show (Struct n fk fs) = "Struct " -- ++ "{" ++ concatMap (\i -> show (fs i) ++ ": " ++ show (fk i) ++ "; ") (getFins n) ++ "}"
 
 instance Show ConstT where
   show (ConstBool b) = "ConstBool " ++ show b
   show (ConstBit n w) = "ConstBit " ++ show n ++ " " ++ show w
-  show (ConstStruct n fk fs fv) = "ConstStruct {" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
-  show (ConstArray n k fv) = "ConstArray " ++ "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
+  show (ConstStruct n fk fs fv) = "ConstStruct " -- ++  "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
+  show (ConstArray n k fv) = "ConstArray " -- ++ "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
 
 
 deriving instance Show BinBitOp
 
 instance Show RtlExpr where
   show (RtlReadReg k s) = "RtlReadReg " ++ show k ++ " " ++ show s
-  show (RtlReadWire k s) = "RtlReadWire" ++ show k ++ " " ++ show s
+  show (RtlReadWire k s) = "RtlReadWire " ++ show k ++ " " ++ show s
   show (RtlConst k c) = "RtlConst " ++ show k ++ " " ++ show c
   show (RtlUniBool op e) = "RtlUniBool " ++ show op ++ " " ++ show e
   show (RtlCABool op e) = "RtlCABool " ++ show op ++ " " ++ show e
@@ -43,8 +52,8 @@ instance Show RtlExpr where
   show (RtlBinBitBool _ _ op e1 e2) = "RtlCABool " ++ show op ++ " " ++ show e1 ++ " " ++ show e2
   show (RtlITE k p e1 e2) = "RtlITE " ++ show k ++ " " ++ show p ++ " " ++ show e1 ++ " " ++ show e2
   show (RtlEq k e1 e2) = "RtlEq " ++ show k ++ " " ++ show e1 ++ " " ++ show e2
-  show (RtlBuildStruct n fk fs fv) = "RtlBuildStruct " ++ show n ++ "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
-  show (RtlBuildArray n k fv) = "RtlBuildArray " ++ show n ++ " " ++ show k ++ "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
+  show (RtlBuildStruct n fk fs fv) = "RtlBuildStruct " ++ show n ++ "MURALI|" ++ "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}" ++ "|DARAN"
+  show (RtlBuildArray n k fv) = "RtlBuildArray " ++ show n -- ++ " " ++ show k ++ "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
   show (RtlReadStruct n fk fs e i) = "RtlReadStruct " ++ show e ++ " " ++ show i
   show (RtlReadArray n k e i) = "RtlReadArray " ++ show e ++ " " ++ show i
   show (RtlReadArrayConst n k e i) = "RtlReadArrayConst " ++ show e ++ " " ++ show i
@@ -75,13 +84,6 @@ finToInt (FS _ x) = Prelude.succ (finToInt x)
 
 instance Show T where
   show f = show (finToInt f)
-
-intToFin :: Int -> Int -> T
-intToFin m 0 = F1 (m-1)
-intToFin m n = FS (m-1) (intToFin (m-1) (n-1))
-
-getFins :: Int -> [T]
-getFins m = foldr (\n l -> intToFin m n : l) [] [0 .. (m-1)]
 
 wordToList :: Target.Word -> [Bool]
 wordToList WO = []
@@ -494,7 +496,8 @@ ppRfName :: (((String, [(String, Bool)]), String), ((Int, Kind), ConstT)) -> Str
 ppRfName (((name, reads), write), ((idxType, dataType), ConstArray num k fv)) = ppName name ++ ".mem"
   
 main =
-  do
-    putStrLn $ ppTopModule fpu
-    let (Build_RtlModule regFs _ _ _ _ _ _) = fpu in
-      mapM_ (\rf -> writeFile (ppRfName rf) (ppRfFile rf)) regFs
+  putStrLn $ show fpu
+  -- do
+  --   putStrLn $ ppTopModule fpu
+  --   let (Build_RtlModule regFs _ _ _ _ _ _) = fpu in
+  --     mapM_ (\rf -> writeFile (ppRfName rf) (ppRfFile rf)) regFs

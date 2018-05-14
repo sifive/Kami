@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XStandaloneDeriving -XFlexibleInstances #-}
+{-# OPTIONS_GHC -XStandaloneDeriving -XFlexibleInstances -XBangPatterns #-}
 
 import Target
 import Data.List
@@ -51,7 +51,7 @@ deriving instance Show BinBitOp
 
 instance Show RtlExpr where
   show (RtlReadReg k s) = "RtlReadReg " ++ show k ++ " " ++ show s
-  show (RtlReadWire k s) = "RtlReadWire" ++ show k ++ " " ++ show s
+  show (RtlReadWire k s) = "RtlReadWire " ++ show k ++ " " ++ show s
   show (RtlConst k c) = "RtlConst " ++ show k ++ " " ++ show c
   show (RtlUniBool op e) = "RtlUniBool " ++ show op ++ " " ++ show e
   show (RtlCABool op e) = "RtlCABool " ++ show op ++ " " ++ show e
@@ -147,6 +147,9 @@ ppConst (ConstBit sz w) = show sz ++ "\'b" ++ ppWord (reverse $ wordToList w)
 ppConst (ConstArray n k fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (getFins n))) ++ "}"
 ppConst (ConstStruct n fk fs fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (getFins n))) ++ "}"
 
+traceSimple :: Show a => a -> a
+traceSimple x = trace ("BASTARD<" ++ show x ++ ">BASTARD") x
+
 ppRtlExpr :: String -> RtlExpr -> State (H.HashMap String (Int, Kind)) String
 ppRtlExpr who e =
   case e of
@@ -198,8 +201,14 @@ ppRtlExpr who e =
         return $ new ++ '.' : (fs i)
     RtlBuildStruct num fk fs es ->
       do
-        strs <- mapM (ppRtlExpr who) (Data.List.map es (getFins num))
-        return $ '{': intercalate ", " strs ++ "}"
+        strs <- mapM (\ i -> do
+                         x <- get
+                         let i' = trace ("CUP<" ++ show (H.size x) ++ "|||" ++ show i ++ ">CUP") i
+                         s <- ppRtlExpr who i'
+                         return s
+                     ) (Data.List.map (\i -> trace ("BUILD<" ++ show (es i) ++ ">BUILD") (es i)) (getFins num))
+        let strs' = trace ("CRAP<" ++ show strs ++ ">CRAP") strs
+        return $ '{': intercalate ", " strs' ++ "}"
     RtlReadArray n k vec idx ->
       do
         xidx <- ppRtlExpr who idx
@@ -375,22 +384,22 @@ ppRtlModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sy
   
     mapM (\(nm, (ty, expr)) -> putStrLn (ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";"))) assigns
     putStrLn ""
-  
+
     mapM (\(sexpr, (pos, ty)) -> putStrLn (ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$wire$" ++ show pos) ty ++ ";"))) assignTruncs
-    -- putStrLn ""
-    -- mapM (\(sexpr, (pos, ty)) -> putStrLn (ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$reg$" ++ show pos) ty ++ ";"))) regTruncs
-    -- putStrLn ""
-    -- mapM (\(sexpr, (pos, ty)) -> putStrLn (ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$sys$" ++ show pos) ty ++ ";"))) sysTruncs
-    -- putStrLn ""
+    putStrLn ""
+    mapM (\(sexpr, (pos, ty)) -> putStrLn (ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$reg$" ++ show pos) ty ++ ";"))) regTruncs
+    putStrLn ""
+    mapM (\(sexpr, (pos, ty)) -> putStrLn (ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$sys$" ++ show pos) ty ++ ";"))) sysTruncs
+    putStrLn ""
   
-    -- mapM (\(sexpr, (pos, ty)) -> putStrLn (ppDealSize0 ty "" ("  assign " ++ "_trunc$wire$" ++ show pos ++ " = " ++ sexpr ++ ";"))) assignTruncs
-    -- putStrLn ""
-    -- mapM (\(sexpr, (pos, ty)) -> putStrLn (ppDealSize0 ty "" ("  assign " ++ "_trunc$reg$" ++ show pos ++ " = " ++ sexpr ++ ";\n"))) regTruncs
-    -- putStrLn ""
-    -- mapM (\(sexpr, (pos, ty)) -> putStrLn (ppDealSize0 ty "" ("  assign " ++ "_trunc$sys$" ++ show pos ++ " = " ++ sexpr ++ ";\n"))) sysTruncs
-    -- putStrLn ""
+    mapM (\(sexpr, (pos, ty)) -> putStrLn (ppDealSize0 ty "" ("  assign " ++ "_trunc$wire$" ++ show pos ++ " = " ++ sexpr ++ ";"))) assignTruncs
+    putStrLn ""
+    mapM (\(sexpr, (pos, ty)) -> putStrLn (ppDealSize0 ty "" ("  assign " ++ "_trunc$reg$" ++ show pos ++ " = " ++ sexpr ++ ";\n"))) regTruncs
+    putStrLn ""
+    mapM (\(sexpr, (pos, ty)) -> putStrLn (ppDealSize0 ty "" ("  assign " ++ "_trunc$sys$" ++ show pos ++ " = " ++ sexpr ++ ";\n"))) sysTruncs
+    putStrLn ""
     
-    -- mapM (\(nm, (ty, sexpr)) -> putStrLn (ppDealSize0 ty "" ("  assign " ++ ppPrintVar nm ++ " = " ++ sexpr ++ ";\n"))) assignExprs
+    mapM (\(nm, (ty, sexpr)) -> putStrLn (ppDealSize0 ty "" ("  assign " ++ ppPrintVar nm ++ " = " ++ sexpr ++ ";\n"))) assignExprs
     putStrLn ""
     
     putStrLn ("  always @(posedge CLK) begin")
@@ -411,18 +420,21 @@ ppRtlModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sy
         outs = removeDups outs'
         regInits = removeDups regInits'
         regWrites = removeDups regWrites'
-        assigns = removeDups assigns' -- (Data.List.map (\i -> let y = trace (show i) i in y) assigns')
+        assigns = removeDups assigns'
         convAssigns =
           mapM (\(nm, (ty, expr)) ->
                   do
+                    -- let expr' = trace ("| " ++ show expr ++ " |") expr
                     s <- ppRtlExpr "wire" expr
-                    return (nm, (ty, s))) (Data.List.map (\i -> let y = trace (show i) i in y) assigns)
+                    x <- get
+                    let !s' = trace ("STUFF<" ++ show (H.size x) ++ "|||" ++ s ++ ">STUFF") s
+                    return (nm, (ty, s'))) ([] :: [((String, [Int]), (Kind, RtlExpr))]) -- assigns
         convRegs =
           mapM (\(nm, (ty, expr)) ->
                   do
                     s <- ppRtlExpr "reg" expr
                     return (nm, (ty, s))) regWrites
-        (assignExprs, assignTruncs') = runState convAssigns H.empty
+        (assignExprs, assignTruncs') = traceSimple (runState convAssigns H.empty)
         (regExprs, regTruncs') = runState convRegs H.empty
         assignTruncs = H.toList assignTruncs'
         regTruncs = H.toList regTruncs'
@@ -519,8 +531,8 @@ ppRfName :: (((String, [(String, Bool)]), String), ((Int, Kind), ConstT)) -> Str
 ppRfName (((name, reads), write), ((idxType, dataType), ConstArray num k fv)) = ppName name ++ ".mem"
   
 main =
-  putStrLn (show fpu)
-  -- do
-  --   let (Build_RtlModule regFs _ _ _ _ _ _) = fpu in
-  --     mapM_ (\rf -> (ppRfFile (ppRfName rf) rf)) regFs
-  --   ppTopModule fpu
+  -- putStrLn (show fpu)
+  do
+    let (Build_RtlModule regFs _ _ _ _ _ _) = fpu in
+      mapM_ (\rf -> (ppRfFile (ppRfName rf) rf)) regFs
+    ppTopModule fpu
