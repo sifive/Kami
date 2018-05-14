@@ -506,9 +506,7 @@ Ltac getStructList structVal :=
                                      end)
   end.
 
-Notation "s @% f" := (ReadStruct s ltac:(let structV := eval cbv in s in
-                                             let typeStructV := type of structV in
-                                             match type of structV with
+Notation "s @% f" := (ReadStruct s ltac:(match type of s with
                                              | Expr _ (SyntaxKind ?val) =>
                                                let valS := eval compute in val in
                                                    match valS with
@@ -527,7 +525,6 @@ Definition testFieldAccess ty :=
   ((testStructVal ty) @% "hello")%kami_expr.
 
 Notation "s '@%[' f <- v ]" := (UpdateStruct s%kami_expr ltac:(let structV := eval cbv in s in
-                                                                   let typeStructV := type of structV in
                                                                    match type of structV with
                                                                    | Expr _ (SyntaxKind ?val) =>
                                                                      match val with
