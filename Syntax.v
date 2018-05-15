@@ -521,39 +521,6 @@ Notation "s @% f" := (ReadStruct s ltac:(let typeS := type of s in
                                          getStructFull typeS f))
                        (at level 38) : kami_expr_scope.
 
-
-
-(* Ltac findStructIdx v f := *)
-(*   let idx := eval cbv in (Vector_find_opt (fun x => getBool (string_dec (fst x) f%string)) v) in *)
-(*       match idx with *)
-(*       | Some ?idx' => *)
-(*         exact idx' *)
-(*       end. *)
-
-(* Ltac getStructList fs f := match fs with *)
-(*                            | (fun i: Fin.t _ => *)
-(*                                 fst (Vector.nth ?v i)): Fin.t _ -> string => *)
-(*                              findStructIdx v f *)
-(*                            | _ => let y := eval red in fs in *)
-(*                                       getStructList y f *)
-(*                            end. *)
-
-(* Ltac getStructStringFn v f := match v with *)
-(*                               | Struct ?fk ?fs => getStructList fs f *)
-(*                               | _ => let y := eval red in v in *)
-(*                                          getStructStringFn y f *)
-(*                               end. *)
-
-(* Ltac getStructFull v f := match v with *)
-(*                           | Expr _ (SyntaxKind ?y) => getStructStringFn y f *)
-(*                           | _ => let y := eval red in v in *)
-(*                                      getStructFull y f *)
-(*                           end. *)
-
-(* Notation "s @% f" := (ReadStruct s ltac:(let typeS := type of s in *)
-(*                                          getStructFull typeS f)) *)
-(*                        (at level 38) : kami_expr_scope. *)
-
 Definition testFieldAccess ty := 
   ((testStructVal ty) @% "hello")%kami_expr.
 
