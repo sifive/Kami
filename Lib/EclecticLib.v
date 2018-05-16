@@ -1,9 +1,51 @@
-Require Import String Coq.Lists.List Omega.
+Require Import String Coq.Lists.List Omega Fin.
 
 Import ListNotations.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
+
+Fixpoint getFins n :=
+  match n return list (Fin.t n) with
+  | 0 => nil
+  | S m => Fin.F1 :: map Fin.FS (getFins m)
+  end.
+
+Definition mapOrFins n (x: Fin.t n) := fold_left (fun a b => x = b \/ a) (getFins n) False.
+
+Lemma fold_left_or_init: forall A (f: A -> Prop) ls (P: Prop), P -> fold_left (fun a b => f b \/ a) ls P.
+Proof.
+  induction ls; simpl; intros; auto.
+Qed.
+
+Lemma fold_left_or_impl: forall A (f: A -> Prop) ls (g: A -> Prop)
+                                (P Q: Prop), (P -> Q) -> (forall a, f a -> g a) ->
+                                             fold_left (fun a b => f b \/ a) ls P ->
+                                             fold_left (fun a b => g b \/ a) ls Q.
+Proof.
+  induction ls; simpl; intros; auto.
+  eapply IHls with (P := f a \/ P) (Q := g a \/ Q); try tauto.
+  specialize (H0 a).
+  tauto.
+Qed.
+
+Lemma fold_left_map A B C (f: A -> B) (g: C -> B -> C) ls:
+  forall init,
+    fold_left g (map f ls) init =
+    fold_left (fun c a => g c (f a)) ls init.
+Proof.
+  induction ls; simpl; auto.
+Qed.
+
+Lemma mapOrFins_true n: forall (x: Fin.t n), mapOrFins x.
+Proof.
+  induction x; unfold mapOrFins in *; simpl; intros.
+  - apply fold_left_or_init; auto.
+  - rewrite fold_left_map.
+    eapply (@fold_left_or_impl _ (fun b => x = b) (getFins n) _ False (Fin.FS x = Fin.F1 \/ False)); try tauto; congruence.
+Qed.
+
+
 
 Lemma list_split A B C (f: A -> C) (g: B -> C): forall l l1 l2,
     map f l = map g l1 ++ map g l2 ->
