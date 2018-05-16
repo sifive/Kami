@@ -572,7 +572,7 @@ Notation "'LETA' name <- act ; cont " :=
   (LetAction act (fun name => cont))
     (at level 12, right associativity, name at level 99) : kami_action_scope.
 Notation "'LETA' name : t <- act ; cont " :=
-  (LetAction (k := SyntaxKind t) act (fun name => cont))
+  (LetAction (k := t) act (fun name => cont))
     (at level 12, right associativity, name at level 99) : kami_action_scope.
 Notation "'NondetN' name : fullkind ; cont" :=
   (ReadNondet fullkind (fun name => cont))

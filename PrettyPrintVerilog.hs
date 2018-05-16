@@ -109,8 +109,8 @@ instance Show RtlExpr where
   show (RtlReadArray n k e i) = "RtlReadArray " ++ show e ++ " " ++ show i
   show (RtlReadArrayConst n k e i) = "RtlReadArrayConst " ++ show e ++ " " ++ show i
 
-instance Show RtlExpr where
-  show e = show (sexp e)
+-- instance Show RtlExpr where
+--   show e = show (sexp e)
 
 deriving instance Show BitFormat
 instance Show RtlSysT where
