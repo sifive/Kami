@@ -568,9 +568,9 @@ ppRfName (((name, reads), write), ((idxType, dataType), ConstArray num k fv)) = 
 
 main =
   -- do
-  --   let !t = show fpu
+  --   let !t = show rtlMod
   --   putStr t
   do
-    putStrLn $ ppTopModule fpu
-    let (Build_RtlModule regFs _ _ _ _ _ _) = fpu in
+    putStrLn $ ppTopModule rtlMod
+    let (Build_RtlModule regFs _ _ _ _ _ _) = rtlMod in
       mapM_ (\rf -> writeFile (ppRfName rf) (ppRfFile rf)) regFs
