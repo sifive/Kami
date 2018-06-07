@@ -5,7 +5,6 @@ import Data.List
 import Data.List.Split
 import Control.Monad.State.Lazy
 import qualified Data.HashMap.Lazy as H
-import Text.Pretty
 import Debug.Trace
 
 wordToNat :: Target.Word -> Int
