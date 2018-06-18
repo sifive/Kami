@@ -680,8 +680,6 @@ Notation "'MODULE' { m1 'with' .. 'with' mN }" :=
   (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..))
     (at level 12, only parsing).
 
-
-
 Ltac existT_destruct :=
   match goal with
   | H: existT _ _ _ = existT _ _ _ |- _ =>
@@ -1473,39 +1471,51 @@ Definition TraceInclusion m1 m2 :=
              (exists rle, In (Rle rle) (map (fun x => fst (snd x)) l1)))) ls1 ls2).
 
 
-
-Definition StepSubstitute m o l :=
-  Substeps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
-  MatchingExecCalls l l (Base (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m))) /\
-  (forall s v, In s (map fst (getAllMethods m)) -> In s (getHidden m) -> InExec (s, v) l -> InCall (s, v) l).
-
 Section WfBaseMod.
   Variable m: BaseModule.
   
   Inductive WfActionT: forall lretT, ActionT type lretT -> Prop :=
-  | WfMCall meth s e lretT c: forall v, WfActionT (c v) -> @WfActionT lretT (MCall meth s e c)
-  | WfLetExpr k (e: Expr type k) lretT c: forall v, WfActionT (c v) -> @WfActionT lretT (LetExpr e c)
-  | WfLetAction k (a: ActionT type k) lretT c: forall v, WfActionT (c v) -> @WfActionT lretT (LetAction a c)
-  | WfReadNondet k lretT c: forall v, WfActionT (c v) -> @WfActionT lretT (ReadNondet k c)
-  | WfReadReg r k lretT c: forall v, WfActionT (c v) -> In (r, k) (getKindAttr (getRegisters m)) -> @WfActionT lretT (ReadReg r k c)
-  | WfWriteReg r k (e: Expr type k) lretT c: In (r, k) (getKindAttr (getRegisters m)) -> @WfActionT lretT (WriteReg r e c)
-  | WfIfElse p k (atrue: ActionT type k) afalse lretT c: forall v, WfActionT (c v) -> WfActionT atrue -> WfActionT afalse -> @WfActionT lretT (IfElse p atrue afalse c)
+  | WfMCall meth s e lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (MCall meth s e c)
+  | WfLetExpr k (e: Expr type k) lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (LetExpr e c)
+  | WfLetAction k (a: ActionT type k) lretT c: WfActionT a -> (forall v, WfActionT (c v)) -> @WfActionT lretT (LetAction a c)
+  | WfReadNondet k lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (ReadNondet k c)
+  | WfReadReg r k lretT c: (forall v, WfActionT (c v)) -> In (r, k) (getKindAttr (getRegisters m)) -> @WfActionT lretT (ReadReg r k c)
+  | WfWriteReg r k (e: Expr type k) lretT c: WfActionT c  -> In (r, k) (getKindAttr (getRegisters m)) -> @WfActionT lretT (WriteReg r e c)
+  | WfIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, WfActionT (c v)) -> WfActionT atrue -> WfActionT afalse -> @WfActionT lretT (IfElse p atrue afalse c)
   | WfAssertion (e: Expr type (SyntaxKind Bool)) lretT c: WfActionT c -> @WfActionT lretT (Assertion e c)
   | WfSys ls lretT c: WfActionT c -> @WfActionT lretT (Sys ls c)
   | WfReturn lretT e: @WfActionT lretT (Return e).
+
+  Inductive WfConcatActionT : forall lretT, ActionT type lretT -> Mod -> Prop :=
+  | WfConcatMCall meth s e lretT c m' :(forall v, WfConcatActionT (c v) m') -> ~In meth (getHidden m') -> @WfConcatActionT lretT (MCall meth s e c) m'
+  | WfConcatLetExpr k (e : Expr type k) lretT c m' : (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetExpr e c) m'
+  | WfConcatLetAction k (a : ActionT type k) lretT c m' : WfConcatActionT a m' -> (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetAction a c) m'
+  | WfConcatReadNondet k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadNondet k c) m'
+  | WfConcatReadReg r k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadReg r k c) m'
+  | WfConcatWriteReg r k (e: Expr type k) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (WriteReg r e c) m'
+  | WfConcatIfElse p k (atrue: ActionT type k) afalse lretT c m': (forall v, WfConcatActionT (c v) m') -> WfConcatActionT atrue m' -> WfConcatActionT afalse m' -> @WfConcatActionT lretT (IfElse p atrue afalse c) m'
+  | WfConcatAssertion (e: Expr type (SyntaxKind Bool)) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Assertion e c) m'
+  | WfConcatSys ls lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Sys ls c) m'
+  | WfConcatReturn lretT e m': @WfConcatActionT lretT (Return e) m'.
 
   Definition WfBaseMod :=
     (forall rule, In rule (getRules m) -> WfActionT (snd rule type)) /\
     (forall meth, In meth (getMethods m) -> forall v, WfActionT (projT2 (snd meth) type v)).
 End WfBaseMod.
 
+Definition WfConcat m m' :=
+  (forall rule, In rule (getAllRules m) -> WfConcatActionT (snd rule type) m') /\
+  (forall meth, In meth (getAllMethods m) -> forall v, WfConcatActionT (projT2 (snd meth) type v) m').
+
 Inductive WfMod: Mod -> Prop :=
-| BaseWf m (WfBaseModule: WfBaseMod m): WfMod (Base m)
+| BaseWf m (WfBaseModule: WfBaseMod m)(NoDupMeths: NoDup (map fst (getMethods m)))
+         (NoDupRegs : NoDup (map fst (getRegisters m)))(NoDupRle : NoDup (map fst (getRules m))): WfMod (Base m)
 | HideMethWf m s (HHideWf: In s (map fst (getAllMethods m))) (HWf: WfMod m): WfMod (HideMeth m s)
 | ConcatModWf m1 m2 (HDisjRegs: DisjKey (getAllRegisters m1) (getAllRegisters m2))
               (HDisjRules: DisjKey (getAllRules m1) (getAllRules m2))
               (HDisjMeths: DisjKey (getAllMethods m1) (getAllMethods m2))
-              (HWf1: WfMod m1) (HWf2: WfMod m2): WfMod (ConcatMod m1 m2).
+              (HWf1: WfMod m1) (HWf2: WfMod m2)(WfConcat1: WfConcat m1 m2)
+              (WfConcat2 : WfConcat m2 m1): WfMod (ConcatMod m1 m2).
 
 Definition getFlat m := BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m).
 
@@ -1516,6 +1526,15 @@ Fixpoint createHide (m: BaseModule) (hides: list string) :=
   end.
 
 Definition flatten m := createHide (getFlat m) (getHidden m).
+
+
+
+Definition StepSubstitute m o l :=
+  Substeps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
+  MatchingExecCalls l l (Base (getFlat m)) /\
+  (forall s v, In s (map fst (getAllMethods m)) -> In s (getHidden m) -> InExec (s, v) l -> InCall (s, v) l).
+
+
 Section inlineSingle.
   Variable ty: Kind -> Type.
   Variable f: DefMethT.
