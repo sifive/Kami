@@ -531,8 +531,8 @@ ppRfName :: (((String, [(String, Bool)]), String), ((Int, Kind), ConstT)) -> Str
 ppRfName (((name, reads), write), ((idxType, dataType), ConstArray num k fv)) = ppName name ++ ".mem"
   
 main =
-  -- putStrLn (show fpu)
+  -- putStrLn (show rtlMod)
   do
-    let (Build_RtlModule regFs _ _ _ _ _ _) = fpu in
+    let (Build_RtlModule regFs _ _ _ _ _ _) = rtlMod in
       mapM_ (\rf -> (ppRfFile (ppRfName rf) rf)) regFs
-    ppTopModule fpu
+    ppTopModule rtlMod
