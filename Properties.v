@@ -3513,7 +3513,10 @@ Proof.
     destruct H0; subst; rewrite createHide_Meths in *; firstorder fail.
   - unfold SubList; induction l; simpl; intros; try tauto.
     + constructor.
-      admit.
+      * admit.
+      * admit.
+      * admit.
+      * admit.
     + assert (WfMod (createHide m l)) by firstorder fail.
       assert (In a (map fst (getMethods m))) by firstorder fail.
       constructor; auto.
