@@ -3469,7 +3469,7 @@ Section TraceSubstitute.
         eapply UpdRegs_perm; eauto.
   Qed.
 
-  Lemma Trace_Inclusion_flatten_r: TraceInclusion m (flatten m).
+  Lemma TraceInclusion_flatten_r: TraceInclusion m (flatten m).
   Proof.
     unfold TraceInclusion; intros.
     exists o1, ls1.
@@ -3477,7 +3477,7 @@ Section TraceSubstitute.
     apply Trace_flatten_same1; auto.
   Qed.
 
-  Lemma Trace_Inclusion_flatten_l: TraceInclusion (flatten m) m.
+  Lemma TraceInclusion_flatten_l: TraceInclusion (flatten m) m.
   Proof.
     apply TraceInclusion'_TraceInclusion.
     unfold TraceInclusion'; intros.

@@ -1486,22 +1486,22 @@ Section WfBaseMod.
   | WfSys ls lretT c: WfActionT c -> @WfActionT lretT (Sys ls c)
   | WfReturn lretT e: @WfActionT lretT (Return e).
 
-  Inductive WfConcatActionT : forall lretT, ActionT type lretT -> Mod -> Prop :=
-  | WfConcatMCall meth s e lretT c m' :(forall v, WfConcatActionT (c v) m') -> ~In meth (getHidden m') -> @WfConcatActionT lretT (MCall meth s e c) m'
-  | WfConcatLetExpr k (e : Expr type k) lretT c m' : (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetExpr e c) m'
-  | WfConcatLetAction k (a : ActionT type k) lretT c m' : WfConcatActionT a m' -> (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetAction a c) m'
-  | WfConcatReadNondet k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadNondet k c) m'
-  | WfConcatReadReg r k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadReg r k c) m'
-  | WfConcatWriteReg r k (e: Expr type k) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (WriteReg r e c) m'
-  | WfConcatIfElse p k (atrue: ActionT type k) afalse lretT c m': (forall v, WfConcatActionT (c v) m') -> WfConcatActionT atrue m' -> WfConcatActionT afalse m' -> @WfConcatActionT lretT (IfElse p atrue afalse c) m'
-  | WfConcatAssertion (e: Expr type (SyntaxKind Bool)) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Assertion e c) m'
-  | WfConcatSys ls lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Sys ls c) m'
-  | WfConcatReturn lretT e m': @WfConcatActionT lretT (Return e) m'.
-
   Definition WfBaseMod :=
     (forall rule, In rule (getRules m) -> WfActionT (snd rule type)) /\
     (forall meth, In meth (getMethods m) -> forall v, WfActionT (projT2 (snd meth) type v)).
 End WfBaseMod.
+
+Inductive WfConcatActionT : forall lretT, ActionT type lretT -> Mod -> Prop :=
+| WfConcatMCall meth s e lretT c m' :(forall v, WfConcatActionT (c v) m') -> ~In meth (getHidden m') -> @WfConcatActionT lretT (MCall meth s e c) m'
+| WfConcatLetExpr k (e : Expr type k) lretT c m' : (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetExpr e c) m'
+| WfConcatLetAction k (a : ActionT type k) lretT c m' : WfConcatActionT a m' -> (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetAction a c) m'
+| WfConcatReadNondet k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadNondet k c) m'
+| WfConcatReadReg r k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadReg r k c) m'
+| WfConcatWriteReg r k (e: Expr type k) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (WriteReg r e c) m'
+| WfConcatIfElse p k (atrue: ActionT type k) afalse lretT c m': (forall v, WfConcatActionT (c v) m') -> WfConcatActionT atrue m' -> WfConcatActionT afalse m' -> @WfConcatActionT lretT (IfElse p atrue afalse c) m'
+| WfConcatAssertion (e: Expr type (SyntaxKind Bool)) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Assertion e c) m'
+| WfConcatSys ls lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Sys ls c) m'
+| WfConcatReturn lretT e m': @WfConcatActionT lretT (Return e) m'.
 
 Definition WfConcat m m' :=
   (forall rule, In rule (getAllRules m) -> WfConcatActionT (snd rule type) m') /\
