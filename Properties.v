@@ -1124,7 +1124,6 @@ Proof.
   firstorder fail.
 Qed.
 
-(*HERE*)
 Lemma Step_meth_InCall_InDef_InExec m o ls:
   Step m o ls ->
   forall (f : MethT),
@@ -2918,6 +2917,7 @@ Definition WeakInclusion (l1 l2 : list FullLabel) : Prop :=
      (forall f : MethT, InExec f l1 /\ InCall f l1 \/ ~ InExec f l1 /\ ~ InCall f l1 <-> InExec f l2 /\ InCall f l2 \/ ~ InExec f l2 /\ ~ InCall f l2)
      /\ ((exists rle : string, In (Rle rle) (map getRleOrMeth l2)) -> exists rle : string, In (Rle rle) (map getRleOrMeth l1)).
 
+
 Lemma InExec_app_comm : forall l1 l2 e, InExec e (l1++l2) -> InExec e (l2++l1).
 Proof.
   intros.
@@ -3093,7 +3093,7 @@ Proof.
     specialize (IHm1 HWf1).
     specialize (IHm2 HWf2).
     simpl in *.
-    constructor;simpl; intros; destruct (in_app_or _ _ _ H) as [In1 | In1]. (*; specialize (in_map fst _ _ InRle) as InRle_map; try destruct (HDisjRules (fst rule)); try contradiction.*)
+    constructor;simpl; intros; destruct (in_app_or _ _ _ H) as [In1 | In1].
     + destruct IHm1 as [Rle Meth]; clear Meth; specialize (Rle _ In1).
       induction Rle; econstructor; eauto; setoid_rewrite map_app; apply in_or_app;left; assumption.
     + destruct IHm2 as [Rle Meth]; clear Meth; specialize (Rle _ In1).
