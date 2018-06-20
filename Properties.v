@@ -3505,44 +3505,68 @@ Proof.
     repeat split; tauto.
 Qed.
 
-Lemma WfMod_createHide l: forall m, WfMod (createHide m l) <-> SubList l (map fst (getMethods m)).
+Lemma WfMod_createHide l: forall m, WfMod (createHide m l) <-> (SubList l (map fst (getMethods m)) /\ WfMod (Base m)).
 Proof.
   split.
-  - induction l; simpl; auto; intros; unfold SubList; simpl; intros; try tauto.
-    inv H.
-    destruct H0; subst; rewrite createHide_Meths in *; firstorder fail.
-  - unfold SubList; induction l; simpl; intros; try tauto.
-    + constructor.
-      * admit.
-      * admit.
-      * admit.
-      * admit.
-    + assert (WfMod (createHide m l)) by firstorder fail.
-      assert (In a (map fst (getMethods m))) by firstorder fail.
-      constructor; auto.
-      rewrite createHide_Meths.
-      auto.
-Admitted.
+  - induction l; simpl; intros; split; unfold SubList; simpl; intros; try tauto.
+    + inv H.
+      destruct H0; subst; rewrite createHide_Meths in *; firstorder fail.
+    + inv H.
+      destruct (IHl HWf); assumption.
+  - unfold SubList; induction l; simpl; intros; try tauto; dest; constructor.
+    + rewrite createHide_Meths; apply (H a); left; reflexivity.
+    + apply IHl; intros; split;auto.
+Qed.
+
+Lemma WfActionT_flatten m k :
+  forall (a : ActionT type k),
+    WfActionT m a <-> WfActionT (getFlat (Base m)) a.
+Proof.
+  split; induction 1; econstructor; eauto.
+Qed.
 
 Lemma flatten_WfMod m: WfMod m -> WfMod (flatten m).
 Proof.
   unfold flatten.
   induction 1; simpl; auto; intros.
   - constructor; auto.
-    admit.
+    unfold getFlat.
+    induction WfBaseModule.
+    constructor; intros.
+    + specialize (H rule H1).
+      apply WfActionT_flatten in H.
+      assumption.
+    + specialize (H0 meth H1 v).
+      apply WfActionT_flatten in H0.
+      assumption.
   - constructor; auto.
     rewrite createHide_Meths.
     auto.
   - unfold getFlat in *; simpl.
-    rewrite WfMod_createHide in *; simpl in *.
-    rewrite map_app.
-    unfold SubList in *; intros.
-    rewrite in_app_iff in *.
-    specialize (IHWfMod1 x).
-    specialize (IHWfMod2 x).
-    tauto.
-Admitted.
-
+    rewrite WfMod_createHide in *; dest; simpl in *.
+    split.
+    + rewrite map_app.
+      unfold SubList in *; intros.
+      rewrite in_app_iff in *.
+      specialize (H3 x).
+      specialize (H1 x).
+      tauto.
+    + constructor;inversion H4; inversion H2; inversion WfBaseModule; inversion WfBaseModule0; subst.
+      * split; intros.
+        -- destruct (in_app_or _ _ _ H6).
+           ++ specialize (H5 _ H7).
+              induction H5; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; left; assumption.
+           ++ specialize (H9 _ H7).
+              induction H9; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; right; assumption.
+        -- destruct (in_app_or _ _ _ H6).
+           ++ specialize (H8 _ H7 v).
+              induction H8; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; left; assumption.
+           ++ specialize (H10 _ H7 v).
+              induction H10; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; right; assumption.
+      * apply (NoDupKey_Expand NoDupMeths NoDupMeths0 HDisjMeths).
+      * apply (NoDupKey_Expand NoDupRegs NoDupRegs0 HDisjRegs).
+      * apply (NoDupKey_Expand NoDupRle NoDupRle0 HDisjRules).
+Qed.
 
 Lemma word0_neq: forall w : word 1, w <> WO~0 -> w = WO~1.
 Proof.
