@@ -521,6 +521,26 @@ Notation "s @% f" := (ReadStruct s ltac:(let typeS := type of s in
                                          getStructFull typeS f))
                        (at level 38) : kami_expr_scope.
 
+Notation "name ::= value" :=
+  (name, value): kami_switch_init_scope.
+Delimit Scope kami_switch_init_scope with switch_init.
+
+Notation "'Switch' val 'Of' inK 'Retn' retK 'With' { s1 ; .. ; sN }" :=
+  (unpack retK (CABit Bor (cons ((SignExtend _ (pack (val == (fst s1%switch_init: Expr _ (SyntaxKind inK))))) & pack (snd s1%switch_init))%kami_expr ..
+                                (cons ((SignExtend _ (pack (val == (fst sN%switch_init: Expr _ (SyntaxKind inK))))) & pack (snd sN%switch_init))%kami_expr nil) ..))):
+    kami_expr_scope.
+
+Notation "'Switch' val 'Retn' retK 'With' { s1 ; .. ; sN }" :=
+  (unpack retK (CABit Bor (cons ((SignExtend _ (pack (val == (fst s1%switch_init)))) & pack (snd s1%switch_init))%kami_expr ..
+                                (cons ((SignExtend _ (pack (val == (fst sN%switch_init)))) & pack (snd sN%switch_init))%kami_expr nil) ..))):
+    kami_expr_scope.
+
+Definition testSwitch ty (val: Bit 5 @# ty) (a b: Bool @# ty) : Bool @# ty :=
+  (Switch val Retn Bool With {
+            $$ (natToWord 5 5) ::= $$ true ;
+            $$ (natToWord 5 6) ::= $$ false
+          })%kami_expr.
+
 Definition testFieldAccess ty := 
   ((testStructVal ty) @% "hello")%kami_expr.
 
