@@ -1580,7 +1580,7 @@ Section inlineSingle.
     | LetExpr _ e cont =>
       LetExpr e (fun ret => inlineSingle (cont ret))
     | LetAction _ a cont =>
-      LetAction a (fun ret => inlineSingle (cont ret))
+      LetAction (inlineSingle a) (fun ret => inlineSingle (cont ret))
     | ReadNondet k c =>
       ReadNondet k (fun ret => inlineSingle (c ret))
     | ReadReg r k c =>
