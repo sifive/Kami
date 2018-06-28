@@ -2664,7 +2664,7 @@ Lemma WfActionT_SemAction : forall (k : Kind)(a : ActionT type k)(retl : type k)
   induction 3; intro; subst; inversion H; EqDep_subst.
   - intros TMP1 TMP2; specialize (IHSemAction (H4 mret) o1 TMP1 TMP2).
     econstructor 1; eauto.
-  - intros TMP1 TMP2; specialize (IHSemAction (H4 (evalExpr e)) o1 TMP1 TMP2).
+  - intros TMP1 TMP2; specialize (IHSemAction H4 o1 TMP1 TMP2).
     econstructor 2; eauto.
   - intros TMP1 TMP2; specialize (IHSemAction1 (H4) o1 TMP1 TMP2); specialize (IHSemAction2 (H6 v) o1 TMP1 TMP2).
     econstructor 3; eauto.
@@ -3622,3 +3622,263 @@ Proof.
       simpl.
       destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
 Qed.
+
+Lemma WfActionT_inlinesingle_f (k : Kind) (f : DefMethT) m v:
+  WfActionT m (projT2 (snd f) type v) ->
+  WfActionT (inlinesingle_BaseModule m f) (projT2 (snd f) type v).
+Proof.
+  intros.
+  induction H; econstructor; auto.
+Qed.
+
+Lemma inline_preserves_key_Meth (f : DefMethT) (meth : DefMethT):
+  fst (inlinesingle_Meth f meth) = fst meth.
+Proof.
+  destruct meth; auto.
+Qed.
+
+Corollary inline_preserves_keys_Meth (f : DefMethT) (l : list DefMethT) :
+  (map fst (map (inlinesingle_Meth f) l)) = (map fst l).
+Proof.
+  induction l; auto.
+  simpl;rewrite inline_preserves_key_Meth; rewrite IHl; reflexivity.
+Qed.
+
+Lemma inline_preserves_key_Rule (f : DefMethT) (rle : RuleT) :
+  fst (inlinesingle_Rule f rle) = fst rle.
+Proof.
+  destruct rle; auto.
+Qed.
+
+Corollary inline_preserves_keys_Rule (f : DefMethT) (l : list RuleT) :
+  (map fst (map (inlinesingle_Rule f) l)) = (map fst l).
+Proof.
+  induction l; auto.
+  simpl; rewrite inline_preserves_key_Rule; rewrite IHl; reflexivity.
+Qed.
+
+Lemma inline_preserves_Regs_BaseMod m f:
+  getRegisters m = getRegisters (inlinesingle_BaseModule m f).
+Proof.
+  unfold inlinesingle_BaseModule;eauto.
+Qed.
+
+Lemma inline_preserves_Regs_Mod m f:
+  (getAllRegisters m) = getAllRegisters (inlinesingle_Mod m f).
+Proof.
+  intros.
+  induction m; simpl;eauto using inline_preserves_Regs_BaseMod.
+  rewrite IHm1, IHm2; reflexivity.
+Qed.
+
+Lemma WfActionT_inlinesingle (k :Kind) (a : ActionT type k) (f : DefMethT) m:
+  WfActionT m a ->
+  (forall v, WfActionT m (projT2 (snd f) type v)) ->
+  WfActionT (inlinesingle_BaseModule m f) (inlineSingle f a).
+  induction 1; try econstructor;eauto.
+  simpl.
+  destruct (string_dec (fst f) meth),(Signature_dec s (projT1 (snd f))); subst; econstructor; eauto.
+  econstructor.
+  specialize (H1 (evalExpr e)).
+  apply (WfActionT_inlinesingle_f);eauto.
+Qed.
+
+Lemma DefMethT_body_Wf m f (Wfm : WfMod m):
+  In f (getAllMethods m) ->
+  (forall v, WfActionT (getFlat m) (projT2 (snd f) type v)).
+Proof.
+  induction m; intros.
+  - inversion Wfm; subst.
+    destruct (WfBaseModule) as [WfRule WfMeth]; clear WfRule; specialize (WfMeth _ H v).
+    apply WfActionT_flatten in WfMeth; assumption.
+  - inversion Wfm; subst.
+    unfold getFlat in *; simpl in *.
+    eapply IHm; eauto.
+  - simpl in H; apply in_app_or in H.
+    unfold getFlat in *; simpl in *.
+    destruct H; inversion Wfm; subst; [specialize (IHm1 HWf1 H v) as TMP|specialize (IHm2 HWf2 H v) as TMP];
+      induction (projT2 (snd f) type v); inv TMP; EqDep_subst; econstructor; eauto;
+        simpl in *; rewrite map_app; apply in_or_app;[left|left|right|right]; assumption.
+Qed.
+
+Lemma inline_createHide_push f m l:
+  inlinesingle_Mod (createHide m l) f = createHide (inlinesingle_BaseModule m f) l.
+Proof.
+  induction l; auto.
+  unfold createHide; simpl; fold (createHide).
+  rewrite IHl; reflexivity.
+Qed.
+
+Lemma inline_flattening_Regs f m :
+  getAllRegisters (inlinesingle_Mod (flatten m) f) = getAllRegisters m.
+Proof.
+  unfold flatten.
+  induction getHidden; simpl; auto.
+Qed.
+
+Lemma inline_flattening_Meths f m :
+  getAllMethods (inlinesingle_Mod m f) = (map (inlinesingle_Meth f) (getAllMethods m)).
+Proof.
+  induction m; simpl; auto.
+  rewrite map_app; rewrite IHm1, IHm2; reflexivity.
+Qed.
+
+Lemma inline_flattening_Rules f m :
+  getAllRules (inlinesingle_Mod m f) = (map (inlinesingle_Rule f) (getAllRules m)).
+Proof.
+  induction m; simpl; auto.
+  rewrite map_app; rewrite IHm1, IHm2; reflexivity.
+Qed.
+
+Lemma inline_getHidden f m :
+  getHidden (inlinesingle_Mod m f) = getHidden m.
+Proof.
+  induction m; simpl; eauto.
+  - rewrite IHm; reflexivity.
+  - rewrite IHm1, IHm2; reflexivity.
+Qed.
+
+Corollary inline_flattening_Hidden f m :
+  getHidden (inlinesingle_Mod (flatten m) f) = getHidden (inlinesingle_Mod m f).
+Proof.
+  repeat rewrite inline_getHidden.
+  unfold flatten; rewrite createHide_hides; reflexivity.
+Qed.
+
+Lemma inline_flattening_flattens_inline f m:
+  (flatten (inlinesingle_Mod m f)) = (inlinesingle_Mod (flatten m) f).
+Proof.
+  unfold flatten, getFlat.
+  rewrite inline_getHidden.
+  rewrite inline_flattening_Rules.
+  rewrite inline_flattening_Meths.
+  rewrite <- inline_preserves_Regs_Mod.
+  rewrite inline_createHide_push.
+  unfold inlinesingle_BaseModule; simpl.
+  reflexivity.
+Qed.
+  
+Lemma inline_preserves_keys_Meth_Mod s m f:
+  In s (map fst (getAllMethods m)) <-> In s (map fst (getAllMethods (inlinesingle_Mod m f))).
+Proof.
+  induction m; simpl; split; intros; eauto.
+  - rewrite inline_preserves_keys_Meth; assumption.
+  - rewrite inline_preserves_keys_Meth in H; assumption.
+  - rewrite <- IHm; assumption.
+  - rewrite IHm; assumption.
+  - rewrite map_app in *; rewrite in_app_iff in *.
+    destruct H;[left;rewrite <- IHm1|right;rewrite <- IHm2]; assumption.
+  - rewrite map_app in *; rewrite in_app_iff in *.
+    destruct H;[left;rewrite IHm1|right; rewrite IHm2]; assumption.
+Qed.
+
+Lemma inline_preserves_keys_Rules_Mod s m f :
+  In s (map fst (getAllRules m)) <-> In s (map fst (getAllRules (inlinesingle_Mod m f))).
+Proof.
+  induction m; simpl;split; intros; eauto.
+  - rewrite inline_preserves_keys_Rule; assumption.
+  - rewrite inline_preserves_keys_Rule in H; assumption.
+  - rewrite <- IHm; assumption.
+  - rewrite IHm; assumption.
+  - rewrite map_app in *; rewrite in_app_iff in *.
+    destruct H;[left;rewrite <- IHm1|right;rewrite <- IHm2]; assumption.
+  - rewrite map_app in *; rewrite in_app_iff in *.
+    destruct H;[left;rewrite IHm1|right; rewrite IHm2]; assumption.
+Qed.
+
+Fixpoint updGatherMeth (s : string) (ls : list FullLabel) : RegsT :=
+  match ls with
+  | a::ls' => match getRleOrMeth a with
+              | Rle _ => updGatherMeth s ls'
+              | Meth f => match string_dec s (fst f) with
+                           | left _ => (fst a)++(updGatherMeth s ls')
+                           | right _ => updGatherMeth s ls'
+                           end
+              end
+  | nil => nil
+  end.
+
+Fixpoint elimMethExec (s : string) (ls : list FullLabel) : list FullLabel :=
+  match ls with
+  | a::ls' => match getRleOrMeth a with
+              |Rle _ => a::(elimMethExec s ls')
+              |Meth f => match string_dec s (fst f) with
+                         | left _ => elimMethExec s ls'
+                         | right _ => a::(elimMethExec s ls')
+                         end
+              end
+  | nil => nil
+  end.
+
+Fixpoint elimCall (s : string) (l : MethsT) : MethsT :=
+  match l with
+  | a::l' => match string_dec s (fst a) with
+             | left _ => elimCall s l'
+             | right _ => a::(elimCall s l')
+             end
+  | nil => nil
+  end.
+
+Fixpoint inlinedFullLabel (s : string)(ls : list FullLabel)(fl : FullLabel): FullLabel :=
+  match fl with
+  | fl => match existsb (strcmp s) (map fst (snd (snd fl))) with
+          | true => ((fst fl)++(updGatherMeth s ls),(fst (snd fl), elimCall s (snd (snd fl))))
+          | false => fl
+          end
+  end.
+
+Definition inlinedFullLabelList (s : string) (l : list FullLabel) (ls : list FullLabel) : list FullLabel := elimMethExec s (map (inlinedFullLabel s ls) ls).
+
+
+(* Lemma WfMod_WfInlineMod m f : *)
+(*   In f (getAllMethods m) -> *)
+(*   WfMod m -> *)
+(*   WfMod (inlinesingle_Mod m f). *)
+(* Proof. *)
+(*   induction 2; econstructor; eauto. *)
+(*   - split; intros; simpl in *; unfold WfBaseMod in WfBaseModule; dest. *)
+(*     + induction (getRules m);[contradiction|]. *)
+(*       destruct H0; subst. *)
+(*       * specialize (H1 a (in_eq _ _ )). *)
+(*         induction a; simpl in *. *)
+(*         apply WfActionT_inlinesingle; eauto. *)
+(*       * eapply IHl; eauto. *)
+(*         -- intros. *)
+(*            apply H1; apply in_cons; assumption. *)
+(*         -- simpl in NoDupRle. *)
+(*            rewrite (NoDup_cons_iff (fst a) (map fst l)) in NoDupRle; firstorder. *)
+(*     + induction (getMethods m);[contradiction|]. *)
+(*       destruct H0. *)
+(*       * subst; specialize (H2 a (in_eq _ _)) as TMP. *)
+(*         destruct a; destruct s0; simpl in *. *)
+(*         specialize (TMP v). *)
+(*         apply WfActionT_inlinesingle; eauto. *)
+(*       * destruct H; subst. *)
+(*         -- specialize (H2 f (in_eq _ _)) as TMP. *)
+(*            admit. *)
+(*         -- eapply IHl; eauto. *)
+(*            intros; eapply H2; eauto. *)
+(*             apply in_cons; assumption. *)
+(*            simpl in NoDupMeths. *)
+(*            rewrite (NoDup_cons_iff (fst a) (map fst l)) in NoDupMeths; firstorder. *)
+(*   - simpl;induction (getMethods m); auto. *)
+(*     simpl in *; rewrite (inline_preserves_key_Meth);constructor; inv NoDupMeths; rewrite (inline_preserves_keys_Meth); eauto. *)
+(*   - simpl;induction (getRules m); auto. *)
+(*     simpl in *; rewrite (inline_preserves_key_Rule);constructor; inv NoDupRle; rewrite (inline_preserves_keys_Rule); eauto. *)
+(*   - fold (inlinesingle_Mod m f). *)
+(*     apply inline_preserves_keys_Meth_Mod; assumption. *)
+(*   - repeat rewrite <- inline_preserves_Regs_Mod; assumption. *)
+(*   - fold (inlinesingle_Mod m1 f); fold (inlinesingle_Mod m2 f). *)
+(*     intro; destruct (HDisjRules k);[left|right];intro;apply H0; *)
+(*       rewrite <- inline_preserves_keys_Rules_Mod in H1; assumption. *)
+(*   - fold (inlinesingle_Mod m1 f); fold (inlinesingle_Mod m2 f). *)
+(*     intro; destruct (HDisjMeths k);[left|right];intro;apply H0; *)
+(*       rewrite <- inline_preserves_keys_Meth_Mod in H1; assumption. *)
+(*   - *)
+(*   - induction m; simpl in *. *)
+(*     + rewrite inline_preserves_keys_Meth; assumption. *)
+(*     + eapply IHm; eauto; intros. *)
+(*       * inv H0; assumption. *)
+(*       * specialize (IHWfMod H); inv IHWfMod ;assumption. *)
+(*     + simpl in *;rewrite map_app; apply in_or_app. *)
+(*       apply in_app_or in H. *)

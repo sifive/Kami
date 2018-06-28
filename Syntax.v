@@ -1496,7 +1496,7 @@ Section WfBaseMod.
   
   Inductive WfActionT: forall lretT, ActionT type lretT -> Prop :=
   | WfMCall meth s e lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (MCall meth s e c)
-  | WfLetExpr k (e: Expr type k) lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (LetExpr e c)
+  | WfLetExpr k (e: Expr type k) lretT c: WfActionT (c (evalExpr e)) -> @WfActionT lretT (LetExpr e c)
   | WfLetAction k (a: ActionT type k) lretT c: WfActionT a -> (forall v, WfActionT (c v)) -> @WfActionT lretT (LetAction a c)
   | WfReadNondet k lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (ReadNondet k c)
   | WfReadReg r k lretT c: (forall v, WfActionT (c v)) -> In (r, k) (getKindAttr (getRegisters m)) -> @WfActionT lretT (ReadReg r k c)
@@ -1513,7 +1513,7 @@ End WfBaseMod.
 
 Inductive WfConcatActionT : forall lretT, ActionT type lretT -> Mod -> Prop :=
 | WfConcatMCall meth s e lretT c m' :(forall v, WfConcatActionT (c v) m') -> ~In meth (getHidden m') -> @WfConcatActionT lretT (MCall meth s e c) m'
-| WfConcatLetExpr k (e : Expr type k) lretT c m' : (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetExpr e c) m'
+| WfConcatLetExpr k (e : Expr type k) lretT c m' : WfConcatActionT (c (evalExpr e)) m' -> @WfConcatActionT lretT (LetExpr e c) m'
 | WfConcatLetAction k (a : ActionT type k) lretT c m' : WfConcatActionT a m' -> (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetAction a c) m'
 | WfConcatReadNondet k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadNondet k c) m'
 | WfConcatReadReg r k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadReg r k c) m'
@@ -1599,6 +1599,39 @@ Section inlineSingle.
 End inlineSingle.
 
 
+Definition inlinesingle_Rule  (f : DefMethT) (rle : RuleT): RuleT.
+Proof.
+  unfold RuleT in *.
+  destruct rle.
+  constructor.
+  - apply s.
+  - unfold Action in *.
+    intro.
+    apply (inlineSingle f (a ty)).
+Defined.
+
+Definition inlinesingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT.
+Proof.
+  unfold DefMethT in *.
+  destruct meth.
+  constructor.
+  - apply s.
+  -  destruct s0.
+     unfold MethodT; unfold MethodT in m.
+     exists x.
+     intros.
+     apply (inlineSingle f (m ty X)).
+Defined.
+
+Definition inlinesingle_BaseModule (m : BaseModule) (f : DefMethT) : BaseModule :=
+  BaseMod (getRegisters m) (map (inlinesingle_Rule f) (getRules m)) (map (inlinesingle_Meth f) (getMethods m)).
+
+Fixpoint inlinesingle_Mod (m : Mod) (f : DefMethT) : Mod :=
+  match m with
+  |Base bm => Base (inlinesingle_BaseModule bm f)
+  |HideMeth m' s => HideMeth (inlinesingle_Mod m' f) s
+  |ConcatMod m1 m2 => ConcatMod (inlinesingle_Mod m1 f) (inlinesingle_Mod m2 f)
+  end.
 
 (*
  * Kami Rewrite
