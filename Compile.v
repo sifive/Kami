@@ -344,7 +344,7 @@ Definition getRegInit (y: {x : FullKind & option (ConstFullT x)}): {x: Kind & op
                            end
          end.
 
-Fixpoint finalWrites (a: Attribute (Action Void)) (regs: list RegInitT) : list (string * list nat * {x : Kind & RtlExpr x}) :=
+Fixpoint finalWrites (regs: list RegInitT) (a: Attribute (Action Void)): list (string * list nat * {x : Kind & RtlExpr x}) :=
   match regs with
   | nil => nil
   | s :: ss => (getRegActionFinalWrite (fst a) (fst s),
@@ -352,8 +352,8 @@ Fixpoint finalWrites (a: Attribute (Action Void)) (regs: list RegInitT) : list (
                             then RtlITE (RtlReadWire _ (getRegActionEn (fst a) (fst s)))
                                         (RtlReadWire _ (getRegActionWrite (fst a) (fst s)))
                                         (RtlReadWire _ (getRegActionRead (fst a) (fst s)))
-                            else RtlReadWire (projT1 (getRegInit (snd s))) (getRegActionWrite (fst a) (fst s))))
-                 :: finalWrites a ss
+                            else RtlReadWire (projT1 (getRegInit (snd s))) (getRegActionRead (fst a) (fst s))))
+                 :: finalWrites ss a
   end.
 
 Fixpoint getAllWriteReadConnections' (regs: list RegInitT) (order: list string) {struct order} :=
@@ -377,7 +377,7 @@ Definition getAllWriteReadConnections (regs: list RegInitT) (order: list string)
   end.
 
 Definition getWires regs (rules: list (Attribute (Action Void))) (order: list string) :=
-  concat (map computeRuleAssigns rules) ++ getAllWriteReadConnections regs order.
+  concat (map computeRuleAssigns rules) ++ concat (map (finalWrites regs) rules) ++ getAllWriteReadConnections regs order.
       
 Definition getWriteRegs (regs: list RegInitT) :=
   map (fun r => (fst r, existT _ (projT1 (getRegInit (snd r))) (RtlReadWire _ (getRegWrite (fst r))))) regs.
