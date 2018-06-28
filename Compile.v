@@ -326,8 +326,9 @@ Definition computeRuleAssigns (r: Attribute (Action Void)) :=
     convertActionToRtl_noGuard (fst r) (snd r (fun _ => list nat)) (RtlReadWire Bool (getActionGuard (fst r)))
     (1 :: nil) (0 :: nil).
 
-Definition getInputs (calls: list (Attribute (Kind * Kind))) := map (fun x => (getMethRet (fst x), snd (snd x))) calls ++
-                                                                    map (fun x => (getMethGuard (fst x), Bool)) calls.
+Definition getInputs (calls: list (Attribute (Kind * Kind))) := map (fun x => (getMethRet (fst x), snd (snd x))) calls.
+                                                                    (* ++ map (fun x => (getMethGuard (fst x), Bool)) calls. *)
+
 Definition getOutputs (calls: list (Attribute (Kind * Kind))) := map (fun x => (getMethArg (fst x), fst (snd x))) calls ++
                                                                      map (fun x => (getMethEn (fst x), Bool)) calls.
 
@@ -385,6 +386,9 @@ Definition getWriteRegs (regs: list RegInitT) :=
 Definition getReadRegs (regs: list RegInitT) :=
   map (fun r => (getRegRead (fst r), existT _ (projT1 (getRegInit (snd r))) (RtlReadReg _ (fst r)))) regs.
 
+Definition setMethodGuards (rules: list (Attribute (Action Void))) :=
+  map (fun m => (getMethGuard (fst m), existT _ Bool (RtlConst (ConstBool true)))) (getCallsPerBaseMod rules).
+
 Definition getRtl (bm: BaseModule) :=
   match bm with
   | BaseMod regs rules dms =>
@@ -393,7 +397,7 @@ Definition getRtl (bm: BaseModule) :=
        outputs := getOutputs (getCallsPerBaseMod rules);
        regInits := map (fun x => (fst x, getRegInit (snd x))) regs;
        regWrites := getWriteRegs regs;
-       wires := getReadRegs regs ++ getWires regs rules (map fst rules);
+       wires := getReadRegs regs ++ getWires regs rules (map fst rules) ++ setMethodGuards rules;
        sys := getSysPerBaseMod rules |}
   | _ => {| regFiles := nil;
             inputs := nil;
