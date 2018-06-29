@@ -350,7 +350,7 @@ ppRtlExpr who e =
 ppRfInstance :: (((String, [(String, Bool)]), String), (((Int, Kind)), ConstT)) -> String
 ppRfInstance (((name, reads), write), ((idxType, dataType), _)) =
   "  " ++ ppName name ++ " " ++
-  ppName name ++ "$inst(.CLK(CLK), .RESET_N(RESET_N), " ++
+  ppName name ++ "$inst(.CLK(CLK), .RESET(RESET), " ++
   concatMap (\(read, _) ->
                ("." ++ ppName read ++ "$_guard(" ++ ppName read ++ "$_guard), ") ++
                ("." ++ ppName read ++ "$_enable(" ++ ppName read ++ "$_enable), ") ++
@@ -375,7 +375,7 @@ ppRfModule (((name, reads), write), ((idxType, dataType), init)) =
   ("  input " ++ ppDeclType (ppName write ++ "$_argument")
     (Struct 2 (\i -> if i == F1 1 then (Bit idxType) else if i == FS 1 (F1 0) then dataType else (Bit 0)) (\i -> if i == F1 1 then "addr" else if i == FS 1 (F1 0) then "data" else "")) ++ ",\n") ++
   "  input logic CLK,\n" ++
-  "  input logic RESET_N\n" ++
+  "  input logic RESET\n" ++
   ");\n" ++
   --"  " ++ ppDeclType (ppName name ++ "$_data") dataType ++ "[0:" ++ show (2^idxType - 1) ++ "];\n" ++
   "  " ++ ppDeclType (ppName name ++ "$_data") (Bit (Target.size dataType)) ++ "[0:" ++ show (2^idxType - 1) ++ "];\n" ++
@@ -403,7 +403,7 @@ removeDups = nubBy (\(a, _) (b, _) -> a == b)
 
 ppRtlInstance :: RtlModule -> String
 ppRtlInstance m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sys') =
-  "  _design _designInst(.CLK(CLK), .RESET_N(RESET_N)" ++
+  "  _design _designInst(.CLK(CLK), .RESET(RESET)" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ '(' : ppPrintVar nm ++ ")")) (removeDups ins' ++ removeDups outs') ++ ");\n"
 
 ppBitFormat :: BitFormat -> String
@@ -435,7 +435,7 @@ ppRtlModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sy
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) ins ++ "\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) outs ++ "\n" ++
   "  input CLK,\n" ++
-  "  input RESET_N\n" ++
+  "  input RESET\n" ++
   ");\n" ++
   concatMap (\(nm, (ty, init)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppName nm) ty ++ ";\n")) regInits ++ "\n" ++
 
@@ -452,7 +452,7 @@ ppRtlModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sy
   concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("  assign " ++ ppPrintVar nm ++ " = " ++ sexpr ++ ";\n")) assignExprs ++ "\n" ++
   
   "  always @(posedge CLK) begin\n" ++
-  "    if(!RESET_N) begin\n" ++
+  "    if(RESET) begin\n" ++
   concatMap (\(nm, (ty, init)) -> case init of
                                     Nothing -> ""
                                     Just init' -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ ppConst init' ++ ";\n")) regInits ++
@@ -514,7 +514,7 @@ ppTopModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sy
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) ins ++ "\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) outs ++ "\n" ++
   "  input CLK,\n" ++
-  "  input RESET_N\n" ++
+  "  input RESET\n" ++
   ");\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) insAll ++ "\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) outsAll ++ "\n" ++
