@@ -4,9 +4,8 @@ Import ListNotations.
 Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
 
-
 Section evalExpr.
-  
+
   Lemma castBits_same ty ni no (pf: ni = no) (e: Expr ty (SyntaxKind (Bit ni))): castBits pf e = match pf in _ = Y return Expr ty (SyntaxKind (Bit Y)) with
                                                                                                  | eq_refl => e
                                                                                                  end.
@@ -3623,6 +3622,9 @@ Proof.
       destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
 Qed.
 
+
+
+
 Lemma WfActionT_inlinesingle_f (k : Kind) (f : DefMethT) m v:
   WfActionT m (projT2 (snd f) type v) ->
   WfActionT (inlinesingle_BaseModule m f) (projT2 (snd f) type v).
@@ -3810,75 +3812,12 @@ Fixpoint elimMethExec (s : string) (ls : list FullLabel) : list FullLabel :=
   | nil => nil
   end.
 
-Fixpoint elimCall (s : string) (l : MethsT) : MethsT :=
-  match l with
-  | a::l' => match string_dec s (fst a) with
-             | left _ => elimCall s l'
-             | right _ => a::(elimCall s l')
+Fixpoint inlineCall (f : MethT)(fcalls : MethsT)(fcalled : MethsT) : MethsT :=
+  match fcalled with
+  | g::fcalled' => match MethT_dec f g with
+             | left _ => fcalls++(inlineCall f fcalls fcalled')
+             | right _ => g::(inlineCall f fcalls fcalled')
              end
   | nil => nil
   end.
 
-Fixpoint inlinedFullLabel (s : string)(ls : list FullLabel)(fl : FullLabel): FullLabel :=
-  match fl with
-  | fl => match existsb (strcmp s) (map fst (snd (snd fl))) with
-          | true => ((fst fl)++(updGatherMeth s ls),(fst (snd fl), elimCall s (snd (snd fl))))
-          | false => fl
-          end
-  end.
-
-Definition inlinedFullLabelList (s : string) (l : list FullLabel) (ls : list FullLabel) : list FullLabel := elimMethExec s (map (inlinedFullLabel s ls) ls).
-
-
-(* Lemma WfMod_WfInlineMod m f : *)
-(*   In f (getAllMethods m) -> *)
-(*   WfMod m -> *)
-(*   WfMod (inlinesingle_Mod m f). *)
-(* Proof. *)
-(*   induction 2; econstructor; eauto. *)
-(*   - split; intros; simpl in *; unfold WfBaseMod in WfBaseModule; dest. *)
-(*     + induction (getRules m);[contradiction|]. *)
-(*       destruct H0; subst. *)
-(*       * specialize (H1 a (in_eq _ _ )). *)
-(*         induction a; simpl in *. *)
-(*         apply WfActionT_inlinesingle; eauto. *)
-(*       * eapply IHl; eauto. *)
-(*         -- intros. *)
-(*            apply H1; apply in_cons; assumption. *)
-(*         -- simpl in NoDupRle. *)
-(*            rewrite (NoDup_cons_iff (fst a) (map fst l)) in NoDupRle; firstorder. *)
-(*     + induction (getMethods m);[contradiction|]. *)
-(*       destruct H0. *)
-(*       * subst; specialize (H2 a (in_eq _ _)) as TMP. *)
-(*         destruct a; destruct s0; simpl in *. *)
-(*         specialize (TMP v). *)
-(*         apply WfActionT_inlinesingle; eauto. *)
-(*       * destruct H; subst. *)
-(*         -- specialize (H2 f (in_eq _ _)) as TMP. *)
-(*            admit. *)
-(*         -- eapply IHl; eauto. *)
-(*            intros; eapply H2; eauto. *)
-(*             apply in_cons; assumption. *)
-(*            simpl in NoDupMeths. *)
-(*            rewrite (NoDup_cons_iff (fst a) (map fst l)) in NoDupMeths; firstorder. *)
-(*   - simpl;induction (getMethods m); auto. *)
-(*     simpl in *; rewrite (inline_preserves_key_Meth);constructor; inv NoDupMeths; rewrite (inline_preserves_keys_Meth); eauto. *)
-(*   - simpl;induction (getRules m); auto. *)
-(*     simpl in *; rewrite (inline_preserves_key_Rule);constructor; inv NoDupRle; rewrite (inline_preserves_keys_Rule); eauto. *)
-(*   - fold (inlinesingle_Mod m f). *)
-(*     apply inline_preserves_keys_Meth_Mod; assumption. *)
-(*   - repeat rewrite <- inline_preserves_Regs_Mod; assumption. *)
-(*   - fold (inlinesingle_Mod m1 f); fold (inlinesingle_Mod m2 f). *)
-(*     intro; destruct (HDisjRules k);[left|right];intro;apply H0; *)
-(*       rewrite <- inline_preserves_keys_Rules_Mod in H1; assumption. *)
-(*   - fold (inlinesingle_Mod m1 f); fold (inlinesingle_Mod m2 f). *)
-(*     intro; destruct (HDisjMeths k);[left|right];intro;apply H0; *)
-(*       rewrite <- inline_preserves_keys_Meth_Mod in H1; assumption. *)
-(*   - *)
-(*   - induction m; simpl in *. *)
-(*     + rewrite inline_preserves_keys_Meth; assumption. *)
-(*     + eapply IHm; eauto; intros. *)
-(*       * inv H0; assumption. *)
-(*       * specialize (IHWfMod H); inv IHWfMod ;assumption. *)
-(*     + simpl in *;rewrite map_app; apply in_or_app. *)
-(*       apply in_app_or in H. *)
