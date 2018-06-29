@@ -117,12 +117,7 @@ Section Compile.
           | _ => fun _ => nil
         end cont
       | WriteReg r k' expr cont =>
-        let wires := convertActionToRtl_noGuard cont enable startList retList in
-        match k' return Expr (fun _ => list nat) k' -> list (string * list nat * sigT RtlExpr) with
-          | SyntaxKind k => fun expr => (getRegActionWrite name r, existT _ k (convertExprToRtl expr)) ::
-                                        (getRegActionEn name r, existT _ Bool enable) :: wires
-          | _ => fun _ => wires
-        end expr
+        convertActionToRtl_noGuard cont enable startList retList
       | Assertion pred cont => convertActionToRtl_noGuard cont enable startList retList
       | Sys ls cont => convertActionToRtl_noGuard cont enable startList retList
       | IfElse pred ktf t f cont =>
@@ -134,6 +129,73 @@ Section Compile.
         convertActionToRtl_noGuard (cont (inc (inc startList))) enable (inc (inc (inc startList))) retList
         end.
 
+  Section GetRegisterWrites.
+    Variable reg: RegInitT.
+    Definition regKind := match projT1 (snd reg) with
+                          | SyntaxKind k => k
+                          | _ => Void
+                          end.
+    Fixpoint getRegisterWrites k (a: ActionT (fun _ => list nat) k) (enable: RtlExpr Bool) startList retList : list (RtlExpr Bool * RtlExpr regKind) :=
+      match a in ActionT _ _ with
+      | MCall meth k argExpr cont =>
+        getRegisterWrites (cont startList) enable (inc startList) retList
+      | Return x => nil
+      | LetExpr k' expr cont =>
+        match k' return Expr (fun _ => list nat) k' ->
+                        (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) -> _ with
+        | SyntaxKind k => fun expr cont => getRegisterWrites (cont startList) enable (inc startList) retList
+        | _ => fun _ _ => nil
+        end expr cont
+      | LetAction k' a' cont =>
+        getRegisterWrites a' enable (0 :: startList) startList ++
+                          getRegisterWrites (cont startList) enable (inc startList) retList
+      | ReadNondet k' cont =>
+        match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) -> _ with
+        | SyntaxKind k => fun cont => getRegisterWrites (cont startList) enable (inc startList) retList
+        | _ => fun _ => nil
+        end cont
+      | ReadReg r k' cont =>
+        match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) -> _ with
+        | SyntaxKind k => fun cont => getRegisterWrites (cont startList) enable
+                                                        (inc startList) retList
+        | _ => fun _ => nil
+        end cont
+      | WriteReg r k' expr cont =>
+        let wires := getRegisterWrites cont enable startList retList in
+        if string_dec r (fst reg)
+        then
+          match k' return Expr (fun _ => list nat) k' -> _ with
+          | SyntaxKind k => fun expr =>
+                              match Kind_dec k regKind with
+                              | left pf =>
+                                match pf in _ = Y return list (RtlExpr Bool * RtlExpr Y) -> list (RtlExpr Bool * RtlExpr Y) with
+                                | eq_refl => fun wires => (enable, convertExprToRtl expr) :: wires
+                                end
+                              | right _ => fun wires => wires
+                              end wires
+          | _ => fun _ => nil
+          end expr
+        else wires
+      | Assertion pred cont => getRegisterWrites cont enable startList retList
+      | Sys ls cont => getRegisterWrites cont enable startList retList
+      | IfElse pred ktf t f cont =>
+        getRegisterWrites t (RtlCABool And (enable :: convertExprToRtl pred :: nil)) (0 :: startList) (startList) ++
+                          getRegisterWrites f
+                          (RtlCABool And (enable :: (RtlUniBool Neg (convertExprToRtl pred)) :: nil)) (0 :: inc startList) (inc startList) ++
+                          getRegisterWrites (cont (inc (inc startList))) enable (inc (inc (inc startList))) retList
+      end.
+
+    Definition convertRegisterWrites k (a: ActionT (fun _ => list nat) k) enable startList retList :=
+      rtlUnpack _ (RtlCABit Bor
+                            (rtlPack (RtlReadWire regKind (getRegActionRead name (fst reg))) ::
+                               map (fun x => (RtlCABit Band (
+                                                         RtlITE (fst x) (RtlConst (ConstBit (wones _))) (RtlConst (ConstBit (wzero _)))
+                                                                :: rtlPack (snd x) :: nil))) (getRegisterWrites a enable startList retList))).
+  End GetRegisterWrites.
+
+  Definition convertRegsWrites regs k (a: ActionT (fun _ => list nat) k) enable startList retList :=
+    map (fun reg => (getRegActionFinalWrite name (fst reg), existT _ (regKind reg) (convertRegisterWrites reg a enable startList retList))) regs.
+  
   Fixpoint convertActionToRtl_guard k (a: ActionT (fun _ => list nat) k) startList:
     list (RtlExpr Bool) :=
     match a in ActionT _ _ with
@@ -326,6 +388,10 @@ Definition computeRuleAssigns (r: Attribute (Action Void)) :=
     convertActionToRtl_noGuard (fst r) (snd r (fun _ => list nat)) (RtlReadWire Bool (getActionGuard (fst r)))
     (1 :: nil) (0 :: nil).
 
+Definition computeRuleAssignsRegs regs (r: Attribute (Action Void)) :=
+  convertRegsWrites (fst r) regs (snd r (fun _ => list nat)) (RtlReadWire Bool (getActionGuard (fst r)))
+                    (1 :: nil) (0 :: nil).
+
 Definition getInputs (calls: list (Attribute (Kind * Kind))) := map (fun x => (getMethRet (fst x), snd (snd x))) calls.
                                                                     (* ++ map (fun x => (getMethGuard (fst x), Bool)) calls. *)
 
@@ -345,17 +411,17 @@ Definition getRegInit (y: {x : FullKind & option (ConstFullT x)}): {x: Kind & op
                            end
          end.
 
-Fixpoint finalWrites (regs: list RegInitT) (a: Attribute (Action Void)): list (string * list nat * {x : Kind & RtlExpr x}) :=
-  match regs with
-  | nil => nil
-  | s :: ss => (getRegActionFinalWrite (fst a) (fst s),
-                existT _ _ (if in_dec string_dec (fst s) (getWrites (snd a (fun _ => list nat)) (1 :: nil))
-                            then RtlITE (RtlReadWire _ (getRegActionEn (fst a) (fst s)))
-                                        (RtlReadWire _ (getRegActionWrite (fst a) (fst s)))
-                                        (RtlReadWire _ (getRegActionRead (fst a) (fst s)))
-                            else RtlReadWire (projT1 (getRegInit (snd s))) (getRegActionRead (fst a) (fst s))))
-                 :: finalWrites ss a
-  end.
+(* Fixpoint finalWrites (regs: list RegInitT) (a: Attribute (Action Void)): list (string * list nat * {x : Kind & RtlExpr x}) := *)
+(*   match regs with *)
+(*   | nil => nil *)
+(*   | s :: ss => (getRegActionFinalWrite (fst a) (fst s), *)
+(*                 existT _ _ (if in_dec string_dec (fst s) (getWrites (snd a (fun _ => list nat)) (1 :: nil)) *)
+(*                             then RtlITE (RtlReadWire _ (getRegActionEn (fst a) (fst s))) *)
+(*                                         (RtlReadWire _ (getRegActionWrite (fst a) (fst s))) *)
+(*                                         (RtlReadWire _ (getRegActionRead (fst a) (fst s))) *)
+(*                             else RtlReadWire (projT1 (getRegInit (snd s))) (getRegActionRead (fst a) (fst s)))) *)
+(*                  :: finalWrites ss a *)
+(*   end. *)
 
 Fixpoint getAllWriteReadConnections' (regs: list RegInitT) (order: list string) {struct order} :=
   match order with
@@ -378,7 +444,7 @@ Definition getAllWriteReadConnections (regs: list RegInitT) (order: list string)
   end.
 
 Definition getWires regs (rules: list (Attribute (Action Void))) (order: list string) :=
-  concat (map computeRuleAssigns rules) ++ concat (map (finalWrites regs) rules) ++ getAllWriteReadConnections regs order.
+  concat (map computeRuleAssigns rules) ++ getAllWriteReadConnections regs order ++ concat (map (computeRuleAssignsRegs regs) rules).
       
 Definition getWriteRegs (regs: list RegInitT) :=
   map (fun r => (fst r, existT _ (projT1 (getRegInit (snd r))) (RtlReadWire _ (getRegWrite (fst r))))) regs.

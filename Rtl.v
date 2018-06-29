@@ -60,3 +60,111 @@ Record RtlModule :=
     wires: list (string * list nat * sigT RtlExpr);
     sys: list (RtlExpr Bool * list RtlSysT)
   }.
+
+Section BitOps.
+  Local Fixpoint sumSizes n: (Fin.t n -> nat) -> nat :=
+    match n return (Fin.t n -> nat) -> nat with
+    | 0 => fun _ => 0
+    | S m => fun sizes => sumSizes (fun x => sizes (Fin.FS x)) + sizes Fin.F1
+    end.
+
+  Local Fixpoint size (k: Kind) {struct k} :=
+    match k with
+    | Bool => 1
+    | Bit n => n
+    | Struct n fk fs =>
+      sumSizes (fun i => size (fk i))
+    | Array n k => n * size k
+    end.
+
+  (* ConstExtract: LSB, MIDDLE, MSB *)
+  (* Concat: MSB, LSB *)
+
+  Local Fixpoint concatStructExpr n {struct n}:
+    forall (sizes: Fin.t n -> nat)
+           (f: forall i, RtlExpr (Bit (sizes i))),
+      RtlExpr (Bit (sumSizes sizes)) :=
+    match n return forall
+        (sizes: Fin.t n -> nat)
+        (f: forall i, RtlExpr (Bit (sizes i))),
+        RtlExpr (Bit (sumSizes sizes)) with
+    | 0 => fun _ _ => RtlConst WO
+    | S m => fun sizes f =>
+               RtlBinBit
+                 (Concat _ _) (f Fin.F1)
+                 (@concatStructExpr m (fun x => (sizes (Fin.FS x))) (fun x => f (Fin.FS x)))
+    end.
+
+  Fixpoint rtlPack (k: Kind): RtlExpr k -> RtlExpr (Bit (size k)) :=
+    match k return RtlExpr k -> RtlExpr (Bit (size k)) with
+    | Bool => fun e => (RtlITE e (RtlConst (WO~1)%word) (RtlConst (WO~0)%word))
+    | Bit n => fun e => e
+    | Struct n fk fs =>
+      fun e =>
+        concatStructExpr (fun i => size (fk i))
+                         (fun i => @rtlPack (fk i) (RtlReadStruct e i))
+    | Array n k =>
+      fun e =>
+        (fix help i :=
+           match i return RtlExpr (Bit (i * size k)) with
+           | 0 => RtlConst WO
+           | S m =>
+             RtlBinBit
+               (Concat (m * size k) (size k)) (help m)
+               (@rtlPack k (RtlReadArray e (RtlConst (natToWord (Nat.log2_up n) m))))
+           end) n
+    end.
+
+  Local Fixpoint sumSizesMsbs n (i: Fin.t n) {struct i}: (Fin.t n -> nat) -> nat :=
+    match i in Fin.t n return (Fin.t n -> nat) -> nat with
+    | Fin.F1 _ => fun _ => 0
+    | Fin.FS m f => fun sizes => sumSizesMsbs f (fun j => sizes (Fin.FS j)) + sizes Fin.F1
+    end.
+
+  Local Lemma helper_sumSizes n (i: Fin.t n):
+    forall (sizes: Fin.t n -> nat), sumSizes sizes = (sumSizes sizes - (sumSizesMsbs i sizes + sizes i)) + sizes i + sumSizesMsbs i sizes.
+  Proof.
+    induction i; simpl; intros; auto.
+    - lia.
+    - specialize (IHi (fun x => sizes (Fin.FS x))).
+      lia.
+  Qed.
+  Local Lemma helper_array n (i: Fin.t n):
+    forall size_k,
+      n * size_k = (n * size_k - ((proj1_sig (Fin.to_nat i) * size_k) + size_k)) + size_k + (proj1_sig (Fin.to_nat i) * size_k).
+  Proof.
+    induction i; simpl; intros; auto.
+    - lia.
+    - case_eq (Fin.to_nat i); simpl; intros.
+      rewrite H in *; simpl in *.
+      rewrite IHi at 1.
+      lia.
+  Qed.
+  
+  Local Definition castBits ni no (pf: ni = no) (e: RtlExpr (Bit ni)) :=
+    nat_cast (fun n => RtlExpr (Bit n)) pf e.
+
+  Local Definition ConstExtract lsb n msb (e: RtlExpr (Bit (lsb + n + msb))): RtlExpr (Bit n) :=
+      RtlUniBit (TruncMsb lsb n) (RtlUniBit (TruncLsb (lsb + n) msb) e).
+
+
+  Fixpoint rtlUnpack (k: Kind): RtlExpr (Bit (size k)) -> RtlExpr k :=
+    match k return RtlExpr (Bit (size k)) -> RtlExpr k with
+    | Bool => fun e => RtlEq e (RtlConst (WO~1)%word)
+    | Bit _ => fun e => e
+    | Struct n fk fs =>
+      fun e => RtlBuildStruct
+                 _ _
+                 (fun i =>
+                    rtlUnpack
+                      _
+                      (ConstExtract
+                         _ _ (sumSizesMsbs i (fun j => size (fk j)))
+                         (@castBits _ _ (helper_sumSizes i (fun j => size (fk j))) e)))
+    | Array n k =>
+      fun e =>
+        RtlBuildArray
+          (fun i => rtlUnpack _ (ConstExtract _ _ (proj1_sig (Fin.to_nat i) * size k)
+                                           (@castBits _ _ (helper_array _ _) e)))
+    end.
+End BitOps.
