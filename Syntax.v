@@ -1,6 +1,7 @@
 Require Export Bool String List FunctionalExtensionality Psatz PeanoNat.
 Require Export bbv.Word Lib.VectorFacts Lib.EclecticLib.
 
+Require Import Permutation.
 Import ListNotations.
 
 Global Set Implicit Arguments.
@@ -932,6 +933,10 @@ Definition MethsT := list MethT.
 
 Notation getKindAttr ls := (map (fun x => (fst x, projT1 (snd x))) ls).
 
+Notation "l '[=]' r" :=
+  ((@Permutation _ (l) (r)))
+    (at level 70, no associativity).
+
 Fixpoint getRegisters m :=
   match m with
   | RegFile dataArray read write IdxNum Data init =>
@@ -1114,6 +1119,116 @@ Section Semantics.
       (HCalls: calls = nil) :
       SemAction (Return e) readRegs newRegs calls evale.
 
+
+  Inductive PSemAction:
+    forall k, ActionT type k -> RegsT -> RegsT -> MethsT -> type k -> Prop :=
+  | PSemMCall
+      meth s (marg: Expr type (SyntaxKind (fst s)))
+      (mret: type (snd s))
+      retK (fret: type retK)
+      (cont: type (snd s) -> ActionT type retK)
+      readRegs newRegs (calls: MethsT) acalls
+      (HDisjCalls: key_not_In meth calls)
+      (HAcalls: acalls [=] (meth, (existT _ _ (evalExpr marg, mret))) :: calls)
+      (HPSemAction: PSemAction (cont mret) readRegs newRegs calls fret):
+      PSemAction (MCall meth s marg cont) readRegs newRegs acalls fret
+  | PSemLetExpr
+      k (e: Expr type k) retK (fret: type retK)
+      (cont: fullType type k -> ActionT type retK) readRegs newRegs calls
+      (HPSemAction: PSemAction (cont (evalExpr e)) readRegs newRegs calls fret):
+      PSemAction (LetExpr e cont) readRegs newRegs calls fret
+  | PSemLetAction
+      k (a: ActionT type k) (v: type k) retK (fret: type retK)
+      (cont: type k -> ActionT type retK)
+      readRegs newRegs readRegsCont newRegsCont calls callsCont
+      (HDisjRegs: DisjKey newRegs newRegsCont)
+      (HDisjCalls: DisjKey calls callsCont)
+      (HPSemAction: PSemAction a readRegs newRegs calls v)
+      ureadRegs unewRegs ucalls
+      (HUReadRegs: ureadRegs [=] readRegs ++ readRegsCont)
+      (HUNewRegs: unewRegs [=] newRegs ++ newRegsCont)
+      (HUCalls: ucalls [=] calls ++ callsCont)
+      (HPSemActionCont: PSemAction (cont v) readRegsCont newRegsCont callsCont fret):
+      PSemAction (LetAction a cont) (ureadRegs) (unewRegs)
+                (ucalls) fret
+  | PSemReadNondet
+      valueT (valueV: fullType type valueT)
+      retK (fret: type retK) (cont: fullType type valueT -> ActionT type retK)
+      readRegs newRegs calls
+      (HPSemAction: PSemAction (cont valueV) readRegs newRegs calls fret):
+      PSemAction (ReadNondet _ cont) readRegs newRegs calls fret
+  | PSemReadReg
+      (r: string) regT (regV: fullType type regT)
+      retK (fret: type retK) (cont: fullType type regT -> ActionT type retK)
+      readRegs newRegs calls areadRegs
+      (HRegVal: In (r, existT _ regT regV) o)
+      (HPSemAction: PSemAction (cont regV) readRegs newRegs calls fret)
+      (HNewReads: areadRegs [=] (r, existT _ regT regV) :: readRegs):
+      PSemAction (ReadReg r _ cont) areadRegs newRegs calls fret
+  | PSemWriteReg
+      (r: string) k
+      (e: Expr type k)
+      retK (fret: type retK)
+      (cont: ActionT type retK) readRegs newRegs calls anewRegs
+      (HRegVal: In (r, k) (getKindAttr o))
+      (HDisjRegs: key_not_In r newRegs)
+      (HANewRegs: anewRegs [=] (r, (existT _ _ (evalExpr e))) :: newRegs)
+      (HPSemAction: PSemAction cont readRegs newRegs calls fret):
+      PSemAction (WriteReg r e cont) readRegs anewRegs calls fret
+  | PSemIfElseTrue
+      (p: Expr type (SyntaxKind Bool)) k1
+      (a: ActionT type k1)
+      (a': ActionT type k1)
+      (r1: type k1)
+      k2 (cont: type k1 -> ActionT type k2)
+      readRegs1 readRegs2  newRegs1 newRegs2 calls1 calls2 (r2: type k2)
+      (HDisjRegs: DisjKey newRegs1 newRegs2)
+      (HDisjCalls: DisjKey calls1 calls2)
+      (HTrue: evalExpr p = true)
+      (HAction: PSemAction a readRegs1 newRegs1 calls1 r1)
+      (HPSemAction: PSemAction (cont r1) readRegs2 newRegs2 calls2 r2)
+      ureadRegs unewRegs ucalls
+      (HUReadRegs: ureadRegs [=] readRegs1 ++ readRegs2)
+      (HUNewRegs: unewRegs [=] newRegs1 ++ newRegs2)
+      (HUCalls: ucalls [=] calls1 ++ calls2) :
+      PSemAction (IfElse p a a' cont) ureadRegs unewRegs ucalls r2
+  | PSemIfElseFalse
+      (p: Expr type (SyntaxKind Bool)) k1
+      (a: ActionT type k1)
+      (a': ActionT type k1)
+      (r1: type k1)
+      k2 (cont: type k1 -> ActionT type k2)
+      readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 (r2: type k2)
+      (HDisjRegs: DisjKey newRegs1 newRegs2)
+      (HDisjCalls: DisjKey calls1 calls2)
+      (HFalse: evalExpr p = false)
+      (HAction: PSemAction a' readRegs1 newRegs1 calls1 r1)
+      (HPSemAction: PSemAction (cont r1) readRegs2 newRegs2 calls2 r2)
+      ureadRegs unewRegs ucalls
+      (HUReadRegs: ureadRegs [=] readRegs1 ++ readRegs2)
+      (HUNewRegs: unewRegs [=] newRegs1 ++ newRegs2)
+      (HUCalls: ucalls [=] calls1 ++ calls2):
+      PSemAction (IfElse p a a' cont) ureadRegs unewRegs ucalls r2
+  | PSemAssertTrue
+      (p: Expr type (SyntaxKind Bool)) k2
+      (cont: ActionT type k2) readRegs2 newRegs2 calls2 (r2: type k2)
+      (HTrue: evalExpr p = true)
+      (HPSemAction: PSemAction cont readRegs2 newRegs2 calls2 r2):
+      PSemAction (Assertion p cont) readRegs2 newRegs2 calls2 r2
+  | PSemDisplay
+      (ls: list (SysT type)) k (cont: ActionT type k)
+      r readRegs newRegs calls
+      (HPSemAction: PSemAction cont readRegs newRegs calls r):
+      PSemAction (Sys ls cont) readRegs newRegs calls r
+  | PSemReturn
+      k (e: Expr type (SyntaxKind k)) evale
+      (HEvalE: evale = evalExpr e)
+      readRegs newRegs calls
+      (HReadRegs: readRegs = nil)
+      (HNewRegs: newRegs = nil)
+      (HCalls: calls = nil) :
+      PSemAction (Return e) readRegs newRegs calls evale.
+  
   Theorem inversionSemAction
           k a reads news calls retC
           (evalA: @SemAction k a reads news calls retC):
@@ -1393,6 +1508,41 @@ Section BaseModule.
             (HNoCall: forall c, In c cs -> InCall c ls -> False)
             (HSubsteps: Substeps ls):
       Substeps l.
+
+  Inductive PSubsteps: list FullLabel -> Prop :=
+  | NilPSubstep (HRegs: getKindAttr o [=] getKindAttr (getRegisters m)) : PSubsteps nil
+  | PAddRule (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
+            rn rb
+            (HInRules: In (rn, rb) (getRules m))
+            reads u cs
+            (HPAction: PSemAction o (rb type) reads u cs WO)
+            (HReadsGood: SubList (getKindAttr reads)
+                                 (getKindAttr (getRegisters m)))
+            (HUpdGood: SubList (getKindAttr u)
+                               (getKindAttr (getRegisters m)))
+            l ls (HLabel: l [=] (u, (Rle rn, cs)) :: ls)
+            (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
+            (HNoRle: forall x, In x ls -> match fst (snd x) with
+                                          | Rle _ => False
+                                          | _ => True
+                                          end)
+            (HNoCall: forall c, In c cs -> InCall c ls -> False)
+            (HPSubstep: PSubsteps ls):
+      PSubsteps l
+  | PAddMeth (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
+            fn fb
+            (HInMeths: In (fn, fb) (getMethods m))
+            reads u cs argV retV
+            (HPAction: PSemAction o ((projT2 fb) type argV) reads u cs retV)
+            (HReadsGood: SubList (getKindAttr reads)
+                                 (getKindAttr (getRegisters m)))
+            (HUpdGood: SubList (getKindAttr u)
+                               (getKindAttr (getRegisters m)))
+            l ls (HLabel: l [=] (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
+            (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
+            (HNoCall: forall c, In c cs -> InCall c ls -> False)
+            (HPSubsteps: PSubsteps ls):
+      PSubsteps l.
 End BaseModule.
 
 Inductive Step: Mod -> RegsT -> list FullLabel -> Prop :=
@@ -1632,6 +1782,8 @@ Fixpoint inlinesingle_Mod (m : Mod) (f : DefMethT) : Mod :=
   |HideMeth m' s => HideMeth (inlinesingle_Mod m' f) s
   |ConcatMod m1 m2 => ConcatMod (inlinesingle_Mod m1 f) (inlinesingle_Mod m2 f)
   end.
+
+
 
 (*
  * Kami Rewrite

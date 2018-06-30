@@ -3,6 +3,7 @@ Require Import Kami.Syntax.
 Import ListNotations.
 Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
+Require Import RelationClasses Setoid Morphisms.
 
 Section evalExpr.
 
@@ -3821,3 +3822,511 @@ Fixpoint inlineCall (f : MethT)(fcalls : MethsT)(fcalled : MethsT) : MethsT :=
   | nil => nil
   end.
 
+Lemma PSemAction_SemAction o k:
+  forall (a : ActionT type k) (readRegs newRegs : RegsT) (calls : MethsT) (fret : type k),
+    PSemAction o a readRegs newRegs calls fret ->
+    (exists (readRegs' newRegs' : RegsT) (calls' : MethsT),
+        readRegs [=] readRegs' /\
+        newRegs [=] newRegs' /\
+        calls [=] calls' /\
+        SemAction o a readRegs' newRegs' calls' fret).
+Proof.
+  induction 1; dest.
+  - exists x, x0, ((meth, existT SignT s (evalExpr marg, mret))::x1).
+    repeat split; eauto.
+    + rewrite <- H2; assumption.
+    + econstructor 1; auto.
+      * unfold key_not_In in HDisjCalls.
+        intro; specialize (HDisjCalls v); rewrite H2 in HDisjCalls; eauto.
+  - exists x, x0, x1.
+    repeat split; eauto.
+    econstructor 2; assumption.
+  - exists (x2++x), (x3++x0), (x4++x1).
+    rewrite H1, H5 in HUReadRegs; rewrite H2, H6 in HUNewRegs; rewrite H3, H7 in HUCalls.
+    repeat split; auto.
+    + econstructor 3; eauto.
+      * intro; specialize (HDisjRegs k0); rewrite <- H6, <- H2; assumption.
+      * intro; specialize (HDisjCalls k0); rewrite <- H7, <- H3; assumption.
+  - exists x, x0, x1.
+    repeat split; auto.
+    econstructor 4; eauto.
+  - exists ((r, existT (fullType type) regT regV)::x), x0, x1.
+    repeat split; eauto.
+    + rewrite <- H0; assumption.
+    + econstructor 5; eauto.
+  - exists x, ((r, existT (fullType type) k (evalExpr e))::x0), x1.
+    repeat split; eauto.
+    + rewrite <- H1; assumption.
+    + econstructor 6; auto.
+      intro; specialize (HDisjRegs v); rewrite H1 in HDisjRegs; apply HDisjRegs.
+  - exists (x2++x), (x3++x0), (x4++x1).
+    rewrite H1, H5 in HUReadRegs; rewrite H2, H6 in HUNewRegs; rewrite H3, H7 in HUCalls.
+    repeat split; auto.
+    econstructor 7; auto.
+    + intro; specialize (HDisjRegs k); rewrite H2, H6 in HDisjRegs; apply HDisjRegs.
+    + intro; specialize (HDisjCalls k); rewrite H3, H7 in HDisjCalls; apply HDisjCalls.
+    + apply H8.
+    + assumption.
+  - exists (x2++x), (x3++x0), (x4++x1).
+    rewrite H1, H5 in HUReadRegs; rewrite H2, H6 in HUNewRegs; rewrite H3, H7 in HUCalls.
+    repeat split; auto.
+    econstructor 8; auto.
+    + intro; specialize (HDisjRegs k); rewrite H2, H6 in HDisjRegs; apply HDisjRegs.
+    + intro; specialize (HDisjCalls k); rewrite H3, H7 in HDisjCalls; apply HDisjCalls.
+    + apply H8.
+    + assumption.
+  - exists x, x0, x1.
+    repeat split; auto.
+    econstructor; eauto.
+  - exists x, x0, x1.
+    repeat split; auto.
+    econstructor; eauto.
+  - exists nil, nil, nil.
+    repeat split; subst; auto.
+    econstructor; eauto.
+Qed.
+
+Lemma SemAction_PSemAction o k:
+  forall (a : ActionT type k) (readRegs newRegs : RegsT) (calls : MethsT) (fret : type k),
+    SemAction o a readRegs newRegs calls fret ->
+    PSemAction o a readRegs newRegs calls fret.
+Proof.
+  induction 1; subst.
+  - econstructor 1; eauto.
+  - econstructor 2; eauto.
+  - econstructor 3; eauto.
+  - econstructor 4; eauto.
+  - econstructor 5; eauto.
+  - econstructor 6; eauto.
+  - econstructor 7; eauto.
+  - econstructor 8; eauto.
+  - econstructor 9; eauto.
+  - econstructor 10; eauto.
+  - econstructor 11; eauto.
+Qed.
+
+Lemma key_in_split' : forall (A B C : Type)(l : list (A*B))(x : (A*C)),
+    In (fst x) (map fst l) ->
+    (exists (l1 l2 : list (A*B))(y : B), l = l1++(((fst x), y)::l2)).
+Proof.
+  induction l; simpl; intros; auto.
+  - contradiction.
+  - destruct H.
+    + exists nil, l; simpl.
+      destruct a, x; simpl in *; subst.
+      exists b; reflexivity.
+    + specialize (IHl _ H).
+      dest.
+      exists (a::x0), x1.
+      simpl. exists x2.
+      rewrite H0; reflexivity.
+Qed.
+
+Lemma map_in_split A B (f : A -> B):
+  forall (l : list A)(x : A),
+    In (f x) (map f l) -> (exists (l1 l2 : list A), (map f l) = (map f l1)++((f x)::(map f l2))).
+Proof.
+  induction l; simpl; intros; auto.
+  - contradiction.
+  - destruct H.
+    + exists nil, l; simpl.
+      rewrite H; reflexivity.
+    + specialize (IHl _ H).
+      dest.
+      exists (a::x0), x1.
+      simpl.
+      rewrite H0; reflexivity.
+Qed.
+
+Lemma getKindAttrPerm_SnapShot (A B : Type)(P : B -> Type)(Q : B -> Type) :
+  forall (l1 : list (A * {x : B & P x}))(l2 : list (A * {x : B & Q x})),
+  getKindAttr l1 [=] getKindAttr l2 ->
+  (exists l2', l2 [=] l2' /\
+               getKindAttr l2' = getKindAttr l1).
+Proof.
+  induction l1.
+  - intros.
+    exists nil.
+    repeat split; auto.
+    destruct l2;[reflexivity|specialize (Permutation_nil H);discriminate].
+  - simpl; intros.
+    assert (In (fst a, projT1 (snd a)) (getKindAttr l2));[rewrite <- H; left; reflexivity|].
+    rewrite in_map_iff in H0; dest.
+    specialize (in_split _ _ H1) as TMP; dest; subst.
+    rewrite map_app in H; simpl in H; rewrite H0 in H.
+    specialize (Permutation_cons_app_inv _ _ H) as TMP.
+    rewrite <- map_app in TMP.
+    specialize (IHl1 _ TMP); dest.
+    exists (x::x2); split.
+    rewrite <- H2; symmetry; apply Permutation_cons_app; reflexivity.
+    simpl; rewrite H3, H0; reflexivity.
+Qed.
+
+Section PSemAction_rewrites.
+  Variable (k : Kind) (a : ActionT type k) (fret : type k).
+  Lemma PSemAction_rewrite_state  readRegs newRegs calls o1 o2:
+      (o1 [=] o2) ->
+      PSemAction o1 a readRegs newRegs calls fret ->
+      PSemAction o2 a readRegs newRegs calls fret.
+  Proof.
+    induction 2.
+    - econstructor 1; eauto.
+    - econstructor 2; eauto.
+    - econstructor 3; eauto.
+    - econstructor 4; eauto.
+    - econstructor 5; eauto.
+      rewrite <- H.
+      assumption.
+    - econstructor 6; eauto.
+      rewrite <- H.
+      assumption.
+    - econstructor 7; eauto.
+    - econstructor 8; eauto.
+    - econstructor 9; eauto.
+    - econstructor 10; eauto.
+    - econstructor 11; eauto.
+  Qed.
+
+  Lemma PSemAction_rewrite_calls readRegs newRegs calls1 calls2 o:
+    (calls1 [=] calls2) ->
+    PSemAction o a readRegs newRegs calls1 fret ->
+    PSemAction o a readRegs newRegs calls2 fret.
+  Proof.
+    induction 2.
+    - econstructor 1; eauto.
+      rewrite <- H; assumption.
+    - econstructor 2; eauto.
+    - econstructor 3; eauto.
+      rewrite <- H; assumption.
+    - econstructor 4; eauto.
+    - econstructor 5; eauto.
+    - econstructor 6; eauto.
+    - econstructor 7; eauto.
+      rewrite <- H; assumption.
+    - econstructor 8; eauto.
+      rewrite <- H; assumption.
+    - econstructor 9; eauto.
+    - econstructor 10; eauto.
+    - econstructor 11; eauto.
+      rewrite HCalls in H; apply (Permutation_nil H).
+  Qed.
+
+  Lemma SubList_refl A (l : list A) :
+    SubList l l.
+  Proof.
+    firstorder.
+  Qed.
+
+  Global Instance SubList_PreOrder A : PreOrder (@SubList A) | 10 := {
+  PreOrder_Reflexive := (@SubList_refl A);
+  PreOrder_Transitive := (@SubList_transitive A)}.
+
+  Lemma PSemAction_rewrite_readRegs readRegs1 readRegs2 newRegs calls o:
+    readRegs1 [=] readRegs2 ->
+    PSemAction o a readRegs1 newRegs calls fret ->
+    PSemAction o a readRegs2 newRegs calls fret.
+  Proof.
+    induction 2.
+    - econstructor 1; eauto.
+    - econstructor 2; eauto.
+    - econstructor 3; eauto.
+      rewrite <- H; assumption.
+    - econstructor 4; eauto.
+    - econstructor 5; eauto.
+      rewrite <- H; assumption.
+    - econstructor 6; eauto.
+    - econstructor 7; eauto.
+      rewrite <- H; assumption.
+    - econstructor 8; eauto.
+      rewrite <- H; assumption.
+    - econstructor 9; eauto.
+    - econstructor 10; eauto.
+    - econstructor 11; eauto.
+      rewrite HReadRegs in H; apply (Permutation_nil H).
+  Qed.
+
+  Lemma PSemAction_rewrite_newRegs readRegs newRegs1 newRegs2 calls o:
+    newRegs1 [=] newRegs2 ->
+    PSemAction o a readRegs newRegs1 calls fret ->
+    PSemAction o a readRegs newRegs2 calls fret.
+  Proof.
+    induction 2.
+    - econstructor 1; eauto.
+    - econstructor 2; eauto.
+    - econstructor 3; eauto.
+      rewrite <- H; assumption.
+    - econstructor 4; eauto.
+    - econstructor 5; eauto.
+    - econstructor 6; eauto.
+      rewrite <- H; assumption.
+    - econstructor 7; eauto.
+      rewrite <- H; assumption.
+    - econstructor 8; eauto.
+      rewrite <- H; assumption.
+    - econstructor 9; eauto.
+    - econstructor 10; eauto.
+    - econstructor 11; eauto.
+      rewrite HNewRegs in H; apply (Permutation_nil H).
+  Qed.
+  
+  Global Instance PSemAction_rewrite' :
+    Proper (@Permutation (string * {x : FullKind & fullType type x}) ==>
+                         @Permutation (string * {x : FullKind & fullType type x}) ==>
+                         @Permutation (string * {x : FullKind & fullType type x}) ==>
+                         @Permutation MethT ==>
+                         iff) (fun w x y z => @PSemAction w k a x y z fret) |10.
+  Proof.
+    repeat red; subst; split; intros; eauto using PSemAction_rewrite_state, PSemAction_rewrite_calls, PSemAction_rewrite_readRegs, PSemAction_rewrite_newRegs.
+    apply Permutation_sym in H; apply Permutation_sym in H0;apply Permutation_sym in H1;apply Permutation_sym in H2.   
+    eauto using PSemAction_rewrite_state, PSemAction_rewrite_calls, PSemAction_rewrite_readRegs, PSemAction_rewrite_newRegs.
+  Qed.
+End PSemAction_rewrites. 
+
+Inductive FullLabel_perm : FullLabel -> FullLabel -> Prop :=
+| FL_eq (u u' : RegsT) (cs cs' : MethsT) (rm rm' : RuleOrMeth): u [=] u' -> rm = rm' -> cs [=] cs' -> FullLabel_perm (u, (rm, cs)) (u', (rm', cs')).
+
+Inductive List_FullLabel_perm : list FullLabel -> list FullLabel -> Prop :=
+| LFL_eq_nil : List_FullLabel_perm nil nil
+| LFL_eq_cons_1 (fl1 fl2 : FullLabel)(ls1 ls2 : list FullLabel): FullLabel_perm fl1 fl2 -> List_FullLabel_perm ls1 ls2 -> List_FullLabel_perm (fl1::ls1) (fl2::ls2)
+| LFL_eq_cons_2 (fl1 fl2 fl3 fl4 : FullLabel)(ls1 ls2 : list FullLabel) : FullLabel_perm fl1 fl2 -> FullLabel_perm fl3 fl4 -> List_FullLabel_perm ls1 ls2 -> List_FullLabel_perm (fl1::fl3::ls1) (fl4::fl2::ls2)
+| LFL_eq_trans ls1 ls2 ls3 : List_FullLabel_perm ls1 ls2 -> List_FullLabel_perm ls2 ls3 -> List_FullLabel_perm ls1 ls3.
+
+Lemma FullLabel_perm_refl fl :
+  FullLabel_perm fl fl.
+Proof.
+  destruct fl, p; constructor; auto.
+Qed.
+
+Lemma FullLabel_perm_sym fl fl' :
+  FullLabel_perm fl fl' -> FullLabel_perm fl' fl.
+Proof.
+  induction 1; econstructor; eauto using Permutation_sym.
+Qed.
+
+Lemma FullLabel_perm_trans fl fl' fl'' :
+  FullLabel_perm fl fl' -> FullLabel_perm fl' fl'' -> FullLabel_perm fl fl''.
+Proof.
+  induction 1; intro; inv H2; econstructor;eauto using Permutation_trans.
+Qed.
+
+Global Instance FullLabel_perm_Equivalence : Equivalence (@FullLabel_perm) | 10 :={
+   Equivalence_Reflexive := @FullLabel_perm_refl;
+   Equivalence_Symmetric := @FullLabel_perm_sym;
+   Equivalence_Transitive := @FullLabel_perm_trans}.
+
+Lemma List_FullLabel_perm_refl ls :
+  List_FullLabel_perm ls ls.
+Proof.
+  induction ls; econstructor; eauto using FullLabel_perm_refl.
+Qed.
+
+Lemma List_FullLabel_perm_sym ls ls':
+  List_FullLabel_perm ls ls' -> List_FullLabel_perm ls' ls.
+Proof.
+  induction 1.
+  - econstructor.
+  - econstructor 2; eauto using FullLabel_perm_sym.
+  - econstructor 3; eauto using FullLabel_perm_sym.
+  - econstructor 4; eauto.
+Qed.
+
+Lemma List_FullLabel_perm_trans :
+  forall (ls ls' ls'' : list FullLabel),
+  List_FullLabel_perm ls ls' -> List_FullLabel_perm ls' ls'' -> List_FullLabel_perm ls ls''.
+Proof.
+  exact LFL_eq_trans.
+Qed.
+
+Global Instance List_FullLabel_perm_Equivalence : Equivalence (@List_FullLabel_perm) | 10 :={
+   Equivalence_Reflexive := @List_FullLabel_perm_refl;
+   Equivalence_Symmetric := @List_FullLabel_perm_sym;
+   Equivalence_Transitive := @List_FullLabel_perm_trans}.
+
+Lemma List_FullLabel_perm_in:
+  forall l l', List_FullLabel_perm l l' ->
+               forall a,
+                 In a l ->
+                 (exists x,
+                     FullLabel_perm a x /\
+                     In x l').
+Proof.
+  induction 1.
+  - contradiction.
+  - intros; destruct H1.
+    + subst.
+      exists fl2; repeat split;[|left]; auto.
+    + specialize (IHList_FullLabel_perm _ H1); dest.
+      exists x; split;[|right]; auto.
+  - intros; destruct H2;[|destruct H2]; subst.
+    + exists fl2; repeat split;[|right;left];auto.
+    + exists fl4; repeat split;[|left];auto.
+    + specialize (IHList_FullLabel_perm _ H2); dest.
+      exists x; split; [|right; right]; auto.
+  - intros; specialize (IHList_FullLabel_perm1 _ H1); dest.
+    specialize (IHList_FullLabel_perm2 _ H3); dest.
+    exists x0; repeat split; eauto using FullLabel_perm_trans.
+Qed.
+
+Lemma Perm_rewrite_List_FullLabel_perm_l l1 l2:
+  l1 [=] l2 ->
+  forall l,
+    List_FullLabel_perm l1 l ->
+    List_FullLabel_perm l2 l.
+Proof.
+  induction 1.
+  - intros; assumption.
+  - intros.
+    rewrite <- H0.
+    econstructor 2.
+    + reflexivity.
+    + eapply IHPermutation.
+      reflexivity.
+  - intros.
+    rewrite <- H.
+    econstructor 3; reflexivity.
+  - intros.
+    rewrite <- H1.
+    eapply IHPermutation2.
+    eapply IHPermutation1.
+    reflexivity.
+Qed.  
+
+Corollary Perm_rewrite_List_FullLabel_perm l1 l2 l3 l4 :
+  l1 [=] l2 ->
+  l3 [=] l4 ->
+  List_FullLabel_perm l1 l3 ->
+  List_FullLabel_perm l2 l4.
+Proof.
+  intros.
+  eauto using Perm_rewrite_List_FullLabel_perm_l, List_FullLabel_perm_sym.
+Qed.
+
+Global Instance Perm_rewrite_List_FullLabel_perm' :
+  Proper (@Permutation FullLabel ==> @Permutation FullLabel ==> iff) (@List_FullLabel_perm) |10.
+Proof.
+  repeat red; split; intros; eauto using Perm_rewrite_List_FullLabel_perm, Permutation_sym.
+Qed.
+
+Section Permutation_filter.
+  Variable A : Type.
+  Variable f : A -> bool.
+  
+  Lemma Permutation_filter l l':
+    l [=] l' -> filter f l [=] filter f l'.
+  Proof.
+    induction 1; auto.
+    - rewrite (filter_app _ (x::nil) l); rewrite (filter_app _ (x::nil) l').
+      rewrite IHPermutation; reflexivity.
+    - rewrite (filter_app _ (y::x::nil) l); rewrite (filter_app _ (x::y::nil) l).
+      apply Permutation_app_tail.
+      rewrite (filter_app _ (y::nil) (x::nil)); rewrite (filter_app _ (x::nil) (y::nil)).
+      rewrite (Permutation_app_comm); reflexivity.
+    - rewrite IHPermutation1; rewrite IHPermutation2; reflexivity.
+  Qed.
+
+  Global Instance Permutation_filter' :
+    Proper (@Permutation A ==> @Permutation A) (@filter A f) | 10.
+  Proof.
+    intro; eauto using Permutation_filter.
+  Qed.
+
+End Permutation_filter.
+Section SubList_rewrites.
+  Variable A : Type.
+
+  Lemma SubList_rewrite (l1 l2 l3 l4 : list A):
+    l1 [=] l3 -> l2 [=] l4 -> SubList l1 l2 -> SubList l3 l4.
+  Proof.
+    unfold SubList; intros.
+    rewrite <- H0.
+    apply (H1 x).
+    rewrite H.
+    assumption.
+  Qed.
+
+  Global Instance SubList_rewrite' :
+    Proper (@Permutation A ==> @Permutation A ==> iff) (@SubList A) | 10.
+  repeat red; intros; split; eauto using SubList_rewrite, Permutation_sym.
+  Qed.
+End SubList_rewrites.
+
+Lemma PSubsteps_Substeps m:
+  forall (o : RegsT)(l : list FullLabel),
+    PSubsteps m o l ->
+    (exists (o' : RegsT)(l' : list FullLabel),
+        o [=] o' /\
+        List_FullLabel_perm l l' /\
+        getKindAttr o' = getKindAttr (getRegisters m) /\
+        Substeps m o' l').
+Proof.
+  induction 1.
+  - specialize (getKindAttrPerm_SnapShot _ _ _ _ (Permutation_sym HRegs)) as TMP
+    ; dest;exists x, nil; repeat split; auto; econstructor 1; eauto.
+  - dest; apply (PSemAction_rewrite_state H0) in HPAction; apply PSemAction_SemAction in HPAction; dest.
+    exists x, ((x2, (Rle rn, x3))::x0); repeat split; auto;[destruct l|].
+    + apply Permutation_nil in HLabel; discriminate.
+    + rewrite HLabel.
+      econstructor; eauto.
+      econstructor; eauto.
+    + econstructor 2; eauto.
+      * rewrite H4 in HReadsGood; assumption.
+      * rewrite H5 in HUpdGood; assumption.
+      * intros;specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H1) _ H8) as TMP; dest;specialize (HDisjRegs _ H10);
+          intro; inversion H9; simpl; destruct (HDisjRegs k);[left|right];intro; apply H16.
+        -- rewrite <- H15; simpl.
+           rewrite <- H11; assumption.
+        -- rewrite H5; assumption.
+      * intros.
+        specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H1) _ H8) as TMP; dest;specialize (HNoRle _ H10);
+          inversion H9;rewrite <- H15 in HNoRle; simpl in *;rewrite H12;assumption.
+      * intros;rewrite <- H6 in H8;unfold InCall in H9; dest; specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H1) _ H9) as TMP;
+          dest;inv H11;eapply HNoCall.
+        -- apply H8.
+        -- unfold InCall;exists (u', (rm', cs'));split; auto; simpl in *;rewrite <- H15; assumption.
+  -  dest; apply (PSemAction_rewrite_state H0) in HPAction; apply PSemAction_SemAction in HPAction; dest.
+    exists x, ((x2, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), x3))::x0); repeat split; auto;[destruct l|].
+    + apply Permutation_nil in HLabel; discriminate.
+    + rewrite HLabel.
+      econstructor; eauto.
+      econstructor; eauto.
+    + econstructor 3; eauto.
+      * rewrite H4 in HReadsGood; assumption.
+      * rewrite H5 in HUpdGood; assumption.
+      * intros;specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H1) _ H8) as TMP; dest;specialize (HDisjRegs _ H10);
+          intro; inversion H9; simpl; destruct (HDisjRegs k);[left|right];intro; apply H16.
+        -- rewrite <- H15; simpl.
+           rewrite <- H11; assumption.
+        -- rewrite H5; assumption.
+      * intros;rewrite <- H6 in H8;unfold InCall in H9; dest; specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H1) _ H9) as TMP;
+          dest;inv H11;eapply HNoCall.
+        -- apply H8.
+        -- unfold InCall;exists (u', (rm', cs'));split; auto; simpl in *;rewrite <- H15; assumption.
+Qed.
+
+Lemma Substeps_PSubsteps m:
+  forall (o : RegsT) (l : list FullLabel),
+    Substeps m o l -> PSubsteps m o l.
+  induction 1; subst.
+  - econstructor 1; rewrite HRegs; reflexivity.
+  - econstructor 2.
+    + rewrite HRegs; reflexivity.
+    + apply HInRules.
+    + apply (SemAction_PSemAction HAction).
+    + assumption.
+    + assumption.
+    + reflexivity.
+    + assumption.
+    + assumption.
+    + assumption.
+    + assumption.
+  - econstructor 3.
+    + rewrite HRegs; reflexivity.
+    + apply HInMeths.
+    + apply (SemAction_PSemAction HAction).
+    + assumption.
+    + assumption.
+    + reflexivity.
+    + assumption.
+    + assumption.
+    + assumption.
+Qed.
