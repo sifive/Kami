@@ -135,6 +135,7 @@ Section Compile.
                           | SyntaxKind k => k
                           | _ => Void
                           end.
+    
     Fixpoint getRegisterWrites k (a: ActionT (fun _ => list nat) k) (enable: RtlExpr Bool) startList retList : list (RtlExpr Bool * RtlExpr regKind) :=
       match a in ActionT _ _ with
       | MCall meth k argExpr cont =>
