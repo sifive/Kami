@@ -4330,3 +4330,149 @@ Lemma Substeps_PSubsteps m:
     + assumption.
     + assumption.
 Qed.
+
+Lemma List_FullLabel_perm_nil l :
+  List_FullLabel_perm nil l ->
+  l = nil.
+Proof.
+  intros; remember (@nil FullLabel) as m in H.
+  induction H; [eauto| | | eauto];discriminate.
+Qed.  
+
+Lemma List_FullLabel_perm_len l1 l2 :
+  List_FullLabel_perm l1 l2 ->
+  length l1 = length l2.
+Proof.
+  induction 1; simpl; eauto using eq_trans.
+Qed.
+
+Lemma List_FullLabel_perm_ind_bis :
+  forall (P : list FullLabel -> list FullLabel -> Prop),
+       P [] [] ->
+       (forall (x x' : FullLabel) (l l' : list FullLabel),FullLabel_perm x x' -> List_FullLabel_perm l l' -> P l l' -> P (x :: l) (x' :: l')) ->
+       (forall (x y x' y' : FullLabel) (l l' : list FullLabel), FullLabel_perm x x' -> FullLabel_perm y y' ->
+                                                                List_FullLabel_perm l l' -> P l l' -> P (y :: x :: l) (x' :: y' :: l')) ->
+       (forall l l' l'' : list FullLabel, List_FullLabel_perm l l' -> P l l' -> List_FullLabel_perm l' l'' -> P l' l'' -> P l l'')
+       -> forall l l' : list FullLabel, List_FullLabel_perm l l' -> P l l'.
+Proof.
+  intros P Hnil Hskip Hswap Htrans.
+  induction 1; auto.
+  eapply Htrans with ls2; auto.
+Qed.
+
+Lemma List_FullLabel_perm_Add a b l l' : FullLabel_perm a b -> List.Add a l l' -> List_FullLabel_perm (b::l) l'.
+Proof.
+  induction 2; simpl.
+  - econstructor 2; eauto using FullLabel_perm_sym, List_FullLabel_perm_refl.
+  - eapply LFL_eq_trans with (x::b::l).
+    + econstructor 3; eauto using FullLabel_perm_refl, List_FullLabel_perm_refl.
+    + econstructor 2; eauto using FullLabel_perm_refl.
+Qed.
+
+Ltac FLInvAdd := repeat (match goal with
+ | H: List.Add ?x _ (_ :: _) |- _ => inversion H; clear H; subst
+                       end).
+
+Lemma List_FullLabel_perm_Add_inv l1 l2:
+  List_FullLabel_perm l1 l2 -> forall l1' l2' a b, FullLabel_perm a b -> List.Add a l1' l1 -> List.Add b l2' l2 ->
+                                                                     List_FullLabel_perm l1' l2'.
+Proof.
+ revert l1 l2. refine (List_FullLabel_perm_ind_bis _ _ _ _ _).
+ - (* nil *)
+   inversion_clear 2.
+ - (* skip *)
+   intros x x' l1 l2 FL_E LFLE IH. intros. FLInvAdd; auto.
+   + rewrite <- LFLE.
+     eapply List_FullLabel_perm_Add; rewrite <- FL_E in H; eauto using FullLabel_perm_trans, FullLabel_perm_sym.
+   + rewrite LFLE.
+     symmetry; eapply List_FullLabel_perm_Add; rewrite H in FL_E; eauto using FullLabel_perm_trans, FullLabel_perm_sym.
+   + econstructor 2; eauto.
+ - (* swap *)
+   intros x y x' y' l1 l2 FL_E1 FL_E2 PFLE IH. intros. FLInvAdd.
+   + try econstructor; eauto using FullLabel_perm_trans, FullLabel_perm_sym.
+   + try econstructor; eauto using FullLabel_perm_trans, FullLabel_perm_sym.
+   + try econstructor; eauto using FullLabel_perm_trans, FullLabel_perm_sym.
+     rewrite <- PFLE.
+     eapply List_FullLabel_perm_Add; rewrite <- FL_E1 in H; eauto.
+   + try econstructor; eauto using FullLabel_perm_trans, FullLabel_perm_sym.
+   + try econstructor; eauto using FullLabel_perm_trans, FullLabel_perm_sym.
+   + assert (y::x::l0 [=] x::y::l0);[constructor| rewrite H0].
+     econstructor 2; eauto.
+     rewrite <- PFLE.
+     eapply List_FullLabel_perm_Add;[rewrite FL_E2;apply H|];eauto.
+   + try econstructor; eauto using FullLabel_perm_trans, FullLabel_perm_sym.
+     rewrite PFLE; symmetry; eapply List_FullLabel_perm_Add;[rewrite <-FL_E2; symmetry; apply H| assumption].
+   + assert (x'::y'::l0 [=] y'::x'::l0);[constructor| rewrite H0].
+     econstructor 2; eauto.
+     symmetry; rewrite PFLE; eapply List_FullLabel_perm_Add;[symmetry; rewrite <- FL_E1; apply H| assumption].
+   + econstructor 3; eauto.
+ - (* trans *)
+   intros l1 l l2 PE IH PE' IH' l1' l2' a b FL_E AD1 AD2.
+   assert (In a l1). rewrite (List.Add_in AD1); left; reflexivity.
+   specialize (List_FullLabel_perm_in PE _ H) as TMP; dest.
+   destruct (Add_inv _ _ H1) as (l', AD).
+   transitivity l'.
+   + eapply IH;[apply H0| |];auto.
+   + rewrite H0 in FL_E. eapply IH';[apply FL_E| |];auto.
+Qed.
+
+Lemma List_FullLabel_perm_cons_inv fl1 fl2 l1 l2:
+  FullLabel_perm fl1 fl2 ->
+    List_FullLabel_perm (fl1::l1) (fl2::l2) ->
+    List_FullLabel_perm l1 l2.
+Proof.
+  intros; eapply List_FullLabel_perm_Add_inv; eauto using List.Add_head.
+Qed.
+  
+Lemma PSubsteps_List_FullLabel_perm_rewrite m o l :
+  PSubsteps m o l ->
+  forall l',
+  List_FullLabel_perm l l' ->
+  PSubsteps m o l'.
+Proof.
+  induction 1.
+  - intros; apply List_FullLabel_perm_nil in H; subst.
+    econstructor 1; eauto.
+  - intros; rewrite HLabel in *.
+    specialize (List_FullLabel_perm_in H0 (u, (Rle rn, cs)) (in_eq _ _)) as TMP; dest.
+      inversion H1; subst; apply (PSemAction_rewrite_newRegs H6) in HPAction;
+        apply (PSemAction_rewrite_calls H9) in HPAction; rewrite H6 in HUpdGood.
+      apply in_split in H2; dest.
+      assert (l' [=] (u', (Rle rn, cs'))::(x++x0)); subst.
+    + symmetry; apply Permutation_cons_app; reflexivity.
+    + econstructor 2; eauto;rewrite H3 in H0; apply List_FullLabel_perm_cons_inv in H0; auto; intros.
+      * specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H0) _ H2) as TMP; dest.
+        specialize (HDisjRegs _ H5).
+        intro; destruct (HDisjRegs k);[left|right];intro; apply H7; inv H4; simpl in *;[rewrite <- H10| rewrite H6]; assumption.
+      * specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H0) _ H2) as TMP; dest.
+        specialize (HNoRle _ H5).
+        inv H4; simpl in *; assumption.
+      * rewrite <- H9 in H2.
+        unfold InCall in H4; dest.
+        eapply HNoCall; eauto; unfold InCall.
+        specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H0) _ H4) as TMP; dest.
+        exists x2; split; auto.
+        inv H7; simpl in *; rewrite <- H12; assumption.
+  - intros; rewrite HLabel in *.
+    specialize (List_FullLabel_perm_in H0 (u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs)) (in_eq _ _)) as TMP; dest.
+      inversion H1; subst; apply (PSemAction_rewrite_newRegs H6) in HPAction;
+        apply (PSemAction_rewrite_calls H9) in HPAction; rewrite H6 in HUpdGood.
+      apply in_split in H2; dest.
+      assert (l' [=] (u', (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs'))::(x++x0)); subst.
+    + symmetry; apply Permutation_cons_app; reflexivity.
+    + econstructor 3; eauto;rewrite H3 in H0; apply List_FullLabel_perm_cons_inv in H0; auto; intros.
+      * specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H0) _ H2) as TMP; dest.
+        specialize (HDisjRegs _ H5).
+        intro; destruct (HDisjRegs k);[left|right];intro; apply H7; inv H4; simpl in *;[rewrite <- H10| rewrite H6]; assumption.
+      * rewrite <- H9 in H2.
+        unfold InCall in H4; dest.
+        eapply HNoCall; eauto; unfold InCall.
+        specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H0) _ H4) as TMP; dest.
+        exists x2; split; auto.
+        inv H7; simpl in *; rewrite <- H12; assumption.
+Qed.
+
+Global Instance PSubsteps_List_FullLabel_perm_rewrite' :
+  Proper (Logic.eq ==> Logic.eq ==> List_FullLabel_perm ==> iff) (@PSubsteps) | 10.
+repeat red; intros; split; intros; subst; eauto using List_FullLabel_perm_sym, PSubsteps_List_FullLabel_perm_rewrite.
+Qed.

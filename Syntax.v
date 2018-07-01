@@ -1574,6 +1574,27 @@ Inductive Step: Mod -> RegsT -> list FullLabel -> Prop :=
                 (HLabels: l = l1 ++ l2):
     Step (ConcatMod m1 m2) o l.
 
+Inductive PStep: Mod -> RegsT -> list FullLabel -> Prop :=
+| PBaseStep m o l (HPSubsteps: PSubsteps m o l) (HMatching: MatchingExecCalls l l (Base m)):
+    PStep (Base m) o l
+| PHideMethStep m s o l (HPStep: PStep m o l)
+                (HHidden: forall v, In s (map fst (getAllMethods m)) -> InExec (s, v) l -> InCall (s, v) l):
+    PStep (HideMeth m s) o l
+| PConcatModStep m1 m2 o1 o2 l1 l2
+                 (HPStep1: PStep m1 o1 l1)
+                 (HPStep2: PStep m2 o2 l2)
+                 (HMatching1: MatchingExecCalls l1 l2 m2)
+                 (HMatching2: MatchingExecCalls l2 l1 m1)
+                 (HNoRle: forall x y, In x l1 -> In y l2 -> match fst (snd x), fst (snd y) with
+                                                            | Rle _, Rle _ => False
+                                                            | _, _ => True
+                                                            end)
+                 (HNoCall: forall x, InCall x l1 -> InCall x l2 -> False)
+                 o l
+                 (HRegs: o [=] o1 ++ o2)
+                 (HLabels: l [=] l1 ++ l2):
+    PStep (ConcatMod m1 m2) o l.
+
 Definition UpdRegs (u: list RegsT) (o o': RegsT)
   := getKindAttr o = getKindAttr o' /\
      (forall s v, In (s, v) o' -> ((exists x, In x u /\ In (s, v) x) \/
