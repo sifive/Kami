@@ -493,29 +493,29 @@ Notation "x != y" := (UniBool Neg (Eq x y))
 Notation "v @[ idx ] " := (ReadArray v idx) (at level 38) : kami_expr_scope.
 Notation "v '@[' idx <- val ] " := (UpdateArray v idx val) (at level 38) : kami_expr_scope.
 
-Ltac findStructIdx v f :=
+Local Ltac findStructIdx v f :=
   let idx := eval cbv in (Vector_find (fun x => getBool (string_dec (fst x) f%string)) v) in
       exact idx.
 
-Ltac getStructList fs f := match fs with
-                           | (fun i: Fin.t _ =>
-                                fst (Vector.nth ?v i)): Fin.t _ -> string =>
-                             findStructIdx v f
-                           | _ => let y := eval hnf in fs in
-                                      getStructList y f
-                           end.
+Local Ltac getStructList fs f := match fs with
+                                 | (fun i: Fin.t _ =>
+                                      fst (Vector.nth ?v i)): Fin.t _ -> string =>
+                                   findStructIdx v f
+                                 | _ => let y := eval hnf in fs in
+                                            getStructList y f
+                                 end.
 
-Ltac getStructStringFn v f := match v with
-                              | Struct ?fk ?fs => getStructList fs f
-                              | _ => let y := eval hnf in v in
-                                         getStructStringFn y f
-                              end.
+Local Ltac getStructStringFn v f := match v with
+                                    | Struct ?fk ?fs => getStructList fs f
+                                    | _ => let y := eval hnf in v in
+                                               getStructStringFn y f
+                                    end.
 
-Ltac getStructFull v f := match v with
-                          | Expr _ (SyntaxKind ?y) => getStructStringFn y f
-                          | _ => let y := eval hnf in v in
-                                     getStructFull y f
-                          end.
+Local Ltac getStructFull v f := match v with
+                                | Expr _ (SyntaxKind ?y) => getStructStringFn y f
+                                | _ => let y := eval hnf in v in
+                                           getStructFull y f
+                                end.
 
 Notation "s @% f" := (ReadStruct s ltac:(let typeS := type of s in
                                          getStructFull typeS f))

@@ -168,3 +168,67 @@ Section BitOps.
                                            (@castBits _ _ (helper_array _ _) e)))
     end.
 End BitOps.
+
+Notation "name ::= value" :=
+  (existT (fun a : Attribute Kind => RtlExpr (snd a))
+          (name%string, _) value) (at level 50) : rtl_struct_init_scope.
+Delimit Scope rtl_struct_init_scope with rtl_init.
+
+Notation getStructVal ls :=
+  (RtlBuildStruct (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
+                  (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j))
+                  (fun k => Vector_nth_map2_r (@projT1 _ _) (fun x => RtlExpr (snd x)) ls k (projT2 (Vector.nth ls k)))).
+
+Notation "'STRUCT' { s1 ; .. ; sN }" :=
+  (getStructVal (Vector.cons _ s1%rtl_init _ ..
+                             (Vector.cons _ sN%rtl_init _ (Vector.nil _)) ..))
+  : rtl_expr_scope.
+
+Delimit Scope rtl_expr_scope with rtl_expr.
+
+Local Definition testStruct :=
+  (STRUCT {
+       "hello" :: Bit 10 ;
+       "a" :: Bit 3 ;
+       "b" :: Bit 5 ;
+       "test" :: Bool }).
+
+Local Definition testStructVal: RtlExpr testStruct :=
+  (STRUCT {
+       "hello" ::= RtlConst (natToWord _ 4) ;
+       "a" ::= RtlConst (natToWord _ 23) ;
+       "b" ::= RtlConst (natToWord _ 5) ;
+       "test" ::= RtlConst true })%rtl_expr.
+
+Local Ltac findStructIdx v f :=
+  let idx := eval cbv in (Vector_find (fun x => getBool (string_dec (fst x) f%string)) v) in
+      exact idx.
+
+Local Ltac getStructList fs f := match fs with
+                                 | (fun i: Fin.t _ =>
+                                      fst (Vector.nth ?v i)): Fin.t _ -> string =>
+                                   findStructIdx v f
+                                 | _ => let y := eval hnf in fs in
+                                            getStructList y f
+                                 end.
+
+Local Ltac getStructStringFn v f := match v with
+                                    | Struct ?fk ?fs => getStructList fs f
+                                    | _ => let y := eval hnf in v in
+                                               getStructStringFn y f
+                                    end.
+
+Local Ltac getStructFull v f := match v with
+                                | RtlExpr ?y => getStructStringFn y f
+                                | _ => let y := eval hnf in v in
+                                           getStructFull y f
+                                end.
+
+
+
+Notation "s @% f" := (RtlReadStruct s ltac:(let typeS := type of s in
+                                            getStructFull typeS f))
+                     : rtl_expr_scope.
+
+Definition testFieldAccess := 
+  (testStructVal @% "hello")%rtl_expr.
