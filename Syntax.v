@@ -1612,10 +1612,13 @@ Definition Maybe k :=
       "data"  :: k
     }.
 
-Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= # x })%kami_expr
+Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_expr
     (at level 100) : kami_expr_scope.
 
-Notation "'Invalid' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= # x })%kami_expr
+Notation "'Invalid'" := (STRUCT { "valid" ::= $$ false ; "data" ::= getDefaultConst _ })%kami_expr
+    (at level 100) : kami_expr_scope.
+
+Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_expr
     (at level 100) : kami_expr_scope.
 
 (*
