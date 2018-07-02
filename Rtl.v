@@ -171,7 +171,7 @@ End BitOps.
 
 Notation "name ::= value" :=
   (existT (fun a : Attribute Kind => RtlExpr (snd a))
-          (name%string, _) value) (at level 50) : rtl_struct_init_scope.
+          (name%string, _) value) (only parsing) (at level 50) : rtl_struct_init_scope.
 Delimit Scope rtl_struct_init_scope with rtl_init.
 
 Notation getStructVal ls :=
