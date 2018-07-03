@@ -225,7 +225,8 @@ Section Compile.
           let wt := @getRegisterWrites _ t (0 :: startList) in
           let wf := @getRegisterWrites _ f (0 :: inc startList) in
           let wc := @getRegisterWrites _ (cont (inc (inc startList))) (inc (inc (inc startList))) in
-          (RtlITE (wc @% "valid") wc (RtlITE (wf @% "valid") wf wt))%rtl_expr
+          (RtlITE (wc @% "valid") wc
+                  (RtlITE (convertExprToRtl pred) wt wf))%rtl_expr
         | WriteReg r k' expr cont =>
           let wc := @getRegisterWrites _ cont startList in
           if string_dec r (fst reg)
@@ -299,7 +300,7 @@ Section Compile.
           let wt := @getMethEns _ t (0 :: startList) in
           let wf := @getMethEns _ f (0 :: inc startList) in
           let wc := @getMethEns _ (cont (inc (inc startList))) (inc (inc (inc startList))) in
-          (RtlITE (wc @% "valid") wc (RtlITE (wf @% "valid") wf wt))%rtl_expr
+          (RtlITE (wc @% "valid") wc (RtlITE (convertExprToRtl pred) wt wf))%rtl_expr
         | WriteReg r k' expr cont =>
           @getMethEns _ cont startList
         end.
