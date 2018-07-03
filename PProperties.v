@@ -901,25 +901,25 @@ Proof.
       eapply H1;[rewrite H | |]; try right; assumption.
 Qed.
 
-Lemma PTrace_Trace m o ls:
-  WfMod m ->
-  PTrace m o ls ->
-  (exists o' ls',
-      o [=] o' /\
-      map fst o' = map fst (getAllRegisters m) /\
-      List_FullLabel_perm_Lists ls ls' /\
-      Trace m o' ls').
-Proof.
-  induction 2; subst.
-  - specialize (key_perm_eq _ _ (Permutation_sym HUpdRegs1)) as TMP;dest.
-    exists x, nil.
-    repeat split; eauto; econstructor; auto.
-    eapply RegInit_generalized_list; eauto.
-  - specialize (WfNoDups H) as TMP; dest.
-    apply PStep_Step in HPStep; dest.
-    unfold PUpdRegs in HPUpdRegs; dest.
-    rewrite H4 in H11.
-    specialize (getKindAttr_perm_eq _ _ _ _ (Permutation_sym H11)) as TMP; dest.
+(* Lemma PTrace_Trace m o ls: *)
+(*   WfMod m -> *)
+(*   PTrace m o ls -> *)
+(*   (exists o' ls', *)
+(*       o [=] o' /\ *)
+(*       map fst o' = map fst (getAllRegisters m) /\ *)
+(*       List_FullLabel_perm_Lists ls ls' /\ *)
+(*       Trace m o' ls'). *)
+(* Proof. *)
+(*   induction 2; subst. *)
+(*   - specialize (key_perm_eq _ _ (Permutation_sym HUpdRegs1)) as TMP;dest. *)
+(*     exists x, nil. *)
+(*     repeat split; eauto; econstructor; auto. *)
+(*     eapply RegInit_generalized_list; eauto. *)
+(*   - specialize (WfNoDups H) as TMP; dest. *)
+(*     apply PStep_Step in HPStep; dest. *)
+(*     unfold PUpdRegs in HPUpdRegs; dest. *)
+(*     rewrite H4 in H11. *)
+(*     specialize (getKindAttr_perm_eq _ _ _ _ (Permutation_sym H11)) as TMP; dest. *)
     
     
 
