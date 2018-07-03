@@ -17,4 +17,5 @@ top.sv
 *.vcd
 *.mem
 Makefile.coq.*
+Makefile.coq
 .coqdeps.d

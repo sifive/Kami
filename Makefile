@@ -1,10 +1,9 @@
 VS:=$(wildcard *.v)
-VS += $(wildcard Lib/*.v)
-VS += $(wildcard Compile/*.v)
+VS+=$(wildcard Lib/*.v)
 
 .PHONY: coq src clean
 
-ARGS := -R . Kami -R ../bbv bbv
+ARGS := $(shell cat _CoqProject)
 
 coq: Makefile.coq.all
 	$(MAKE) -f Makefile.coq.all
@@ -21,5 +20,6 @@ Makefile.coq.src: Makefile $(VS)
 clean:: Makefile.coq.all Makefile.coq.src
 	$(MAKE) -f Makefile.coq.all clean || $(MAKE) -f Makefile.coq.src clean
 	rm -f */*.v.d */*.glob */*.vo */*~ *~
+	rm -f *.hi *.o
 	rm -f Makefile.coq.all
 	rm -f Makefile.coq.src

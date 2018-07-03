@@ -1,2 +1,1 @@
--R . Kami
--R ../bbv bbv
+-R . Kami -R ../bbv/theories bbv
