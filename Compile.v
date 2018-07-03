@@ -180,7 +180,7 @@ Section Compile.
 
   Definition invalidRtl (k: Kind) :=
     ((STRUCT {
-          "valid" ::= RtlConst true ;
+          "valid" ::= RtlConst false ;
           "data" ::= RtlConst (getDefaultConst k)
      })%rtl_expr : RtlExpr (Maybe k)).
 
