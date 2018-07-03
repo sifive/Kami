@@ -2113,7 +2113,7 @@ Proof.
       rewrite ?map_app; congruence.
     + econstructor 2; eauto; simpl; rewrite ?map_app; try congruence.
       * rewrite in_app_iff; right; eassumption.
-      * pose proof (SemActionReadsSub HAction).
+      * pose proof (SemActionReadsSub m2 HAction).
         pose proof (SemActionUpdSub HAction).
         eapply SemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; right.
         -- eapply H0; eauto.
@@ -2126,7 +2126,7 @@ Proof.
           unfold InCall in *; simpl in *; dest; tauto.
     + econstructor 3; eauto; simpl; rewrite ?map_app; try congruence.
       * rewrite in_app_iff; right; eassumption.
-      * pose proof (SemActionReadsSub HAction).
+      * pose proof (SemActionReadsSub m2 HAction).
         pose proof (SemActionUpdSub HAction).
         eapply SemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; right.
         -- eapply H0; eauto.
@@ -2147,7 +2147,7 @@ Proof.
     econstructor 2; eauto; simpl; rewrite ?map_app; try congruence.
     + inv H0; congruence.
     + rewrite in_app_iff; left; eassumption.
-    + pose proof (SemActionReadsSub HAction).
+    + pose proof (SemActionReadsSub m1 HAction).
       pose proof (SemActionUpdSub HAction).
       eapply SemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; left.
       * eapply H1; eauto.
@@ -2189,7 +2189,7 @@ Proof.
     econstructor 3; eauto; simpl; rewrite ?map_app; try congruence.
     + inv H0; congruence.
     + rewrite in_app_iff; left; eassumption.
-    + pose proof (SemActionReadsSub HAction).
+    + pose proof (SemActionReadsSub m1 HAction).
       pose proof (SemActionUpdSub HAction).
       eapply SemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; left.
       * eapply H1; eauto.
