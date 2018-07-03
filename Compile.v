@@ -550,17 +550,19 @@ Definition getReadRegs (regs: list RegInitT) :=
 Definition setMethodGuards (rules: list (Attribute (Action Void))) :=
   map (fun m => (getMethGuard (fst m), existT _ Bool (RtlConst (ConstBool true)))) (getCallsPerBaseMod rules).
 
-Definition getRtl (bm: BaseModule) :=
-  match bm with
+Definition getRtl (bm: (list string * list RegFileBase * BaseModule)) :=
+  match snd bm with
   | BaseMod regs rules dms =>
-    {| regFiles := nil;
+    {| hiddenWires := fst (fst bm);
+       regFiles := snd (fst bm);
        inputs := getInputs (getCallsPerBaseMod rules);
        outputs := getOutputs (getCallsPerBaseMod rules);
        regInits := map (fun x => (fst x, getRegInit (snd x))) regs;
        regWrites := getWriteRegs regs;
        wires := getReadRegs regs ++ getWires regs rules (map fst rules) ++ setMethodGuards rules;
        sys := getSysPerBaseMod rules |}
-  | _ => {| regFiles := nil;
+  | _ => {| hiddenWires := fst (fst bm);
+            regFiles := snd (fst bm);
             inputs := nil;
             outputs := nil;
             regInits := nil;

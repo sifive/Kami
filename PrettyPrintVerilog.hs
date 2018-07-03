@@ -18,6 +18,7 @@ deriving instance Show UniBoolOp
 deriving instance Show CABoolOp
 deriving instance Show UniBitOp
 deriving instance Show CABitOp
+deriving instance Show RegFileBase
 
 intToFin :: Int -> Int -> T
 intToFin m 0 = F1 (m-1)
@@ -122,7 +123,7 @@ instance Show RtlSysT where
 -- deriving instance Show RtlModule
 
 instance Show RtlModule where
-  show (Build_RtlModule regFiles inputs outputs regInits regWrites wires sys) =
+  show (Build_RtlModule hiddenMeths regFiles inputs outputs regInits regWrites wires sys) =
     "REGFILES:\n" ++
     foldl (\s new -> s ++ show new ++ "\n") "" regFiles ++ "\n" ++
     "\nINPUTS:\n" ++
@@ -347,62 +348,62 @@ ppRtlExpr who e =
         x3 <- ppRtlExpr who e3
         return $ '(' : x1 ++ " " ++ op1 ++ " " ++ x2 ++ " " ++ op2 ++ " " ++ x3 ++ ")"
 
-ppRfInstance :: (((String, [(String, Bool)]), String), (((Int, Kind)), ConstT)) -> String
-ppRfInstance (((name, reads), write), ((idxType, dataType), _)) =
-  "  " ++ ppName name ++ " " ++
-  ppName name ++ "$inst(.CLK(CLK), .RESET(RESET), " ++
-  concatMap (\(read, _) ->
-               ("." ++ ppName read ++ "$_guard(" ++ ppName read ++ "$_guard), ") ++
-               ("." ++ ppName read ++ "$_enable(" ++ ppName read ++ "$_enable), ") ++
-               ("." ++ ppName read ++ "$_argument(" ++ ppName read ++ "$_argument), ") ++
-               ppDealSize0 dataType "" ("." ++ ppName read ++ "$_return(" ++ ppName read ++ "$_return), ")) reads ++
-  ("." ++ ppName write ++ "$_guard(" ++ ppName write ++ "$_guard), ") ++
-  ("." ++ ppName write ++ "$_enable(" ++ ppName write ++ "$_enable), ") ++
-  ("." ++ ppName write ++ "$_argument(" ++ ppName write ++ "$_argument)") ++
-  ");\n\n"
+--ppRfInstance :: (((String, [(String, Bool)]), String), (((Int, Kind)), ConstT)) -> String
+--ppRfInstance (((name, reads), write), ((idxType, dataType), _)) =
+--  "  " ++ ppName name ++ " " ++
+--  ppName name ++ "$inst(.CLK(CLK), .RESET(RESET), " ++
+--  concatMap (\(read, _) ->
+--               ("." ++ ppName read ++ "$_guard(" ++ ppName read ++ "$_guard), ") ++
+--               ("." ++ ppName read ++ "$_enable(" ++ ppName read ++ "$_enable), ") ++
+--               ("." ++ ppName read ++ "$_argument(" ++ ppName read ++ "$_argument), ") ++
+--               ppDealSize0 dataType "" ("." ++ ppName read ++ "$_return(" ++ ppName read ++ "$_return), ")) reads ++
+--  ("." ++ ppName write ++ "$_guard(" ++ ppName write ++ "$_guard), ") ++
+--  ("." ++ ppName write ++ "$_enable(" ++ ppName write ++ "$_enable), ") ++
+--  ("." ++ ppName write ++ "$_argument(" ++ ppName write ++ "$_argument)") ++
+--  ");\n\n"
 
 
-ppRfModule :: (((String, [(String, Bool)]), String), ((Int, Kind), ConstT)) -> String
-ppRfModule (((name, reads), write), ((idxType, dataType), init)) =
-  "module " ++ ppName name ++ "(\n" ++
-  concatMap (\(read, _) ->
-               ("  output " ++ ppDeclType (ppName read ++ "$_guard") Bool ++ ",\n") ++
-               ("  input " ++ ppDeclType (ppName read ++ "$_enable") Bool ++ ",\n") ++
-               ("  input " ++ ppDeclType (ppName read ++ "$_argument") (Bit idxType) ++ ",\n") ++
-               ppDealSize0 dataType "" ("  output " ++ ppDeclType (ppName read ++ "$_return") dataType ++ ",\n")) reads ++
-  ("  output " ++ ppDeclType (ppName write ++ "$_guard") Bool ++ ",\n") ++
-  ("  input " ++ ppDeclType (ppName write ++ "$_enable") Bool ++ ",\n") ++
-  ("  input " ++ ppDeclType (ppName write ++ "$_argument")
-    (Struct 2 (\i -> if i == F1 1 then (Bit idxType) else if i == FS 1 (F1 0) then dataType else (Bit 0)) (\i -> if i == F1 1 then "addr" else if i == FS 1 (F1 0) then "data" else "")) ++ ",\n") ++
-  "  input logic CLK,\n" ++
-  "  input logic RESET\n" ++
-  ");\n" ++
-  --"  " ++ ppDeclType (ppName name ++ "$_data") dataType ++ "[0:" ++ show (2^idxType - 1) ++ "];\n" ++
-  "  " ++ ppDeclType (ppName name ++ "$_data") (Bit (Target.size dataType)) ++ "[0:" ++ show (2^idxType - 1) ++ "];\n" ++
-  "  initial begin\n" ++
-  -- "    " ++ ppName name ++ "$_data = " ++ '\'' : ppConst init ++ ";\n" ++
-  "    $readmemb(" ++ "\"" ++ ppName name ++ ".mem" ++ "\", " ++ ppName name ++ "$_data, 0, " ++ show (2^idxType - 1) ++ ");\n" ++
-  "  end\n" ++
-  concatMap (\(read, bypass) ->
-               "  assign " ++ ppName read ++ "$_guard = 1'b1;\n" ++
-               ppDealSize0 dataType "" ("  assign " ++ ppName read ++ "$_return = " ++
-                                        if bypass
-                                        then ppName write ++ "$_enable && " ++ ppName write ++ "$_argument.addr == " ++
-                                        ppName read ++ "$_argument ? " ++ ppName write ++ "$_data : "
-                                        else "" ++ ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ ppName read ++ "$_argument];\n"))) reads ++
-  "  assign " ++ ppName write ++ "$_guard = 1'b1;\n" ++
-  "  always@(posedge CLK) begin\n" ++
-  "    if(" ++ ppName write ++ "$_enable) begin\n" ++
-  ppDealSize0 dataType "" ("      " ++ ppName name ++ "$_data[" ++ ppName write ++ "$_argument.addr] <= " ++ ppName write ++ "$_argument.data;\n") ++
-  "    end\n" ++
-  "  end\n" ++
-  "endmodule\n\n"
+--ppRfModule :: (((String, [(String, Bool)]), String), ((Int, Kind), ConstT)) -> String
+--ppRfModule (((name, reads), write), ((idxType, dataType), init)) =
+--  "module " ++ ppName name ++ "(\n" ++
+--  concatMap (\(read, _) ->
+--               ("  output " ++ ppDeclType (ppName read ++ "$_guard") Bool ++ ",\n") ++
+--               ("  input " ++ ppDeclType (ppName read ++ "$_enable") Bool ++ ",\n") ++
+--               ("  input " ++ ppDeclType (ppName read ++ "$_argument") (Bit idxType) ++ ",\n") ++
+--               ppDealSize0 dataType "" ("  output " ++ ppDeclType (ppName read ++ "$_return") dataType ++ ",\n")) reads ++
+--  ("  output " ++ ppDeclType (ppName write ++ "$_guard") Bool ++ ",\n") ++
+--  ("  input " ++ ppDeclType (ppName write ++ "$_enable") Bool ++ ",\n") ++
+--  ("  input " ++ ppDeclType (ppName write ++ "$_argument")
+--    (Struct 2 (\i -> if i == F1 1 then (Bit idxType) else if i == FS 1 (F1 0) then dataType else (Bit 0)) (\i -> if i == F1 1 then "addr" else if i == FS 1 (F1 0) then "data" else "")) ++ ",\n") ++
+--  "  input logic CLK,\n" ++
+--  "  input logic RESET\n" ++
+--  ");\n" ++
+--  --"  " ++ ppDeclType (ppName name ++ "$_data") dataType ++ "[0:" ++ show (2^idxType - 1) ++ "];\n" ++
+--  "  " ++ ppDeclType (ppName name ++ "$_data") (Bit (Target.size dataType)) ++ "[0:" ++ show (2^idxType - 1) ++ "];\n" ++
+--  "  initial begin\n" ++
+--  -- "    " ++ ppName name ++ "$_data = " ++ '\'' : ppConst init ++ ";\n" ++
+--  "    $readmemb(" ++ "\"" ++ ppName name ++ ".mem" ++ "\", " ++ ppName name ++ "$_data, 0, " ++ show (2^idxType - 1) ++ ");\n" ++
+--  "  end\n" ++
+--  concatMap (\(read, bypass) ->
+--               "  assign " ++ ppName read ++ "$_guard = 1'b1;\n" ++
+--               ppDealSize0 dataType "" ("  assign " ++ ppName read ++ "$_return = " ++
+--                                        if bypass
+--                                        then ppName write ++ "$_enable && " ++ ppName write ++ "$_argument.addr == " ++
+--                                        ppName read ++ "$_argument ? " ++ ppName write ++ "$_data : "
+--                                        else "" ++ ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ ppName read ++ "$_argument];\n"))) reads ++
+--  "  assign " ++ ppName write ++ "$_guard = 1'b1;\n" ++
+--  "  always@(posedge CLK) begin\n" ++
+--  "    if(" ++ ppName write ++ "$_enable) begin\n" ++
+--  ppDealSize0 dataType "" ("      " ++ ppName name ++ "$_data[" ++ ppName write ++ "$_argument.addr] <= " ++ ppName write ++ "$_argument.data;\n") ++
+--  "    end\n" ++
+--  "  end\n" ++
+--  "endmodule\n\n"
 
 removeDups :: Eq a => [(a, b)] -> [(a, b)]
 removeDups = nubBy (\(a, _) (b, _) -> a == b)
 
 ppRtlInstance :: RtlModule -> String
-ppRtlInstance m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sys') =
+ppRtlInstance m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
   "  _design _designInst(.CLK(CLK), .RESET(RESET)" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ '(' : ppPrintVar nm ++ ")")) (removeDups ins' ++ removeDups outs') ++ ");\n"
 
@@ -430,7 +431,7 @@ ppRtlSys (RtlDispArray n k v f) = do
   return $ "        $write(\"[" ++ Data.List.concat (Data.List.map (\i -> show i ++ ":=" ++ ppFullBitFormat f ++ "; ") [0 .. (n-1)]) ++ "]\", " ++ Data.List.concat rest ++ ");\n"
 
 ppRtlModule :: RtlModule -> String
-ppRtlModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sys') =
+ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
   "module _design(\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) ins ++ "\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) outs ++ "\n" ++
@@ -508,8 +509,9 @@ sumOutEdge x = case x of
                  (a, b) : ys -> Data.List.length b + sumOutEdge ys
 
 ppTopModule :: RtlModule -> String
-ppTopModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sys') =
-  concatMap ppRfModule regFs ++ ppRtlModule m ++
+ppTopModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
+  --concatMap ppRfModule regFs ++
+  ppRtlModule m ++
   "module top(\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) ins ++ "\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) outs ++ "\n" ++
@@ -518,7 +520,7 @@ ppTopModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sy
   ");\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) insAll ++ "\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) outsAll ++ "\n" ++
-  concatMap ppRfInstance regFs ++
+  --concatMap ppRfInstance regFs ++
   ppRtlInstance m ++
   "endmodule\n"
   where
@@ -528,20 +530,21 @@ ppTopModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sy
     outs = Data.List.filter filtCond outsAll
     badRead x read = x == read ++ "#_guard" || x == read ++ "#_enable" || x == read ++ "#_argument" || x == read ++ "#_return"
     badReads x reads = foldl (\accum (v, _) -> badRead x v || accum) False reads
-    filtCond ((x, _), _) = case Data.List.find (\((((_, reads), write), (_, _))) ->
-                                                  badReads x reads ||
-                                                  {-
-                                                  x == read ++ "#_guard" ||
-                                                  x == read ++ "#_enable" ||
-                                                  x == read ++ "#_argument" ||
-                                                  x == read ++ "#_return" ||
-                                                  -}
-                                                  x == write ++ "#_guard" ||
-                                                  x == write ++ "#_enable" ||
-                                                  x == write ++ "#_argument" ||
-                                                  x == write ++ "#_return") regFs of
-                          Nothing -> True
-                          _ -> False
+    filtCond _ = True
+    --filtCond ((x, _), _) = case Data.List.find (\((((_, reads), write), (_, _))) ->
+    --                                              badReads x reads ||
+    --                                              {-
+    --                                              x == read ++ "#_guard" ||
+    --                                              x == read ++ "#_enable" ||
+    --                                              x == read ++ "#_argument" ||
+    --                                              x == read ++ "#_return" ||
+    --                                              -}
+    --                                              x == write ++ "#_guard" ||
+    --                                              x == write ++ "#_enable" ||
+    --                                              x == write ++ "#_argument" ||
+    --                                              x == write ++ "#_return") regFs of
+    --                      Nothing -> True
+    --                      _ -> False
 
 printDiff :: [(String, [String])] -> [(String, [String])] -> IO ()
 printDiff (x:xs) (y:ys) =
@@ -571,5 +574,5 @@ main =
   --   putStr t
   do
     putStrLn $ ppTopModule rtlMod
-    let (Build_RtlModule regFs _ _ _ _ _ _) = rtlMod in
-      mapM_ (\rf -> writeFile (ppRfName rf) (ppRfFile rf)) regFs
+    --let (Build_RtlModule hiddenMeths regFs _ _ _ _ _ _) = rtlMod in
+    --  mapM_ (\rf -> writeFile (ppRfName rf) (ppRfFile rf)) regFs

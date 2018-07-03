@@ -49,10 +49,8 @@ Inductive RtlSysT : Type :=
 
 
 Record RtlModule :=
-  { regFiles: list (string * list (string * bool) * string * sigT (fun x: (nat * Kind) => ConstT (Array (fst x) (snd x))));
-    (* asyncRegFiles: list (string * list (string * bool) * string * sigT (fun x: (nat * Kind) => ConstT (Array (fst x) (snd x)))); *)
-    (* syncRegFilesData: list (string * list (string * bool) * string * sigT (fun x: (nat * Kind) => ConstT (Array (fst x) (snd x)))); *)
-    (* syncRegFilesAddr: list (string * list (string * bool) * string * sigT (fun x: (nat * Kind) => ConstT (Array (fst x) (snd x)))); *)
+  { hiddenWires: list string;
+    regFiles: list RegFileBase;
     inputs: list (string * list nat * Kind);
     outputs: list (string * list nat * Kind);
     regInits: list (string * sigT (fun x => option (ConstT x)));

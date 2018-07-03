@@ -385,12 +385,12 @@ Inductive Mod: Type :=
 | ConcatMod (m1 m2: Mod): Mod.
 
 
-Fixpoint separateMod (m: Mod): (list string * list BaseModule * list BaseModule) :=
+Fixpoint separateMod (m: Mod): (list string * list RegFileBase * list BaseModule) :=
   match m with
   | Base m' =>
     match m' with
-    | BaseMod _ _ _ => (nil, nil, m' :: nil)
-    | _ => (nil, m' :: nil, nil)
+    | BaseMod regs rules meths => (nil, nil, BaseMod regs rules meths :: nil)
+    | BaseRegFile rf => (nil, rf :: nil, nil)
     end
   | HideMeth m' meth =>
     let '(meths, rfs, ms) := separateMod m' in
