@@ -1706,7 +1706,6 @@ Definition TraceInclusion m1 m2 :=
             ((exists rle, In (Rle rle) (map (fun x => fst (snd x)) l2)) ->
              (exists rle, In (Rle rle) (map (fun x => fst (snd x)) l1)))) ls1 ls2).
 
-
 Section WfBaseMod.
   Variable m: BaseModule.
   

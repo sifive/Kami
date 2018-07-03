@@ -426,7 +426,7 @@ Global Instance Perm_rewrite_List_FullLabel_perm' :
 Proof.
   repeat red; split; intros; eauto using Perm_rewrite_List_FullLabel_perm, Permutation_sym.
 Qed.
-
+  
 Section Permutation_filter.
   Variable A : Type.
   Variable f : A -> bool.
@@ -750,7 +750,30 @@ Proof.
       specialize (IHList_FullLabel_perm H4) as TMP; dest.
       exists x0; split;auto.
 Qed.
-      
+
+
+Lemma List_FullLabel_perm_WeakInclusion l l' :
+  List_FullLabel_perm l l' ->
+  WeakInclusion l l'.
+Proof.
+  unfold WeakInclusion.
+  intros; repeat split; dest;
+    eauto using List_FullLabel_perm_InExec_rewrite, List_FullLabel_perm_InCall_rewrite, List_FullLabel_perm_sym;[intro; destruct H0;[left|right]|intro; destruct H0;[left|right]|];
+      try destruct H0; try split; eauto using List_FullLabel_perm_InExec_rewrite, List_FullLabel_perm_InCall_rewrite, List_FullLabel_perm_sym.
+  intros; dest.
+  exists x.
+  induction H; eauto.
+  - inv H; destruct H0.
+    + rewrite <- H.
+      left; reflexivity.
+    + specialize (IHList_FullLabel_perm H); right; assumption.
+  - repeat destruct H0.
+    + inv H1.
+      right; left; reflexivity.
+    + inv H.
+      left; reflexivity.
+    + specialize (IHList_FullLabel_perm H0); right; right; assumption.
+Qed.
 
 Lemma MatchingExecCalls_List_FullLabel_perm_rewrite_1 m l l' l'':
   List_FullLabel_perm l' l'' ->
@@ -863,6 +886,23 @@ Proof.
   - constructor.
     + eapply IHl; eauto.
     + rewrite H5; assumption.
+Qed.
+
+Lemma List_FullLabel_perm_Lists_len l l' :
+  List_FullLabel_perm_Lists l l' ->
+  length l = length l'.
+Proof.
+  induction 1;[|simpl; rewrite IHList_FullLabel_perm_Lists]; reflexivity.
+Qed.
+
+Lemma List_FullLabel_perm_Lists_WeakInclusions l l' :
+  List_FullLabel_perm_Lists l l' ->
+  WeakInclusions l l'.
+Proof.
+  induction 1.
+  - apply WeakInclusionsRefl.
+  - econstructor; eauto.
+    apply List_FullLabel_perm_WeakInclusion in H0; assumption.
 Qed.
 
 Lemma RegInit_generalized_list x:
@@ -1039,4 +1079,29 @@ Proof.
       split; eauto.
       rewrite H0; reflexivity.
 Qed.
+
+Definition PTraceList (m : Mod) (ls : list (list FullLabel)) :=
+  (exists (o : RegsT), PTrace m o ls).
+
+Definition PTraceInclusion (m m' : Mod) :=
+  forall (o : RegsT)(ls : list (list FullLabel)), PTrace m o ls -> exists (ls' : list (list FullLabel)), PTraceList m' ls' /\ WeakInclusions ls ls'.
+
+Lemma PTraceInclusion_TraceInclusion m1 m2 :
+  WfMod m1 ->
+  WfMod m2 ->
+  PTraceInclusion m1 m2 -> TraceInclusion m1 m2.
+Proof.
+  intros.
+  apply TraceInclusion'_TraceInclusion.
+  repeat intro.
+  apply Trace_PTrace in H2.
+  specialize (H1 o ls H2); dest.
+  unfold PTraceList in H1; dest.
+  apply PTrace_Trace in H1; dest; eauto.
+  exists x2; split.
+  - exists x1; assumption.
+  - specialize (List_FullLabel_perm_Lists_WeakInclusions H5) as trans.
+    apply (WeakInclusionsTrans H3 trans).
+Qed.
+  
 
