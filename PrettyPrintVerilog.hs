@@ -510,7 +510,8 @@ sumOutEdge x = case x of
 
 ppTopModule :: RtlModule -> String
 ppTopModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
-  --concatMap ppRfModule regFs ++ ppRtlModule m ++
+  --concatMap ppRfModule regFs ++
+  ppRtlModule m ++
   "module top(\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) ins ++ "\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) outs ++ "\n" ++
