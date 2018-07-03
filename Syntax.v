@@ -1642,32 +1642,23 @@ Section Trace.
                   (HUpdRegs: UpdRegs (map fst l) o o')
                   (HTrace: ls' = l :: ls):
       Trace o' ls'.
-Definition PUpdRegs (u: list RegsT) (o o': RegsT)
-  := getKindAttr o [=] getKindAttr o' /\
-     (forall s v, In (s, v) o' -> ((exists x, In x u /\ In (s, v) x) \/
-                                   ((~ exists x, In x u /\ In s (map fst x)) /\ In (s, v) o))).
+
+  Definition PUpdRegs (u: list RegsT) (o o': RegsT)
+    := getKindAttr o [=] getKindAttr o' /\
+       (forall s v, In (s, v) o' -> ((exists x, In x u /\ In (s, v) x) \/
+                                     ((~ exists x, In x u /\ In s (map fst x)) /\ In (s, v) o))).
+
   Inductive PTrace: RegsT -> list (list FullLabel) -> Prop :=
-  | PInitTrace (o' : RegsT) ls'
-              (HUpdRegs1 : map fst o' [=] map fst (getAllRegisters m))
-              (HUpdRegs2 : (forall o r,
-                               In o o' ->
-                               In r (getAllRegisters m) ->
-                               fst o = fst r ->
-                               (exists (pf: projT1 (snd o) = projT1 (snd r)),
-                                   match projT2 (snd r) with
-                                   | None => True
-                                   | Some x =>
-                                     match pf in _ = Y return _ Y with
-                                     | eq_refl => projT2 (snd o)
-                                     end = evalConstFullT x
-                                   end)))
-              (HTrace: ls' = nil):
+  | PInitTrace (o' o'' : RegsT) ls'
+               (HPerm : o' [=] o'')
+               (HUpdRegs : Forall2 regInit o'' (getAllRegisters m))
+               (HTrace: ls' = nil):
       PTrace o' ls'
   | PContinueTrace o ls l o' ls'
-                  (PHOldTrace: PTrace o ls)
-                  (HPStep: PStep m o l)
-                  (HPUpdRegs: PUpdRegs (map fst l) o o')
-                  (HTrace: ls' = l :: ls):
+                   (PHOldTrace: PTrace o ls)
+                   (HPStep: PStep m o l)
+                   (HPUpdRegs: PUpdRegs (map fst l) o o')
+                   (HTrace: ls' = l :: ls):
       PTrace o' ls'.
 End Trace.
 

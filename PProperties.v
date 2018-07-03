@@ -784,9 +784,10 @@ Qed.
 Lemma PStep_Step m o l:
   PStep m o l ->
   (exists o' l',
-          o [=] o' /\
-          List_FullLabel_perm l l' /\
-          Step m o' l').
+      o [=] o' /\
+      getKindAttr o' = getKindAttr (getAllRegisters m) /\
+      List_FullLabel_perm l l' /\
+      Step m o' l').
 Proof.
   induction 1.
   - apply PSubsteps_Substeps in HPSubsteps; dest.
@@ -798,28 +799,29 @@ Proof.
     exists x, x0; repeat split; eauto.
     econstructor 2; auto.
     intros.
-    apply (List_FullLabel_perm_InCall_rewrite H1).
+    apply (List_FullLabel_perm_InCall_rewrite H2).
     eapply HHidden; eauto.
-    apply (List_FullLabel_perm_InExec_rewrite _ (List_FullLabel_perm_sym H1)); assumption.
+    apply (List_FullLabel_perm_InExec_rewrite _ (List_FullLabel_perm_sym H2)); assumption.
   - dest.
     exists (x1++x), (x2++x0).
     repeat split.
-    + rewrite HRegs, H4, H1; reflexivity.
+    + rewrite HRegs, H5, H1; reflexivity.
+    + simpl; repeat rewrite map_app; rewrite H2, H6; reflexivity.
     + rewrite HLabels.
       eapply List_FullLabel_perm_app; eauto.
     + econstructor 3; eauto.
-      * rewrite <- H5; rewrite <- H2; assumption.
-      * rewrite <- H5; rewrite <- H2; assumption.
+      * rewrite <- H7; rewrite <- H3; assumption.
+      * rewrite <- H7; rewrite <- H3; assumption.
       * intros.
-        apply (List_FullLabel_perm_in (List_FullLabel_perm_sym H5)) in H7;
-          apply (List_FullLabel_perm_in (List_FullLabel_perm_sym H2)) in H8; dest.
-        specialize (HNoRle _ _ H10 H9).
-        inv H7; inv H8; subst; simpl in *; assumption.
+        apply (List_FullLabel_perm_in (List_FullLabel_perm_sym H7)) in H9;
+          apply (List_FullLabel_perm_in (List_FullLabel_perm_sym H3)) in H10; dest.
+        specialize (HNoRle _ _ H12 H11).
+        inv H9; inv H10; subst; simpl in *; assumption.
       * intros.
         eapply HNoCall.
-        -- apply (List_FullLabel_perm_InCall_rewrite (List_FullLabel_perm_sym H5)) in H7;
-             apply H7.
-        -- apply (List_FullLabel_perm_InCall_rewrite (List_FullLabel_perm_sym H2));
+        -- apply (List_FullLabel_perm_InCall_rewrite (List_FullLabel_perm_sym H7)) in H9;
+             apply H9.
+        -- apply (List_FullLabel_perm_InCall_rewrite (List_FullLabel_perm_sym H3));
            assumption.
 Qed.
 
@@ -901,25 +903,140 @@ Proof.
       eapply H1;[rewrite H | |]; try right; assumption.
 Qed.
 
-(* Lemma PTrace_Trace m o ls: *)
-(*   WfMod m -> *)
-(*   PTrace m o ls -> *)
-(*   (exists o' ls', *)
-(*       o [=] o' /\ *)
-(*       map fst o' = map fst (getAllRegisters m) /\ *)
-(*       List_FullLabel_perm_Lists ls ls' /\ *)
-(*       Trace m o' ls'). *)
-(* Proof. *)
-(*   induction 2; subst. *)
-(*   - specialize (key_perm_eq _ _ (Permutation_sym HUpdRegs1)) as TMP;dest. *)
-(*     exists x, nil. *)
-(*     repeat split; eauto; econstructor; auto. *)
-(*     eapply RegInit_generalized_list; eauto. *)
-(*   - specialize (WfNoDups H) as TMP; dest. *)
-(*     apply PStep_Step in HPStep; dest. *)
-(*     unfold PUpdRegs in HPUpdRegs; dest. *)
-(*     rewrite H4 in H11. *)
-(*     specialize (getKindAttr_perm_eq _ _ _ _ (Permutation_sym H11)) as TMP; dest. *)
+Lemma keys_establish_order (A B : Type):
+  forall (l : list (A*B)),
+    NoDup (map fst l) ->
+    forall (l' : list (A*B)),
+      l [=] l' ->
+      (map fst l = map fst l') ->
+      l = l'.
+Proof.
+  induction l; eauto; intros.
+  - apply Permutation_nil in H0; rewrite H0; reflexivity.
+  - destruct l';[ symmetry in H0; apply Permutation_nil in H0; inv H0|].
+    simpl in *; inv H1; inv H.
+    specialize (Permutation_in _ H0 (in_eq _ _)) as T; destruct T.
+    + subst.
+      apply Permutation_cons_inv in H0.
+      rewrite (IHl H6 _ H0 H4); reflexivity.
+    + apply False_ind.
+      apply H5; rewrite H4.
+      apply (in_map fst) in H; assumption.
+Qed.
+
+Lemma List_FullLabel_perm_fst l l':
+  List_FullLabel_perm l l' ->
+  forall a,
+  In a (map fst l) ->
+  (exists a',
+      a [=] a' /\
+      In a' (map fst l')).
+Proof.
+  induction 1; simpl; eauto; intros.
+  - destruct H1; subst.
+    + inv H; simpl in *.
+      exists u'; split; eauto.
+    + specialize (IHList_FullLabel_perm a H1); dest.
+      exists x; split; eauto.
+  - repeat destruct H2; subst.
+    + inv H.
+      exists u'; split; eauto.
+    + inv H0.
+      exists u'; split; eauto.
+    + specialize (IHList_FullLabel_perm a H2); dest.
+      exists x; split; eauto.
+  - specialize (IHList_FullLabel_perm1 a H1); dest.
+    specialize (IHList_FullLabel_perm2 x H3); dest.
+    exists x0; split; eauto using Permutation_trans.
+Qed.
     
-    
+Lemma Forall2_RegInit_keymatch x :
+  forall l,
+    Forall2
+      (fun (o'0 : string * {x : FullKind & fullType type x}) (r : string * {x0 : FullKind & option (ConstFullT x0)}) =>
+         fst o'0 = fst r /\
+         (exists pf : projT1 (snd o'0) = projT1 (snd r),
+             match projT2 (snd r) with
+             | Some x0 => match pf in (_ = Y) return (fullType type Y) with
+                          | eq_refl => projT2 (snd o'0)
+                          end = evalConstFullT x0
+             | None => True
+             end)) x l ->
+    map fst x = map fst l.
+Proof.
+  induction x; intros; inv H.
+  - reflexivity.
+  - simpl.
+    destruct H2.
+    rewrite H.
+    rewrite (IHx _ H4); reflexivity.
+Qed.
+
+Lemma PTrace_Trace m o ls:
+  WfMod m ->
+  PTrace m o ls ->
+  (exists o' ls',
+      o' [=] o /\
+      map fst o' = map fst (getAllRegisters m) /\
+      List_FullLabel_perm_Lists ls ls' /\
+      Trace m o' ls').
+Proof.
+  induction 2; subst.
+  - exists o'', nil;
+      repeat split; eauto using Permutation_sym; try econstructor; eauto.
+    apply Forall2_RegInit_keymatch; assumption.
+  (* - unfold UpdRegs in HPUpdRegs; apply PStep_Step in HPStep; dest. *)
+  (* - specialize (key_perm_eq _ _ (Permutation_sym HUpdRegs1)) as TMP;dest. *)
+  (*   exists x, nil. *)
+  (*   repeat split; eauto using Permutation_sym; econstructor; auto. *)
+  (*   eapply RegInit_generalized_list; eauto. *)
+  - specialize (WfNoDups H) as TMP; dest.
+    apply PStep_Step in HPStep; dest.
+    unfold PUpdRegs in HPUpdRegs; dest.
+    rewrite <- H4 in H12.
+    specialize (getKindAttr_perm_eq _ _ _ _ (H12)) as TMP; dest.
+    exists x3, (x2::x0).
+    rewrite <- H5 in H1.
+    rewrite <- H4 in H8.
+    specialize (getKindAttr_map_fst _ _ H9); intros.
+    rewrite <- H5 in H16.
+    specialize (keys_establish_order H1 H8 (eq_sym H16)) as eq_x_x1.
+    specialize (getKindAttr_map_fst _ _ H15); intros.
+    setoid_rewrite <- H17 in H1.
+    repeat split; eauto using Permutation_sym.
+    + setoid_rewrite H17; setoid_rewrite H5; reflexivity.
+    + econstructor; eauto.
+    + econstructor 2; eauto.
+      * rewrite eq_x_x1; assumption.
+      * specialize (List_FullLabel_perm_fst H10).
+        intros.
+        split; eauto.
+        intros.
+        rewrite <- H14 in H19.
+        specialize (H13 _ _ H19); dest.
+        destruct H13;[left|right];dest.
+        -- specialize (H18 _ H13); dest.
+           exists x5; split; auto.
+           rewrite <- H18; assumption.
+        -- split;[|rewrite H4];auto.
+           intro; dest.
+           apply H13.
+           specialize (List_FullLabel_perm_fst (List_FullLabel_perm_sym H10) _ H21) as TMP; dest.
+           exists x5; split; eauto.
+           rewrite <- H23; assumption.
+Qed.
+
+Lemma Trace_PTrace m o ls :
+  Trace m o ls ->
+  PTrace m o ls.
+Proof.
+  induction 1; subst.
+  - econstructor; eauto.
+  - econstructor 2; eauto.
+    + apply Step_PStep in HStep.
+      assumption.
+    + unfold PUpdRegs; unfold UpdRegs in HUpdRegs; dest.
+      split; eauto.
+      rewrite H0; reflexivity.
+Qed.
 
