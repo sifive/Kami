@@ -430,7 +430,7 @@ ppRtlSys (RtlDispArray n k v f) = do
   return $ "        $write(\"[" ++ Data.List.concat (Data.List.map (\i -> show i ++ ":=" ++ ppFullBitFormat f ++ "; ") [0 .. (n-1)]) ++ "]\", " ++ Data.List.concat rest ++ ");\n"
 
 ppRtlModule :: RtlModule -> String
-ppRtlModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sys') =
+ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
   "module _design(\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) ins ++ "\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) outs ++ "\n" ++
@@ -508,7 +508,7 @@ sumOutEdge x = case x of
                  (a, b) : ys -> Data.List.length b + sumOutEdge ys
 
 ppTopModule :: RtlModule -> String
-ppTopModule m@(Build_RtlModule regFs ins' outs' regInits' regWrites' assigns' sys') =
+ppTopModule m@(Build_RtlModule hiddenMeths regFs ins' outs' regInits' regWrites' assigns' sys') =
   concatMap ppRfModule regFs ++ ppRtlModule m ++
   "module top(\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) ins ++ "\n" ++
