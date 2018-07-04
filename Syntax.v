@@ -385,21 +385,29 @@ Inductive Mod: Type :=
 | ConcatMod (m1 m2: Mod): Mod.
 
 
-Fixpoint separateMod (m: Mod): (list string * list RegFileBase * list BaseModule) :=
+Fixpoint separateBaseMod (m: Mod): (list RegFileBase * list BaseModule) :=
   match m with
   | Base m' =>
     match m' with
-    | BaseMod regs rules meths => (nil, nil, BaseMod regs rules meths :: nil)
-    | BaseRegFile rf => (nil, rf :: nil, nil)
+    | BaseMod regs rules meths => (nil, BaseMod regs rules meths :: nil)
+    | BaseRegFile rf => (rf :: nil, nil)
     end
-  | HideMeth m' meth =>
-    let '(meths, rfs, ms) := separateMod m' in
-    (meth :: meths, rfs, ms)
+  | HideMeth m' meth => separateBaseMod m'
   | ConcatMod m1 m2 =>
-    let '(meths1, rfs1, ms1) := separateMod m1 in
-    let '(meths2, rfs2, ms2) := separateMod m2 in
-    (meths1 ++ meths2, rfs1 ++ rfs2, ms1 ++ ms2)
+    let '(rfs1, ms1) := separateBaseMod m1 in
+    let '(rfs2, ms2) := separateBaseMod m2 in
+    (rfs1 ++ rfs2, ms1 ++ ms2)
   end.
+
+Fixpoint getHidden m :=
+  match m with
+  | Base _ => []
+  | ConcatMod m1 m2 => getHidden m1 ++ getHidden m2
+  | HideMeth m' s => s :: getHidden m'
+  end.
+
+Definition separateMod (m: Mod) :=
+  (getHidden m, separateBaseMod m).
     
 
 
@@ -1484,13 +1492,6 @@ Fixpoint getAllMethods m :=
   end.
 
 Notation FullLabel := (RegsT * (RuleOrMeth * MethsT))%type.
-
-Fixpoint getHidden m :=
-  match m with
-  | Base _ => []
-  | ConcatMod m1 m2 => getHidden m1 ++ getHidden m2
-  | HideMeth m' s => s :: getHidden m'
-  end.
 
 Definition MatchingExecCalls (lexec lcall: list FullLabel) mcall :=
   forall f, InCall f lexec ->

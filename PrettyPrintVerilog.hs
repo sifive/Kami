@@ -14,132 +14,12 @@ wordToNat (WS b _ w) = 2*(wordToNat w) + if b then 1 else 0
 instance Show Target.Word where
   show w = show (wordToNat w)
 
-deriving instance Show UniBoolOp
-deriving instance Show CABoolOp
-deriving instance Show UniBitOp
-deriving instance Show CABitOp
-deriving instance Show RegFileBase
-
 intToFin :: Int -> Int -> T
 intToFin m 0 = F1 (m-1)
 intToFin m n = FS (m-1) (intToFin (m-1) (n-1))
 
 getFins :: Int -> [T]
 getFins m = foldr (\n l -> intToFin m n : l) [] [0 .. (m-1)]
-
-instance Show Kind where
-  show Bool = "Bool"
-  show (Bit n) = "Bit " ++ show n
-  show (Array n k) = "Array " ++ show n ++ " " ++ show k
-  show (Struct n fk fs) = "Struct " ++ "{" ++ concatMap (\i -> show (fs i) ++ ": " ++ show (fk i) ++ "; ") (getFins n) ++ "}"
-
-instance Show ConstT where
-  show (ConstBool b) = "ConstBool " ++ show b
-  show (ConstBit n w) = "ConstBit " ++ show n ++ " " ++ show w
-  show (ConstStruct n fk fs fv) = "ConstStruct " ++  "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
-  show (ConstArray n k fv) = "ConstArray " ++ "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
-
-
-deriving instance Show BinBitOp
-
--- data Tree =
---   Leaf
---   | Node [Tree]
-
--- prit :: Tree -> String
--- prit Leaf = "0 "
--- prit (Node xs) = show (length xs) ++ "[" ++ concatMap (\x -> prit x ++ " ") xs ++ "] "
-
--- instance Show Tree where
---   show t = prit t
-
--- sexp :: RtlExpr -> Tree
--- sexp (RtlReadReg k s) = Leaf
--- sexp (RtlReadWire k s) = Leaf
--- sexp (RtlConst k c) = Leaf
--- sexp (RtlUniBool op e) = Node [sexp e]
--- sexp (RtlCABool op e) = Node (Data.List.map sexp e)
--- sexp (RtlUniBit _ _ op e) = Node [sexp e]
--- sexp (RtlCABit _ op e) = Node (Data.List.map sexp e)
--- sexp (RtlBinBit _ _ _ op e1 e2) = Node [sexp e1, sexp e2]
--- sexp (RtlBinBitBool _ _ op e1 e2) = Node [sexp e1, sexp e2]
--- sexp (RtlITE k p e1 e2) = Node [sexp p, sexp e1, sexp e2]
--- sexp (RtlEq k e1 e2) = Node [sexp e1, sexp e2]
--- sexp (RtlBuildStruct n fk fs fv) = Node (Data.List.map (\i -> sexp (fv i)) (getFins n))
--- sexp (RtlBuildArray n k fv) = Node (Data.List.map (\i -> sexp (fv i)) (getFins n))
--- sexp (RtlReadStruct n fk fs e i) = Node [sexp e]
--- sexp (RtlReadArray n k e i) = Node [sexp e, sexp i]
--- sexp (RtlReadArrayConst n k e i) = Node [sexp e]
-
-
--- sexp :: RtlExpr -> Int
--- sexp (RtlReadReg k s) = 1
--- sexp (RtlReadWire k s) = 1
--- sexp (RtlConst k c) = 1
--- sexp (RtlUniBool op e) = sexp e + 1
--- sexp (RtlCABool op e) = foldl (\a b -> a + sexp b) 1 e
--- sexp (RtlUniBit _ _ op e) = sexp e + 1
--- sexp (RtlCABit _ op e) = foldl (\a b -> a + sexp b) 1 e
--- sexp (RtlBinBit _ _ _ op e1 e2) = sexp e1 + sexp e2 + 1
--- sexp (RtlBinBitBool _ _ op e1 e2) = sexp e1 + sexp e2 + 1
--- sexp (RtlITE k p e1 e2) = sexp p + sexp e1 + sexp e2 + 1
--- sexp (RtlEq k e1 e2) = sexp e1 + sexp e2 + 1
--- sexp (RtlBuildStruct n fk fs fv) = foldl (\a (b) -> a + sexp (fv b)) 1 (getFins n)
--- sexp (RtlBuildArray n k fv) = foldl (\a b -> a + sexp (fv b)) 1 (getFins n)
--- sexp (RtlReadStruct n fk fs e i) = sexp e + 1
--- sexp (RtlReadArray n k e i) = sexp e + sexp i + 1
--- sexp (RtlReadArrayConst n k e i) = sexp e + 1
-
-
-instance Show RtlExpr where
-  show (RtlReadReg k s) = "RtlReadReg " ++ show k ++ " " ++ show s
-  show (RtlReadWire k s) = "RtlReadWire " ++ show k ++ " " ++ show s
-  show (RtlConst k c) = "RtlConst " ++ show k ++ " " ++ show c
-  show (RtlUniBool op e) = "RtlUniBool " ++ show op ++ " " ++ show e
-  show (RtlCABool op e) = "RtlCABool " ++ show op ++ " " ++ show e
-  show (RtlUniBit _ _ op e) = "RtlUniBit " ++ show op ++ " " ++ show e
-  show (RtlCABit _ op e) = "RtlCABit " ++ show op ++ " " ++ show e
-  show (RtlBinBit _ _ _ op e1 e2) = "RtlCABool " ++ show op ++ " " ++ show e1 ++ " " ++ show e2
-  show (RtlBinBitBool _ _ op e1 e2) = "RtlCABool " ++ show op ++ " " ++ show e1 ++ " " ++ show e2
-  show (RtlITE k p e1 e2) = "RtlITE " ++ show k ++ " " ++ show p ++ " " ++ show e1 ++ " " ++ show e2
-  show (RtlEq k e1 e2) = "RtlEq " ++ show k ++ " " ++ show e1 ++ " " ++ show e2
-  show (RtlBuildStruct n fk fs fv) = "RtlBuildStruct " ++ show n ++ " {" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
-  show (RtlBuildArray n k fv) = "RtlBuildArray " ++ show n ++ " " ++ show k ++ " {" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
-  show (RtlReadStruct n fk fs e i) = "RtlReadStruct " ++ show e ++ " " ++ show i
-  show (RtlReadArray n k e i) = "RtlReadArray " ++ show e ++ " " ++ show i
-  show (RtlReadArrayConst n k e i) = "RtlReadArrayConst " ++ show e ++ " " ++ show i
-
--- instance Show RtlExpr where
---   show e = show (sexp e)
-
-deriving instance Show BitFormat
-instance Show RtlSysT where
-  show (RtlDispString s) = "RtlDispString " ++ show s
-  show (RtlDispBool e f) = "RtlDispBool " ++ show e ++ " " ++ show f
-  show (RtlDispBit _ e f) = "RtlDispBool " ++ show e ++ " " ++ show f
-  show (RtlDispStruct n fk fs e ff) = "RtlDispStruct " ++ show e ++  "{" ++ concatMap (\i -> show (ff i) ++ "; ") (getFins n) ++ "}"
-  show (RtlDispArray n k fv ff) = "RtlDispArray " ++ show fv ++ " " ++ show ff
-
--- deriving instance Show RtlModule
-
-instance Show RtlModule where
-  show (Build_RtlModule hiddenMeths regFiles inputs outputs regInits regWrites wires sys) =
-    "REGFILES:\n" ++
-    foldl (\s new -> s ++ show new ++ "\n") "" regFiles ++ "\n" ++
-    "\nINPUTS:\n" ++
-    foldl (\s new -> s ++ show new ++ "\n") "" inputs ++ "\n" ++
-    "\nOUTPUTS:\n" ++
-    foldl (\s new -> s ++ show new ++ "\n") "" outputs ++ "\n" ++
-    "\nREGINITS:\n" ++
-    foldl (\s new -> s ++ show new ++ "\n") "" regInits ++ "\n" ++
-    "\nREGWRITES:\n" ++
-    foldl (\s new -> s ++ show new ++ "\n") "" regWrites ++ "\n" ++
-    "\nWIRES:\n" ++
-    foldl (\s new -> s ++ show (fst new) ++ ": " ++ show (fst (snd new)) ++ "\n    " ++ show (snd (snd new)) ++ "\n") "" wires ++ "\n" ++
-    "\nSYS:\n" ++
-    foldl (\s new -> s ++ show new ++ "\n") "" sys ++ "\n"
-    
-
 
 deriving instance Eq T
 
@@ -576,3 +456,94 @@ main =
     putStrLn $ ppTopModule rtlMod
     --let (Build_RtlModule hiddenMeths regFs _ _ _ _ _ _) = rtlMod in
     --  mapM_ (\rf -> writeFile (ppRfName rf) (ppRfFile rf)) regFs
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{-
+
+deriving instance Show UniBoolOp
+deriving instance Show CABoolOp
+deriving instance Show UniBitOp
+deriving instance Show CABitOp
+
+
+instance Show Kind where
+  show Bool = "Bool"
+  show (Bit n) = "Bit " ++ show n
+  show (Array n k) = "Array " ++ show n ++ " " ++ show k
+  show (Struct n fk fs) = "Struct " ++ "{" ++ concatMap (\i -> show (fs i) ++ ": " ++ show (fk i) ++ "; ") (getFins n) ++ "}"
+
+instance Show ConstT where
+  show (ConstBool b) = "ConstBool " ++ show b
+  show (ConstBit n w) = "ConstBit " ++ show n ++ " " ++ show w
+  show (ConstStruct n fk fs fv) = "ConstStruct " ++  "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
+  show (ConstArray n k fv) = "ConstArray " ++ "{" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
+
+deriving instance Show RegFileBase
+
+deriving instance Show BinBitOp
+
+instance Show RtlExpr where
+  show (RtlReadReg k s) = "RtlReadReg " ++ show k ++ " " ++ show s
+  show (RtlReadWire k s) = "RtlReadWire " ++ show k ++ " " ++ show s
+  show (RtlConst k c) = "RtlConst " ++ show k ++ " " ++ show c
+  show (RtlUniBool op e) = "RtlUniBool " ++ show op ++ " " ++ show e
+  show (RtlCABool op e) = "RtlCABool " ++ show op ++ " " ++ show e
+  show (RtlUniBit _ _ op e) = "RtlUniBit " ++ show op ++ " " ++ show e
+  show (RtlCABit _ op e) = "RtlCABit " ++ show op ++ " " ++ show e
+  show (RtlBinBit _ _ _ op e1 e2) = "RtlCABool " ++ show op ++ " " ++ show e1 ++ " " ++ show e2
+  show (RtlBinBitBool _ _ op e1 e2) = "RtlCABool " ++ show op ++ " " ++ show e1 ++ " " ++ show e2
+  show (RtlITE k p e1 e2) = "RtlITE " ++ show k ++ " " ++ show p ++ " " ++ show e1 ++ " " ++ show e2
+  show (RtlEq k e1 e2) = "RtlEq " ++ show k ++ " " ++ show e1 ++ " " ++ show e2
+  show (RtlBuildStruct n fk fs fv) = "RtlBuildStruct " ++ show n ++ " {" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
+  show (RtlBuildArray n k fv) = "RtlBuildArray " ++ show n ++ " " ++ show k ++ " {" ++ concatMap (\i -> show (fv i) ++ "; ") (getFins n) ++ "}"
+  show (RtlReadStruct n fk fs e i) = "RtlReadStruct " ++ show e ++ " " ++ show i
+  show (RtlReadArray n k e i) = "RtlReadArray " ++ show e ++ " " ++ show i
+  show (RtlReadArrayConst n k e i) = "RtlReadArrayConst " ++ show e ++ " " ++ show i
+
+-- instance Show RtlExpr where
+--   show e = show (sexp e)
+
+deriving instance Show BitFormat
+instance Show RtlSysT where
+  show (RtlDispString s) = "RtlDispString " ++ show s
+  show (RtlDispBool e f) = "RtlDispBool " ++ show e ++ " " ++ show f
+  show (RtlDispBit _ e f) = "RtlDispBool " ++ show e ++ " " ++ show f
+  show (RtlDispStruct n fk fs e ff) = "RtlDispStruct " ++ show e ++  "{" ++ concatMap (\i -> show (ff i) ++ "; ") (getFins n) ++ "}"
+  show (RtlDispArray n k fv ff) = "RtlDispArray " ++ show fv ++ " " ++ show ff
+
+-- deriving instance Show RtlModule
+
+instance Show RtlModule where
+  show (Build_RtlModule hiddenMeths regFiles inputs outputs regInits regWrites wires sys) =
+    "REGFILES:\n" ++
+    foldl (\s new -> s ++ show new ++ "\n") "" regFiles ++ "\n" ++
+    "\nINPUTS:\n" ++
+    foldl (\s new -> s ++ show new ++ "\n") "" inputs ++ "\n" ++
+    "\nOUTPUTS:\n" ++
+    foldl (\s new -> s ++ show new ++ "\n") "" outputs ++ "\n" ++
+    "\nREGINITS:\n" ++
+    foldl (\s new -> s ++ show new ++ "\n") "" regInits ++ "\n" ++
+    "\nREGWRITES:\n" ++
+    foldl (\s new -> s ++ show new ++ "\n") "" regWrites ++ "\n" ++
+    "\nWIRES:\n" ++
+    foldl (\s new -> s ++ show (fst new) ++ ": " ++ show (fst (snd new)) ++ "\n    " ++ show (snd (snd new)) ++ "\n") "" wires ++ "\n" ++
+    "\nSYS:\n" ++
+    foldl (\s new -> s ++ show new ++ "\n") "" sys ++ "\n"
+-}  
+
+
