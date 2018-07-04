@@ -3821,3 +3821,157 @@ Fixpoint inlineCall (f : MethT)(fcalls : MethsT)(fcalled : MethsT) : MethsT :=
              end
   | nil => nil
   end.
+
+Fixpoint mergeSeparatedBaseMod (bl : list BaseModule) : Mod :=
+  match bl with
+  | b::bl' => ConcatMod (Base b) (mergeSeparatedBaseMod bl')
+  | nil => Base (BaseMod nil nil nil)
+  end.
+
+Fixpoint mergeSeparatedBaseFile (rfl : list RegFileBase) : Mod :=
+  match rfl with
+  | rf::rfl' => ConcatMod (Base (BaseRegFile rf))(mergeSeparatedBaseFile rfl')
+  | nil => Base (BaseMod nil nil nil)
+  end.
+
+Fixpoint createHide' (m : Mod) (hides : list string) : Mod :=
+  match hides with
+  | nil => m
+  | h::hides' => HideMeth (createHide' m hides') h
+  end.
+
+Definition mergeSeparatedMod (hl : list string)(rfl : list RegFileBase) (bl : list BaseModule) :=
+  createHide' (ConcatMod (mergeSeparatedBaseFile rfl) (mergeSeparatedBaseMod bl)) hl.
+ 
+Lemma mergeSeparatedBaseFile_noHides (rfl : list RegFileBase) :
+  getHidden (mergeSeparatedBaseFile rfl) = nil.
+Proof.
+  induction rfl; auto.
+Qed.
+
+Lemma mergeSeparatedBaseMod_noHides (bl : list BaseModule) :
+  getHidden (mergeSeparatedBaseMod bl) = nil.
+Proof.
+  induction bl; auto.
+Qed.
+
+Lemma getHidden_createHide' (m : Mod) (hides : list string) :
+  getHidden (createHide' m hides) = hides++(getHidden m).
+Proof.
+  induction hides; auto.
+  - simpl; rewrite IHhides; reflexivity.
+Qed.
+
+Lemma getAllRegisters_createHide' (m : Mod) (hides : list string) :
+  getAllRegisters (createHide' m hides) = getAllRegisters m.
+Proof.
+  induction hides; auto.
+Qed.
+
+Lemma getAllRegisters_mergeBaseFile (rfl : list RegFileBase) :
+  getAllRegisters (mergeSeparatedBaseFile rfl) = (concat (map getRegFileRegisters rfl)).
+Proof.
+  induction rfl;auto.
+  simpl; rewrite IHrfl; reflexivity.
+Qed.
+
+Lemma getAllRegisters_mergeBaseMod (bl : list BaseModule) :
+  getAllRegisters (mergeSeparatedBaseMod bl) = (concat (map getRegisters bl)).
+Proof.
+  induction bl; auto.
+  simpl; rewrite IHbl; reflexivity.
+Qed.
+
+Lemma getAllMethods_createHide' (m : Mod) (hides : list string) :
+  getAllMethods (createHide' m hides) = getAllMethods m.
+Proof.
+  induction hides; auto.
+Qed.
+
+Lemma getAllMethods_mergeBaseFile (rfl : list RegFileBase) :
+  getAllMethods (mergeSeparatedBaseFile rfl) = (concat (map getRegFileMethods rfl)).
+Proof.
+  induction rfl;auto.
+  simpl; rewrite IHrfl; reflexivity.
+Qed.
+
+Lemma getAllMethods_mergeBaseMod (bl : list BaseModule) :
+  getAllMethods (mergeSeparatedBaseMod bl) = (concat (map getMethods bl)).
+Proof.
+  induction bl; auto.
+  simpl; rewrite IHbl; reflexivity.
+Qed.
+
+Lemma getAllRules_createHide' (m : Mod) (hides : list string) :
+  getAllRules (createHide' m hides) = getAllRules m.
+Proof.
+  induction hides; auto.
+Qed.
+
+Lemma getAllRules_mergeBaseFile (rfl : list RegFileBase) :
+  getAllRules (mergeSeparatedBaseFile rfl) = nil.
+Proof.
+  induction rfl;auto.
+Qed.
+
+Lemma getAllRules_mergeBaseMod (bl : list BaseModule) :
+  getAllRules (mergeSeparatedBaseMod bl) = (concat (map getRules bl)).
+Proof.
+  induction bl; auto.
+  simpl; rewrite IHbl; reflexivity.
+Qed.
+
+Lemma separateBaseMod_flatten (m : Mod) :
+  getAllRegisters m [=] getAllRegisters (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+Proof.
+  unfold mergeSeparatedMod.
+  rewrite getAllRegisters_createHide'.
+  unfold separateMod; simpl.
+  rewrite getAllRegisters_mergeBaseFile, getAllRegisters_mergeBaseMod.
+  induction m.
+  - destruct m; simpl; repeat rewrite app_nil_r; reflexivity.
+  - simpl; assumption.
+  - simpl in *.
+    destruct (separateBaseMod m1), (separateBaseMod m2).
+    simpl in *.
+    repeat rewrite map_app, concat_app; rewrite IHm1, IHm2.
+    repeat rewrite <- app_assoc; apply Permutation_app_head.
+    repeat rewrite app_assoc; apply Permutation_app_tail.
+    apply Permutation_app_comm.
+Qed.
+
+Lemma separateBaseModule_flatten_Methods (m : Mod) :
+  getAllMethods m [=] getAllMethods (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+Proof.
+  unfold mergeSeparatedMod.
+  rewrite getAllMethods_createHide'.
+  unfold separateMod; simpl.
+  rewrite getAllMethods_mergeBaseFile, getAllMethods_mergeBaseMod.
+  induction m.
+  - destruct m; simpl; repeat rewrite app_nil_r; reflexivity.
+  - simpl; assumption.
+  - simpl in *.
+    destruct (separateBaseMod m1), (separateBaseMod m2).
+    simpl in *.
+    repeat rewrite map_app, concat_app; rewrite IHm1, IHm2.
+    repeat rewrite <- app_assoc; apply Permutation_app_head.
+    repeat rewrite app_assoc; apply Permutation_app_tail.
+    apply Permutation_app_comm.
+Qed.
+
+Lemma separateBaseModule_flatten_Rules (m : Mod) :
+  getAllRules m [=] getAllRules (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+Proof.
+  unfold mergeSeparatedMod.
+  rewrite getAllRules_createHide'.
+  unfold separateMod; simpl.
+  rewrite getAllRules_mergeBaseFile, getAllRules_mergeBaseMod; simpl.
+  induction m.
+  - destruct m; simpl; repeat rewrite app_nil_r; reflexivity.
+  - simpl; assumption.
+  - simpl in *.
+    destruct (separateBaseMod m1), (separateBaseMod m2).
+    simpl in *.
+    repeat rewrite map_app, concat_app; rewrite IHm1, IHm2.
+    reflexivity.
+Qed.
