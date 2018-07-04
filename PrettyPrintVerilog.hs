@@ -393,38 +393,22 @@ ppTopModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
   --concatMap ppRfModule regFs ++
   ppRtlModule m ++
   "module top(\n" ++
-  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) ins ++ "\n" ++
-  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) outs ++ "\n" ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) insFiltered ++ "\n" ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) outsFiltered ++ "\n" ++
   "  input CLK,\n" ++
   "  input RESET\n" ++
   ");\n" ++
-  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) insAll ++ "\n" ++
-  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) outsAll ++ "\n" ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) ins ++ "\n" ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) outs ++ "\n" ++
   --concatMap ppRfInstance regFs ++
   ppRtlInstance m ++
   "endmodule\n"
   where
-    insAll = removeDups ins'
-    outsAll = removeDups outs'
-    ins = Data.List.filter filtCond insAll
-    outs = Data.List.filter filtCond outsAll
-    badRead x read = x == read ++ "#_guard" || x == read ++ "#_enable" || x == read ++ "#_argument" || x == read ++ "#_return"
-    badReads x reads = foldl (\accum (v, _) -> badRead x v || accum) False reads
-    filtCond _ = True
-    --filtCond ((x, _), _) = case Data.List.find (\((((_, reads), write), (_, _))) ->
-    --                                              badReads x reads ||
-    --                                              {-
-    --                                              x == read ++ "#_guard" ||
-    --                                              x == read ++ "#_enable" ||
-    --                                              x == read ++ "#_argument" ||
-    --                                              x == read ++ "#_return" ||
-    --                                              -}
-    --                                              x == write ++ "#_guard" ||
-    --                                              x == write ++ "#_enable" ||
-    --                                              x == write ++ "#_argument" ||
-    --                                              x == write ++ "#_return") regFs of
-    --                      Nothing -> True
-    --                      _ -> False
+    ins = removeDups ins'
+    outs = removeDups outs'
+    isHidden (x, _) = not (elem x hiddenWires)
+    insFiltered = Data.List.filter isHidden ins'
+    outsFiltered = Data.List.filter isHidden outs'
 
 printDiff :: [(String, [String])] -> [(String, [String])] -> IO ()
 printDiff (x:xs) (y:ys) =
