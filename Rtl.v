@@ -50,7 +50,7 @@ Inductive RtlSysT : Type :=
 
 Record RtlModule :=
   { hiddenWires: list (string * list nat);
-    regFiles: list RegFileBase;
+    regFiles: list (bool * RegFileBase);
     inputs: list (string * list nat * Kind);
     outputs: list (string * list nat * Kind);
     regInits: list (string * sigT (fun x => option (ConstT x)));

@@ -1860,6 +1860,9 @@ Fixpoint inlinesingle_Mod (m : Mod) (f : DefMethT) : Mod :=
   |ConcatMod m1 m2 => ConcatMod (inlinesingle_Mod m1 f) (inlinesingle_Mod m2 f)
   end.
 
+Definition WriteRegFile n dataT := STRUCT {
+                                       "addr" :: Bit (Nat.log2_up n);
+                                       "data" :: dataT }.
 
 Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_expr
     (at level 100) : kami_expr_scope.

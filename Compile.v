@@ -563,7 +563,7 @@ Definition setMethodGuards (ignoreMeths: list (string * {x : Signature & MethodT
 (* Reg File methods definitions must serve as wires *)
 Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) :=
   {| hiddenWires := map (fun x => getMethRet x) (fst bm) ++ map (fun x => getMethArg x) (fst bm) ++ map (fun x => getMethEn x) (fst bm);
-     regFiles := fst (snd bm);
+     regFiles := map (fun x => (false, x)) (fst (snd bm));
      inputs := getInputs (SubtractList fst fst (getCallsPerBaseMod (getRules (snd (snd bm))))
                                        (getAllMethodsRegFileList (fst (snd bm)))
                          );
