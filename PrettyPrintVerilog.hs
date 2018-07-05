@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -XStandaloneDeriving #-}
 
-import Target
+import Target hiding (map, concat)
 import Data.List
 import Data.List.Split
 import Control.Monad.State.Lazy
@@ -322,6 +322,8 @@ ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
 
   concatMap (\(nm, (ty, expr)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) assigns ++ "\n" ++
 
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) rfMeths ++ "\n" ++
+
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$wire$" ++ show pos) ty ++ ";\n")) assignTruncs ++ "\n" ++
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$reg$" ++ show pos) ty ++ ";\n")) regTruncs ++ "\n" ++
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$sys$" ++ show pos) ty ++ ";\n")) sysTruncs ++ "\n" ++
@@ -350,6 +352,10 @@ ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
     regInits = removeDups regInits'
     regWrites = removeDups regWrites'
     assigns = removeDups assigns'
+    rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", []), fst (fst (snd x))) ) (getAllMethodsRegFileList regFs) ++
+              Data.List.map (\x -> ((fst x ++ "#_return", []), snd (fst (snd x))) ) (getAllMethodsRegFileList regFs) ++
+              Data.List.map (\x -> ((fst x ++ "#_enable", []), Bool) ) (getAllMethodsRegFileList regFs) ++
+              Data.List.map (\x -> ((fst x ++ "#_guard", []), Bool) ) (getAllMethodsRegFileList regFs)
     convAssigns =
       mapM (\(nm, (ty, expr)) ->
               do
