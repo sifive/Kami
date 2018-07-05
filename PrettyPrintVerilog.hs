@@ -388,6 +388,15 @@ sumOutEdge x = case x of
                  [] -> 0
                  (a, b) : ys -> Data.List.length b + sumOutEdge ys
 
+
+-- ppRfInstance :: RegFileBase -> string
+-- ppRfInstance rf@(RegFile dataArray reads write idxNum dataT init) =
+--   "  RegFile " ++ dataArray ++ "#(.idxNum(" ++ idxNum ++ "), .dataSz(" ++ size dataT ++ ")) (" ++
+  
+  
+-- ppRfInstance rf@(SyncRegFile isAddr dataArray reads write idxNum dataT init) =
+
+
 ppTopModule :: RtlModule -> String
 ppTopModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
   --concatMap ppRfModule regFs ++
