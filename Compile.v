@@ -547,17 +547,30 @@ Definition getWriteRegs (regs: list RegInitT) :=
 Definition getReadRegs (regs: list RegInitT) :=
   map (fun r => (getRegRead (fst r), existT _ (projT1 (getRegInit (snd r))) (RtlReadReg _ (fst r)))) regs.
 
-Definition setMethodGuards (rules: list (Attribute (Action Void))) :=
-  map (fun m => (getMethGuard (fst m), existT _ Bool (RtlConst (ConstBool true)))) (getCallsPerBaseMod rules).
+Definition filterNotInList A (f: A -> string) ls x :=
+  if In_dec string_dec (f x) ls then false else true.
+
+Definition getAllMethodsRegFileList ls :=
+  concat (map (fun x => getMethods (BaseRegFile x)) ls).
+
+Definition SubtractList A B (f: A -> string) (g: B -> string) l1 l2 :=
+  filter (filterNotInList f (map g l2)) l1.
+
+Definition setMethodGuards (ignoreMeths: list (string * {x : Signature & MethodT x})) (rules: list (Attribute (Action Void))) :=
+  map (fun m => (getMethGuard (fst m), existT _ Bool (RtlConst (ConstBool true)))) (SubtractList fst fst (getCallsPerBaseMod rules) ignoreMeths).
 
 (* Inputs and outputs must be all method calls in base module - register file methods being called *)
 (* Reg File methods definitions must serve as wires *)
 Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) :=
   {| hiddenWires := map (fun x => getMethRet x) (fst bm) ++ map (fun x => getMethArg x) (fst bm) ++ map (fun x => getMethEn x) (fst bm);
-     regFiles := fst (snd bm);
-     inputs := getInputs (getCallsPerBaseMod (getRules (snd (snd bm))));
-     outputs := getOutputs (getCallsPerBaseMod (getRules (snd (snd bm))));
+     regFiles := map (fun x => (false, x)) (fst (snd bm));
+     inputs := getInputs (SubtractList fst fst (getCallsPerBaseMod (getRules (snd (snd bm))))
+                                       (getAllMethodsRegFileList (fst (snd bm)))
+                         );
+     outputs := getOutputs (SubtractList fst fst (getCallsPerBaseMod (getRules (snd (snd bm))))
+                                         (getAllMethodsRegFileList (fst (snd bm))));
      regInits := map (fun x => (fst x, getRegInit (snd x))) (getRegisters (snd (snd bm)));
      regWrites := getWriteRegs (getRegisters (snd (snd bm)));
-     wires := getReadRegs (getRegisters (snd (snd bm))) ++ getWires (getRegisters (snd (snd bm))) (getRules (snd (snd bm))) (map fst (getRules (snd (snd bm)))) ++ setMethodGuards (getRules (snd (snd bm)));
+     wires := getReadRegs (getRegisters (snd (snd bm))) ++ getWires (getRegisters (snd (snd bm))) (getRules (snd (snd bm))) (map fst (getRules (snd (snd bm)))) ++
+                          setMethodGuards (getAllMethodsRegFileList (fst (snd bm))) (getRules (snd (snd bm)));
      sys := getSysPerBaseMod (getRules (snd (snd bm))) |}.
