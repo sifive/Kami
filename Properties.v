@@ -3975,3 +3975,13 @@ Proof.
     repeat rewrite map_app, concat_app; rewrite IHm1, IHm2.
     reflexivity.
 Qed.
+
+Lemma separateBaseModule_flatten_Hides (m : Mod) :
+  getHidden m [=] getHidden (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+  unfold mergeSeparatedMod.
+  rewrite getHidden_createHide';simpl.
+  rewrite mergeSeparatedBaseFile_noHides.
+  rewrite mergeSeparatedBaseMod_noHides.
+  repeat rewrite app_nil_r.
+  reflexivity.
+Qed.
