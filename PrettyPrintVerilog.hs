@@ -56,7 +56,7 @@ ppDeclType :: String -> Kind -> String
 ppDeclType s k = ppTypeName k ++ ppType k ++ " " ++ s
 
 ppName :: String -> String
-ppName s = intercalate "$" (Data.List.map (\x -> ppDottedName x) (splitOneOf "$#" s))
+ppName s = intercalate "$" (Data.List.map (\x -> ppDottedName x) (splitOneOf "$#?" s))
   {-
   if elem '.' s
   then intercalate "$" (case splitOneOf ".#" s of
@@ -151,7 +151,7 @@ ppRtlExpr who e =
     RtlReadStruct num fk fs e i ->
       do
         new <- optionAddToTrunc (Struct num fk fs) e
-        return $ new ++ '.' : (fs i)
+        return $ new ++ '.' : ppName (fs i)
     RtlBuildStruct num fk fs es ->
       do
         strs <- mapM (ppRtlExpr who) (Data.List.map es (getFins num))
@@ -273,13 +273,13 @@ ppRfModule (bypass, rf@(RegFile name reads write idxNum dataType init)) =
   "  input logic CLK,\n" ++
   "  input logic RESET\n" ++
   ");\n" ++
-  ppDealSize0 dataType "" ("  " ++ ppDeclType (ppName name ++ "$_data") dataType ++ "[0:" ++ show idxNum ++ "];\n") ++
+  ppDealSize0 dataType "" ("  " ++ ppDeclType (ppName name ++ "$_data") dataType ++ "[0:" ++ show (idxNum - 1) ++ "];\n") ++
   "  assign " ++ ppName write ++ "$_guard = 1'b1;\n" ++
   (case init of
      Just initVal ->
        "  initial begin\n" ++
-       "    for(Integer _i = 0; _i < " ++ show idxNum ++ " _i=_i+1) begin\n" ++
-       ppDealSize0 dataType "" ("      " ++ ppName name ++ "$_data[_i] = " ++ ppConst initVal ++ "\n") ++
+       "    for(int _i = 0; _i < " ++ show (idxNum-1) ++ "; _i=_i+1) begin\n" ++
+       ppDealSize0 dataType "" ("      " ++ ppName name ++ "$_data[_i] = " ++ ppConst initVal ++ ";\n") ++
        "    end\n" ++
        "  end\n"
      Nothing -> "") ++
@@ -294,8 +294,8 @@ ppRfModule (bypass, rf@(RegFile name reads write idxNum dataType init)) =
   (case init of
      Just initVal ->
        "    if(RESET) begin\n" ++
-       "      for(Integer _i = 0; _i < " ++ show idxNum ++ " _i=_i+1) begin\n" ++
-       ppDealSize0 dataType "" ("        " ++ ppName name ++ "$_data[_i] = " ++ ppConst initVal ++ "\n") ++
+       "      for(int _i = 0; _i < " ++ show (idxNum-1) ++ "; _i=_i+1) begin\n" ++
+       ppDealSize0 dataType "" ("        " ++ ppName name ++ "$_data[_i] = " ++ ppConst initVal ++ ";\n") ++
        "      end\n" ++
        "    end\n"
      Nothing -> "") ++
@@ -312,7 +312,13 @@ removeDups = nubBy (\(a, _) (b, _) -> a == b)
 ppRtlInstance :: RtlModule -> String
 ppRtlInstance m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
   "  _design _designInst(.CLK(CLK), .RESET(RESET)" ++
-  concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ '(' : ppPrintVar nm ++ ")")) (removeDups ins' ++ removeDups outs') ++ ");\n"
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ '(' : ppPrintVar nm ++ ")")) (removeDups ins' ++ removeDups outs') ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ '(' : ppPrintVar nm ++ ")")) rfMeths ++ ");\n"
+  where
+    rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", []), fst (fst (snd x))) ) (getAllMethodsRegFileList (map snd regFs)) ++
+              Data.List.map (\x -> ((fst x ++ "#_return", []), snd (fst (snd x))) ) (getAllMethodsRegFileList (map snd regFs)) ++
+              Data.List.map (\x -> ((fst x ++ "#_enable", []), Bool) ) (getAllMethodsRegFileList (map snd regFs)) ++
+              Data.List.map (\x -> ((fst x ++ "#_guard", []), Bool) ) (getAllMethodsRegFileList (map snd regFs))
 
 ppBitFormat :: BitFormat -> String
 ppBitFormat Binary = "b"
@@ -342,14 +348,15 @@ ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
   "module _design(\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) ins ++ "\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) outs ++ "\n" ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) rfMethsIn ++ "\n" ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) rfMethsOut ++ "\n" ++
+
   "  input CLK,\n" ++
   "  input RESET\n" ++
   ");\n" ++
   concatMap (\(nm, (ty, init)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppName nm) ty ++ ";\n")) regInits ++ "\n" ++
 
   concatMap (\(nm, (ty, expr)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) assigns ++ "\n" ++
-
-  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) rfMeths ++ "\n" ++
 
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$wire$" ++ show pos) ty ++ ";\n")) assignTruncs ++ "\n" ++
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$reg$" ++ show pos) ty ++ ";\n")) regTruncs ++ "\n" ++
@@ -379,10 +386,10 @@ ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
     regInits = removeDups regInits'
     regWrites = removeDups regWrites'
     assigns = removeDups assigns'
-    rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", []), fst (fst (snd x))) ) (getAllMethodsRegFileList (map snd regFs)) ++
-              Data.List.map (\x -> ((fst x ++ "#_return", []), snd (fst (snd x))) ) (getAllMethodsRegFileList (map snd regFs)) ++
-              Data.List.map (\x -> ((fst x ++ "#_enable", []), Bool) ) (getAllMethodsRegFileList (map snd regFs)) ++
-              Data.List.map (\x -> ((fst x ++ "#_guard", []), Bool) ) (getAllMethodsRegFileList (map snd regFs))
+    rfMethsIn = Data.List.map (\x -> ((fst x ++ "#_return", []), snd (fst (snd x))) ) (getAllMethodsRegFileList (map snd regFs)) ++
+                Data.List.map (\x -> ((fst x ++ "#_guard", []), Bool) ) (getAllMethodsRegFileList (map snd regFs))
+    rfMethsOut = Data.List.map (\x -> ((fst x ++ "#_argument", []), fst (fst (snd x))) ) (getAllMethodsRegFileList (map snd regFs)) ++
+                 Data.List.map (\x -> ((fst x ++ "#_enable", []), Bool) ) (getAllMethodsRegFileList (map snd regFs))
     convAssigns =
       mapM (\(nm, (ty, expr)) ->
               do
@@ -442,7 +449,8 @@ ppTopModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
   ");\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) ins ++ "\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) outs ++ "\n" ++
-  --concatMap ppRfInstance regFs ++
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) rfMeths ++ "\n" ++
+  concatMap ppRfInstance regFs ++
   ppRtlInstance m ++
   "endmodule\n"
   where
@@ -451,6 +459,10 @@ ppTopModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
     isHidden (x, _) = not (elem x hiddenWires)
     insFiltered = Data.List.filter isHidden ins'
     outsFiltered = Data.List.filter isHidden outs'
+    rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", []), fst (fst (snd x))) ) (getAllMethodsRegFileList (map snd regFs)) ++
+              Data.List.map (\x -> ((fst x ++ "#_return", []), snd (fst (snd x))) ) (getAllMethodsRegFileList (map snd regFs)) ++
+              Data.List.map (\x -> ((fst x ++ "#_enable", []), Bool) ) (getAllMethodsRegFileList (map snd regFs)) ++
+              Data.List.map (\x -> ((fst x ++ "#_guard", []), Bool) ) (getAllMethodsRegFileList (map snd regFs))
 
 printDiff :: [(String, [String])] -> [(String, [String])] -> IO ()
 printDiff (x:xs) (y:ys) =
