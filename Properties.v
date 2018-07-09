@@ -3623,12 +3623,9 @@ Proof.
       destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
 Qed.
 
-
-
-
-Lemma WfActionT_inlinesingle_f (k : Kind) (f : DefMethT) m v:
-  WfActionT m (projT2 (snd f) type v) ->
-  WfActionT (inlinesingle_BaseModule m f) (projT2 (snd f) type v).
+Lemma WfActionT_inlinesingle_f (k : Kind) (a : ActionT type k) (f : DefMethT) m :
+  WfActionT m a ->
+  WfActionT (inlinesingle_BaseModule m f) a.
 Proof.
   intros.
   induction H; econstructor; auto.
@@ -3712,7 +3709,7 @@ Proof.
   rewrite IHl; reflexivity.
 Qed.
 
-Lemma inline_flattening_Regs f m :
+Lemma inline_flattening_AllRegs f m :
   getAllRegisters (inlinesingle_Mod (flatten m) f) = getAllRegisters m.
 Proof.
   unfold flatten.
@@ -3760,7 +3757,44 @@ Proof.
   unfold inlinesingle_BaseModule; simpl.
   reflexivity.
 Qed.
-  
+
+Lemma ActionT_rules rule f:
+  (snd (inlinesingle_Rule f rule) type) = (inlineSingle f (snd rule type)).
+Proof.
+  destruct rule; simpl.
+  reflexivity.
+Qed.
+
+Lemma ActionT_meths f m1 m2 m:
+  inlinesingle_Meth f m1 = m2 ->
+  (forall (v : type (fst (projT1 (snd f)))), WfActionT m (projT2 (snd f) type v)) ->
+  (forall (v : type (fst (projT1 (snd m1)))), WfActionT m (projT2 (snd m1) type v)) ->
+  (forall (v : type (fst (projT1 (snd m2)))), WfActionT (inlinesingle_BaseModule m f) (projT2 (snd m2) type v)).
+Proof.
+  intros.
+  destruct m1, m2, s0; simpl in *.
+  inversion H; subst; simpl in *.
+  specialize (H1 v).
+  eapply WfActionT_inlinesingle; eauto.
+Qed.
+
+Lemma WfMod_inline_WfMod m f :
+  WfMod (Base m) ->
+  In f (getMethods m) ->
+  WfMod (Base (inlinesingle_BaseModule m f)).
+Proof.
+  intros; inv H; econstructor; eauto.
+  - split; intros; simpl in *;inv WfBaseModule; eauto; pose proof (H2 _ H0); rewrite in_map_iff in H; dest.
+    + specialize (H1 _ H4).
+      specialize (WfActionT_inlinesingle _ H1 H3); intro; rewrite <- H.
+      rewrite ActionT_rules; apply WfActionT_inlinesingle; eauto.
+    + specialize (H2 _ H4).
+      eapply ActionT_meths; eauto.
+  - rewrite <- (inline_preserves_keys_Meth f (getMethods m)) in NoDupMeths; assumption.
+  - rewrite <- (inline_preserves_keys_Rule f (getRules m)) in NoDupRle; assumption.
+Qed.
+      
+
 Lemma inline_preserves_keys_Meth_Mod s m f:
   In s (map fst (getAllMethods m)) <-> In s (map fst (getAllMethods (inlinesingle_Mod m f))).
 Proof.
