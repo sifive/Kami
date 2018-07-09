@@ -1764,6 +1764,10 @@ Fixpoint createHide (m: BaseModule) (hides: list string) :=
 Definition flatten m := createHide (getFlat m) (getHidden m).
 
 
+Definition PStepSubstitute m o l :=
+  PSubsteps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
+  MatchingExecCalls l l (Base (getFlat m)) /\
+  (forall s v, In s (map fst (getAllMethods m)) -> In s (getHidden m) -> InExec (s, v) l -> InCall (s, v) l).
 
 Definition StepSubstitute m o l :=
   Substeps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
