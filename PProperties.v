@@ -360,7 +360,7 @@ Qed.
 Global Instance List_FullLabel_perm_Equivalence : Equivalence (@List_FullLabel_perm) | 10 :={
    Equivalence_Reflexive := @List_FullLabel_perm_refl;
    Equivalence_Symmetric := @List_FullLabel_perm_sym;
-   Equivalence_Transitive := @List_FullLabel_perm_trans}.
+   Equivalence_Transitive := @List_FullLabel_perm_trans}.  
 
 Lemma List_FullLabel_perm_in:
   forall l l', List_FullLabel_perm l l' ->
@@ -385,6 +385,33 @@ Proof.
   - intros; specialize (IHList_FullLabel_perm1 _ H1); dest.
     specialize (IHList_FullLabel_perm2 _ H3); dest.
     exists x0; repeat split; eauto using FullLabel_perm_trans.
+Qed.
+
+Lemma List_FullLabel_perm_getRleOrMeth l1 l2:
+  List_FullLabel_perm l1 l2 ->
+  (map getRleOrMeth l1) [=] (map getRleOrMeth l2).
+Proof.
+  induction 1; eauto using Permutation_trans.
+  - inv H; simpl.
+    econstructor 2; eauto.
+  - inv H; inv H0; simpl.
+    rewrite perm_swap; repeat econstructor 2; eauto.
+Qed.
+
+Corollary List_FullLabel_perm_InExec_rewrite f l1 l2:
+  List_FullLabel_perm l1 l2 ->
+  InExec f l1 ->
+  InExec f l2.
+Proof.
+  intros; apply List_FullLabel_perm_getRleOrMeth in H.
+  unfold InExec.
+  rewrite <- H; assumption.
+Qed.
+
+Global Instance List_FullLabel_perm_InExec_rewrite' f:
+  Proper (List_FullLabel_perm ==> iff) (@InExec f) |10.
+Proof.
+  repeat red; intros; split; intros; eauto using List_FullLabel_perm_InExec_rewrite, List_FullLabel_perm_sym.
 Qed.
 
 Lemma Perm_rewrite_List_FullLabel_perm_l l1 l2:
@@ -521,6 +548,7 @@ Proof.
           dest;inv H11;eapply HNoCall.
         -- apply H8.
         -- unfold InCall;exists (u', (rm', cs'));split; auto; simpl in *;rewrite <- H15; assumption.
+      * rewrite <- H1; assumption.
 Qed.
 
 Lemma Substeps_PSubsteps m:
@@ -528,27 +556,8 @@ Lemma Substeps_PSubsteps m:
     Substeps m o l -> PSubsteps m o l.
   induction 1; subst.
   - econstructor 1; rewrite HRegs; reflexivity.
-  - econstructor 2.
-    + rewrite HRegs; reflexivity.
-    + apply HInRules.
-    + apply (SemAction_PSemAction HAction).
-    + assumption.
-    + assumption.
-    + reflexivity.
-    + assumption.
-    + assumption.
-    + assumption.
-    + assumption.
-  - econstructor 3.
-    + rewrite HRegs; reflexivity.
-    + apply HInMeths.
-    + apply (SemAction_PSemAction HAction).
-    + assumption.
-    + assumption.
-    + reflexivity.
-    + assumption.
-    + assumption.
-    + assumption.
+  - econstructor 2;[rewrite HRegs|apply HInRules| apply (SemAction_PSemAction HAction)| | | | | | | ]; eauto.
+  - econstructor 3;[rewrite HRegs|apply HInMeths| apply (SemAction_PSemAction HAction)| | | | | | | ]; eauto.
 Qed.
 
 Lemma List_FullLabel_perm_nil l :
@@ -704,26 +713,12 @@ Proof.
         specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H0) _ H4) as TMP; dest.
         exists x2; split; auto.
         inv H7; simpl in *; rewrite <- H12; assumption.
+      * apply HNoExec; rewrite H0; assumption.
 Qed.
 
 Global Instance PSubsteps_List_FullLabel_perm_rewrite' :
   Proper (Logic.eq ==> Logic.eq ==> List_FullLabel_perm ==> iff) (@PSubsteps) | 10.
 repeat red; intros; split; intros; subst; eauto using List_FullLabel_perm_sym, PSubsteps_List_FullLabel_perm_rewrite.
-Qed.
-
-Lemma List_FullLabel_perm_InExec_rewrite f l l' :
-  List_FullLabel_perm l l' ->
-  InExec f l ->
-  InExec f l'.
-Proof.
-  unfold InExec; induction 1; simpl; auto; intros.
-  - destruct H1.
-    + inversion H; subst; simpl in *; auto.
-    + right; auto.
-  - destruct H2; subst.
-    + destruct H, H0; subst; simpl in *; auto.
-    + destruct H, H0; subst; simpl in *; auto.
-      destruct H2; auto.
 Qed.
 
 Lemma List_FullLabel_perm_InCall_rewrite f l l' :
@@ -750,7 +745,6 @@ Proof.
       specialize (IHList_FullLabel_perm H4) as TMP; dest.
       exists x0; split;auto.
 Qed.
-
 
 Lemma List_FullLabel_perm_WeakInclusion l l' :
   List_FullLabel_perm l l' ->
@@ -1109,8 +1103,8 @@ Section PSubsteps_rewrite.
     induction 2.
     - econstructor 1.
       rewrite <- H; assumption.
-    - econstructor 2;[rewrite <- H|apply HInRules|apply (PSemAction_rewrite_state H) in HPAction; apply HPAction| | |apply HLabel| | | |];assumption.
-    - econstructor 3;[rewrite <- H|apply HInMeths|apply (PSemAction_rewrite_state H) in HPAction; apply HPAction| | |apply HLabel| | |];assumption.
+    - econstructor 2;[rewrite <- H|apply HInRules|apply (PSemAction_rewrite_state H) in HPAction; apply HPAction| | |apply HLabel| | | | ];assumption.
+    - econstructor 3;[rewrite <- H|apply HInMeths|apply (PSemAction_rewrite_state H) in HPAction; apply HPAction| | |apply HLabel| | | | ];assumption.
   Qed.
 
   Lemma PSubsteps_rewrite_lists m o l1 l2:
@@ -1416,6 +1410,18 @@ Proof.
   eapply PSubsteps_upd_SubList_key; eauto.
 Qed.
 
+Lemma PSubsteps_meth_In m o l :
+  PSubsteps m o l ->
+  forall u f cs, In (u, (Meth f, cs)) l ->
+                 In (fst f) (map fst (getMethods m)).
+Proof.
+  intros.
+  apply (PSubsteps_Substeps) in H; dest.
+  specialize (List_FullLabel_perm_in H1 _ H0) as TMP; dest.
+  inv H4.
+  apply (Substeps_meth_In H3 _ _ _ H5).
+Qed.
+
 Lemma PSubsteps_combine m1 o1 l1:
   PSubsteps m1 o1 l1 ->
   forall m2 o2 l2  (DisjRegs: DisjKey (getRegisters m1) (getRegisters m2)) (DisjMeths: DisjKey (getMethods m1) (getMethods m2))
@@ -1544,6 +1550,12 @@ Proof.
       eapply HNoCall0; eauto.
       unfold InCall.
       eexists; rewrite HLabel;split; simpl; eauto.
+    + rewrite InExec_app_iff; intros; destruct H1; auto.
+      unfold InExec in H1; rewrite in_map_iff in H1; dest.
+      destruct x, p; simpl in *; subst.
+      eapply PSubsteps_meth_In in H2; eauto.
+      destruct (DisjMeths fn);auto.
+      apply (in_map fst) in HInMeths; contradiction.
 Qed.
 
 Corollary PStep_meth_InExec m o l :
@@ -1922,6 +1934,10 @@ Section SplitSubsteps.
                destruct (L H10); assumption.
           -- intros; apply (HNoCall c H10). destruct H11 as [x1 [L R]];exists x1;split;[|assumption].
              destruct (filter_In (BaseModuleFilter m1) x1 ls) as [L1 R1]; destruct (L1 L); assumption.
+          -- intros; apply HNoExec; unfold InExec in *.
+             rewrite in_map_iff in H10; dest; destruct x1, p; simpl in *; subst.
+             unfold ModuleFilterLabels in H11; rewrite filter_In in H11; dest.
+             apply (in_map getRleOrMeth) in H10; assumption.
         * rewrite HLabel,(NotInMethods_Filter _ _ _ _ _ _ _ _ H3); assumption.
       + subst; dest; exists x, x0;split;[|split;[|split;[|split]]]; auto.
         * rewrite HLabel,(NotInMethods_Filter _ _ _ _ _ _ _ _ H3); assumption.
@@ -1938,6 +1954,10 @@ Section SplitSubsteps.
                destruct (L H10); assumption.
           -- intros; apply (HNoCall c H10). destruct H11 as [x1 [L R]];exists x1;split;[|assumption].
              destruct (filter_In (BaseModuleFilter m2) x1 ls) as [L1 R1]; destruct (L1 L); assumption.
+          -- intros; apply HNoExec; unfold InExec in *.
+             rewrite in_map_iff in H10; dest; destruct x1, p; simpl in *; subst.
+             unfold ModuleFilterLabels in H11; rewrite filter_In in H11; dest.
+             apply (in_map getRleOrMeth) in H10; assumption.
   Qed.
   
   Lemma split_Substeps2 o l:

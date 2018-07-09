@@ -2216,6 +2216,18 @@ Proof.
       eapply HNoCall0; eauto.
       unfold InCall.
       eexists; split; simpl; eauto.
+    + intro.
+      rewrite InExec_app_iff in H1.
+      destruct H1.
+      * tauto.
+      * unfold InExec in H1.
+        rewrite in_map_iff in H1; dest.
+        destruct x, p.
+        simpl in *; subst.
+        eapply Substeps_meth_In in H2; eauto.
+        simpl in *.
+        destruct (DisjMeths fn);[|contradiction].
+        apply (in_map fst) in HInMeths; contradiction.
 Qed.
 
 Lemma Substeps_flatten m o l:
@@ -2809,6 +2821,10 @@ Section SplitSubsteps.
                destruct (L H10); assumption.
           -- intros; apply (HNoCall c H10). destruct H11 as [x1 [L R]];exists x1;split;[|assumption].
              destruct (filter_In (BaseModuleFilter m1) x1 ls) as [L1 R1]; destruct (L1 L); assumption.
+          -- intros; apply HNoExec. unfold InExec in *.
+             rewrite in_map_iff in H10; dest;destruct x1, p; simpl in *; subst.
+             unfold ModuleFilterLabels in H11; rewrite filter_In in H11; dest.
+             apply (in_map getRleOrMeth) in H7; assumption.
         * rewrite (NotInMethods_Filter _ _ _ _ _ _ _ _ H3); assumption.
       + subst; dest; exists x, x0;split;[|split;[|split;[|split]]]; auto.
         * rewrite (NotInMethods_Filter _ _ _ _ _ _ _ _ H3); assumption.
@@ -2823,6 +2839,10 @@ Section SplitSubsteps.
                destruct (L H10); assumption.
           -- intros; apply (HNoCall c H10). destruct H11 as [x1 [L R]];exists x1;split;[|assumption].
              destruct (filter_In (BaseModuleFilter m2) x1 ls) as [L1 R1]; destruct (L1 L); assumption.
+          -- intros; apply HNoExec; unfold InExec in *.
+             rewrite in_map_iff in H10; dest; destruct x1,p; simpl in *; subst.
+             unfold ModuleFilterLabels in H11; rewrite filter_In in H11; dest.
+             apply (in_map getRleOrMeth) in H7; assumption.
   Qed.
   
   Lemma split_Substeps2 o l:
