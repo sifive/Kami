@@ -299,7 +299,7 @@ ppRfModule (bypass, rf@(RegFile name reads write idxNum dataType init)) =
        "      end\n" ++
        "    end\n"
      Nothing -> "") ++
-  "    if(" ++ ppName write ++ "$_enable) begin\n" ++
+  "    else if(" ++ ppName write ++ "$_enable) begin\n" ++
   ppDealSize0 dataType "" ("      " ++ ppName name ++ "$_data[" ++ ppName write ++ "$_argument.addr] <= " ++ ppName write ++ "$_argument.data;\n") ++
   "    end\n" ++
   "  end\n" ++
