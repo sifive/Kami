@@ -354,13 +354,17 @@ Section PPlusTrace.
                        (HPPlusTrace : ls' = ((upds, (execs, calls))::ls)):
       PPlusTrace o' ls'.
 
+  Notation PPT_upds := (fun x => fst x).
+  Notation PPT_execs := (fun x => fst (snd x)).
+  Notation PPT_calls := (fun x => snd (snd x)).
+  
   Lemma PPlusTrace_PTrace o ls :
     PPlusTrace o ls ->
     exists ls',
       PTrace (Base m) o ls' /\
-      PermutationEquivLists (map fst ls) (map getLabelUpds ls') /\
-      PermutationEquivLists (map (fun x => fst (snd x)) ls) (map getLabelExecs ls') /\
-      PermutationEquivLists (map (fun x => snd (snd x)) ls) (map getLabelCalls ls').
+      PermutationEquivLists (map PPT_upds ls) (map getLabelUpds ls') /\
+      PermutationEquivLists (map PPT_execs ls) (map getLabelExecs ls') /\
+      PermutationEquivLists (map PPT_calls ls) (map getLabelCalls ls').
   Proof.
     induction 1; subst; dest.
     - exists nil; repeat split; econstructor; eauto.
@@ -383,37 +387,151 @@ Section PPlusTrace.
           exists x3; subst; auto.
   Qed.
 
-  Inductive ExtractedTriples : list (list FullLabel) ->
-                            list (RegsT * ((list RuleOrMeth) * MethsT)) -> Prop :=
-  |NilTriple : ExtractedTriples nil nil
-  |ContTriple l ls tls upds execs calls : ExtractedTriples ls tls ->
-                                          upds = getLabelUpds l ->
-                                          execs = getLabelExecs l ->
-                                          calls = getLabelCalls l ->
-                                          ExtractedTriples (l::ls) ((upds, (execs, calls))::tls).
+  Definition extractTriple (lfl : list FullLabel) : (RegsT * ((list RuleOrMeth) * MethsT)) :=
+    (getLabelUpds lfl, (getLabelExecs lfl, getLabelCalls lfl)).
+
+  Fixpoint extractTriples (llfl : list (list FullLabel)) : list (RegsT * ((list RuleOrMeth) * MethsT)) :=
+    match llfl with
+    |lfl::llfl' => (extractTriple lfl)::(extractTriples llfl')
+    |nil => nil
+    end.
+
+  Lemma extractTriples_nil l :
+    extractTriples l = nil -> l = nil.
+  Proof.
+    destruct l; intros; auto.
+    inv H.
+  Qed.
   
   Lemma PTrace_PPlusTrace o ls:
     PTrace (Base m) o ls ->
-    forall tls,
-      ExtractedTriples ls tls ->
-      PPlusTrace o tls.
+      PPlusTrace o (extractTriples ls).
   Proof.
     induction 1; subst; intros.
-    - inv H.
-      econstructor; eauto.
-    - destruct tls; inv H0.
-      econstructor 2; eauto.
-      + apply PStep_PPlusStep; assumption.
+    - econstructor; eauto.
+    - simpl; econstructor 2; eauto.
+      + apply PStep_PPlusStep; apply HPStep.
       + unfold PUpdRegs,PPlusUpdRegs in *; dest; repeat split; eauto.
         intros; destruct (H1 _ _ H2);[left|right]; unfold getLabelUpds; dest.
         * rewrite <- flat_map_concat_map, in_flat_map.
           rewrite (in_map_iff fst) in H3; dest; rewrite <- H3 in H4.
           firstorder.
         * split; auto; intro; apply H3.
-          rewrite <- flat_map_concat_map, in_map_iff in H6; dest.
-          rewrite in_flat_map in H7; dest.
+          rewrite <- flat_map_concat_map, in_map_iff in H5; dest.
+          rewrite in_flat_map in H6; dest.
           exists (fst x0); split.
           -- rewrite in_map_iff; exists x0; firstorder.
-          -- rewrite <- H6, in_map_iff; exists x; firstorder.
+          -- rewrite <- H5, in_map_iff; exists x; firstorder.
+      + unfold extractTriple; reflexivity.
   Qed.
 End PPlusTrace.
+
+Section PPlusTraceInclusion.
+  Notation PPT_upds := (fun x => fst x).
+  Notation PPT_execs := (fun x => fst (snd x)).
+  Notation PPT_calls := (fun x => snd (snd x)).
+  
+  Definition WeakInclusion_flat (t1 t2 : (RegsT *((list RuleOrMeth) * MethsT))) :=
+    (forall (f : MethT), In (Meth f) (PPT_execs t1) /\ ~In f (PPT_calls t1) <->
+                         In (Meth f) (PPT_execs t2) /\ ~In f (PPT_calls t2)) /\
+    (forall (f : MethT), ~In (Meth f) (PPT_execs t1) /\ In f (PPT_calls t1) <->
+                         ~In (Meth f) (PPT_execs t2) /\ In f (PPT_calls t2)) /\
+    (forall (f : MethT), ((In (Meth f) (PPT_execs t1) /\ In f (PPT_calls t1)) \/
+                          (~In (Meth f) (PPT_execs t1) /\ ~In f (PPT_calls t1))) <->
+                         ((In (Meth f) (PPT_execs t2) /\ In f (PPT_calls t2)) \/
+                          (~In (Meth f) (PPT_execs t2) /\ ~In f (PPT_calls t2)))) /\
+    ((exists rle, In (Rle rle) (PPT_execs t2)) ->
+     (exists rle, In (Rle rle) (PPT_execs t1))).
+
+  Lemma  InExec_rewrite f l:
+    In (Meth f) (getLabelExecs l) <-> InExec f l.
+  Proof.
+    split; unfold InExec; induction l; simpl in *; intros; auto.
+  Qed.
+
+  Lemma InCall_rewrite f l :
+    In f (getLabelCalls l) <-> InCall f l.
+  Proof.
+    split; unfold InCall; induction l; simpl in *; intros; dest; try contradiction.
+    - unfold getLabelCalls in H. rewrite <- flat_map_concat_map, in_flat_map in H.
+      assumption.
+    -  unfold getLabelCalls; rewrite <- flat_map_concat_map, in_flat_map.
+       firstorder fail.
+  Qed.
+
+  Lemma WeakInclusion_flat_WeakInclusion (l1 l2 : list FullLabel) :
+    WeakInclusion_flat (extractTriple l1) (extractTriple l2) ->
+    WeakInclusion l1 l2.
+  Proof.
+    unfold WeakInclusion_flat, extractTriple; simpl.
+    setoid_rewrite InExec_rewrite; setoid_rewrite InCall_rewrite.
+    intros; assumption.
+  Qed.
+  
+  Inductive WeakInclusions_flat : list (RegsT * ((list RuleOrMeth) * MethsT)) -> list (RegsT *((list RuleOrMeth) * MethsT)) -> Prop :=
+  |WIf_Nil : WeakInclusions_flat nil nil
+  |WIf_Cons : forall (lt1 lt2 : list (RegsT *((list RuleOrMeth) * MethsT))) (t1 t2 : RegsT *((list RuleOrMeth) * MethsT)),
+      WeakInclusions_flat lt1 lt2 -> WeakInclusion_flat t1 t2 -> WeakInclusions_flat (t1::lt1) (t2::lt2).
+
+  
+  Lemma WeakInclusions_flat_WeakInclusions (ls1 ls2 : list (list FullLabel)) :
+    WeakInclusions_flat (extractTriples ls1) (extractTriples ls2) ->
+    WeakInclusions ls1 ls2.
+  Proof.
+    revert ls2; induction ls1; intros; simpl in *; inv H.
+    - symmetry in H0; apply extractTriples_nil in H0; subst; econstructor.
+    - destruct ls2; inv H2.
+      econstructor 2.
+      + eapply IHls1; eauto.
+      + apply WeakInclusion_flat_WeakInclusion; assumption.
+  Qed.
+  
+  Definition PPlusTraceList (m : BaseModule)(lt : list (RegsT * ((list RuleOrMeth) * MethsT))) :=
+    (exists (o : RegsT), PPlusTrace m o lt).
+
+  Definition PPlusTraceInclusion (m m' : BaseModule) :=
+    forall (o : RegsT)(tl : list (RegsT *((list RuleOrMeth) * MethsT))),
+      PPlusTrace m o tl -> exists (tl' : list (RegsT * ((list RuleOrMeth) * MethsT))),  PPlusTraceList m' tl' /\ WeakInclusions_flat tl tl'.
+
+  Lemma WeakInclusions_flat_PermutationEquivLists_r ls1:
+    forall l ls2,
+      WeakInclusions_flat (extractTriples ls1) l ->
+      PermutationEquivLists (map PPT_upds l) (map getLabelUpds ls2) ->
+      PermutationEquivLists (map PPT_execs l) (map getLabelExecs ls2) ->
+      PermutationEquivLists (map PPT_calls l) (map getLabelCalls ls2) ->
+      WeakInclusions_flat (extractTriples ls1) (extractTriples ls2).
+  Proof.
+    induction ls1; intros; inv H; simpl in *.
+    - destruct ls2; simpl in *.
+      + econstructor.
+      + inv H2.
+    - destruct ls2; inv H2; inv H1; inv H0; simpl in *.
+      econstructor.
+      + eapply IHls1; eauto.
+      + unfold WeakInclusion_flat in *; dest; simpl in *.
+        split;[|split;[|split]];setoid_rewrite <- H10;auto; setoid_rewrite <- H9; auto.
+  Qed.
+  
+  Lemma PPlusTraceInclusion_PTraceInclusion (m m' : BaseModule) :
+    PPlusTraceInclusion m m' ->
+    PTraceInclusion (Base m) (Base m').
+  Proof.
+    repeat intro.
+    apply (PTrace_PPlusTrace) in H0.
+    specialize (H o _ H0); dest.
+    destruct  H.
+    apply (PPlusTrace_PTrace) in H; dest.
+    exists x1; split.
+    - exists x0; assumption.
+    - apply WeakInclusions_flat_WeakInclusions.
+      apply (WeakInclusions_flat_PermutationEquivLists_r _ _ H1 H2 H3 H4).
+  Qed.
+
+  Corollary PPlusTraceInclusion_TraceInclusion (m m' : BaseModule) (Wfm : WfMod (Base m)) (Wfm' : WfMod (Base m')):
+    PPlusTraceInclusion m m' ->
+    TraceInclusion (Base m) (Base m').
+  Proof.
+    intros; apply PTraceInclusion_TraceInclusion, PPlusTraceInclusion_PTraceInclusion; auto.
+  Qed.
+End PPlusTraceInclusion.
+    
