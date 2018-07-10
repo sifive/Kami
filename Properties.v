@@ -3433,7 +3433,7 @@ Proof.
   apply substitute_Step'; auto.
 Qed.
 
-Inductive PermutationEquivLists : (list (list FullLabel)) -> (list (list FullLabel)) -> Prop :=
+Inductive PermutationEquivLists {A : Type} : (list (list A)) -> (list (list A)) -> Prop :=
 |PermutationEquiv_nil : PermutationEquivLists nil nil
 |PermutationEquiv_cons ls ls' l l' : PermutationEquivLists ls ls' -> Permutation l l' -> PermutationEquivLists (l::ls) (l'::ls').
 

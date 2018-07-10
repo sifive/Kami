@@ -125,6 +125,9 @@ Section BaseModule.
           setoid_rewrite in_flat_map.
           unfold InCall in *; dest.
           firstorder fail.
+        * clear - H2 H4 HExecs HNoExec.
+          apply HNoExec; unfold InExec in *.
+          rewrite H2; assumption.
       + rewrite H1 in HUpds; auto.
       + rewrite HExecs.
         constructor; auto.
@@ -227,14 +230,190 @@ Section PPlusSubsteps_rewrite.
   Qed.
 End PPlusSubsteps_rewrite.
 
+Lemma Permutation_flat_map_rewrite (A B : Type) (l1 l2 : list A) (f : A -> list B) :
+  l1 [=] l2 ->
+  flat_map f l1 [=] flat_map f l2.
+Proof.
+  induction 1; simpl in *; auto.
+  - apply Permutation_app_head; assumption.
+  - repeat rewrite app_assoc; apply Permutation_app_tail.
+    rewrite Permutation_app_comm; reflexivity.
+  - rewrite IHPermutation1, IHPermutation2; reflexivity.
+Qed.
+
+Global Instance Permutation_flat_map_rewrite' (A B : Type)(f : A -> list B):
+  Proper (@Permutation A ==> @Permutation B) (@flat_map A B f) | 10.
+repeat red; intros; intros; eauto using Permutation_flat_map_rewrite.
+Qed.
 
 Lemma PSubsteps_PPlusSubsteps:
   forall m o l,
     PSubsteps m o l ->
     PPlusSubsteps m o (getLabelUpds l) (getLabelExecs l) (getLabelCalls l).
 Proof.
-  induction 1; unfold getLabelUpds, getLabelExecs, getLabelCalls; try setoid_rewrite <- flat_map_concat_map.
+  induction 1; unfold getLabelUpds, getLabelExecs, getLabelCalls in *; try setoid_rewrite <- flat_map_concat_map.
   - econstructor; eauto.
-  - admit.
-  - admit.
-Admitted.
+  - rewrite HLabel; simpl; setoid_rewrite <-flat_map_concat_map in IHPSubsteps.
+    econstructor 2; intros; eauto.
+    + clear - HDisjRegs.
+      induction ls.
+      * firstorder.
+      * intro; simpl in *; rewrite map_app, in_app_iff, DeM1.
+        assert (DisjKey (flat_map (fun x : FullLabel => fst x) ls) u);[eapply IHls; eauto|].
+        specialize (HDisjRegs a (or_introl _ eq_refl) k); specialize (H k).
+        firstorder fail.
+    + rewrite in_map_iff in H0; dest; rewrite <- H0.
+      eapply HNoRle; eauto.
+    + eapply HNoCall; eauto.
+      rewrite in_flat_map in H1; dest.
+      firstorder.
+  - rewrite HLabel; simpl; setoid_rewrite <- flat_map_concat_map in IHPSubsteps.
+    econstructor 3; intros; eauto.
+    + clear - HDisjRegs.
+      induction ls.
+      * firstorder.
+      * intro; simpl in *; rewrite map_app, in_app_iff, DeM1.
+        assert (DisjKey (flat_map (fun x : FullLabel => fst x) ls) u);[eapply IHls; eauto|].
+        specialize (HDisjRegs a (or_introl _ eq_refl) k); specialize (H k).
+        firstorder fail.
+    + eapply HNoCall; eauto.
+      rewrite in_flat_map in H1; dest.
+      firstorder.
+Qed.
+
+Section PPlusStep.
+  Variable m: BaseModule.
+  Variable o: RegsT.
+  
+  Definition MatchingExecCalls_flat (calls : MethsT) (exec : list RuleOrMeth) (m : BaseModule) :=
+    forall (f : MethT),
+      In f calls ->
+      In (fst f) (map fst (getMethods m)) ->
+      In (Meth f) exec.
+  
+  Inductive PPlusStep :  RegsT -> list RuleOrMeth -> MethsT -> Prop :=
+  | BasePPlusStep upds execs calls:
+      PPlusSubsteps m o upds execs calls ->
+      MatchingExecCalls_flat calls execs m -> PPlusStep upds execs calls.
+  
+  Lemma PPlusStep_PStep:
+    forall upds execs calls,
+      PPlusStep upds execs calls ->
+      exists l,
+        PStep (Base m) o l /\
+        upds [=] getLabelUpds l /\
+        execs [=] getLabelExecs l /\
+        calls [=] getLabelCalls l.
+  Proof.
+    induction 1.
+    apply PPlusSubsteps_PSubsteps in H; dest.
+    exists x; repeat split; eauto.
+    econstructor 1; eauto.
+    repeat intro; specialize (H0 f) ; simpl; split; auto.
+    unfold InCall, InExec, getLabelUpds, getLabelExecs, getLabelCalls in *; dest.
+    rewrite <- flat_map_concat_map in *.
+    rewrite H2 in H0; apply H0; eauto.
+    rewrite H3, in_flat_map; firstorder.
+  Qed.
+
+  Lemma PStep_PPlusStep :
+  forall l,
+    PStep (Base m) o l ->
+    PPlusStep (getLabelUpds l) (getLabelExecs l) (getLabelCalls l).
+  Proof.
+    intros; inv H; econstructor.
+    - apply PSubsteps_PPlusSubsteps in HPSubsteps; assumption.
+    - repeat intro; specialize (HMatching f).
+      unfold InCall, InExec, getLabelUpds, getLabelExecs, getLabelCalls in *.
+      rewrite <- flat_map_concat_map, in_flat_map in *; dest.
+      eapply HMatching; eauto.
+  Qed.
+End PPlusStep.
+
+Section PPlusTrace.
+  Variable m: BaseModule.
+  
+  Definition PPlusUpdRegs (u o o' : RegsT) :=
+    getKindAttr o [=] getKindAttr o' /\
+    (forall s v, In (s, v) o' -> In (s, v) u \/ (~ In s (map fst u) /\ In (s, v) o)).
+  
+  Inductive PPlusTrace : RegsT -> list (RegsT * ((list RuleOrMeth) * MethsT)) -> Prop :=
+  | PPlusInitTrace (o' o'' : RegsT) ls'
+                   (HPerm : o' [=] o'')
+                   (HUpdRegs : Forall2 regInit o'' (getRegisters m))
+                   (HTrace : ls' = nil):
+      PPlusTrace o' ls'
+  | PPlusContinueTrace (o o' : RegsT)
+                       (upds : RegsT)
+                       (execs : list RuleOrMeth)
+                       (calls : MethsT)
+                       (ls ls' : list (RegsT * ((list RuleOrMeth) * MethsT)))
+                       (PPlusOldTrace : PPlusTrace o ls)
+                       (HPPlusStep : PPlusStep m o upds execs calls)
+                       (HUpdRegs : PPlusUpdRegs upds o o')
+                       (HPPlusTrace : ls' = ((upds, (execs, calls))::ls)):
+      PPlusTrace o' ls'.
+
+  Lemma PPlusTrace_PTrace o ls :
+    PPlusTrace o ls ->
+    exists ls',
+      PTrace (Base m) o ls' /\
+      PermutationEquivLists (map fst ls) (map getLabelUpds ls') /\
+      PermutationEquivLists (map (fun x => fst (snd x)) ls) (map getLabelExecs ls') /\
+      PermutationEquivLists (map (fun x => snd (snd x)) ls) (map getLabelCalls ls').
+  Proof.
+    induction 1; subst; dest.
+    - exists nil; repeat split; econstructor; eauto.
+    - apply PPlusStep_PStep in HPPlusStep; dest.
+      exists (x0::x); repeat split; eauto; simpl in *; econstructor 2; eauto.
+      + unfold PPlusUpdRegs in HUpdRegs; dest.
+        repeat split; eauto.
+        intros; destruct (H9 _ _ H10).
+        * rewrite H5 in H11; unfold getLabelUpds in H11.
+          rewrite <- flat_map_concat_map, in_flat_map in *; dest.
+          left; exists (fst x1); split; auto.
+          apply (in_map fst) in H11; assumption.
+        * destruct H11; right; split; auto.
+          intro; apply H11; dest.
+          unfold getLabelUpds in *.
+          rewrite H5, <- flat_map_concat_map, in_map_iff.
+          setoid_rewrite in_flat_map.
+          rewrite in_map_iff in H13,H14; dest.
+          exists x2; split; auto.
+          exists x3; subst; auto.
+  Qed.
+
+  Inductive ExtractedTriples : list (list FullLabel) ->
+                            list (RegsT * ((list RuleOrMeth) * MethsT)) -> Prop :=
+  |NilTriple : ExtractedTriples nil nil
+  |ContTriple l ls tls upds execs calls : ExtractedTriples ls tls ->
+                                          upds = getLabelUpds l ->
+                                          execs = getLabelExecs l ->
+                                          calls = getLabelCalls l ->
+                                          ExtractedTriples (l::ls) ((upds, (execs, calls))::tls).
+  
+  Lemma PTrace_PPlusTrace o ls:
+    PTrace (Base m) o ls ->
+    forall tls,
+      ExtractedTriples ls tls ->
+      PPlusTrace o tls.
+  Proof.
+    induction 1; subst; intros.
+    - inv H.
+      econstructor; eauto.
+    - destruct tls; inv H0.
+      econstructor 2; eauto.
+      + apply PStep_PPlusStep; assumption.
+      + unfold PUpdRegs,PPlusUpdRegs in *; dest; repeat split; eauto.
+        intros; destruct (H1 _ _ H2);[left|right]; unfold getLabelUpds; dest.
+        * rewrite <- flat_map_concat_map, in_flat_map.
+          rewrite (in_map_iff fst) in H3; dest; rewrite <- H3 in H4.
+          firstorder.
+        * split; auto; intro; apply H3.
+          rewrite <- flat_map_concat_map, in_map_iff in H6; dest.
+          rewrite in_flat_map in H7; dest.
+          exists (fst x0); split.
+          -- rewrite in_map_iff; exists x0; firstorder.
+          -- rewrite <- H6, in_map_iff; exists x; firstorder.
+  Qed.
+End PPlusTrace.
