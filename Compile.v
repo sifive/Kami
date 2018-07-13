@@ -535,8 +535,8 @@ Section ForMeth.
 
   Definition getMethEnsRulesArg rules :=
     match getMethEnsRules rules with
-    | None => (getMethEn (fst meth), existT _ _ (RtlConst (getDefaultConst (fst (snd meth)))))%rtl_expr
-    | Some vals => (getMethEn (fst meth), existT _ _ (vals @% "data"))%rtl_expr
+    | None => (getMethArg (fst meth), existT _ _ (RtlConst (getDefaultConst (fst (snd meth)))))%rtl_expr
+    | Some vals => (getMethArg (fst meth), existT _ _ (vals @% "data"))%rtl_expr
     end.
     (* (getMethArg (fst meth), existT _ _ (getMethEnsRules rules @% "data"))%rtl_expr. *)
   Close Scope string.
