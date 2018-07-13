@@ -1960,7 +1960,7 @@ Section SplitSubsteps.
              apply (in_map getRleOrMeth) in H10; assumption.
   Qed.
   
-  Lemma split_Substeps2 o l:
+  Lemma split_PSubsteps2 o l:
     PSubsteps (concatFlat m1 m2) o l ->
       (forall x y : FullLabel,
           In x (ModuleFilterLabels m1 l) ->
@@ -2146,8 +2146,8 @@ Proof.
       split; auto.
       intro; apply (PWfConcats WfConcat2 H6 H15 (v:=(snd f))); destruct f ;assumption.
     + intros.
-      eapply split_Substeps2; eauto; rewrite <- P1; assumption.
-    + eapply split_Substeps2; eauto; rewrite P1; apply H.
+      eapply split_PSubsteps2; eauto; rewrite <- P1; assumption.
+    + eapply split_PSubsteps2; eauto; rewrite P1; apply H.
     + reflexivity.
     + reflexivity.
 Qed.
