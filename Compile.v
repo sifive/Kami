@@ -161,14 +161,22 @@ Section Compile.
       | Assertion pred cont => convertExprToRtl pred ::
                                               (convertActionToRtl_guard cont startList)
       | Sys ls cont => convertActionToRtl_guard cont startList
-      | Return x => RtlConst (ConstBool true) :: nil
+      | Return x => nil
       | IfElse pred ktf t f cont =>
-        (RtlITE (convertExprToRtl pred) (RtlCABool And
-                                                   (convertActionToRtl_guard t (0 :: startList)))
-                (RtlCABool And (convertActionToRtl_guard f (0 :: inc startList))))
-          ::
-          (convertActionToRtl_guard (cont (inc (inc startList)))
-                                    (inc (inc (inc startList))))
+        let wc := convertActionToRtl_guard (cont (inc (inc startList))) (inc (inc (inc startList))) in
+        let p := convertExprToRtl pred in
+        match convertActionToRtl_guard t (0 :: startList), convertActionToRtl_guard f (0 :: inc startList) with
+        | nil, nil => wc
+        | e, nil => RtlCABool Or (RtlUniBool Neg p :: e) :: wc
+        | nil, e => RtlCABool Or (p :: e) :: wc
+        | e1, e2 => RtlITE p (RtlCABool And e1) (RtlCABool And e2) :: wc
+        end
+        (* (RtlITE (convertExprToRtl pred) (RtlCABool And *)
+        (*                                            (convertActionToRtl_guard t (0 :: startList))) *)
+        (*         (RtlCABool And (convertActionToRtl_guard f (0 :: inc startList)))) *)
+        (*   :: *)
+        (*   (convertActionToRtl_guard (cont (inc (inc startList))) *)
+        (*                             (inc (inc (inc startList)))) *)
       | LetAction k' a' cont =>
         convertActionToRtl_guard a' (0 :: startList) ++
                                  convertActionToRtl_guard (cont startList) (inc startList)
@@ -233,8 +241,8 @@ Section Compile.
           match wt, wf, wc with
           | None, None, None => None
           | None, None, Some wc' => Some wc'
-          | None, Some wf', None => Some wf'
-          | Some wt', None, None => Some wt'
+          | None, Some wf', None => Some (RtlITE p (invalidRtl _) wf')
+          | Some wt', None, None => Some (RtlITE p wt' (invalidRtl _))
           | Some wt', Some wf', None => Some (RtlITE p wt' wf')
           | Some wt', None, Some wc' => Some (RtlITE (wc' @% "valid") wc' (RtlITE p wt' (invalidRtl _)))%rtl_expr
           | None, Some wf', Some wc' => Some (RtlITE (wc' @% "valid") wc' (RtlITE p (invalidRtl _) wf'))%rtl_expr
@@ -316,8 +324,8 @@ Section Compile.
           match wt, wf, wc with
           | None, None, None => None
           | None, None, Some wc' => Some wc'
-          | None, Some wf', None => Some wf'
-          | Some wt', None, None => Some wt'
+          | None, Some wf', None => Some (RtlITE p (invalidRtl _) wf')
+          | Some wt', None, None => Some (RtlITE p wt' (invalidRtl _))
           | Some wt', Some wf', None => Some (RtlITE p wt' wf')
           | Some wt', None, Some wc' => Some (RtlITE (wc' @% "valid") wc' (RtlITE p wt' (invalidRtl _)))%rtl_expr
           | None, Some wf', Some wc' => Some (RtlITE (wc' @% "valid") wc' (RtlITE p (invalidRtl _) wf'))%rtl_expr
