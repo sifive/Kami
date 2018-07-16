@@ -192,6 +192,10 @@ Section Compile.
      })%rtl_expr : RtlExpr (Maybe k)).
 
 
+  Definition conditionPair k (p: RtlExpr Bool) (e1 e2: (RtlExpr Bool * RtlExpr k)) :=
+    (RtlITE p (fst e1) (fst e2), RtlITE p (snd e1) (snd e2)).
+  Definition invalidPair k := (RtlConst false, RtlConst (getDefaultConst k)).
+             
   Section MethReg.
     Open Scope string.
     Section GetRegisterWrites.
@@ -201,7 +205,7 @@ Section Compile.
                             | SyntaxKind k => k
                             | _ => Void
                             end.
-      Fixpoint getRegisterWrites k (a: ActionT (fun _ => list nat) k) (startList: list nat) : option (RtlExpr (Maybe regKind)) :=
+      Fixpoint getRegisterWrites k (a: ActionT (fun _ => list nat) k) (startList: list nat) : option (RtlExpr Bool * RtlExpr regKind) :=
         match a in ActionT _ _ with
         | MCall meth k argExpr cont =>
           @getRegisterWrites _ (cont startList) (inc startList)
@@ -219,7 +223,7 @@ Section Compile.
           | None, None => None
           | None, Some w2' => Some w2'
           | Some w1', None => Some w1'
-          | Some w1', Some w2' => Some (RtlITE (w2' @% "valid") w2' w1')%rtl_expr
+          | Some w1', Some w2' => Some (conditionPair (fst w2') w2' w1')%rtl_expr
           end
         | ReadNondet k' cont =>
           match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) -> _ with
@@ -241,36 +245,33 @@ Section Compile.
           match wt, wf, wc with
           | None, None, None => None
           | None, None, Some wc' => Some wc'
-          | None, Some wf', None => Some (RtlITE p (invalidRtl _) wf')
-          | Some wt', None, None => Some (RtlITE p wt' (invalidRtl _))
-          | Some wt', Some wf', None => Some (RtlITE p wt' wf')
-          | Some wt', None, Some wc' => Some (RtlITE (wc' @% "valid") wc' (RtlITE p wt' (invalidRtl _)))%rtl_expr
-          | None, Some wf', Some wc' => Some (RtlITE (wc' @% "valid") wc' (RtlITE p (invalidRtl _) wf'))%rtl_expr
-          | Some wt', Some wf', Some wc' => Some (RtlITE (wc' @% "valid") wc'
-                                                         (RtlITE p wt' wf'))%rtl_expr
+          | None, Some wf', None => Some (conditionPair p (invalidPair _) wf')
+          | Some wt', None, None => Some (conditionPair p wt' (invalidPair _))
+          | Some wt', Some wf', None => Some (conditionPair p wt' wf')
+          | Some wt', None, Some wc' => Some (conditionPair (fst wc') wc' (conditionPair p wt' (invalidPair _)))%rtl_expr
+          | None, Some wf', Some wc' => Some (conditionPair (fst wc') wc' (conditionPair p (invalidPair _) wf'))%rtl_expr
+          | Some wt', Some wf', Some wc' => Some (conditionPair (fst wc') wc'
+                                                         (conditionPair p wt' wf'))%rtl_expr
           end
         | WriteReg r k' expr cont =>
           let wc := @getRegisterWrites _ cont startList in
           if string_dec r (fst reg)
           then
-            match k' return Expr (fun _ => list nat) k' -> option (RtlExpr (Maybe regKind)) with
+            match k' return Expr (fun _ => list nat) k' -> option (RtlExpr Bool * RtlExpr regKind) with
             | SyntaxKind k => fun expr =>
                                 match Kind_dec regKind k with
-                                | left pf => match pf in _ = Y return Expr _ (SyntaxKind Y) -> option (RtlExpr (Maybe regKind)) with
+                                | left pf => match pf in _ = Y return Expr _ (SyntaxKind Y) -> option (RtlExpr Bool * RtlExpr regKind) with
                                              | eq_refl => fun expr =>
                                                             match wc with
                                                             | Some wc' =>
-                                                              Some (RtlITE (wc' @% "valid") wc'
-                                                                           (STRUCT {
-                                                                                "valid" ::= RtlReadWire Bool (getActionGuard name) ;
-                                                                                "data" ::= convertExprToRtl expr
-                                                                           })
+                                                              Some (conditionPair (fst wc') wc'
+                                                                                  (RtlReadWire Bool (getActionGuard name),
+                                                                                   convertExprToRtl expr)
                                                                    )%rtl_expr
                                                             | None => 
-                                                              Some (STRUCT {
-                                                                        "valid" ::= RtlReadWire Bool (getActionGuard name) ;
-                                                                        "data" ::= convertExprToRtl expr
-                                                                   })%rtl_expr
+                                                              Some (RtlReadWire Bool (getActionGuard name),
+                                                                    convertExprToRtl expr
+                                                                   )%rtl_expr
                                                             end
                                              end expr
                                 | right _ => wc
@@ -286,7 +287,7 @@ Section Compile.
       
       Definition argKind := fst (snd meth).
 
-      Fixpoint getMethEns k (a: ActionT (fun _ => list nat) k) (startList: list nat) : option (RtlExpr (Maybe argKind)) :=
+      Fixpoint getMethEns k (a: ActionT (fun _ => list nat) k) (startList: list nat) : option (RtlExpr Bool * RtlExpr argKind) :=
         match a in ActionT _ _ with
         | Return x => None
         | LetExpr k' expr cont =>
@@ -302,7 +303,7 @@ Section Compile.
           | None, None => None
           | None, Some w2' => Some w2'
           | Some w1', None => Some w1'
-          | Some w1', Some w2' => Some (RtlITE (w2' @% "valid") w2' w1')%rtl_expr
+          | Some w1', Some w2' => Some (conditionPair (fst w2') w2' w1')%rtl_expr
           end
         | ReadNondet k' cont =>
           match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) -> _ with
@@ -324,13 +325,13 @@ Section Compile.
           match wt, wf, wc with
           | None, None, None => None
           | None, None, Some wc' => Some wc'
-          | None, Some wf', None => Some (RtlITE p (invalidRtl _) wf')
-          | Some wt', None, None => Some (RtlITE p wt' (invalidRtl _))
-          | Some wt', Some wf', None => Some (RtlITE p wt' wf')
-          | Some wt', None, Some wc' => Some (RtlITE (wc' @% "valid") wc' (RtlITE p wt' (invalidRtl _)))%rtl_expr
-          | None, Some wf', Some wc' => Some (RtlITE (wc' @% "valid") wc' (RtlITE p (invalidRtl _) wf'))%rtl_expr
-          | Some wt', Some wf', Some wc' => Some (RtlITE (wc' @% "valid") wc'
-                                                         (RtlITE p wt' wf'))%rtl_expr
+          | None, Some wf', None => Some (conditionPair p (invalidPair _) wf')
+          | Some wt', None, None => Some (conditionPair p wt' (invalidPair _))
+          | Some wt', Some wf', None => Some (conditionPair p wt' wf')
+          | Some wt', None, Some wc' => Some (conditionPair (fst wc') wc' (conditionPair p wt' (invalidPair _)))%rtl_expr
+          | None, Some wf', Some wc' => Some (conditionPair (fst wc') wc' (conditionPair p (invalidPair _) wf'))%rtl_expr
+          | Some wt', Some wf', Some wc' => Some (conditionPair (fst wc') wc'
+                                                         (conditionPair p wt' wf'))%rtl_expr
           end
         | WriteReg r k' expr cont =>
           @getMethEns _ cont startList
@@ -339,21 +340,18 @@ Section Compile.
           if string_dec f (fst meth)
           then
             match Kind_dec argKind (fst k) with
-            | left pf => match pf in _ = Y return Expr _ (SyntaxKind Y) -> option (RtlExpr (Maybe argKind)) with
+            | left pf => match pf in _ = Y return Expr _ (SyntaxKind Y) -> option (RtlExpr Bool * RtlExpr argKind) with
                          | eq_refl => fun expr =>
                                         match wc with
                                         | Some wc' =>
-                                          Some (RtlITE (wc' @% "valid") wc'
-                                                       (STRUCT {
-                                                            "valid" ::= RtlReadWire Bool (getActionGuard name) ;
-                                                            "data" ::= convertExprToRtl expr
-                                                       })
+                                          Some (conditionPair (fst wc') wc'
+                                                              (RtlReadWire Bool (getActionGuard name),
+                                                               convertExprToRtl expr)
                                                )%rtl_expr
                                         | None =>
-                                          Some (STRUCT {
-                                                    "valid" ::= RtlReadWire Bool (getActionGuard name) ;
-                                                    "data" ::= convertExprToRtl expr
-                                               })%rtl_expr
+                                          Some (RtlReadWire Bool (getActionGuard name),
+                                                convertExprToRtl expr
+                                               )%rtl_expr
                                         end
                          end expr
             | right _ => wc
@@ -371,7 +369,7 @@ Section Compile.
            match wc with
            | Some wc' =>
              (getRegActionFinalWrite name (fst reg), existT _ (regKind reg)
-                                                            (RtlITE (wc' @% "valid"%string)%rtl_expr (wc' @% "data"%string)%rtl_expr
+                                                            (RtlITE (fst wc')%rtl_expr (snd wc')%rtl_expr
                                                                     (RtlReadWire _ (getRegActionRead name (fst reg)))))
            | None => (getRegActionFinalWrite name (fst reg), existT _ (regKind reg) (RtlReadWire _ (getRegActionRead name (fst reg))))
            end
@@ -511,10 +509,7 @@ Definition getCallsPerBaseMod rules := concat (map getCallsSignPerRule rules).
 Section ForMeth.
   Variable meth: Attribute Signature.
   Open Scope string.
-  Fixpoint getMethEnsRules (rules: list (Attribute (Action Void))) : option (RtlExpr (STRUCT {
-                                                                                          "valid" :: Bool ;
-                                                                                          "data" :: fst (snd meth)
-                                                                            })) :=
+  Fixpoint getMethEnsRules (rules: list (Attribute (Action Void))) : option (RtlExpr Bool * RtlExpr (fst (snd meth))) :=
     match rules with
     | r :: rules' => let wc' := getMethEnsRules rules' in
                      let wm' := getMethEns (fst r) meth (snd r _) (1 :: nil) in
@@ -523,7 +518,7 @@ Section ForMeth.
                      | Some wc'', None => Some wc''
                      | None, Some wm'' => Some wm''
                      | Some wc'', Some wm'' =>
-                       Some (RtlITE (wc'' @% "valid") wc'' wm'')%rtl_expr
+                       Some (conditionPair (fst wc'') wc'' wm'')%rtl_expr
                      end
                      (* (RtlITE (wc' @% "valid") wc' *)
                      (*         match getMethEns (fst r) meth (snd r _) (1 :: nil) with *)
@@ -537,14 +532,14 @@ Section ForMeth.
   Definition getMethEnsRulesEn rules :=
     match getMethEnsRules rules with
     | None => (getMethEn (fst meth), existT _ Bool (RtlConst false))%rtl_expr
-    | Some vals => (getMethEn (fst meth), existT _ Bool (vals @% "valid"))%rtl_expr
+    | Some vals => (getMethEn (fst meth), existT _ Bool (fst vals))%rtl_expr
     end.
     (* (getMethEn (fst meth), existT _ Bool (getMethEnsRules rules @% "valid"))%rtl_expr. *)
 
   Definition getMethEnsRulesArg rules :=
     match getMethEnsRules rules with
     | None => (getMethArg (fst meth), existT _ _ (RtlConst (getDefaultConst (fst (snd meth)))))%rtl_expr
-    | Some vals => (getMethArg (fst meth), existT _ _ (vals @% "data"))%rtl_expr
+    | Some vals => (getMethArg (fst meth), existT _ _ (snd vals))%rtl_expr
     end.
     (* (getMethArg (fst meth), existT _ _ (getMethEnsRules rules @% "data"))%rtl_expr. *)
   Close Scope string.
