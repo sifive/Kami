@@ -3,7 +3,7 @@ Require Import Syntax Rtl.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
-Open Scope string.
+Local Open Scope string.
 
 Local Notation nil_nat := (nil: list nat).
 
@@ -26,7 +26,7 @@ Definition getMethGuard f := (f ++ "#_guard", nil_nat).
 Definition getActionGuard r := (r ++ "#_guard", nil_nat).
 Definition getActionEn r := (r ++ "#_enable", nil_nat).
 
-Close Scope string.
+Local Close Scope string.
 
 Local Notation cast k' v := v.
 
