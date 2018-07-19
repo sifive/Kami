@@ -274,7 +274,8 @@ Section Compile.
                                                                    )%rtl_expr
                                                             end
                                              end expr
-                                | right _ => wc
+                                | right _ => Some (RtlReadWire Bool
+                                                               (("TYPES DONT MATCH FOR REGISTER " ++ r), nil), RtlReadWire _ ("", nil))
                                 end
             | _ => fun _ => wc
             end expr
@@ -354,7 +355,8 @@ Section Compile.
                                                )%rtl_expr
                                         end
                          end expr
-            | right _ => wc
+            | right _ => Some (RtlReadWire Bool ("TYPES DONT MATCH FOR METHOD " ++ f, nil),
+                               RtlReadWire _ ("", nil))
             end
           else wc
         end.
