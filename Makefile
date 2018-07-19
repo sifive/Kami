@@ -1,27 +1,17 @@
-VS:=$(wildcard *.v)
-VS+=$(wildcard Lib/*.v)
+VS:=$(shell find . -type f -name '*.v')
 
-.PHONY: coq src clean
+.PHONY: coq clean force
 
-ARGS := $(shell cat _CoqProject)
-
-coq: Makefile.coq.all
+coq: Makefile.coq.all $(VS)
 	$(MAKE) -f Makefile.coq.all
 
-Makefile.coq.all: Makefile $(VS)
-	$(COQBIN)coq_makefile $(ARGS) $(VS) -o Makefile.coq.all
+Makefile.coq.all: force
+	$(COQBIN)coq_makefile -f _CoqProject $(VS) -o Makefile.coq.all
 
-src: Makefile.coq.src
-	$(MAKE) -f Makefile.coq.src
+force:
 
-Makefile.coq.src: Makefile $(VS)
-	$(COQBIN)coq_makefile $(ARGS) $(VS) -o Makefile.coq.src
+clean:: Makefile.coq.all
+	$(MAKE) -f Makefile.coq.all clean
+	rm -rf *.v.d *.glob *.vo *~ *.hi *.o
+	rm -f Makefile.coq.all Makefile.coq.all.conf
 
-clean:: Makefile.coq.all Makefile.coq.src
-	$(MAKE) -f Makefile.coq.all clean || $(MAKE) -f Makefile.coq.src clean
-	rm -f */*.v.d */*.glob */*.vo */*~ *~
-	rm -f *.hi *.o
-	rm -f Makefile.coq.all
-	rm -f Makefile.coq.src
-	rm -f Makefile.coq.*
-	rm -f *.v.d *.glob *.vo
