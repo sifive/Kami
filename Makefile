@@ -23,3 +23,5 @@ clean:: Makefile.coq.all Makefile.coq.src
 	rm -f *.hi *.o
 	rm -f Makefile.coq.all
 	rm -f Makefile.coq.src
+	rm -f Makefile.coq.*
+	rm -f *.v.d *.glob *.vo
