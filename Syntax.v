@@ -1064,7 +1064,8 @@ Section Semantics.
       retK (fret: type retK)
       (cont: type (snd s) -> ActionT type retK)
       readRegs newRegs (calls: MethsT) acalls
-      (HDisjCalls: key_not_In meth calls)
+      (* (HDisjCalls: key_not_In meth calls) *)
+      (HDisjCalls: ~In (meth, (existT _ _ (evalExpr marg, mret))) calls)
       (HAcalls: acalls = (meth, (existT _ _ (evalExpr marg, mret))) :: calls)
       (HSemAction: SemAction (cont mret) readRegs newRegs calls fret):
       SemAction (MCall meth s marg cont) readRegs newRegs acalls fret
@@ -1078,7 +1079,8 @@ Section Semantics.
       (cont: type k -> ActionT type retK)
       readRegs newRegs readRegsCont newRegsCont calls callsCont
       (HDisjRegs: DisjKey newRegs newRegsCont)
-      (HDisjCalls: DisjKey calls callsCont)
+      (* (HDisjCalls: DisjKey calls callsCont) *)
+      (HDisjCalls: forall x, (~In x calls \/ ~In x callsCont))
       (HSemAction: SemAction a readRegs newRegs calls v)
       (HSemActionCont: SemAction (cont v) readRegsCont newRegsCont callsCont fret):
       SemAction (LetAction a cont) (readRegs ++ readRegsCont) (newRegs ++ newRegsCont)
@@ -1115,7 +1117,8 @@ Section Semantics.
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2  newRegs1 newRegs2 calls1 calls2 (r2: type k2)
       (HDisjRegs: DisjKey newRegs1 newRegs2)
-      (HDisjCalls: DisjKey calls1 calls2)
+      (* (HDisjCalls: DisjKey calls1 calls2) *)
+      (HDisjCalls: (forall x, ~In x calls1 \/ ~In x calls2))
       (HTrue: evalExpr p = true)
       (HAction: SemAction a readRegs1 newRegs1 calls1 r1)
       (HSemAction: SemAction (cont r1) readRegs2 newRegs2 calls2 r2)
@@ -1132,7 +1135,8 @@ Section Semantics.
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 (r2: type k2)
       (HDisjRegs: DisjKey newRegs1 newRegs2)
-      (HDisjCalls: DisjKey calls1 calls2)
+      (* (HDisjCalls: DisjKey calls1 calls2) *)
+      (HDisjCalls: (forall x, ~In x calls1 \/ ~In x calls2))
       (HFalse: evalExpr p = false)
       (HAction: SemAction a' readRegs1 newRegs1 calls1 r1)
       (HSemAction: SemAction (cont r1) readRegs2 newRegs2 calls2 r2)
@@ -1170,7 +1174,8 @@ Section Semantics.
       retK (fret: type retK)
       (cont: type (snd s) -> ActionT type retK)
       readRegs newRegs (calls: MethsT) acalls
-      (HDisjCalls: key_not_In meth calls)
+      (HDisjCalls: ~In (meth, (existT _ _ (evalExpr marg, mret))) calls)
+      (* (HDisjCalls: key_not_In meth calls) *)
       (HAcalls: acalls [=] (meth, (existT _ _ (evalExpr marg, mret))) :: calls)
       (HPSemAction: PSemAction (cont mret) readRegs newRegs calls fret):
       PSemAction (MCall meth s marg cont) readRegs newRegs acalls fret
@@ -1184,7 +1189,8 @@ Section Semantics.
       (cont: type k -> ActionT type retK)
       readRegs newRegs readRegsCont newRegsCont calls callsCont
       (HDisjRegs: DisjKey newRegs newRegsCont)
-      (HDisjCalls: DisjKey calls callsCont)
+      (HDisjCalls: forall x, (~In x calls \/ ~In x callsCont))
+      (* (HDisjCalls: DisjKey calls callsCont) *)
       (HPSemAction: PSemAction a readRegs newRegs calls v)
       ureadRegs unewRegs ucalls
       (HUReadRegs: ureadRegs [=] readRegs ++ readRegsCont)
@@ -1225,7 +1231,8 @@ Section Semantics.
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2  newRegs1 newRegs2 calls1 calls2 (r2: type k2)
       (HDisjRegs: DisjKey newRegs1 newRegs2)
-      (HDisjCalls: DisjKey calls1 calls2)
+      (* (HDisjCalls: DisjKey calls1 calls2) *)
+      (HDisjCalls: (forall x, ~In x calls1 \/ ~In x calls2))
       (HTrue: evalExpr p = true)
       (HAction: PSemAction a readRegs1 newRegs1 calls1 r1)
       (HPSemAction: PSemAction (cont r1) readRegs2 newRegs2 calls2 r2)
@@ -1242,7 +1249,8 @@ Section Semantics.
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 (r2: type k2)
       (HDisjRegs: DisjKey newRegs1 newRegs2)
-      (HDisjCalls: DisjKey calls1 calls2)
+      (* (HDisjCalls: DisjKey calls1 calls2) *)
+      (HDisjCalls: (forall x, ~In x calls1 \/ ~In x calls2))
       (HFalse: evalExpr p = false)
       (HAction: PSemAction a' readRegs1 newRegs1 calls1 r1)
       (HPSemAction: PSemAction (cont r1) readRegs2 newRegs2 calls2 r2)
@@ -1277,7 +1285,8 @@ Section Semantics.
     match a with
     | MCall m s e c =>
       exists mret pcalls,
-      key_not_In m pcalls /\
+      (~In (m, (existT _ _ (evalExpr e, mret))) pcalls) /\
+      (* key_not_In m pcalls /\ *)
       SemAction (c mret) reads news pcalls retC /\
       calls = (m, (existT _ _ (evalExpr e, mret))) :: pcalls
     | LetExpr _ e cont =>
@@ -1285,7 +1294,8 @@ Section Semantics.
     | LetAction _ a cont =>
       exists reads1 news1 calls1 reads2 news2 calls2 r1,
       DisjKey news1 news2 /\
-      DisjKey calls1 calls2 /\  
+      (* DisjKey calls1 calls2 /\   *)
+      (forall x, ~In x calls1 \/ ~In x calls2) /\
       SemAction a reads1 news1 calls1 r1 /\
       SemAction (cont r1) reads2 news2 calls2 retC /\
       reads = reads1 ++ reads2 /\
@@ -1308,7 +1318,8 @@ Section Semantics.
     | IfElse p _ aT aF c =>
       exists reads1 news1 calls1 reads2 news2 calls2 r1,
       DisjKey news1 news2 /\
-      DisjKey calls1 calls2 /\
+      (* DisjKey calls1 calls2 /\ *)
+      (forall x, ~In x calls1 \/ ~In x calls2) /\
       match evalExpr p with
       | true =>
         SemAction aT reads1  news1 calls1 r1 /\
