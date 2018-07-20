@@ -1403,6 +1403,31 @@ Proof.
               apply HNoExec; right; assumption.
 Qed.
 
+Lemma InCall_getLabelCalls f l:
+  InCall f l ->
+  In f (getLabelCalls l).
+Proof.
+  induction l; unfold InCall,getLabelCalls in *; intros; simpl; dest; auto.
+  destruct H; subst;apply in_app_iff; [left; assumption|right; apply IHl].
+  exists x; auto.
+Qed.
+
+Lemma getLabelCalls_InCall f l:
+  In f (getLabelCalls l) ->
+  InCall f l.
+Proof.
+  induction l; unfold InCall, getLabelCalls in *; intros; simpl in *;[contradiction|].
+  rewrite in_app_iff in H; destruct H;[exists a; auto|specialize (IHl H);dest].
+  exists x; auto.
+Qed.
+
+Corollary InCall_getLabelCalls_iff f l:
+  InCall f l <->
+  In f (getLabelCalls l).
+Proof.
+  split; intro; eauto using InCall_getLabelCalls, getLabelCalls_InCall.
+Qed.
+
 Lemma extract_exec (f : DefMethT) m o l u cs fb:
   NoDup (map fst (getMethods m)) ->
   In f (getMethods m) ->
@@ -1410,7 +1435,7 @@ Lemma extract_exec (f : DefMethT) m o l u cs fb:
   exists reads e mret,
     fb =  existT SignT (projT1 (snd f)) (e, mret) /\
     DisjKey u (getLabelUpds l) /\
-    DisjKey cs (getLabelCalls l) /\
+    (forall x, ~In x cs \/ ~In x (getLabelCalls l)) /\
     SemAction o ((projT2 (snd f) type) e) reads u cs mret /\
     Substeps m o l.
 Proof.
@@ -1431,8 +1456,11 @@ Proof.
         specialize (HDisjRegs a (in_eq _ _) k) as TMP; simpl in *.
         assert (forall x, In x ls -> DisjKey (fst x) u0);[intros; eapply HDisjRegs; eauto|].
         specialize (IHls H k) as TMP2; destruct TMP, TMP2; firstorder fail.
-    + admit. 
-Admitted.
+    + intro x0; specialize (HNoCall x0).
+      clear - HNoCall.
+      destruct (in_dec MethT_dec x0 cs0), (InCall_dec x0 ls);auto.
+      right; rewrite <-InCall_getLabelCalls_iff; assumption.
+Qed.
 
 Lemma List_FullLabel_perm_getLabelUpds_perm l1 l2:
   List_FullLabel_perm l1 l2 ->
@@ -1485,7 +1513,7 @@ Lemma extract_exec_P (f : DefMethT) m o l u cs fb:
   exists reads e mret,
     fb = existT SignT (projT1 (snd f)) (e, mret) /\
     DisjKey u (getLabelUpds l) /\
-    DisjKey cs (getLabelCalls l) /\
+    (forall x, ~In x cs \/ ~In x (getLabelCalls l)) /\
     PSemAction o ((projT2 (snd f) type) e) reads u cs mret /\
     PSubsteps m o l.
 Proof.
@@ -1502,8 +1530,8 @@ Proof.
   + rewrite H11.
     rewrite (List_FullLabel_perm_getLabelUpds_perm P2).
     assumption.
-  + rewrite H14.
-    rewrite (List_FullLabel_perm_getLabelCalls_perm P2).
+  + setoid_rewrite H14.
+    setoid_rewrite (List_FullLabel_perm_getLabelCalls_perm P2).
     assumption.
   + symmetry in H1, H11, H14.
     apply (PSemAction_rewrite_state H1).
@@ -1524,7 +1552,7 @@ Corollary extract_exec_PPlus (f : DefMethT) m o upds execs calls fb:
     upds [=] upds1++upds2 /\
     calls [=] calls1++calls2 /\
     DisjKey upds1 upds2 /\
-    DisjKey calls1 calls2 /\
+    (forall x, ~In x calls1 \/ ~In x calls2) /\
     PPlusSubsteps m o upds2 execs calls2.
 Proof.
   intros.
@@ -1604,26 +1632,25 @@ Proof.
       rewrite filter_In in H1; dest; assumption.
 Qed.
 
-Lemma PPlusSubsteps_inline_In f m o upds execs calls :
+Lemma PPlusSubsteps_inline_In f m o :
   NoDup (map fst (getMethods m)) ->
   In f (getMethods m) ->
-  MatchingExecCalls_flat calls execs m ->
-  PPlusSubsteps m o upds execs calls ->
-  PPlusSubsteps (inlinesingle_BaseModule m f) o upds (filter (complement (called_execs (filter (called_by f) calls))) execs) (filter (complement (called_by f)) calls).
+  forall fcalls upds nfcalls execs,
+    (forall m, In (Meth m) execs -> (fst m <> fst f)) ->
+    (forall c, In c fcalls -> fst c = fst f) ->
+    (forall c, In c nfcalls -> fst c <> fst f) ->
+    PPlusSubsteps m o upds ((map Meth fcalls)++execs) (fcalls++nfcalls) ->
+    exists reads upds1 upds2 calls1 calls2,
+      upds [=] upds1++upds2 /\
+      (fcalls++nfcalls [=] calls1++calls2) /\
+      PSemAction_meth_collector f o reads upds1 calls1 fcalls /\
+      PPlusSubsteps m o upds2 execs calls2.
 Proof.
-  induction 4; simpl.
-  - econstructor 1; auto.
-  - rewrite HUpds, HExecs, HCalls; simpl.
-    rewrite filter_app.
-    destruct (in_dec string_dec (fst f) (map fst cs)).
-    + specialize (fst_produce_snd _ _ i) as TMP; dest.
-      unfold MatchingExecCalls_flat in H1; setoid_rewrite HCalls in H1.
-      specialize (H1 _ (in_or_app _ _ _ (or_introl _ H3))) as TMP; simpl in *.
-      specialize (TMP (in_map fst _ _ H0)); simpl in *.
-      rewrite HExecs in TMP; destruct TMP;[discriminate|].
-      specialize (in_split _ _ H4) as TMP; dest.
-      rewrite H5, <- Permutation_middle in H2.
-      admit.
-    + admit.
-  - admit.
+  induction fcalls; simpl in *; intros.
+  - exists nil, nil, upds, nil, nfcalls; simpl.
+    repeat split; auto.
+    constructor.
+  - destruct a; specialize (H2 _ (or_introl _ eq_refl)) as TMP; simpl in *; subst.
+    specialize (extract_exec_PPlus _ H H0 H4) as TMP; dest; subst.
+    admit.
 Admitted.
