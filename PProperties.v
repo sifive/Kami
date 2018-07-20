@@ -19,9 +19,8 @@ Proof.
     repeat split; eauto.
     + rewrite <- H2; assumption.
     + econstructor 1; auto.
-      * intro; apply HDisjCalls; rewrite H2; assumption.
-        (* unfold key_not_In in HDisjCalls. *)
-        (* intro; specialize (HDisjCalls v); rewrite H2 in HDisjCalls; eauto. *)
+      * unfold key_not_In in HDisjCalls.
+        intro; specialize (HDisjCalls v); rewrite H2 in HDisjCalls; eauto.
   - exists x, x0, x1.
     repeat split; eauto.
     econstructor 2; assumption.
@@ -30,8 +29,7 @@ Proof.
     repeat split; auto.
     + econstructor 3; eauto.
       * intro; specialize (HDisjRegs k0); rewrite <- H6, <- H2; assumption.
-      * intro; specialize (HDisjCalls x5); rewrite <-H7, <-H3; assumption.
-        (* intro; specialize (HDisjCalls k0); rewrite <- H7, <- H3; assumption. *)
+      * intro; specialize (HDisjCalls k0); rewrite <- H7, <- H3; assumption.
   - exists x, x0, x1.
     repeat split; auto.
     econstructor 4; eauto.
@@ -47,17 +45,17 @@ Proof.
   - exists (x2++x), (x3++x0), (x4++x1).
     rewrite H1, H5 in HUReadRegs; rewrite H2, H6 in HUNewRegs; rewrite H3, H7 in HUCalls.
     repeat split; auto.
-    econstructor 7 with (calls1 := x4) (calls2 := x1); auto.
+    econstructor 7; auto.
     + intro; specialize (HDisjRegs k); rewrite H2, H6 in HDisjRegs; apply HDisjRegs.
-    + intro; specialize (HDisjCalls x5); rewrite H3, H7 in HDisjCalls; apply HDisjCalls.
+    + intro; specialize (HDisjCalls k); rewrite H3, H7 in HDisjCalls; apply HDisjCalls.
     + apply H8.
     + assumption.
   - exists (x2++x), (x3++x0), (x4++x1).
     rewrite H1, H5 in HUReadRegs; rewrite H2, H6 in HUNewRegs; rewrite H3, H7 in HUCalls.
     repeat split; auto.
-    econstructor 8 with (calls1:=x4)(calls2:=x1); auto.
+    econstructor 8; auto.
     + intro; specialize (HDisjRegs k); rewrite H2, H6 in HDisjRegs; apply HDisjRegs.
-    + intro; specialize (HDisjCalls x5); rewrite H3, H7 in HDisjCalls; apply HDisjCalls.
+    + intro; specialize (HDisjCalls k); rewrite H3, H7 in HDisjCalls; apply HDisjCalls.
     + apply H8.
     + assumption.
   - exists x, x0, x1.
@@ -1962,7 +1960,7 @@ Section SplitSubsteps.
              apply (in_map getRleOrMeth) in H10; assumption.
   Qed.
   
-  Lemma split_PSubsteps2 o l:
+  Lemma split_Substeps2 o l:
     PSubsteps (concatFlat m1 m2) o l ->
       (forall x y : FullLabel,
           In x (ModuleFilterLabels m1 l) ->
@@ -2148,8 +2146,8 @@ Proof.
       split; auto.
       intro; apply (PWfConcats WfConcat2 H6 H15 (v:=(snd f))); destruct f ;assumption.
     + intros.
-      eapply split_PSubsteps2; eauto; rewrite <- P1; assumption.
-    + eapply split_PSubsteps2; eauto; rewrite P1; apply H.
+      eapply split_Substeps2; eauto; rewrite <- P1; assumption.
+    + eapply split_Substeps2; eauto; rewrite P1; apply H.
     + reflexivity.
     + reflexivity.
 Qed.

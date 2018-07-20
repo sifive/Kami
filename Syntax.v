@@ -1064,8 +1064,7 @@ Section Semantics.
       retK (fret: type retK)
       (cont: type (snd s) -> ActionT type retK)
       readRegs newRegs (calls: MethsT) acalls
-      (* (HDisjCalls: key_not_In meth calls) *)
-      (HDisjCalls: ~In (meth, (existT _ _ (evalExpr marg, mret))) calls)
+      (HDisjCalls: key_not_In meth calls)
       (HAcalls: acalls = (meth, (existT _ _ (evalExpr marg, mret))) :: calls)
       (HSemAction: SemAction (cont mret) readRegs newRegs calls fret):
       SemAction (MCall meth s marg cont) readRegs newRegs acalls fret
@@ -1079,8 +1078,7 @@ Section Semantics.
       (cont: type k -> ActionT type retK)
       readRegs newRegs readRegsCont newRegsCont calls callsCont
       (HDisjRegs: DisjKey newRegs newRegsCont)
-      (* (HDisjCalls: DisjKey calls callsCont) *)
-      (HDisjCalls: forall x, (~In x calls \/ ~In x callsCont))
+      (HDisjCalls: DisjKey calls callsCont)
       (HSemAction: SemAction a readRegs newRegs calls v)
       (HSemActionCont: SemAction (cont v) readRegsCont newRegsCont callsCont fret):
       SemAction (LetAction a cont) (readRegs ++ readRegsCont) (newRegs ++ newRegsCont)
@@ -1117,8 +1115,7 @@ Section Semantics.
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2  newRegs1 newRegs2 calls1 calls2 (r2: type k2)
       (HDisjRegs: DisjKey newRegs1 newRegs2)
-      (* (HDisjCalls: DisjKey calls1 calls2) *)
-      (HDisjCalls: (forall x, ~In x calls1 \/ ~In x calls2))
+      (HDisjCalls: DisjKey calls1 calls2)
       (HTrue: evalExpr p = true)
       (HAction: SemAction a readRegs1 newRegs1 calls1 r1)
       (HSemAction: SemAction (cont r1) readRegs2 newRegs2 calls2 r2)
@@ -1135,8 +1132,7 @@ Section Semantics.
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 (r2: type k2)
       (HDisjRegs: DisjKey newRegs1 newRegs2)
-      (* (HDisjCalls: DisjKey calls1 calls2) *)
-      (HDisjCalls: (forall x, ~In x calls1 \/ ~In x calls2))
+      (HDisjCalls: DisjKey calls1 calls2)
       (HFalse: evalExpr p = false)
       (HAction: SemAction a' readRegs1 newRegs1 calls1 r1)
       (HSemAction: SemAction (cont r1) readRegs2 newRegs2 calls2 r2)
@@ -1174,8 +1170,7 @@ Section Semantics.
       retK (fret: type retK)
       (cont: type (snd s) -> ActionT type retK)
       readRegs newRegs (calls: MethsT) acalls
-      (HDisjCalls: ~In (meth, (existT _ _ (evalExpr marg, mret))) calls)
-      (* (HDisjCalls: key_not_In meth calls) *)
+      (HDisjCalls: key_not_In meth calls)
       (HAcalls: acalls [=] (meth, (existT _ _ (evalExpr marg, mret))) :: calls)
       (HPSemAction: PSemAction (cont mret) readRegs newRegs calls fret):
       PSemAction (MCall meth s marg cont) readRegs newRegs acalls fret
@@ -1189,8 +1184,7 @@ Section Semantics.
       (cont: type k -> ActionT type retK)
       readRegs newRegs readRegsCont newRegsCont calls callsCont
       (HDisjRegs: DisjKey newRegs newRegsCont)
-      (HDisjCalls: forall x, (~In x calls \/ ~In x callsCont))
-      (* (HDisjCalls: DisjKey calls callsCont) *)
+      (HDisjCalls: DisjKey calls callsCont)
       (HPSemAction: PSemAction a readRegs newRegs calls v)
       ureadRegs unewRegs ucalls
       (HUReadRegs: ureadRegs [=] readRegs ++ readRegsCont)
@@ -1231,8 +1225,7 @@ Section Semantics.
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2  newRegs1 newRegs2 calls1 calls2 (r2: type k2)
       (HDisjRegs: DisjKey newRegs1 newRegs2)
-      (* (HDisjCalls: DisjKey calls1 calls2) *)
-      (HDisjCalls: (forall x, ~In x calls1 \/ ~In x calls2))
+      (HDisjCalls: DisjKey calls1 calls2)
       (HTrue: evalExpr p = true)
       (HAction: PSemAction a readRegs1 newRegs1 calls1 r1)
       (HPSemAction: PSemAction (cont r1) readRegs2 newRegs2 calls2 r2)
@@ -1249,8 +1242,7 @@ Section Semantics.
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 (r2: type k2)
       (HDisjRegs: DisjKey newRegs1 newRegs2)
-      (* (HDisjCalls: DisjKey calls1 calls2) *)
-      (HDisjCalls: (forall x, ~In x calls1 \/ ~In x calls2))
+      (HDisjCalls: DisjKey calls1 calls2)
       (HFalse: evalExpr p = false)
       (HAction: PSemAction a' readRegs1 newRegs1 calls1 r1)
       (HPSemAction: PSemAction (cont r1) readRegs2 newRegs2 calls2 r2)
@@ -1285,8 +1277,7 @@ Section Semantics.
     match a with
     | MCall m s e c =>
       exists mret pcalls,
-      (~In (m, (existT _ _ (evalExpr e, mret))) pcalls) /\
-      (* key_not_In m pcalls /\ *)
+      key_not_In m pcalls /\
       SemAction (c mret) reads news pcalls retC /\
       calls = (m, (existT _ _ (evalExpr e, mret))) :: pcalls
     | LetExpr _ e cont =>
@@ -1294,8 +1285,7 @@ Section Semantics.
     | LetAction _ a cont =>
       exists reads1 news1 calls1 reads2 news2 calls2 r1,
       DisjKey news1 news2 /\
-      (* DisjKey calls1 calls2 /\   *)
-      (forall x, ~In x calls1 \/ ~In x calls2) /\
+      DisjKey calls1 calls2 /\  
       SemAction a reads1 news1 calls1 r1 /\
       SemAction (cont r1) reads2 news2 calls2 retC /\
       reads = reads1 ++ reads2 /\
@@ -1318,8 +1308,7 @@ Section Semantics.
     | IfElse p _ aT aF c =>
       exists reads1 news1 calls1 reads2 news2 calls2 r1,
       DisjKey news1 news2 /\
-      (* DisjKey calls1 calls2 /\ *)
-      (forall x, ~In x calls1 \/ ~In x calls2) /\
+      DisjKey calls1 calls2 /\
       match evalExpr p with
       | true =>
         SemAction aT reads1  news1 calls1 r1 /\
@@ -1530,7 +1519,7 @@ Section BaseModule.
                                           | Rle _ => False
                                           | _ => True
                                           end)
-            (HNoCall: forall c, In c cs -> InCall c ls -> False)
+            (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False)
             (HSubstep: Substeps ls):
       Substeps l
   | AddMeth (HRegs: getKindAttr o = getKindAttr (getRegisters m))
@@ -1544,7 +1533,7 @@ Section BaseModule.
                                (getKindAttr (getRegisters m)))
             l ls (HLabel: l = (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
-            (HNoCall: forall c, In c cs -> InCall c ls -> False)
+            (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False)
             (HNoExec: InExec (fn, existT _ _ (argV, retV)) ls -> False)
             (HSubsteps: Substeps ls):
       Substeps l.
@@ -1566,7 +1555,7 @@ Section BaseModule.
                                           | Rle _ => False
                                           | _ => True
                                           end)
-            (HNoCall: forall c, In c cs -> InCall c ls -> False)
+            (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False)
             (HPSubstep: PSubsteps ls):
       PSubsteps l
   | PAddMeth (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
@@ -1580,7 +1569,7 @@ Section BaseModule.
                                (getKindAttr (getRegisters m)))
             l ls (HLabel: l [=] (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
-            (HNoCall: forall c, In c cs -> InCall c ls -> False)
+            (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False)
             (HNoExec: InExec (fn, existT _ _ (argV, retV)) ls -> False)
             (HPSubsteps: PSubsteps ls):
       PSubsteps l.
@@ -1601,7 +1590,7 @@ Inductive Step: Mod -> RegsT -> list FullLabel -> Prop :=
                                                            | Rle _, Rle _ => False
                                                            | _, _ => True
                                                            end)
-                (HNoCall: forall x, InCall x l1 -> InCall x l2 -> False)
+                (HNoCall: forall f, InCall f l1 -> forall v2, InCall (fst f, v2) l2 -> False)
                 o l
                 (HRegs: o = o1 ++ o2)
                 (HLabels: l = l1 ++ l2):
@@ -1622,7 +1611,7 @@ Inductive PStep: Mod -> RegsT -> list FullLabel -> Prop :=
                                                             | Rle _, Rle _ => False
                                                             | _, _ => True
                                                             end)
-                 (HNoCall: forall x, InCall x l1 -> InCall x l2 -> False)
+                 (HNoCall: forall f, InCall f l1 -> forall v2, InCall (fst f, v2) l2 -> False)
                  o l
                  (HRegs: o [=] o1 ++ o2)
                  (HLabels: l [=] l1 ++ l2):
@@ -1704,21 +1693,21 @@ Definition filterExecs f m (l: list FullLabel) :=
 
 
 Definition TraceInclusion m1 m2 :=
-  forall o1 ls1,
-    Trace m1 o1 ls1 ->
-    exists o2 ls2,
-      Trace m2 o2 ls2 /\
-      length ls1 = length ls2 /\
-      (nthProp2
-         (fun l1 l2 =>
-            (forall f, (InExec f l1 /\ ~ InCall f l1) <->
-                       (InExec f l2 /\ ~ InCall f l2)) /\
-            (forall f, (~ InExec f l1 /\ InCall f l1) <->
-                       (~ InExec f l2 /\ InCall f l2)) /\
-            (forall f, ((InExec f l1 /\ InCall f l1) \/ (~ InExec f l1 /\ ~ InCall f l1)) <->
-                       ((InExec f l2 /\ InCall f l2) \/ (~ InExec f l2 /\ ~ InCall f l2))) /\
-            ((exists rle, In (Rle rle) (map (fun x => fst (snd x)) l2)) ->
-             (exists rle, In (Rle rle) (map (fun x => fst (snd x)) l1)))) ls1 ls2).
+ forall o1 ls1,
+   Trace m1 o1 ls1 ->
+   exists o2 ls2,
+     Trace m2 o2 ls2 /\
+     length ls1 = length ls2 /\
+     (nthProp2
+        (fun l1 l2 =>
+           (forall f, (InExec f l1 /\ ~ InCall f l1) <->
+                      (InExec f l2 /\ ~ InCall f l2)) /\
+           (forall f, (~ InExec f l1 /\ InCall f l1) <->
+                      (~ InExec f l2 /\ InCall f l2)) /\
+           (forall f, ((InExec f l1 /\ InCall f l1) \/ (forall v2, ~ InExec (fst f, v2) l1) /\ (forall v2, ~ InCall (fst f, v2) l1)) <->
+                      ((InExec f l2 /\ InCall f l2) \/ (forall v2, ~ InExec (fst f, v2) l2) /\ (forall v2, ~ InCall (fst f, v2) l2))) /\
+           ((exists rle, In (Rle rle) (map (fun x => fst (snd x)) l2)) ->
+            (exists rle, In (Rle rle) (map (fun x => fst (snd x)) l1)))) ls1 ls2).
 
 Section WfBaseMod.
   Variable m: BaseModule.
