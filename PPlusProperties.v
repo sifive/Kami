@@ -30,7 +30,7 @@ Section BaseModule.
                                                 | Rle _ => False
                                                 | _ => True
                                                 end)
-            (HNoCall: forall c, In c cs -> In c oldCalls -> False)
+            (HNoCall: forall c, In c cs -> forall v, In (fst c, v) oldCalls -> False)
             (HPSubstep: PPlusSubsteps oldUpds oldExecs oldCalls):
       PPlusSubsteps upds execs calls
   | PPlusAddMeth (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
@@ -47,7 +47,7 @@ Section BaseModule.
             (HExecs: execs [=] Meth (fn, existT _ _ (argV, retV)) :: oldExecs)
             (HCalls: calls [=] cs ++ oldCalls)
             (HDisjRegs: DisjKey oldUpds u)
-            (HNoCall: forall c, In c cs -> In c oldCalls -> False)
+            (HNoCall: forall c, In c cs -> forall v, In (fst c, v) oldCalls -> False)
             (HNoExec: In (Meth (fn, existT _ _ (argV, retV))) oldExecs -> False)
             (HPSubstep: PPlusSubsteps oldUpds oldExecs oldCalls):
       PPlusSubsteps upds execs calls.
@@ -94,12 +94,13 @@ Section BaseModule.
           rewrite in_map_iff.
           firstorder fail.
         * clear - H3 H4 H5 HCalls HNoCall.
-          apply HNoCall with (c := c); auto.
+          eapply HNoCall with (c := f); auto.
           rewrite H3.
           rewrite <- flat_map_concat_map.
           setoid_rewrite in_flat_map.
           unfold InCall in *; dest.
-          firstorder fail.
+          exists x0; split; auto.
+          apply i0.
       + rewrite H1 in HUpds; auto.
       + rewrite HExecs.
         constructor; auto.
@@ -119,12 +120,13 @@ Section BaseModule.
           rewrite in_map_iff in *; dest; subst.
           firstorder fail.
         * clear - H3 H4 H5 HCalls HNoCall.
-          apply HNoCall with (c := c); auto.
+          eapply HNoCall with (c := f); auto.
           rewrite H3.
           rewrite <- flat_map_concat_map.
           setoid_rewrite in_flat_map.
           unfold InCall in *; dest.
-          firstorder fail.
+          exists x0; split; auto.
+          apply i0.
         * clear - H2 H4 HExecs HNoExec.
           apply HNoExec; unfold InExec in *.
           rewrite H2; assumption.
@@ -266,7 +268,8 @@ Proof.
       eapply HNoRle; eauto.
     + eapply HNoCall; eauto.
       rewrite in_flat_map in H1; dest.
-      firstorder.
+      unfold InCall; exists x; split; auto.
+      apply H2.
   - rewrite HLabel; simpl; setoid_rewrite <- flat_map_concat_map in IHPSubsteps.
     econstructor 3; intros; eauto.
     + clear - HDisjRegs.
@@ -278,7 +281,8 @@ Proof.
         firstorder fail.
     + eapply HNoCall; eauto.
       rewrite in_flat_map in H1; dest.
-      firstorder.
+      unfold InCall; exists x; split; auto.
+      apply H2.
 Qed.
 
 Section PPlusStep.
@@ -437,9 +441,9 @@ Section PPlusTraceInclusion.
     (forall (f : MethT), ~In (Meth f) (PPT_execs t1) /\ In f (PPT_calls t1) <->
                          ~In (Meth f) (PPT_execs t2) /\ In f (PPT_calls t2)) /\
     (forall (f : MethT), ((In (Meth f) (PPT_execs t1) /\ In f (PPT_calls t1)) \/
-                          (~In (Meth f) (PPT_execs t1) /\ ~In f (PPT_calls t1))) <->
+                          ((forall v, ~In (Meth (fst f, v)) (PPT_execs t1)) /\ (forall v, ~In (fst f, v) (PPT_calls t1)))) <->
                          ((In (Meth f) (PPT_execs t2) /\ In f (PPT_calls t2)) \/
-                          (~In (Meth f) (PPT_execs t2) /\ ~In f (PPT_calls t2)))) /\
+                          ((forall v, (~In (Meth (fst f, v)) (PPT_execs t2))) /\ (forall v, ~In (fst f, v) (PPT_calls t2))))) /\
     ((exists rle, In (Rle rle) (PPT_execs t2)) ->
      (exists rle, In (Rle rle) (PPT_execs t1))).
 
@@ -464,7 +468,7 @@ Section PPlusTraceInclusion.
     WeakInclusion l1 l2.
   Proof.
     unfold WeakInclusion_flat, extractTriple; simpl.
-    setoid_rewrite InExec_rewrite; setoid_rewrite InCall_rewrite.
+    setoid_rewrite InExec_rewrite; setoid_rewrite InCall_rewrite.    
     intros; assumption.
   Qed.
   
@@ -597,13 +601,17 @@ Proof.
   intros; apply PSemAction_NoDup_Key_Writes in H; apply NoDup_map_inv in H; assumption.
 Qed.
 
-Lemma PPlusSubsteps_NoDup_Calls m o upds execs calls:
+Lemma PPlusSubsteps_NoDup_Key_Calls m o upds execs calls:
   PPlusSubsteps m o upds execs calls ->
-  NoDup calls.
+  NoDup (map fst calls).
 Proof.
   induction 1;[econstructor| |];
-    rewrite HCalls; rewrite NoDup_app_iff; repeat split;
-      auto; eauto using PSemAction_NoDup_Calls.
+    rewrite HCalls; rewrite map_app, NoDup_app_iff; repeat split;
+      auto; eauto using PSemAction_NoDup_Key_Calls; repeat intro;
+        specialize (fst_produce_snd _ _ H0) as TMP; dest;
+          specialize (fst_produce_snd _ _ H1) as TMP; dest;
+            [apply (HNoCall _ H2 _ H3)| apply (HNoCall _ H3 _ H2)
+             |apply (HNoCall _ H2 _ H3)| apply (HNoCall _ H3 _ H2)].
 Qed.
 
 Lemma PPlusSubsteps_NoDup_Key_Writes m o upds execs calls:
