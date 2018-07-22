@@ -1519,7 +1519,7 @@ Section BaseModule.
                                           | Rle _ => False
                                           | _ => True
                                           end)
-            (HNoCall: forall f, In f cs -> (forall v2, InCall (fst f,v2) ls -> False))
+            (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False)
             (HSubstep: Substeps ls):
       Substeps l
   | AddMeth (HRegs: getKindAttr o = getKindAttr (getRegisters m))
@@ -1533,7 +1533,7 @@ Section BaseModule.
                                (getKindAttr (getRegisters m)))
             l ls (HLabel: l = (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
-            (HNoCall: forall f, In f cs -> (forall v2, InCall (fst f,v2) ls -> False))
+            (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False)
             (HNoExec: InExec (fn, existT _ _ (argV, retV)) ls -> False)
             (HSubsteps: Substeps ls):
       Substeps l.
@@ -1555,7 +1555,7 @@ Section BaseModule.
                                           | Rle _ => False
                                           | _ => True
                                           end)
-            (HNoCall: forall f, In f cs -> (forall v2, InCall (fst f,v2) ls -> False))
+            (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False)
             (HPSubstep: PSubsteps ls):
       PSubsteps l
   | PAddMeth (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
@@ -1569,7 +1569,7 @@ Section BaseModule.
                                (getKindAttr (getRegisters m)))
             l ls (HLabel: l [=] (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
-            (HNoCall: forall f, In f cs -> (forall v2, InCall (fst f,v2) ls -> False))
+            (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False)
             (HNoExec: InExec (fn, existT _ _ (argV, retV)) ls -> False)
             (HPSubsteps: PSubsteps ls):
       PSubsteps l.
@@ -1590,7 +1590,7 @@ Inductive Step: Mod -> RegsT -> list FullLabel -> Prop :=
                                                            | Rle _, Rle _ => False
                                                            | _, _ => True
                                                            end)
-                (HNoCall: forall f, InCall f l1 -> (forall v2, InCall (fst f, v2) l2 -> False))
+                (HNoCall: forall f, InCall f l1 -> forall v2, InCall (fst f, v2) l2 -> False)
                 o l
                 (HRegs: o = o1 ++ o2)
                 (HLabels: l = l1 ++ l2):
@@ -1611,7 +1611,7 @@ Inductive PStep: Mod -> RegsT -> list FullLabel -> Prop :=
                                                             | Rle _, Rle _ => False
                                                             | _, _ => True
                                                             end)
-                 (HNoCall: forall f, InCall f l1 -> (forall v2, InCall (fst f, v2) l2 -> False))
+                 (HNoCall: forall f, InCall f l1 -> forall v2, InCall (fst f, v2) l2 -> False)
                  o l
                  (HRegs: o [=] o1 ++ o2)
                  (HLabels: l [=] l1 ++ l2):
