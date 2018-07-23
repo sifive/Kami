@@ -45,7 +45,8 @@ Inductive RtlSysT : Type :=
 | RtlDispStruct : forall n (fk : Fin.t n -> Kind) (fs : Fin.t n -> string),
     RtlExpr (Struct fk fs) -> (Fin.t n -> FullBitFormat) -> RtlSysT
 | RtlDispArray : forall n k,
-    RtlExpr (Array n k) -> FullBitFormat -> RtlSysT.
+    RtlExpr (Array n k) -> FullBitFormat -> RtlSysT
+| RtlFinish: RtlSysT.
 
 
 Record RtlModule :=

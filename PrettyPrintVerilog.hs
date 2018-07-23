@@ -342,6 +342,7 @@ ppRtlSys (RtlDispStruct n fk fs fv ff) = do
 ppRtlSys (RtlDispArray n k v f) = do
   rest <- mapM (\i -> ppRtlExpr "sys" (RtlReadArray n k v (RtlConst k (ConstBit (log2_up n) (natToWord (log2_up n) i))))) [0 .. (n-1)]
   return $ "        $write(\"[" ++ Data.List.concat (Data.List.map (\i -> show i ++ ":=" ++ ppFullBitFormat f ++ "; ") [0 .. (n-1)]) ++ "]\", " ++ Data.List.concat rest ++ ");\n"
+ppRtlSys (RtlFinish) = return $ "        $finish();\n"
 
 ppRtlModule :: RtlModule -> String
 ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =

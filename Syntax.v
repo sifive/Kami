@@ -332,7 +332,8 @@ Section Phoas.
   | DispStruct: forall n fk fs, Expr (SyntaxKind (@Struct n fk fs)) ->
                                   (Fin.t n -> FullBitFormat)
                                   -> SysT
-  | DispArray: forall n k, Expr (SyntaxKind (Array n k)) -> FullBitFormat -> SysT.
+  | DispArray: forall n k, Expr (SyntaxKind (Array n k)) -> FullBitFormat -> SysT
+  | Finish: SysT.
   
   Inductive ActionT (lretT: Kind) : Type :=
   | MCall (meth: string) s:

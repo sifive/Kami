@@ -385,6 +385,7 @@ Section Compile.
     | DispBit n e f => RtlDispBit (@convertExprToRtl _ e) f
     | DispStruct n fk fs e f => RtlDispStruct (@convertExprToRtl _ e) f
     | DispArray n k e f => RtlDispArray (@convertExprToRtl _ e) f
+    | Finish => RtlFinish
     end.
 
   Fixpoint getRtlSys k (a: ActionT (fun _ => list nat) k) enable startList : list (RtlExpr Bool * list RtlSysT) :=
