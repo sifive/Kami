@@ -1534,6 +1534,7 @@ Section BaseModule.
             l ls (HLabel: l = (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
             (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False)
+            (HNoCycle: ~In fn (map fst cs))
             (HNoExec: InExec (fn, existT _ _ (argV, retV)) ls -> False)
             (HSubsteps: Substeps ls):
       Substeps l.
@@ -1570,6 +1571,7 @@ Section BaseModule.
             l ls (HLabel: l [=] (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
             (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False)
+            (HNoCycle: ~In fn (map fst cs))
             (HNoExec: InExec (fn, existT _ _ (argV, retV)) ls -> False)
             (HPSubsteps: PSubsteps ls):
       PSubsteps l.
