@@ -669,6 +669,7 @@ Delimit Scope kami_action_scope with kami_action.
 
 Inductive ModuleElt :=
 | MERegister (_ : RegInitT)
+| MERegAry (_ : list RegInitT)
 | MERule (_ : Attribute (Action Void))
 | MEMeth (_ : DefMethT).
 
@@ -683,6 +684,7 @@ Fixpoint makeModule' (im : InModule) :=
     let '(iregs, irules, imeths) := makeModule' i in
     match e with
     | MERegister mreg => (mreg :: iregs, irules, imeths)
+    | MERegAry mregs => (mregs ++ iregs, irules, imeths)
     | MERule mrule => (iregs, mrule :: irules, imeths)
     | MEMeth mmeth => (iregs, irules, mmeth :: imeths)
     end
@@ -706,6 +708,73 @@ Notation "'RegisterU' name : type" :=
   (MERegister (name%string, existT optConstFullT (SyntaxKind type) None))
     (at level 12, name at level 99) : kami_scope.
 
+Section Positive.
+    Import BinPosDef.
+    Local Open Scope positive_scope.
+    Fixpoint of_pos (p : positive) (rest : string) : string :=
+        match p with
+        | 1 => String "1" rest
+        | 2 => String "2" rest
+        | 3 => String "3" rest
+        | 4 => String "4" rest
+        | 5 => String "5" rest
+        | 6 => String "6" rest
+        | 7 => String "7" rest
+        | 8 => String "8" rest
+        | 9 => String "9" rest
+        | 10 => String "A" rest
+        | 11 => String "B" rest
+        | 12 => String "C" rest
+        | 13 => String "D" rest
+        | 14 => String "E" rest
+        | 15 => String "F" rest
+        | p'~0~0~0~0 => of_pos p' (String "0" rest)
+        | p'~0~0~0~1 => of_pos p' (String "1" rest)
+        | p'~0~0~1~0 => of_pos p' (String "2" rest)
+        | p'~0~0~1~1 => of_pos p' (String "3" rest)
+        | p'~0~1~0~0 => of_pos p' (String "4" rest)
+        | p'~0~1~0~1 => of_pos p' (String "5" rest)
+        | p'~0~1~1~0 => of_pos p' (String "6" rest)
+        | p'~0~1~1~1 => of_pos p' (String "7" rest)
+        | p'~1~0~0~0 => of_pos p' (String "8" rest)
+        | p'~1~0~0~1 => of_pos p' (String "9" rest)
+        | p'~1~0~1~0 => of_pos p' (String "A" rest)
+        | p'~1~0~1~1 => of_pos p' (String "B" rest)
+        | p'~1~1~0~0 => of_pos p' (String "C" rest)
+        | p'~1~1~0~1 => of_pos p' (String "D" rest)
+        | p'~1~1~1~0 => of_pos p' (String "E" rest)
+        | p'~1~1~1~1 => of_pos p' (String "F" rest)
+        end.
+    Local Close Scope positive_scope.
+    Definition natToHexStr (n : nat) : string :=
+        match (BinNat.N.of_nat n) with
+        | N0     => "0"
+        | Npos p => of_pos p ""
+        end.
+End Positive.
+
+Definition IndexReg name idx := (name ++ "_" ++ natToHexStr idx)%string.
+
+Fixpoint nameList name size : list string :=
+    match size with
+    | S n => (IndexReg name n) :: (nameList name n)
+    | O   => nil
+    end.
+
+Notation "'RegisterArray' name 'times' size : type <- init" :=
+  (MERegAry (
+    map (fun indexed_name =>
+      (indexed_name%string, existT optConstFullT (SyntaxKind type) (Some (makeConst init)))
+    ) (nameList name size)
+  ))
+    (at level 12, name at level 9, size at level 9) : kami_scope.
+
+Delimit Scope kami_scope with kami.
+
+(* Example
+    Compute (RegisterArray "test" times 20 : Bool <- false)%kami.
+*)
+
 Notation "'Method' name () : retT := c" :=
   (MEMeth (name%string, existT MethodT (Void, retT)
                                (fun ty (_: ty Void) => c%kami_action : ActionT ty retT)))
@@ -719,8 +788,6 @@ Notation "'Method' name ( param : dom ) : retT := c" :=
 Notation "'Rule' name := c" :=
   (MERule (name%string, fun ty => (c)%kami_action : ActionT ty Void))
     (at level 12) : kami_scope.
-
-Delimit Scope kami_scope with kami.
 
 Notation "'MODULE' { m1 'with' .. 'with' mN }" :=
   (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..))
