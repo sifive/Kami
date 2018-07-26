@@ -665,6 +665,22 @@ Notation "'Retv'" := (Return (Const _ (k := Void) Default)) : kami_action_scope.
 
 Delimit Scope kami_action_scope with kami_action.
 
+Definition gatherActions (ty : Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_out (cont : _ -> ActionT ty k_out):=
+  fold_right (fun (a : ActionT ty k_in) acc =>
+                (fun vals =>
+                   LETA val <- a;
+                     acc ((#val)%kami_expr :: vals)
+                )%kami_action
+             ) cont acts.
+
+Notation "'GatherActions' actionList 'as' val ; cont" :=
+  (gatherActions actionList (fun val => cont) nil)
+    (at level 12, right associativity, val at level 99) : kami_action_scope.
+
+
+
+
+
 (** * Notation for normal modules *)
 
 Inductive ModuleElt :=
