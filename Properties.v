@@ -1276,7 +1276,7 @@ Section ModularSubstition.
                            TraceInclusion b b' ->
                            TraceInclusion (ConcatMod a b) (ConcatMod a' b').
   Proof.
-    unfold TraceInclusion in *; intros.
+    unfold TraceInclusion, WeakInclusion in *; intros.
     pose proof (SplitTrace DisjRegs DisjRules DisjMeths H1); dest.
     specialize (@H _ _ H2).
     specialize (@H0 _ _ H3).
@@ -1726,7 +1726,7 @@ Proof.
   exists x1, x2.
   repeat split; auto.
   - congruence.
-  - unfold nthProp2 in *; intros.
+  - unfold nthProp2, WeakInclusion in *; intros.
     specialize (H3 i); specialize (H5 i).
     case_eq (nth_error ls1 i);
       case_eq (nth_error x0 i);
@@ -3080,7 +3080,7 @@ Section SplitSubsteps.
 
 End SplitSubsteps.
 
-Definition WeakInclusion (l1 l2 : list FullLabel) : Prop := 
+Definition PWeakInclusion (l1 l2 : list FullLabel) : Prop := 
      (forall f : MethT, InExec f l1 /\ ~ InCall f l1 <-> InExec f l2 /\ ~ InCall f l2) /\
      (forall f : MethT, ~ InExec f l1 /\ InCall f l1 <-> ~ InExec f l2 /\ InCall f l2) /\
      (forall f : MethT, InExec f l1 /\ InCall f l1 \/ (forall v, ~ InExec (fst f, v) l1 ) /\ (forall v, ~ InCall (fst f, v) l1) <-> InExec f l2 /\ InCall f l2 \/ (forall v, ~ InExec (fst f, v) l2) /\ (forall v, ~ InCall (fst f, v) l2))
@@ -3567,7 +3567,7 @@ Ltac Permutation_replace :=
 Lemma PermutationWI : forall (l l' : list FullLabel), Permutation l l' -> WeakInclusion l l'.
 Proof.
   intros; unfold WeakInclusion.
-  repeat split; dest; intros;[| | | | | | | |destruct H0;dest;[left;split|right;split;intro;specialize (H0 v);specialize (H1 v)]|destruct H0;dest;[left;split|right;split;intro;specialize (H0 v); specialize (H1 v)]|dest; exists x; induction H; auto; destruct H0;firstorder];Permutation_replace.
+  repeat split; dest; intros;[| | | | | | | |destruct H0;dest;[left;split|right;split;intro;specialize (H0 v2);specialize (H1 v2)]|destruct H0;dest;[left;split|right;split;intro;specialize (H0 v2); specialize (H1 v2)]|dest; exists x; induction H; auto; destruct H0;firstorder];Permutation_replace.
 Qed.
 
 Corollary PermutationWE : forall (l l' : list FullLabel), Permutation l l' -> WeakEquality l l'.
