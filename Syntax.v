@@ -2,6 +2,7 @@ Require Export Bool String List FunctionalExtensionality Psatz PeanoNat.
 Require Export bbv.Word Lib.VectorFacts Lib.EclecticLib.
 
 Require Import Permutation.
+Require Import ZArith.
 Import ListNotations.
 
 Global Set Implicit Arguments.
@@ -1694,6 +1695,19 @@ Definition filterExecs f m (l: list FullLabel) :=
                        getBool (in_dec string_dec y (map fst (getAllMethods m)))
                      end) l.
 
+Definition WeakInclusion (l1 l2 : list FullLabel) :=
+  (forall f, (InExec f l1 /\ ~ InCall f l1) <->
+             (InExec f l2 /\ ~ InCall f l2)) /\
+  (forall f, (~ InExec f l1 /\ InCall f l1) <->
+             (~ InExec f l2 /\ InCall f l2)) /\
+  (forall f, ((InExec f l1 /\ InCall f l1) \/ (forall v2, ~ InExec (fst f, v2) l1) /\ (forall v2, ~ InCall (fst f, v2) l1)) <->
+             ((InExec f l2 /\ InCall f l2) \/ (forall v2, ~ InExec (fst f, v2) l2) /\ (forall v2, ~ InCall (fst f, v2) l2))) /\
+  ((exists rle, In (Rle rle) (map (fun x => fst (snd x)) l2)) ->
+   (exists rle, In (Rle rle) (map (fun x => fst (snd x)) l1))).
+
+(* Fixpoint FullLabel_diff (f : MethT) (l : list FullLabel) : Z := *)
+(*   match l with *)
+(*   | fl::l =>  *)
 
 Definition TraceInclusion m1 m2 :=
  forall o1 ls1,
@@ -1701,16 +1715,16 @@ Definition TraceInclusion m1 m2 :=
    exists o2 ls2,
      Trace m2 o2 ls2 /\
      length ls1 = length ls2 /\
-     (nthProp2
-        (fun l1 l2 =>
-           (forall f, (InExec f l1 /\ ~ InCall f l1) <->
-                      (InExec f l2 /\ ~ InCall f l2)) /\
-           (forall f, (~ InExec f l1 /\ InCall f l1) <->
-                      (~ InExec f l2 /\ InCall f l2)) /\
-           (forall f, ((InExec f l1 /\ InCall f l1) \/ (forall v2, ~ InExec (fst f, v2) l1) /\ (forall v2, ~ InCall (fst f, v2) l1)) <->
-                      ((InExec f l2 /\ InCall f l2) \/ (forall v2, ~ InExec (fst f, v2) l2) /\ (forall v2, ~ InCall (fst f, v2) l2))) /\
-           ((exists rle, In (Rle rle) (map (fun x => fst (snd x)) l2)) ->
-            (exists rle, In (Rle rle) (map (fun x => fst (snd x)) l1)))) ls1 ls2).
+     (nthProp2 WeakInclusion ls1 ls2).
+           (* (fun l1 l2 => *)
+           (* (forall f, (InExec f l1 /\ ~ InCall f l1) <-> *)
+           (*            (InExec f l2 /\ ~ InCall f l2)) /\ *)
+           (* (forall f, (~ InExec f l1 /\ InCall f l1) <-> *)
+           (*            (~ InExec f l2 /\ InCall f l2)) /\ *)
+           (* (forall f, ((InExec f l1 /\ InCall f l1) \/ (forall v2, ~ InExec (fst f, v2) l1) /\ (forall v2, ~ InCall (fst f, v2) l1)) <-> *)
+           (*            ((InExec f l2 /\ InCall f l2) \/ (forall v2, ~ InExec (fst f, v2) l2) /\ (forall v2, ~ InCall (fst f, v2) l2))) /\ *)
+           (* ((exists rle, In (Rle rle) (map (fun x => fst (snd x)) l2)) -> *)
+           (*  (exists rle, In (Rle rle) (map (fun x => fst (snd x)) l1)))) ls1 ls2). *)
 
 Section WfBaseMod.
   Variable m: BaseModule.
