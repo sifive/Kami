@@ -1066,7 +1066,7 @@ Section Semantics.
       retK (fret: type retK)
       (cont: type (snd s) -> ActionT type retK)
       readRegs newRegs (calls: MethsT) acalls
-      (HDisjCalls: key_not_In meth calls)
+      (* (HDisjCalls: key_not_In meth calls) *)
       (HAcalls: acalls = (meth, (existT _ _ (evalExpr marg, mret))) :: calls)
       (HSemAction: SemAction (cont mret) readRegs newRegs calls fret):
       SemAction (MCall meth s marg cont) readRegs newRegs acalls fret
@@ -1080,7 +1080,7 @@ Section Semantics.
       (cont: type k -> ActionT type retK)
       readRegs newRegs readRegsCont newRegsCont calls callsCont
       (HDisjRegs: DisjKey newRegs newRegsCont)
-      (HDisjCalls: DisjKey calls callsCont)
+      (* (HDisjCalls: DisjKey calls callsCont) *)
       (HSemAction: SemAction a readRegs newRegs calls v)
       (HSemActionCont: SemAction (cont v) readRegsCont newRegsCont callsCont fret):
       SemAction (LetAction a cont) (readRegs ++ readRegsCont) (newRegs ++ newRegsCont)
@@ -1117,7 +1117,7 @@ Section Semantics.
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2  newRegs1 newRegs2 calls1 calls2 (r2: type k2)
       (HDisjRegs: DisjKey newRegs1 newRegs2)
-      (HDisjCalls: DisjKey calls1 calls2)
+      (* (HDisjCalls: DisjKey calls1 calls2) *)
       (HTrue: evalExpr p = true)
       (HAction: SemAction a readRegs1 newRegs1 calls1 r1)
       (HSemAction: SemAction (cont r1) readRegs2 newRegs2 calls2 r2)
@@ -1134,7 +1134,7 @@ Section Semantics.
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 (r2: type k2)
       (HDisjRegs: DisjKey newRegs1 newRegs2)
-      (HDisjCalls: DisjKey calls1 calls2)
+      (* (HDisjCalls: DisjKey calls1 calls2) *)
       (HFalse: evalExpr p = false)
       (HAction: SemAction a' readRegs1 newRegs1 calls1 r1)
       (HSemAction: SemAction (cont r1) readRegs2 newRegs2 calls2 r2)
@@ -1279,7 +1279,7 @@ Section Semantics.
     match a with
     | MCall m s e c =>
       exists mret pcalls,
-      key_not_In m pcalls /\
+      (* key_not_In m pcalls /\ *)
       SemAction (c mret) reads news pcalls retC /\
       calls = (m, (existT _ _ (evalExpr e, mret))) :: pcalls
     | LetExpr _ e cont =>
@@ -1287,7 +1287,7 @@ Section Semantics.
     | LetAction _ a cont =>
       exists reads1 news1 calls1 reads2 news2 calls2 r1,
       DisjKey news1 news2 /\
-      DisjKey calls1 calls2 /\  
+      (* DisjKey calls1 calls2 /\   *)
       SemAction a reads1 news1 calls1 r1 /\
       SemAction (cont r1) reads2 news2 calls2 retC /\
       reads = reads1 ++ reads2 /\
@@ -1310,7 +1310,7 @@ Section Semantics.
     | IfElse p _ aT aF c =>
       exists reads1 news1 calls1 reads2 news2 calls2 r1,
       DisjKey news1 news2 /\
-      DisjKey calls1 calls2 /\
+      (* DisjKey calls1 calls2 /\ *)
       match evalExpr p with
       | true =>
         SemAction aT reads1  news1 calls1 r1 /\
@@ -1495,10 +1495,86 @@ Fixpoint getAllMethods m :=
 
 Notation FullLabel := (RegsT * (RuleOrMeth * MethsT))%type.
 
-Definition MatchingExecCalls (lexec lcall: list FullLabel) mcall :=
-  forall f, InCall f lexec ->
-            In (fst f) (map fst (getAllMethods mcall)) ->
-            ~ In (fst f) (getHidden mcall) /\ InExec f lcall.
+
+Lemma SignT_dec: forall k1 k2 (s1 s2: SignT (k1, k2)), {s1 = s2} + {s1 <> s2}.
+Proof.
+  intros.
+  destruct s1, s2.
+  simpl in *.
+  apply prod_dec; simpl; auto; apply isEq.
+Qed.
+
+Lemma sigT_SignT_dec: forall s1 s2: (sigT SignT), {s1 = s2} + {s1 <> s2}.
+Proof.
+  intros.
+  destruct s1, s2.
+  destruct (Signature_dec x x0); subst.
+  - destruct (SignT_dec s s0); subst.
+    + left; reflexivity.
+    + right; intro.
+      apply EqdepFacts.eq_sigT_eq_dep in H.
+      apply (Eqdep_dec.eq_dep_eq_dec (Signature_dec)) in H.
+      tauto.
+  - right; intro.
+    inversion H.
+    tauto.
+Qed.
+
+Lemma MethT_dec: forall s1 s2: MethT, {s1 = s2} + {s1 <> s2}.
+Proof.
+  intros.
+  destruct s1, s2.
+  apply prod_dec.
+  - apply string_dec.
+  - apply sigT_SignT_dec.
+Qed.
+
+Fixpoint getNumFromCalls (f : MethT) (l : MethsT) : Z :=
+  match l with
+  |g::l' => match MethT_dec f g with
+            | left _ => 1%Z + (getNumFromCalls f l')
+            | right _ => (getNumFromCalls f l')
+            end
+  |nil => 0
+  end.
+
+Definition getNumCalls (f : MethT) (l : list FullLabel) :=
+  getNumFromCalls f (concat (map (fun x => (snd (snd x))) l)).
+
+Fixpoint getNumFromExecs (f : MethT) (l : list RuleOrMeth) : Z :=
+  match l with
+  |rm::l' => match rm with
+             |Rle _ => (getNumFromExecs f l')
+             |Meth g => match MethT_dec f g with
+                        |left _ => 1%Z + (getNumFromExecs f l')
+                        |right _ => (getNumFromExecs f l')
+                        end
+             end
+  |nil => 0
+  end.
+
+Definition getNumExecs (f : MethT) (l : list FullLabel) :=
+  getNumFromExecs f (map (fun x => fst (snd x)) l).
+
+Definition getListFullLabel_diff (f : MethT) (l : list FullLabel) :=
+  ((getNumExecs f l) - (getNumCalls f l))%Z.
+
+Definition MatchingExecCalls_Base (l : list FullLabel) m :=
+  forall f,
+    In (fst f) (map fst (getMethods m)) ->
+    (getNumCalls f l <= getNumExecs f l)%Z.
+
+Definition MatchingExecCalls_Concat (lcall lexec : list FullLabel) mexec :=
+  forall f,
+    (getNumCalls f lcall <> 0%Z) ->
+    In (fst f) (map fst (getAllMethods mexec)) ->
+    ~In (fst f) (getHidden mexec) /\
+    (getNumCalls f lcall + getNumCalls f lexec <= getNumExecs f lexec)%Z.
+
+(* Definition MatchingExecCalls (lexec lcall: list FullLabel) mcall := *)
+(*   forall f, InCall f lexec -> *)
+(*             In (fst f) (map fst (getAllMethods mcall)) -> *)
+(*             ~ In (fst f) (getHidden mcall) /\ InExec f lcall. *)
 
 Section BaseModule.
   Variable m: BaseModule.
@@ -1521,7 +1597,7 @@ Section BaseModule.
                                           | Rle _ => False
                                           | _ => True
                                           end)
-            (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False)
+            (* (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False) *)
             (HSubstep: Substeps ls):
       Substeps l
   | AddMeth (HRegs: getKindAttr o = getKindAttr (getRegisters m))
@@ -1535,9 +1611,9 @@ Section BaseModule.
                                (getKindAttr (getRegisters m)))
             l ls (HLabel: l = (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
-            (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False)
+            (* (HNoCall: forall f, In f cs -> forall v2, InCall (fst f,v2) ls -> False) *)
             (HNoCycle: ~In fn (map fst cs))
-            (HNoExec: InExec (fn, existT _ _ (argV, retV)) ls -> False)
+            (* (HNoExec: InExec (fn, existT _ _ (argV, retV)) ls -> False) *)
             (HSubsteps: Substeps ls):
       Substeps l.
 
@@ -1580,28 +1656,29 @@ Section BaseModule.
 End BaseModule.
 
 Inductive Step: Mod -> RegsT -> list FullLabel -> Prop :=
-| BaseStep m o l (HSubsteps: Substeps m o l) (HMatching: MatchingExecCalls l l (Base m)):
+| BaseStep m o l (HSubsteps: Substeps m o l) (HMatching: MatchingExecCalls_Base l  m):
     Step (Base m) o l
 | HideMethStep m s o l (HStep: Step m o l)
-               (HHidden: forall v, In s (map fst (getAllMethods m)) -> InExec (s, v) l -> InCall (s, v) l):
+               (* (HHidden: forall v, In s (map fst (getAllMethods m)) -> InExec (s, v) l -> InCall (s, v) l): *)
+               (Hidden : forall s, In s (map fst (getAllMethods m)) -> (forall v, (getListFullLabel_diff (s, v) l = 0%Z))):
     Step (HideMeth m s) o l
 | ConcatModStep m1 m2 o1 o2 l1 l2
                 (HStep1: Step m1 o1 l1)
                 (HStep2: Step m2 o2 l2)
-                (HMatching1: MatchingExecCalls l1 l2 m2)
-                (HMatching2: MatchingExecCalls l2 l1 m1)
+                (HMatching1: MatchingExecCalls_Concat l1 l2 m2)
+                (HMatching2: MatchingExecCalls_Concat l2 l1 m1)
                 (HNoRle: forall x y, In x l1 -> In y l2 -> match fst (snd x), fst (snd y) with
                                                            | Rle _, Rle _ => False
                                                            | _, _ => True
                                                            end)
-                (HNoCall: forall f, InCall f l1 -> forall v2, InCall (fst f, v2) l2 -> False)
+                (* (HNoCall: forall f, InCall f l1 -> forall v2, InCall (fst f, v2) l2 -> False) *)
                 o l
                 (HRegs: o = o1 ++ o2)
                 (HLabels: l = l1 ++ l2):
     Step (ConcatMod m1 m2) o l.
 
 Inductive PStep: Mod -> RegsT -> list FullLabel -> Prop :=
-| PBaseStep m o l (HPSubsteps: PSubsteps m o l) (HMatching: MatchingExecCalls l l (Base m)):
+| PBaseStep m o l (HPSubsteps: PSubsteps m o l) (HMatching: MatchingExecCalls_Base l m):
     PStep (Base m) o l
 | PHideMethStep m s o l (HPStep: PStep m o l)
                 (HHidden: forall v, In s (map fst (getAllMethods m)) -> InExec (s, v) l -> InCall (s, v) l):
@@ -1609,8 +1686,8 @@ Inductive PStep: Mod -> RegsT -> list FullLabel -> Prop :=
 | PConcatModStep m1 m2 o1 o2 l1 l2
                  (HPStep1: PStep m1 o1 l1)
                  (HPStep2: PStep m2 o2 l2)
-                 (HMatching1: MatchingExecCalls l1 l2 m2)
-                 (HMatching2: MatchingExecCalls l2 l1 m1)
+                 (HMatching1: MatchingExecCalls_Concat l1 l2 m2)
+                 (HMatching2: MatchingExecCalls_Concat l2 l1 m1)
                  (HNoRle: forall x y, In x l1 -> In y l2 -> match fst (snd x), fst (snd y) with
                                                             | Rle _, Rle _ => False
                                                             | _, _ => True
@@ -1705,73 +1782,6 @@ Definition filterExecs f m (l: list FullLabel) :=
 (*   ((exists rle, In (Rle rle) (map (fun x => fst (snd x)) l2)) -> *)
 (*    (exists rle, In (Rle rle) (map (fun x => fst (snd x)) l1))). *)
 
-
-Lemma SignT_dec: forall k1 k2 (s1 s2: SignT (k1, k2)), {s1 = s2} + {s1 <> s2}.
-Proof.
-  intros.
-  destruct s1, s2.
-  simpl in *.
-  apply prod_dec; simpl; auto; apply isEq.
-Qed.
-
-Lemma sigT_SignT_dec: forall s1 s2: (sigT SignT), {s1 = s2} + {s1 <> s2}.
-Proof.
-  intros.
-  destruct s1, s2.
-  destruct (Signature_dec x x0); subst.
-  - destruct (SignT_dec s s0); subst.
-    + left; reflexivity.
-    + right; intro.
-      apply EqdepFacts.eq_sigT_eq_dep in H.
-      apply (Eqdep_dec.eq_dep_eq_dec (Signature_dec)) in H.
-      tauto.
-  - right; intro.
-    inversion H.
-    tauto.
-Qed.
-
-Lemma MethT_dec: forall s1 s2: MethT, {s1 = s2} + {s1 <> s2}.
-Proof.
-  intros.
-  destruct s1, s2.
-  apply prod_dec.
-  - apply string_dec.
-  - apply sigT_SignT_dec.
-Qed.
-
-(* Definition getNumCalls (f : MethT) (l : list FullLabel) := *)
-(*   (length (filter (fun x => (getBool (MethT_dec f x))) (concat (map (fun x => (snd (snd x))) l)))). *)
-
-Fixpoint getNumFromCalls (f : MethT) (l : MethsT) : Z :=
-  match l with
-  |g::l' => match MethT_dec f g with
-            | left _ => 1%Z + (getNumFromCalls f l')
-            | right _ => (getNumFromCalls f l')
-            end
-  |nil => 0
-  end.
-
-Definition getNumCalls (f : MethT) (l : list FullLabel) :=
-  getNumFromCalls f (concat (map (fun x => (snd (snd x))) l)).
-
-Fixpoint getNumFromExecs (f : MethT) (l : list RuleOrMeth) : Z :=
-  match l with
-  |rm::l' => match rm with
-             |Rle _ => (getNumFromExecs f l')
-             |Meth g => match MethT_dec f g with
-                        |left _ => 1%Z + (getNumFromExecs f l')
-                        |right _ => (getNumFromExecs f l')
-                        end
-             end
-  |nil => 0
-  end.
-
-Definition getNumExecs (f : MethT) (l : list FullLabel) :=
-  getNumFromExecs f (map (fun x => fst (snd x)) l).
-
-Definition getListFullLabel_diff (f : MethT) (l : list FullLabel) :=
-  ((getNumExecs f l) - (getNumCalls f l))%Z.
-
 Definition WeakInclusion (l1 : list FullLabel) (l2 : list FullLabel) : Prop :=
   (forall f, getListFullLabel_diff f l1 = getListFullLabel_diff f l2) /\
   ((exists rle, In (Rle rle) (map (fun x => fst (snd x)) l2)) ->
@@ -1853,12 +1863,12 @@ Definition flatten m := createHide (getFlat m) (getHidden m).
 
 Definition PStepSubstitute m o l :=
   PSubsteps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
-  MatchingExecCalls l l (Base (getFlat m)) /\
+  MatchingExecCalls_Base l (getFlat m) /\
   (forall s v, In s (map fst (getAllMethods m)) -> In s (getHidden m) -> InExec (s, v) l -> InCall (s, v) l).
 
 Definition StepSubstitute m o l :=
   Substeps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
-  MatchingExecCalls l l (Base (getFlat m)) /\
+  MatchingExecCalls_Base l (getFlat m) /\
   (forall s v, In s (map fst (getAllMethods m)) -> In s (getHidden m) -> InExec (s, v) l -> InCall (s, v) l).
 
 

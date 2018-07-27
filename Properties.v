@@ -4,6 +4,7 @@ Import ListNotations.
 Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
+Require Import ZArith.
 
 Section evalExpr.
 
@@ -95,6 +96,181 @@ Section evalExpr.
 End evalExpr.
 
 
+Lemma getNumCalls_nil f :
+  getNumCalls f nil = 0%Z.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma getNumExecs_nil f :
+  getNumExecs f nil = 0%Z.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma getNumFromCalls_eq_cons f g l :
+  f = g ->
+  getNumFromCalls f (g::l) = (1 + (getNumFromCalls f l))%Z.
+Proof.
+  intro;unfold getNumFromCalls; destruct MethT_dec; auto; contradiction.
+Qed.
+
+Lemma getNumFromCalls_neq_cons f g l :
+  f <> g ->
+  getNumFromCalls f (g::l) = getNumFromCalls f l.
+Proof.
+  intro; unfold getNumFromCalls; destruct MethT_dec; auto; contradiction.
+Qed.
+Opaque getNumFromCalls.
+
+Lemma getNumFromCalls_app f l1:
+  forall l2,
+  getNumFromCalls f (l1++l2) = (getNumFromCalls f l1 + getNumFromCalls f l2)%Z.
+Proof.
+  induction l1.
+  - simpl; reflexivity.
+  - intros.
+    destruct (MethT_dec f a).
+    + simpl; repeat rewrite getNumFromCalls_eq_cons; auto.
+      rewrite IHl1; ring.
+    + simpl; repeat rewrite getNumFromCalls_neq_cons; auto.
+Qed.
+
+Corollary getNumCalls_app f l1 :
+  forall l2,
+    getNumCalls f (l1 ++ l2) = (getNumCalls f l1 + getNumCalls f l2)%Z.
+Proof.
+  unfold getNumCalls.
+  intro.
+  rewrite map_app, concat_app, getNumFromCalls_app.
+  reflexivity.
+Qed.
+
+Lemma getNumCalls_cons f a l :
+  getNumCalls f (a::l) = ((getNumFromCalls f (snd (snd a))) + getNumCalls f l)%Z.
+Proof.
+  unfold getNumCalls.
+  simpl; rewrite getNumFromCalls_app; reflexivity.
+Qed.
+Transparent getNumFromCalls.
+
+Lemma getNumFromCalls_nonneg f l :
+  (0 <= getNumFromCalls f l)%Z.
+Proof.
+  induction l.
+  - unfold getNumFromCalls; reflexivity.
+  - destruct (MethT_dec f a);[rewrite getNumFromCalls_eq_cons; auto| rewrite getNumFromCalls_neq_cons; auto].
+    Omega.omega.
+Qed.
+
+Lemma getNumCalls_nonneg f l:
+  (0 <= (getNumCalls f l))%Z.
+Proof.
+  induction l.
+  - rewrite getNumCalls_nil;reflexivity.
+  - rewrite getNumCalls_cons.
+    specialize (getNumFromCalls_nonneg f (snd (snd a))) as B1.
+    Omega.omega.
+Qed.
+    
+Lemma getNumFromExecs_eq_cons f g l :
+  f = g ->
+  getNumFromExecs f ((Meth g)::l) = (1 + (getNumFromExecs f l))%Z.
+Proof.
+  intros; simpl; destruct (MethT_dec f g); auto; contradiction.
+Qed.
+
+Lemma getNumFromExecs_neq_cons f g l :
+  f <> g ->
+  getNumFromExecs f ((Meth g)::l) = (getNumFromExecs f l).
+Proof.
+  intros; simpl; destruct (MethT_dec f g); auto; contradiction.
+Qed.
+
+Lemma getNumFromExecs_Rle_cons f rn l:
+  getNumFromExecs f ((Rle rn)::l) = (getNumFromExecs f l).
+Proof.
+  intros; simpl; reflexivity.
+Qed.
+
+Opaque getNumFromExecs.
+Lemma getNumFromExecs_app f l1:
+  forall l2,
+    getNumFromExecs f (l1++l2) = (getNumFromExecs f l1 + getNumFromExecs f l2)%Z.
+Proof.
+  induction l1.
+  - simpl; reflexivity.
+  - intros; destruct a;[|destruct (MethT_dec f f0)];simpl.
+    + repeat rewrite getNumFromExecs_Rle_cons; apply IHl1.
+    + repeat rewrite getNumFromExecs_eq_cons; auto.
+      rewrite IHl1; ring.
+    + repeat rewrite getNumFromExecs_neq_cons; auto.
+Qed.
+Transparent getNumFromExecs.
+
+Corollary getNumExecs_app f l1 :
+  forall l2,
+    getNumExecs f (l1++l2) = (getNumExecs f l1 + getNumExecs f l2)%Z.
+Proof.
+  unfold getNumExecs.
+  intros;rewrite map_app, getNumFromExecs_app; reflexivity.
+Qed.
+
+Lemma getNumFromExecs_nonneg f l:
+  (0 <= (getNumFromExecs f l))%Z.
+Proof.
+  induction l.
+  - simpl; reflexivity.
+  - destruct a;[rewrite getNumFromExecs_Rle_cons
+               |destruct (MethT_dec f f0);[rewrite getNumFromExecs_eq_cons
+                                          |rewrite getNumFromExecs_neq_cons]]; auto; Omega.omega.
+Qed.
+
+Corollary getNumExecs_nonneg f l :
+  (0 <= (getNumExecs f l))%Z.
+Proof.
+  unfold getNumExecs;apply getNumFromExecs_nonneg.
+Qed.
+
+Lemma getNumFromCalls_perm f l l':
+  l [=] l' ->
+  getNumFromCalls f l = getNumFromCalls f l'.
+Proof.
+  induction 1; auto.
+  - destruct (MethT_dec f x);[repeat rewrite getNumFromCalls_eq_cons| repeat rewrite getNumFromCalls_neq_cons];auto.
+    rewrite IHPermutation; reflexivity.
+  - destruct (MethT_dec f x), (MethT_dec f y).
+    + repeat rewrite getNumFromCalls_eq_cons; auto.
+    + rewrite getNumFromCalls_neq_cons, getNumFromCalls_eq_cons, getNumFromCalls_eq_cons, getNumFromCalls_neq_cons ; auto.
+    + rewrite getNumFromCalls_eq_cons, getNumFromCalls_neq_cons, getNumFromCalls_neq_cons, getNumFromCalls_eq_cons ; auto.
+    + repeat rewrite getNumFromCalls_neq_cons; auto.
+  - rewrite IHPermutation1, IHPermutation2; reflexivity.
+Qed.
+
+
+Lemma getNumFromExecs_perm f l l':
+  l [=] l' ->
+  getNumFromExecs f l = getNumFromExecs f l'.
+Proof.
+  induction 1; auto.
+  - destruct x;[repeat rewrite getNumFromExecs_Rle_cons;rewrite IHPermutation; reflexivity|].
+    destruct (MethT_dec f f0);[repeat rewrite getNumFromExecs_eq_cons| repeat rewrite getNumFromExecs_neq_cons];auto.
+    rewrite IHPermutation; reflexivity.
+  - destruct x, y.
+    + repeat rewrite getNumFromExecs_Rle_cons; reflexivity.
+    + destruct (MethT_dec f f0).
+      * rewrite getNumFromExecs_eq_cons, getNumFromExecs_Rle_cons, getNumFromExecs_Rle_cons, getNumFromExecs_eq_cons; auto.
+      * rewrite getNumFromExecs_neq_cons, getNumFromExecs_Rle_cons, getNumFromExecs_Rle_cons, getNumFromExecs_neq_cons; auto.
+    + destruct (MethT_dec f f0).
+      * rewrite getNumFromExecs_eq_cons, getNumFromExecs_Rle_cons, getNumFromExecs_Rle_cons, getNumFromExecs_eq_cons; auto.
+      * rewrite getNumFromExecs_neq_cons, getNumFromExecs_Rle_cons, getNumFromExecs_Rle_cons, getNumFromExecs_neq_cons; auto.
+    + destruct (MethT_dec f f0), (MethT_dec f f1).
+      * repeat rewrite getNumFromExecs_eq_cons; auto.
+      * rewrite getNumFromExecs_neq_cons, getNumFromExecs_eq_cons, getNumFromExecs_eq_cons, getNumFromExecs_neq_cons; auto.
+      * rewrite getNumFromExecs_eq_cons, getNumFromExecs_neq_cons, getNumFromExecs_neq_cons, getNumFromExecs_eq_cons; auto.
+      * repeat rewrite getNumFromExecs_neq_cons; auto.
+  - eauto using eq_trans.
+Qed.
 
 Lemma UpdRegs_same: forall u o o', UpdRegs u o o' -> UpdRegs' u o o'.
 Proof.
@@ -106,38 +282,38 @@ Proof.
 Qed.
 
 
-Lemma SignT_dec: forall k1 k2 (s1 s2: SignT (k1, k2)), {s1 = s2} + {s1 <> s2}.
-Proof.
-  intros.
-  destruct s1, s2.
-  simpl in *.
-  apply prod_dec; simpl; auto; apply isEq.
-Qed.
+(* Lemma SignT_dec: forall k1 k2 (s1 s2: SignT (k1, k2)), {s1 = s2} + {s1 <> s2}. *)
+(* Proof. *)
+(*   intros. *)
+(*   destruct s1, s2. *)
+(*   simpl in *. *)
+(*   apply prod_dec; simpl; auto; apply isEq. *)
+(* Qed. *)
 
-Lemma sigT_SignT_dec: forall s1 s2: (sigT SignT), {s1 = s2} + {s1 <> s2}.
-Proof.
-  intros.
-  destruct s1, s2.
-  destruct (Signature_dec x x0); subst.
-  - destruct (SignT_dec s s0); subst.
-    + left; reflexivity.
-    + right; intro.
-      apply EqdepFacts.eq_sigT_eq_dep in H.
-      apply (Eqdep_dec.eq_dep_eq_dec (Signature_dec)) in H.
-      tauto.
-  - right; intro.
-    inversion H.
-    tauto.
-Qed.
+(* Lemma sigT_SignT_dec: forall s1 s2: (sigT SignT), {s1 = s2} + {s1 <> s2}. *)
+(* Proof. *)
+(*   intros. *)
+(*   destruct s1, s2. *)
+(*   destruct (Signature_dec x x0); subst. *)
+(*   - destruct (SignT_dec s s0); subst. *)
+(*     + left; reflexivity. *)
+(*     + right; intro. *)
+(*       apply EqdepFacts.eq_sigT_eq_dep in H. *)
+(*       apply (Eqdep_dec.eq_dep_eq_dec (Signature_dec)) in H. *)
+(*       tauto. *)
+(*   - right; intro. *)
+(*     inversion H. *)
+(*     tauto. *)
+(* Qed. *)
 
-Lemma MethT_dec: forall s1 s2: MethT, {s1 = s2} + {s1 <> s2}.
-Proof.
-  intros.
-  destruct s1, s2.
-  apply prod_dec.
-  - apply string_dec.
-  - apply sigT_SignT_dec.
-Qed.
+(* Lemma MethT_dec: forall s1 s2: MethT, {s1 = s2} + {s1 <> s2}. *)
+(* Proof. *)
+(*   intros. *)
+(*   destruct s1, s2. *)
+(*   apply prod_dec. *)
+(*   - apply string_dec. *)
+(*   - apply sigT_SignT_dec. *)
+(* Qed. *)
 
 Lemma getKindAttr_map_fst A (P Q: A -> Type)
   : forall (l2: list (Attribute (sigT P))) (l1: list (Attribute (sigT Q))),
@@ -682,8 +858,8 @@ Section SplitJoin.
     Step m1 (filterRegs id m1 o) (filterExecs id m1 l) /\
     Step m2 (filterRegs id m2 o) (filterExecs id m2 l) /\
     o = filterRegs id m1 o ++ filterRegs id m2 o /\
-    MatchingExecCalls (filterExecs id m1 l) (filterExecs id m2 l) m2 /\
-    MatchingExecCalls (filterExecs id m2 l) (filterExecs id m1 l) m1 /\
+    MatchingExecCalls_Concat (filterExecs id m1 l) (filterExecs id m2 l) m2 /\
+    MatchingExecCalls_Concat (filterExecs id m2 l) (filterExecs id m1 l) m1 /\
     (forall x y : FullLabel,
         In x (filterExecs id m1 l) ->
         In y (filterExecs id m2 l) ->
@@ -694,7 +870,7 @@ Section SplitJoin.
                    end
         | Meth _ => True
         end) /\
-    (forall f, InCall f (filterExecs id m1 l) -> forall v2, InCall (fst f,v2) (filterExecs id m2 l) -> False) /\
+    (* (forall f, InCall f (filterExecs id m1 l) -> forall v2, InCall (fst f,v2) (filterExecs id m2 l) -> False) /\ *)
     l = filterExecs id m1 l ++ filterExecs id m2 l.
   Proof.
     intros H.
@@ -705,7 +881,7 @@ Section SplitJoin.
     rewrite DisjRegs_1_id with (l2 := getAllRegisters m2) (o1 := o1),
                                DisjRegs_2_id with (l1 := getAllRegisters m1) (o2 := o2); auto.
     rewrite DisjMeths_1_id with (m2 := m2) (o1 := o1) (o2 := o2), DisjMeths_2_id with (m1 := m1) (o1 := o1) (o2 := o2); auto.
-    Opaque MatchingExecCalls.
+    Opaque MatchingExecCalls_Concat.
     repeat split; auto.
   Qed.
 
@@ -762,8 +938,8 @@ Section SplitJoin.
     o = filterRegs id m1 o ++ filterRegs id m2 o /\
     mapProp
       (fun l =>
-         MatchingExecCalls (filterExecs id m1 l) (filterExecs id m2 l) m2 /\
-         MatchingExecCalls (filterExecs id m2 l) (filterExecs id m1 l) m1 /\
+         MatchingExecCalls_Concat (filterExecs id m1 l) (filterExecs id m2 l) m2 /\
+         MatchingExecCalls_Concat (filterExecs id m2 l) (filterExecs id m1 l) m1 /\
          (forall x y : FullLabel,
              In x (filterExecs id m1 l) ->
              In y (filterExecs id m2 l) ->
@@ -774,11 +950,11 @@ Section SplitJoin.
                         end
              | Meth _ => True
              end) /\
-         (forall f, InCall f (filterExecs id m1 l) -> forall v2, InCall (fst f,v2) (filterExecs id m2 l) -> False) /\
+         (* (forall f, InCall f (filterExecs id m1 l) -> forall v2, InCall (fst f,v2) (filterExecs id m2 l) -> False) /\ *)
          l = filterExecs id m1 l ++ filterExecs id m2 l) ls /\
   map fst o = map fst (getAllRegisters (ConcatMod m1 m2)).
   Proof.
-    Opaque MatchingExecCalls.
+    Opaque MatchingExecCalls_Concat.
     induction 1; subst; simpl.
     - unfold filterRegs, filterExecs; simpl.
       rewrite ?map_app, ?filter_app.
@@ -813,21 +989,21 @@ Section SplitJoin.
                                         o') as sth_o'.
           simpl in sth_o, sth_o'.
           rewrite <- ?sth_o, <- ?sth_o'.
-          rewrite H13; auto.
-        * unfold filterRegs, id in H15.
-          rewrite filter_In in H15; dest.
+          rewrite H12; auto.
+        * unfold filterRegs, id in H14.
+          rewrite filter_In in H14; dest.
           simpl in *.
           destruct (in_dec string_dec s (map fst (getAllRegisters m1))); [simpl in *| discriminate].
-          specialize (H14 _ _ H15).
-          destruct H14; [left; dest | right].
+          specialize (H13 _ _ H14).
+          destruct H13; [left; dest | right].
           -- exists x; repeat split; auto.
              eapply Step_upd_1; eauto.
           -- split; try intro; dest.
-             ++ unfold filterExecs, id in H17.
-                rewrite in_map_iff in H17; dest.
-                rewrite filter_In in H20; dest.
-                setoid_rewrite in_map_iff at 1 in H14.
-                clear - H14 H17 H20 H19.
+             ++ unfold filterExecs, id in H16.
+                rewrite in_map_iff in H16; dest.
+                rewrite filter_In in H19; dest.
+                setoid_rewrite in_map_iff at 1 in H13.
+                clear - H13 H16 H19 H18.
                 firstorder fail.
              ++ unfold filterRegs, id.
                 rewrite filter_In.
@@ -842,21 +1018,21 @@ Section SplitJoin.
                                         o') as sth_o'.
           simpl in sth_o, sth_o'.
           rewrite <- ?sth_o, <- ?sth_o'.
-          rewrite H13; auto.
-        * unfold filterRegs, id in H15.
-          rewrite filter_In in H15; dest.
+          rewrite H12; auto.
+        * unfold filterRegs, id in H14.
+          rewrite filter_In in H14; dest.
           simpl in *.
           destruct (in_dec string_dec s (map fst (getAllRegisters m2))); [simpl in *| discriminate].
-          specialize (H14 _ _ H15).
-          destruct H14; [left; dest | right].
+          specialize (H13 _ _ H14).
+          destruct H13; [left; dest | right].
           -- exists x; repeat split; auto.
              eapply Step_upd_2; eauto.
           -- split; try intro; dest.
-             ++ unfold filterExecs, id in H17.
-                rewrite in_map_iff in H17; dest.
-                rewrite filter_In in H20; dest.
-                setoid_rewrite in_map_iff at 1 in H14.
-                clear - H14 H17 H20 H19.
+             ++ unfold filterExecs, id in H16.
+                rewrite in_map_iff in H16; dest.
+                rewrite filter_In in H19; dest.
+                setoid_rewrite in_map_iff at 1 in H13.
+                clear - H13 H16 H19 H18.
                 firstorder fail.
              ++ unfold filterRegs, id.
                 rewrite filter_In.
@@ -864,14 +1040,14 @@ Section SplitJoin.
                 destruct (in_dec string_dec s (map fst (getAllRegisters m2))); simpl; auto.
       + apply UpdRegs_same in HUpdRegs.
         unfold UpdRegs' in *; dest.
-        rewrite H13 in H4.
+        rewrite H12 in H4.
         simpl in H4.
         rewrite map_app in H4.
         unfold filterRegs, id.
         apply filter_map_app_sameKey; auto.
       + apply UpdRegs_same in HUpdRegs.
         unfold UpdRegs' in *; dest.
-        rewrite H13 in H4.
+        rewrite H12 in H4.
         simpl in H4.
         auto.
   Qed.
@@ -879,13 +1055,13 @@ Section SplitJoin.
   Lemma JoinStep o1 o2 l1 l2:
     Step m1 o1 l1 ->
     Step m2 o2 l2 ->
-    (MatchingExecCalls l1 l2 m2) ->
-    (MatchingExecCalls l2 l1 m1) ->
+    (MatchingExecCalls_Concat l1 l2 m2) ->
+    (MatchingExecCalls_Concat l2 l1 m1) ->
     (forall x1 x2, In x1 l1 -> In x2 l2 -> match fst (snd x1), fst (snd x2) with
                                            | Rle _, Rle _ => False
                                            | _, _ => True
                                            end) ->
-    (forall f, InCall f l1 -> forall v2, InCall (fst f,v2) l2 -> False) ->
+    (* (forall f, InCall f l1 -> forall v2, InCall (fst f,v2) l2 -> False) -> *)
     Step (ConcatMod m1 m2) (o1 ++ o2) (l1 ++ l2).
   Proof.
     intros.
@@ -896,8 +1072,8 @@ Section SplitJoin.
     forall o1 o2,
     Trace m1 o1 (map fst l) ->
     Trace m2 o2 (map snd l) ->
-    (mapProp2 (fun l1 l2 => MatchingExecCalls l1 l2 m2) l) ->
-    (mapProp2 (fun l1 l2 => MatchingExecCalls l2 l1 m1) l) ->
+    (mapProp2 (fun l1 l2 => MatchingExecCalls_Concat l1 l2 m2) l) ->
+    (mapProp2 (fun l1 l2 => MatchingExecCalls_Concat l2 l1 m1) l) ->
     (mapProp2 (fun l1 l2 =>
                  (forall x1 x2 : RegsT * (RuleOrMeth * MethsT),
                      In x1 l1 -> In x2 l2 -> match fst (snd x1) with
@@ -907,9 +1083,9 @@ Section SplitJoin.
                                                         end
                                              | Meth _ => True
                                              end)) l) ->
-    (mapProp2 (fun l1 l2 =>
-                 (forall f, InCall f l1 ->
-                            forall v2, InCall (fst f,v2) l2 -> False)) l) ->
+    (* (mapProp2 (fun l1 l2 => *)
+    (*              (forall f, InCall f l1 -> *)
+    (*                         forall v2, InCall (fst f,v2) l2 -> False)) l) -> *)
     Trace (ConcatMod m1 m2) (o1 ++ o2) (map (fun x => fst x ++ snd x) l).
   Proof.
     induction l; simpl; intros.
@@ -920,7 +1096,7 @@ Section SplitJoin.
     - destruct a; simpl in *; dest.
       inv H; [discriminate| ]; inv H0; [discriminate|].
       inv HTrace; inv HTrace0.
-      specialize (IHl _ _ HOldTrace HOldTrace0 H8 H7 H6).
+      specialize (IHl _ _ HOldTrace HOldTrace0 H6 H5 H4).
       econstructor 2 with (o := o ++ o0); eauto.
       eapply JoinStep; eauto.
       unfold UpdRegs in *; dest.
@@ -928,25 +1104,25 @@ Section SplitJoin.
       + rewrite ?map_app.
         congruence.
       + intros.
-        rewrite in_app_iff in H11.
-        destruct H11.
-        * specialize (H10 _ _ H11).
+        rewrite in_app_iff in H9.
+        destruct H9.
+        * specialize (H8 _ _ H9).
           rewrite ?map_app.
           repeat setoid_rewrite in_app_iff.
-          destruct H10; [left; dest | right; dest].
+          destruct H8; [left; dest | right; dest].
           -- exists x; split; auto.
           -- split; auto.
              intro.
              dest.
-             destruct H13; [firstorder fail|].
-             rewrite in_map_iff in H14; dest.
+             destruct H11; [firstorder fail|].
+             rewrite in_map_iff in H12; dest.
              destruct x0.
              subst.
              simpl in *.
-             pose proof (Step_upd_SubList_key HStep0 _ _ _ H13 H15).
-             pose proof (Step_read HStep _ _ H12).
+             pose proof (Step_upd_SubList_key HStep0 _ _ _ H11 H13).
+             pose proof (Step_read HStep _ _ H10).
              firstorder fail.
-        * specialize (H0 _ _ H11).
+        * specialize (H0 _ _ H9).
           rewrite ?map_app.
           repeat setoid_rewrite in_app_iff.
           destruct H0; [left; dest | right; dest].
@@ -954,13 +1130,13 @@ Section SplitJoin.
           -- split; auto.
              intro.
              dest.
-             destruct H13; [|firstorder fail].
-             rewrite in_map_iff in H14; dest.
+             destruct H11; [|firstorder fail].
+             rewrite in_map_iff in H12; dest.
              destruct x0.
              subst.
              simpl in *.
-             pose proof (Step_upd_SubList_key HStep _ _ _ H13 H15).
-             pose proof (Step_read HStep0 _ _ H12).
+             pose proof (Step_upd_SubList_key HStep _ _ _ H11 H13).
+             pose proof (Step_read HStep0 _ _ H10).
              firstorder fail.
   Qed.
 
@@ -969,8 +1145,8 @@ Section SplitJoin.
       length l1 = length l2 ->
       Trace m1 o1 l1 ->
       Trace m2 o2 l2 ->
-      (mapProp_len (fun l1 l2 => MatchingExecCalls l1 l2 m2) l1 l2) ->
-      (mapProp_len (fun l1 l2 => MatchingExecCalls l2 l1 m1) l1 l2) ->
+      (mapProp_len (fun l1 l2 => MatchingExecCalls_Concat l1 l2 m2) l1 l2) ->
+      (mapProp_len (fun l1 l2 => MatchingExecCalls_Concat l2 l1 m1) l1 l2) ->
       (mapProp_len (fun l1 l2 =>
                       (forall x1 x2 : RegsT * (RuleOrMeth * MethsT),
                           In x1 l1 -> In x2 l2 -> match fst (snd x1) with
@@ -980,8 +1156,8 @@ Section SplitJoin.
                                                              end
                                                   | Meth _ => True
                                                   end)) l1 l2) ->
-      (mapProp_len (fun l1 l2 =>
-                      (forall f, InCall f l1 -> forall v2, InCall (fst f,v2) l2 -> False)) l1 l2) ->
+      (* (mapProp_len (fun l1 l2 => *)
+      (*                 (forall f, InCall f l1 -> forall v2, InCall (fst f,v2) l2 -> False)) l1 l2) -> *)
       Trace (ConcatMod m1 m2) (o1 ++ o2) (map (fun x => fst x ++ snd x) (zip l1 l2)).
   Proof.
     intros.
@@ -994,8 +1170,8 @@ Section SplitJoin.
       length l1 = length l2 ->
       Trace m1 o1 l1 ->
       Trace m2 o2 l2 ->
-      nthProp2 (fun l1 l2 => MatchingExecCalls l1 l2 m2 /\
-                             MatchingExecCalls l2 l1 m1 /\
+      nthProp2 (fun l1 l2 => MatchingExecCalls_Concat l1 l2 m2 /\
+                             MatchingExecCalls_Concat l2 l1 m1 /\
                              (forall x1 x2 : RegsT * (RuleOrMeth * MethsT),
                                  In x1 l1 -> In x2 l2 -> match fst (snd x1) with
                                                          | Rle _ => match fst (snd x2) with
@@ -1003,8 +1179,8 @@ Section SplitJoin.
                                                                     | Meth _ => True
                                                                     end
                                                          | Meth _ => True
-                                                         end) /\
-                             (forall f, InCall f l1 -> forall v2, InCall (fst f,v2) l2 -> False)) l1 l2 ->
+                                                         end)(*  /\ *)
+                             (* (forall f, InCall f l1 -> forall v2, InCall (fst f,v2) l2 -> False) *)) l1 l2 ->
       Trace (ConcatMod m1 m2) (o1 ++ o2) (map (fun x => fst x ++ snd x) (zip l1 l2)).
   Proof.
     intros ? ? ? ?.
@@ -1109,6 +1285,7 @@ Proof.
   apply Trace_meth_In_map.
 Qed.
 
+
 Lemma InExec_app_iff: forall x l1 l2, InExec x (l1 ++ l2) <-> InExec x l1 \/ InExec x l2.
 Proof.
   unfold InExec in *; intros.
@@ -1124,35 +1301,87 @@ Proof.
   firstorder fail.
 Qed.
 
+Lemma NotInDef_ZeroExecs_Substeps m o ls f :
+  ~In (fst f) (map fst (getMethods m)) ->
+  Substeps m o ls ->
+  (getNumExecs f ls = 0%Z).
+Proof.
+  induction 2.
+  - reflexivity.
+  - rewrite HLabel.
+    unfold getNumExecs in *; simpl; assumption.
+  - rewrite HLabel.
+    unfold getNumExecs.
+    Opaque getNumFromExecs.
+    simpl; destruct (MethT_dec f (fn, existT _ (projT1 fb) (argV, retV))).
+    + destruct f; inv e.
+      apply (in_map fst) in HInMeths; simpl in *; contradiction.
+    + rewrite getNumFromExecs_neq_cons; auto.
+Qed.
+
+Lemma NotInDef_ZeroExecs_Step m o ls f:
+  ~In (fst f) (map fst (getAllMethods m)) ->
+  Step m o ls ->
+  (getNumExecs f ls = 0%Z).
+Proof.
+  induction 2; simpl in *; auto.
+  - apply (NotInDef_ZeroExecs_Substeps _ H HSubsteps).
+  - rewrite HLabels.
+    rewrite getNumExecs_app.
+    rewrite map_app, in_app_iff in H.
+    assert (~In (fst f) (map fst (getAllMethods m1)) /\ ~In (fst f) (map fst (getAllMethods m2)));[tauto|]; dest.
+    rewrite IHStep1, IHStep2; auto.
+Qed.
+
+Lemma Trace_meth_InExec' m o ls:
+  Trace m o ls ->
+  forall f i l, nth_error ls i = Some l ->
+                (0 < getNumExecs f l)%Z ->
+                In (fst f) (map fst (getAllMethods m)).
+Proof.
+  induction 1; subst; simpl; intros; auto; destruct i; simpl in *; try discriminate.
+  - inv H0.
+    destruct (in_dec string_dec (fst f) (map fst (getAllMethods m))); auto.
+    specialize (NotInDef_ZeroExecs_Step _ n HStep) as noExec_zero.
+    apply False_ind; Omega.omega.
+  - eapply IHTrace; eauto.
+Qed.
+
 Lemma Step_meth_InCall_InDef_InExec m o ls:
   Step m o ls ->
   forall (f : MethT),
-    InCall f ls ->
-    In (fst f) (map fst (getAllMethods m)) -> InExec f ls.
+    In (fst f) (map fst (getAllMethods m)) ->
+    (getNumCalls f ls <= getNumExecs f ls)%Z.
+    (* InCall f ls -> *)
+    (* In (fst f) (map fst (getAllMethods m)) -> InExec f ls. *)
 Proof.
   induction 1.
-  - unfold MatchingExecCalls in *.
+  - unfold MatchingExecCalls_Base in *.
     firstorder fail.
   - assumption.
   - subst.
     simpl.
     rewrite map_app.
+    setoid_rewrite getNumCalls_app.
+    setoid_rewrite getNumExecs_app.
     setoid_rewrite in_app_iff.
-    setoid_rewrite InExec_app_iff.
     intros.
-    rewrite InCall_app_iff in H1.
-    unfold MatchingExecCalls in *.
-    repeat match goal with
-           | H: forall (x: MethT), _ |- _ => specialize (H f)
-           end.
-    tauto.
+    unfold MatchingExecCalls_Concat in *.
+    specialize (getNumExecs_nonneg f l1) as P1;specialize (getNumExecs_nonneg f l2) as P2.
+    destruct H1.
+    + specialize (IHStep1 _ H1); destruct (Z.eq_dec (getNumCalls f l2) 0%Z).
+      * rewrite e, Z.add_0_r;Omega.omega.
+      * specialize (HMatching2 _ n H1); dest; Omega.omega.
+    + specialize (IHStep2 _ H1); destruct (Z.eq_dec (getNumCalls f l1) 0%Z).
+      * rewrite e; simpl; Omega.omega.
+      * specialize (HMatching1 _ n H1); dest; Omega.omega.
 Qed.
 
 Lemma Trace_meth_InCall_InDef_InExec m o ls:
   Trace m o ls ->
   forall (f : MethT) (i : nat) (l : list (RegsT * (RuleOrMeth * MethsT))),
-    nth_error ls i = Some l -> InCall f l ->
-    In (fst f) (map fst (getAllMethods m)) -> InExec f l.
+    nth_error ls i = Some l -> In (fst f) (map fst (getAllMethods m)) ->
+    (getNumCalls f l <= getNumExecs f l)%Z.
 Proof.
   induction 1; subst; auto; simpl; intros.
   - destruct i; simpl in *; try congruence.
@@ -1166,13 +1395,14 @@ Lemma Trace_meth_InCall_not_InExec_not_InDef m o ls:
   Trace m o ls ->
   forall (f : MethT) (i : nat) (l : list (RegsT * (RuleOrMeth * MethsT))),
     nth_error ls i = Some l ->
-    InCall f l ->
-    ~ InExec f l ->
+    (* InCall f l -> *)
+    (* ~ InExec f l -> *)
+    ~(getNumCalls f l <= getNumExecs f l)%Z ->
     ~ In (fst f) (map fst (getAllMethods m)).
 Proof.
   intros.
   intro.
-  eapply Trace_meth_InCall_InDef_InExec in H3; eauto.
+  eapply Trace_meth_InCall_InDef_InExec in H2; eauto.
 Qed.
 
 Lemma InCall_dec: forall x l, InCall x l \/ ~ InCall x l.
@@ -1276,7 +1506,7 @@ Section ModularSubstition.
                            TraceInclusion b b' ->
                            TraceInclusion (ConcatMod a b) (ConcatMod a' b').
   Proof.
-    unfold TraceInclusion, WeakInclusion in *; intros.
+    unfold TraceInclusion, WeakInclusion,getListFullLabel_diff in *; intros.
     pose proof (SplitTrace DisjRegs DisjRules DisjMeths H1); dest.
     specialize (@H _ _ H2).
     specialize (@H0 _ _ H3).
@@ -1299,10 +1529,10 @@ Section ModularSubstition.
         try congruence; auto;
           [rewrite H11, H12, H13 in *; dest|
            solve [exfalso; apply (nth_error_len _ _ _ H11 H13 H9)]].
-      Opaque MatchingExecCalls.
+      Opaque MatchingExecCalls_Concat.
       repeat split; intros.
-      Transparent MatchingExecCalls.
-      + unfold MatchingExecCalls in *; intros.
+      Transparent MatchingExecCalls_Concat.
+      + unfold MatchingExecCalls_Concat in *; intros.
         repeat match goal with
                | H : forall (x: MethT), _ |- _ => specialize (H f)
                end; try specialize (DisjMeths (fst f));
@@ -1311,13 +1541,20 @@ Section ModularSubstition.
           try specialize (SameList_b (fst f));
           try specialize (Subset_a (fst f));
           try specialize (Subset_b (fst f)).
-        specialize (Subset_b H25).
-        destruct (InExec_dec f l1); [pose proof (Trace_meth_InExec H _ _ H13 i0) as sth; clear - DisjMeths' sth H25; firstorder fail|].
-        pose proof (proj2 H21 (conj n H24)); dest.
-        specialize (H5 H27 Subset_b); dest.
-        destruct f; simpl in *.
-        clear - H28 H27 H16 H8 SameList_b H5 Subset_b; firstorder fail.
-      + unfold MatchingExecCalls in *; intros.
+        specialize (Subset_b H20).
+        specialize (getNumExecs_nonneg f l1) as P1;
+          rewrite Z.lt_eq_cases in P1; destruct P1;
+            [specialize (Trace_meth_InExec' H _ _ H13 H21) as P2; clear - DisjMeths' P2 H20; tauto|].
+        specialize (getNumCalls_nonneg f l1) as P1; rewrite Z.lt_eq_cases in P1; destruct P1;[|symmetry in H22; contradiction].
+        rewrite <- H21 in H10; simpl in H10.
+        specialize (getNumExecs_nonneg f (filterExecs id a l)) as P1.
+        specialize (getNumCalls_nonneg f (filterExecs id a l)) as P2.
+        assert (getNumCalls f (filterExecs id a l) <> 0%Z);[clear - P1 P2 H22 H10;Omega.omega|].
+        specialize (H5 H23 Subset_b); dest.
+        specialize (conj Subset_b H5) as P3; rewrite SameList_b in P3; dest; split; auto.
+        assert (getNumCalls f l1 <= getNumCalls f (filterExecs id a l))%Z;[clear - H10 P1 P2 H22; Omega.omega|].
+        clear - H24 H8 H27; Omega.omega.
+      + unfold MatchingExecCalls_Concat in *; intros.
         repeat match goal with
                | H : forall (x: MethT), _ |- _ => specialize (H f)
                end; try specialize (DisjMeths (fst f));
@@ -1326,63 +1563,36 @@ Section ModularSubstition.
           try specialize (SameList_b (fst f));
           try specialize (Subset_a (fst f));
           try specialize (Subset_b (fst f)).
-        specialize (Subset_a H25).
-        destruct (InExec_dec f l0); [pose proof (Trace_meth_InExec H0 _ _ H12 i0) as sth; clear - DisjMeths' sth H25; firstorder fail|].
-        pose proof (proj2 H18 (conj n H24)); dest.
-        specialize (H14 H27 Subset_a); dest.
-        clear - H28 H27 H16 H10 SameList_a H14 Subset_a.
-        destruct f; simpl in *.
-        firstorder fail.
+        specialize (Subset_a H20).
+        specialize (getNumExecs_nonneg f l0) as P1;
+          rewrite Z.lt_eq_cases in P1; destruct P1;
+            [specialize (Trace_meth_InExec' H0 _ _ H12 H21) as P2; clear - DisjMeths' P2 H20; tauto|].
+        specialize (getNumCalls_nonneg f l0) as P1; rewrite Z.lt_eq_cases in P1; destruct P1;[|symmetry in H22; contradiction].
+        rewrite <- H21 in H8; simpl in H8.
+        specialize (getNumExecs_nonneg f (filterExecs id b l)) as P1.
+        specialize (getNumCalls_nonneg f (filterExecs id b l)) as P2.
+        assert (getNumCalls f (filterExecs id b l) <> 0%Z);[clear - P1 P2 H22 H8;Omega.omega|].
+        specialize (H14 H23 Subset_a); dest.
+        specialize (conj Subset_a H14) as P3; rewrite SameList_a in P3; dest; split; auto.
+        assert (getNumCalls f l0 <= getNumCalls f (filterExecs id b l))%Z;[clear - H8 P1 P2 H22; Omega.omega|].
+        clear - H24 H10 H27; Omega.omega.
       + destruct x3, x4, p, p0, r1, r2; simpl; auto.
-        pose proof (in_map (fun x => fst (snd x)) _ _ H24) as sth3.
-        pose proof (in_map (fun x => fst (snd x)) _ _ H25) as sth4.
+        pose proof (in_map (fun x => fst (snd x)) _ _ H19) as sth3.
+        pose proof (in_map (fun x => fst (snd x)) _ _ H20) as sth4.
         simpl in *.
         assert (sth5: exists rle, In (Rle rle)
                                      (map (fun x => fst (snd x))
                                           (filterExecs id a l))) by
-            (clear - H23 sth3; firstorder fail).
+            (clear - H18 sth3; firstorder fail).
         assert (sth6: exists rle, In (Rle rle)
                                      (map (fun x => fst (snd x))
                                           (filterExecs id b l))) by
-            (clear - H20 sth4; firstorder fail).
+            (clear - H17 sth4; firstorder fail).
         dest.
         rewrite in_map_iff in *; dest.
-        specialize (H15 _ _ H29 H28).
-        rewrite H27, H26 in *.
+        specialize (H15 _ _ H24 H23).
+        rewrite H22, H21 in *.
         assumption.
-      + destruct (InExec_dec f l1), (InExec_dec (fst f, v2) l0).
-        * pose proof (Trace_meth_InExec H _ _ H13 i0) as sth3.
-          pose proof (Trace_meth_InExec H0 _ _ H12 i1) as sth4.
-          clear - DisjMeths' sth3 sth4.
-          firstorder fail.
-        * pose proof (Trace_meth_InExec H _ _ H13 i0) as i0'.
-          pose proof (Trace_meth_InCall_not_InExec_not_InDef H0 _ H12 H25 n) as n'.
-          pose proof (proj2 (H18 _) (conj n H25)); dest.
-          unfold MatchingExecCalls in *.
-          pose proof (proj2 (H22 _) (or_introl (conj i0 H24))).
-          destruct H28; dest.
-          -- eapply H16; eauto.
-          -- specialize (Subset_a _ i0').
-             specialize (H14 _ H27 Subset_a).
-             specialize (H28 v2).
-             tauto.
-        * pose proof (Trace_meth_InExec H0 _ _ H12 i0) as i0'.
-          pose proof (Trace_meth_InCall_not_InExec_not_InDef H _ H13 H24 n) as n'.
-          pose proof (proj2 (H21 _) (conj n H24)); dest.
-          unfold MatchingExecCalls in *.
-          pose proof (proj2 (H19 _) (or_introl (conj i0 H25))).
-          destruct H28; dest.
-          -- eapply H16; eauto.
-          -- specialize (Subset_b _ i0').
-             specialize (H5 _ H27 Subset_b).
-             destruct f; simpl in *.
-             specialize (H28 s0).
-             tauto.
-        * pose proof (proj2 (H21 _) (conj n H24)); dest.
-          pose proof (proj2 (H18 _) (conj n0 H25)); dest.
-          clear - H27 H29 H16.
-          specialize (H16 f H27 v2).
-          tauto.
     - rewrite map_length.
       rewrite length_zip; congruence.
     - unfold nthProp, nthProp2 in *; intros.
@@ -1395,314 +1605,17 @@ Section ModularSubstition.
         case_eq (nth_error x0 i);
         intros; auto; rewrite H12, H13 in *; simpl in *; intros.
       split; intros.
-      + rewrite ?InExec_app_iff in *.
-        rewrite ?InCall_app_iff in *.
-        rewrite ?Demorgans in *.
-        split; intros; dest.
-        * rewrite H19 in H14, H15; clear H19.
-          rewrite InExec_app_iff, InCall_app_iff in *.
-          assert (~ InCall f (filterExecs id a l) /\
-                  ~ InCall f (filterExecs id b l)) by (clear - H15; tauto).
-          clear H15; dest.
-          specialize (H10 f); specialize (H8 f).
-          split; [tauto|].
-          intro.
-          destruct H14, H26; try tauto.
-          -- destruct (InExec_dec f l0).
-             ++ pose proof (Trace_meth_InExec H0 _ _ H12 i0) as sth.
-                pose proof (Trace_meth_InExec H2 _ _ (map_nth_error _ i ls1 H11) H14)
-                  as sth3.
-                specialize (Subset_b _ sth).
-                clear - sth3 Subset_b DisjMeths; firstorder fail.
-             ++ pose proof (proj2 (H20 _ ) (conj n H26)); dest.
-                tauto.
-          -- destruct (InExec_dec f l1).
-             ++ pose proof (Trace_meth_InExec H _ _ H13 i0) as sth.
-                pose proof (Trace_meth_InExec H3 _ _ (map_nth_error _ i ls1 H11) H14)
-                  as sth3.
-                specialize (Subset_a _ sth).
-                clear - sth3 Subset_a DisjMeths; firstorder fail.
-             ++ pose proof (proj2 (H23 _ ) (conj n H26)); dest.
-                tauto.
-        * assert (~ InCall f l1 /\ ~ InCall f l0) by (clear - H15; tauto).
-          clear H15; dest.
-          rewrite H19.
-          rewrite InExec_app_iff.
-          rewrite InCall_app_iff.
-          specialize (H10 f); specialize (H8 f).
-          split; [tauto|].
-          intro.
-          destruct H14, H27; try tauto.
-          -- destruct (InExec_dec f (filterExecs id b l)).
-             ++ pose proof (Trace_meth_InExec H _ _ H13 H14) as sth.
-                pose proof (Trace_meth_InExec H3 _ _ (map_nth_error _ i ls1 H11) i0)
-                  as sth3.
-                specialize (Subset_a _ sth).
-                clear - sth3 Subset_a DisjMeths; firstorder fail.
-             ++ pose proof (proj1 (H20 _) (conj n H27)); dest.
-                tauto.
-          -- destruct (InExec_dec f (filterExecs id a l)).
-             ++ pose proof (Trace_meth_InExec H0 _ _ H12 H14) as sth.
-                pose proof (Trace_meth_InExec H2 _ _ (map_nth_error _ i ls1 H11) i0)
-                  as sth3.
-                specialize (Subset_b _ sth).
-                clear - sth3 Subset_b DisjMeths; firstorder fail.
-             ++ pose proof (proj1 (H23 _) (conj n H27)); dest.
-                tauto.
-      + split; intros.
-        * rewrite ?InExec_app_iff in *.
-          rewrite ?InCall_app_iff in *.
-          rewrite ?Demorgans in *.
-          split; intros; dest.
-          -- rewrite H19 in H14, H15; rewrite ?InExec_app_iff, ?InCall_app_iff,
-                                      ?Demorgans in *.
-             assert (~ InExec f (filterExecs id a l) /\
-                     ~ InExec f (filterExecs id b l)) by (clear - H14; firstorder fail).
-             clear H14; dest.
-             specialize (H20 f); specialize (H23 f).
-             split; [|tauto].
-             intro.
-             destruct H15, H27; try tauto.
-             ++ unfold MatchingExecCalls in *.
-                pose proof (Trace_meth_InExec H0 _ _ H12 H27) as sth.
-                specialize (Subset_b _ sth).
-                specialize (H5 f).
-                tauto.
-             ++ unfold MatchingExecCalls in *.
-                pose proof (Trace_meth_InExec H _ _ H13 H27) as sth.
-                specialize (Subset_a _ sth).
-                specialize (H16 f).
-                tauto.
-          -- assert (~ InExec f l1 /\ ~ InExec f l0) by (clear - H14; firstorder fail).
-             clear H14; dest.
-             rewrite H19 .
-             rewrite InExec_app_iff, InCall_app_iff.
-             specialize (H20 f); specialize (H23 f).
-             split; [|tauto].
-             intro.
-             destruct H15, H27; try tauto.
-             ++ unfold MatchingExecCalls in *.
-                destruct (InCall_dec f (filterExecs id b l)).
-                ** pose proof (proj2 H23 (conj H14 H15)); dest.
-                   destruct f; simpl in *.
-                   eapply H18; eauto.
-                ** pose proof (proj1 (H8 _) (conj H27 H28)).
-                   tauto.
-             ++ unfold MatchingExecCalls in *.
-                destruct (InCall_dec f (filterExecs id a l)).
-                ** pose proof (proj2 H20 (conj H26 H15)); dest.
-                   destruct f; simpl in *.
-                   eapply H18; eauto.
-                ** pose proof (proj1 (H10 _) (conj H27 H28)).
-                   tauto.
-        * split; intros;
-            unfold MatchingExecCalls in *; dest;
-              repeat match goal with
-                     | H: forall x: MethT, _ |- _ => let sth := fresh "Something" in pose proof H as sth; unfold MethT in sth; specialize (H f)
-                     end; try (specialize (DisjMeths (fst f)); specialize (SameList_a (fst f)); specialize (Subset_a (fst f));
-                specialize (SameList_b (fst f)); specialize (Subset_b (fst f))).
-          -- split; intros; dest.
-             ++ rewrite H17 in H24.
-                rewrite InExec_app_iff, InCall_app_iff in *.
-                dest.
-                destruct H24; dest.
-                ** destruct H24, H25.
-                   --- assert (forall v2, ~ InCall (fst f, v2) (filterExecs id b l)) by tauto.
-                       assert (forall v2, ~ InExec (fst f, v2) (filterExecs id b l)).
-                       { intro; intro.
-                         pose proof (Trace_meth_InExec H2 _ _ (map_nth_error _ i ls1 H11) H24).
-                         pose proof (Trace_meth_InExec H3 _ _ (map_nth_error _ i ls1 H11) H27).
-                         tauto.
-                       }
-                       pose proof (proj1 H19 (or_intror (conj H27 H26))).
-                       destruct H28; [left; clear - H28; tauto| dest].
-                       pose proof (proj1 H22 (or_introl (conj H24 H25))).
-                       destruct H30; [left; clear - H30; tauto| dest].
-                       clear - H28 H29 H30 H31.
-                       right.
-                       split; intro; repeat match goal with
-                                            | H: forall x, _ |- _ => specialize (H v2)
-                                            end; [setoid_rewrite InExec_app_iff | setoid_rewrite InCall_app_iff]; tauto.
-                   --- assert (~ InCall f (filterExecs id a l)) by (clear - H16 H24 H25; destruct f; simpl in *; firstorder fail).
-                       assert (forall v2, ~ InExec (fst f, v2) (filterExecs id b l)).
-                       { intro; intro.
-                         pose proof (Trace_meth_InExec H2 _ _ (map_nth_error _ i ls1 H11) H24).
-                         pose proof (Trace_meth_InExec H3 _ _ (map_nth_error _ i ls1 H11) H27).
-                         tauto.
-                       }
-                       clear - H24 H25 H26 H27 H10 H21 H8 H18.
-                       destruct f; simpl in *.
-                       specialize (H27 s0).
-                       tauto.
-                   --- assert (forall v2, ~ InCall (fst f, v2) (filterExecs id b l)) by tauto.
-                       assert (~ InExec f (filterExecs id a l)).
-                       { intro.
-                         pose proof (Trace_meth_InExec H2 _ _ (map_nth_error _ i ls1 H11) H27).
-                         pose proof (Trace_meth_InExec H3 _ _ (map_nth_error _ i ls1 H11) H24).
-                         tauto.
-                       }
-                       clear - H24 H25 H26 H27 H10 H21 H8 H18.
-                       destruct f; simpl in *.
-                       specialize (H26 s0).
-                       tauto.
-                   --- assert (forall v2, ~ InCall (fst f, v2) (filterExecs id a l)).
-                       { intro M1; intro M2.
-                         destruct f; simpl in *.
-                         clear - H16 Something H24 H25 M2.
-                         eapply Something; eauto.
-                       }
-                       assert (forall v2, ~ InExec (fst f, v2) (filterExecs id a l)).
-                       { intro M1; intro.
-                         pose proof (Trace_meth_InExec H2 _ _ (map_nth_error _ i ls1 H11) H27).
-                         pose proof (Trace_meth_InExec H3 _ _ (map_nth_error _ i ls1 H11) H24).
-                         tauto.
-                       }
-                       simpl in *.
-                       pose proof (proj1 H22 (or_intror (conj H27 H26))).
-                       destruct H28; [left; clear - H28; tauto| dest].
-                       pose proof (proj1 H19 (or_introl (conj H24 H25))).
-                       destruct H30; [left; clear - H30; tauto| dest].
-                       clear - H28 H29 H30 H31.
-                       right.
-                       split; intro; repeat match goal with
-                                            | H: forall x, _ |- _ => specialize (H v2)
-                                            end; [setoid_rewrite InExec_app_iff | setoid_rewrite InCall_app_iff]; tauto.
-                ** assert ((forall v2, ~ InExec (fst f, v2) (filterExecs id a l)) /\ forall v2, ~ InExec (fst f, v2) (filterExecs id b l)).
-                   { split; intro; intro.
-                     - specialize (H24 v2).
-                       rewrite ?InExec_app_iff in H24.
-                       clear - H24 H26.
-                       tauto.
-                     - specialize (H24 v2).
-                       rewrite ?InExec_app_iff in H24.
-                       clear - H24 H26.
-                       tauto.
-                   }
-                   assert ((forall v2, ~ InCall (fst f, v2) (filterExecs id a l)) /\ forall v2, ~ InCall (fst f, v2) (filterExecs id b l)).
-                   { split; intro; intro.
-                     - specialize (H25 v2).
-                       rewrite ?InCall_app_iff in H25.
-                       clear - H25 H27.
-                       tauto.
-                     - specialize (H25 v2).
-                       rewrite ?InCall_app_iff in H25.
-                       clear - H25 H27.
-                       tauto.
-                   }
-                   dest.
-                   pose proof (proj1 H22 (or_intror (conj H26 H27))).
-                   pose proof (proj1 H19 (or_intror (conj H29 H28))).
-                   destruct H30, H31; clear - H30 H31; try tauto.
-                   setoid_rewrite InExec_app_iff.
-                   setoid_rewrite InCall_app_iff.
-                   destruct f; simpl in *.
-                   firstorder fail.
-             ++ rewrite H17.
-                rewrite InExec_app_iff, InCall_app_iff in *.
-                dest.
-                specialize (DisjMeths' (fst f)).
-                destruct H24; dest.
-                ** destruct H24, H25.
-                   --- pose proof (proj2 H22 (or_introl (conj H24 H25))).
-                       destruct H26; [clear - H26; tauto| dest].
-                       pose proof (Trace_meth_InExec H _ _ H13 H24).
-                       specialize (Subset_a H28).
-                       assert (~ In (fst f) (map fst (getAllMethods b))) by (clear - Subset_a DisjMeths; tauto).
-                       assert (forall v2, ~ InExec (fst f, v2) (filterExecs id b l)).
-                       { intro Help; intro Help2.
-                         pose proof (Trace_meth_InExec H3 _ _ (map_nth_error _ i ls1 H11) Help2).
-                         simpl in *.
-                         clear - H29 H30.
-                         tauto.
-                       }
-                       destruct (InCall_dec_quant2 (fst f) (filterExecs id b l));[destruct H31|right; setoid_rewrite InExec_app_iff; setoid_rewrite InCall_app_iff; clear - H26 H27 H30 H31; firstorder fail].
-                       
-                       (* assert (sth: forall v2, InCall (fst f, v2) (filterExecs id b l) \/ ~ InCall (fst f, v2) (filterExecs id b l)) by (intro v2; *)
-                       (*                                                                                                                   eapply InCall_dec; eauto). *)
-                       (* destruct (InCall_dec f (filterExecs id b l)). *)
-                       (* [| clear - H26 H27 H30 H31; tauto]. *)
-                       specialize (Something0 _ H31 Subset_a); dest.
-                       specialize (H26 x3); contradiction.
-                   --- destruct (InCall_dec f l1), (InExec_dec f l0).
-                       +++ pose proof (Trace_meth_InExec H _ _ H13 H24).
-                           pose proof (Trace_meth_InExec H0 _ _ H12 i0).
-                           clear - DisjMeths' H27 H28; tauto.
-                       +++ pose proof (proj2 H18 (conj n H25)); dest.
-                           pose proof (proj2 H22 (or_introl (conj H24 H26))).
-                           destruct H29; [clear - H16 H29; tauto| dest].
-                           pose proof (Trace_meth_InExec H _ _ H13 H24).
-                           specialize (Subset_a H31).
-                           specialize (H14 H28 Subset_a); specialize (H29 (snd f));
-                             destruct f; simpl in *; clear - H14 H29; tauto.
-                       +++ pose proof (Trace_meth_InExec H0 _ _ H12 i0).
-                           specialize (Subset_b H27).
-                           pose proof (Trace_meth_InExec H _ _ H13 H24).
-                           specialize (Subset_a H28).
-                           clear - Subset_a Subset_b DisjMeths; tauto.
-                       +++ pose proof (proj2 H10 (conj H24 H26)); dest.
-                           pose proof (proj2 H18 (conj n H25)); dest.
-                           clear - H27 H30; tauto.
-                   --- destruct (InCall_dec f l0), (InExec_dec f l1).
-                       +++ pose proof (Trace_meth_InExec H0 _ _ H12 H24).
-                           pose proof (Trace_meth_InExec H _ _ H13 i0).
-                           clear - DisjMeths' H27 H28; tauto.
-                       +++ pose proof (proj2 H21 (conj n H25)); dest.
-                           pose proof (proj2 H19 (or_introl (conj H24 H26))).
-                           destruct H29; [clear - H16 H29; tauto| dest].
-                           pose proof (Trace_meth_InExec H0 _ _ H12 H24).
-                           specialize (Subset_b H31).
-                           specialize (H5 H28 Subset_b); specialize (H29 (snd f));
-                             destruct f; simpl in *; clear - H5 H29; tauto.
-                       +++ pose proof (Trace_meth_InExec H _ _ H13 i0).
-                           specialize (Subset_a H27).
-                           pose proof (Trace_meth_InExec H0 _ _ H12 H24).
-                           specialize (Subset_b H28).
-                           clear - Subset_a Subset_b DisjMeths; tauto.
-                       +++ pose proof (proj2 H8 (conj H24 H26)); dest.
-                           pose proof (proj2 H21 (conj n H25)); dest.
-                           clear - H27 H30; tauto.
-                   --- pose proof (proj2 H19 (or_introl (conj H24 H25))).
-                       destruct H26; [clear - H26; tauto| dest].
-                       pose proof (Trace_meth_InExec H0 _ _ H12 H24).
-                       specialize (Subset_b H28).
-                       assert (~ In (fst f) (map fst (getAllMethods a))) by (clear - Subset_b DisjMeths; tauto).
-                       assert (forall v, ~ InExec (fst f, v) (filterExecs id a l)).
-                       { intros Help1 Help2.
-                         pose proof (Trace_meth_InExec H2 _ _ (map_nth_error _ i ls1 H11) Help2).
-                         tauto.
-                       }
-                       destruct (InCall_dec_quant2 (fst f) (filterExecs id a l));
-                         [destruct H31
-                         |right; setoid_rewrite InExec_app_iff; setoid_rewrite InCall_app_iff;
-                          clear - H26 H27 H30 H31; firstorder fail].
-                       (* destruct (InCall_dec f (filterExecs id a l)); [| clear - H26 H27 H30 H31; tauto]. *)
-                       specialize (Something1 _ H31 Subset_b); specialize (H26 x3); dest; tauto.
-                ** assert ((forall v, ~ InExec (fst f, v) l1) /\ (forall v, ~ InExec (fst f, v) l0));
-                     [split; repeat intro; apply (H24 v); rewrite InExec_app_iff; auto|dest].
-                     (* by *)
-                     (*  (clear - H24; setoid_rewrite InExec_app_iff in H24; tauto); dest. *)
-                     (*  (specialize (H24 (snd f)); destruct f; simpl in *; *)
-                     (*   clear - H24; rewrite InExec_app_iff in *; tauto); dest. *)
-                   assert ((forall v, ~ InCall (fst f, v) l1) /\ (forall v, ~ InCall (fst f, v) l0));
-                     [split; repeat intro; apply (H25 v); rewrite InCall_app_iff; auto|dest].
-                     (*  by *)
-                     (* (specialize (H25 (snd f)); destruct f; simpl in *; *)
-                     (*  clear - H25; rewrite InCall_app_iff in *; tauto); dest. *)
-                   clear - H22 H19 H26 H27 H28 H29.
-                   pose proof (proj2 H22 (or_intror (conj H26 H28))).
-                   pose proof (proj2 H19 (or_intror (conj H27 H29))).
-                   setoid_rewrite InCall_app_iff; setoid_rewrite InExec_app_iff.
-                   clear H22 H19.
-                   destruct H, H0; try tauto.
-                   dest; right; split; repeat intro; specialize (H0 v2); specialize (H1 v2);
-                   specialize (H v2); specialize (H2 v2);destruct H3; auto.
-          -- intros; dest; rewrite ?map_app, ?in_app_iff in *.
-             rewrite H18.
-             rewrite map_app.
-             setoid_rewrite in_app_iff.
-             clear - H14 H21 H24.
-             firstorder fail.
-  Qed.
+      + dest.
+        rewrite H16 at 1 2.
+        repeat rewrite getNumExecs_app, getNumCalls_app.
+        specialize (H8 f);specialize (H10 f).
+        clear - H8 H10; Omega.omega.
+      + dest.
+        rewrite H17. rewrite map_app, in_app_iff in *; setoid_rewrite in_app_iff.
+        clear - H19 H18 H14.
+        firstorder fail.
+Qed.
+
 End ModularSubstition.
 
 
@@ -1734,16 +1647,8 @@ Proof.
       intros; auto.
     + rewrite H6, H7, H8 in *.
       dest.
-      split; [|split; [|split]]; intros;
-        repeat match goal with
-               | H: forall x: MethT, _ |- _ => specialize (H f)
-               end.
-      * tauto.
-      * tauto.
-      * rewrite <- H13 in H10.
-        assumption.
-      * tauto.
-    + pose proof (nth_error_len _ _ _ H7 H6 H4); tauto.
+      split;[eauto using eq_trans|auto].
+    + pose proof (nth_error_len _ _ _ H7 H6 H4); contradiction.
 Qed.
 
 
