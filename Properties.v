@@ -1737,26 +1737,24 @@ Proof.
   induction m; simpl; intros; auto.
   - constructor; auto.
     + constructor; auto.
-    + unfold MatchingExecCalls; firstorder fail.
+    + unfold MatchingExecCalls_Base.
+      intros; rewrite getNumCalls_nil, getNumExecs_nil; reflexivity.
   - constructor 2.
     + eapply IHm; eauto.
     + intros.
-      unfold InExec in *; simpl in *.
-      tauto.
+      unfold getListFullLabel_diff; auto.
   - rewrite map_app in H.
     pose proof (list_split _ _ _ _ _ H).
     dest.
     specialize (IHm1 _ H1).
     specialize (IHm2 _ H2).
     eapply ConcatModStep with (o1 := x) (o2 := x0) (l1 := []) (l2 := []); eauto.
-    + unfold MatchingExecCalls; intros.
-      unfold InCall in *; simpl in *; dest; tauto.
-    + unfold MatchingExecCalls; intros.
-      unfold InCall in *; simpl in *; dest; tauto.
+    + unfold MatchingExecCalls_Concat; intros.
+      rewrite getNumCalls_nil in H3; apply False_ind; apply H3; reflexivity.
+    + unfold MatchingExecCalls_Concat; intros.
+      rewrite getNumCalls_nil in H3; apply False_ind; apply H3; reflexivity.
     + intros.
       simpl in *; tauto.
-    + intros.
-      unfold InCall in *; simpl in *; dest; tauto.
 Qed.
 
 Lemma Trace_Step_empty m o l:
@@ -1785,12 +1783,12 @@ Section StepSimulation.
         exists lSpec oSpec',
           Step spec oSpec lSpec /\
           UpdRegs (map fst lSpec) oSpec oSpec' /\
-          simRel oImp' oSpec' /\
-          (forall f : MethT, InExec f lImp /\ ~ InCall f lImp <-> InExec f lSpec /\ ~ InCall f lSpec) /\
-          (forall f : MethT, ~ InExec f lImp /\ InCall f lImp <-> ~ InExec f lSpec /\ InCall f lSpec) /\
-          (forall f : MethT, InExec f lImp /\ InCall f lImp \/ (forall v, ~ InExec (fst f, v) lImp) /\ (forall v, ~ InCall (fst f, v) lImp) <->
-                             InExec f lSpec /\ InCall f lSpec \/ (forall v, ~ InExec (fst f, v) lSpec) /\ (forall v, ~ InCall (fst f, v) lSpec)) /\
-          ((exists rle : string, In (Rle rle) (map getRleOrMeth lSpec)) -> (exists rle : string, In (Rle rle) (map getRleOrMeth lImp))).
+          simRel oImp' oSpec' /\ WeakInclusion lImp lSpec.
+          (* (forall f : MethT, InExec f lImp /\ ~ InCall f lImp <-> InExec f lSpec /\ ~ InCall f lSpec) /\ *)
+          (* (forall f : MethT, ~ InExec f lImp /\ InCall f lImp <-> ~ InExec f lSpec /\ InCall f lSpec) /\ *)
+          (* (forall f : MethT, InExec f lImp /\ InCall f lImp \/ (forall v, ~ InExec (fst f, v) lImp) /\ (forall v, ~ InCall (fst f, v) lImp) <-> *)
+          (*                    InExec f lSpec /\ InCall f lSpec \/ (forall v, ~ InExec (fst f, v) lSpec) /\ (forall v, ~ InCall (fst f, v) lSpec)) /\ *)
+          (* ((exists rle : string, In (Rle rle) (map getRleOrMeth lSpec)) -> (exists rle : string, In (Rle rle) (map getRleOrMeth lImp))). *)
 
   Lemma StepDecomposition':
     forall (oImp : RegsT) (lsImp : list (list FullLabel)),
@@ -1798,14 +1796,15 @@ Section StepSimulation.
       exists (oSpec : RegsT) (lsSpec : list (list FullLabel)),
         Trace spec oSpec lsSpec /\
         Datatypes.length lsImp = Datatypes.length lsSpec /\
-        nthProp2
-          (fun l1 l2 : list FullLabel =>
-             (forall f : MethT, InExec f l1 /\ ~ InCall f l1 <-> InExec f l2 /\ ~ InCall f l2) /\
-             (forall f : MethT, ~ InExec f l1 /\ InCall f l1 <-> ~ InExec f l2 /\ InCall f l2) /\
-             (forall f : MethT, InExec f l1 /\ InCall f l1 \/ (forall v, ~ InExec (fst f, v) l1 )/\ (forall v, ~ InCall (fst f, v) l1) <-> InExec f l2 /\ InCall f l2 \/ (forall v, ~ InExec (fst f, v) l2) /\ (forall v, ~ InCall (fst f, v) l2)) /\
-             ((exists rle : string, In (Rle rle) (map getRleOrMeth l2)) -> (exists rle : string, In (Rle rle) (map getRleOrMeth l1)))
-          ) lsImp lsSpec /\
+        nthProp2 WeakInclusion lsImp lsSpec /\
         simRel oImp oSpec.
+        (*   (fun l1 l2 : list FullLabel => *)
+        (*      (forall f : MethT, InExec f l1 /\ ~ InCall f l1 <-> InExec f l2 /\ ~ InCall f l2) /\ *)
+        (*      (forall f : MethT, ~ InExec f l1 /\ InCall f l1 <-> ~ InExec f l2 /\ InCall f l2) /\ *)
+        (*      (forall f : MethT, InExec f l1 /\ InCall f l1 \/ (forall v, ~ InExec (fst f, v) l1 )/\ (forall v, ~ InCall (fst f, v) l1) <-> InExec f l2 /\ InCall f l2 \/ (forall v, ~ InExec (fst f, v) l2) /\ (forall v, ~ InCall (fst f, v) l2)) /\ *)
+        (*      ((exists rle : string, In (Rle rle) (map getRleOrMeth l2)) -> (exists rle : string, In (Rle rle) (map getRleOrMeth l1))) *)
+        (*   ) lsImp lsSpec /\ *)
+        (* simRel oImp oSpec. *)
   Proof.
     induction 1; subst; simpl; auto; intros.
     - pose proof (initRel HUpdRegs) as [rspec rspecProp].
@@ -1824,7 +1823,6 @@ Section StepSimulation.
              unfold UpdRegs; split; intros; try tauto.
              right; split; try intro; dest; auto.
         * rewrite nthProp2_cons; split; simpl; auto; repeat split; dest; simpl in *; try tauto.
-          constructor.
         * pose proof (Trace_NoDup H NoDupRegs) as sth.
           pose proof (UpdRegs_nil_upd sth HUpdRegs); subst; auto.
       + specialize (stepSimulationNonZero HStep ltac:(intro; discriminate) HUpdRegs H3).
@@ -1903,51 +1901,52 @@ Section DecompositionZero.
           repeat split; auto.
           constructor; auto.
           -- constructor; auto.
-          -- clear; firstorder fail.
+          -- unfold MatchingExecCalls_Base; intros; reflexivity.
           -- intros.
              right; split; try intro; dest; simpl in *; try tauto.
-          -- dest; unfold InExec in *; dest; try tauto; simpl in *.
-             destruct H4; congruence.
-          -- dest; unfold InExec in *; dest; try tauto; simpl in *.
-             destruct H4; congruence.
-          -- dest; unfold InExec in *; dest; try tauto; simpl in *; tauto.
-          -- dest; unfold InExec in *; dest; try tauto; simpl in *; tauto.
-          -- unfold InCall in *; clear - H4.
-             dest.
-             simpl in *.
-             destruct H0; subst; simpl in *; tauto.
-          -- unfold InCall in *; clear - H4.
-             dest.
-             simpl in *.
-             destruct H0; subst; simpl in *; tauto.
-          -- unfold InCall in *; clear - H4.
-             dest.
-             simpl in *.
-             destruct H0; subst; simpl in *; tauto.
-          -- intros.
-             destruct H4; dest.
-             ++ unfold InExec in H4; simpl in *.
-                destruct H4; [discriminate | tauto].
-             ++ right.
-                split; repeat intro.
-                ** unfold InExec, InCall in *; simpl in *; tauto.
-                ** unfold InExec, InCall in *; simpl in *; dest; tauto.
-          -- intros.
-             destruct H4; dest.
-             ++ unfold InExec in H4; simpl in *; tauto.
-             ++ right.
-                split; repeat intro.
-                ** unfold InExec, InCall in *; simpl in *. destruct H6; [discriminate | tauto].
-                ** unfold InExec, InCall in *; simpl in *; dest; destruct H6; subst; simpl in *; tauto.
-          -- intros.
-             dest.
-             simpl in *.
-             tauto.
+          -- intros; dest. inv H4.
+        
+          (*   dest; unfold InExec in *; dest; try tauto; simpl in *. *)
+          (*    destruct H4; congruence. *)
+          (* -- dest; unfold InExec in *; dest; try tauto; simpl in *. *)
+          (*    destruct H4; congruence. *)
+          (* -- dest; unfold InExec in *; dest; try tauto; simpl in *; tauto. *)
+          (* -- dest; unfold InExec in *; dest; try tauto; simpl in *; tauto. *)
+          (* -- unfold InCall in *; clear - H4. *)
+          (*    dest. *)
+          (*    simpl in *. *)
+          (*    destruct H0; subst; simpl in *; tauto. *)
+          (* -- unfold InCall in *; clear - H4. *)
+          (*    dest. *)
+          (*    simpl in *. *)
+          (*    destruct H0; subst; simpl in *; tauto. *)
+          (* -- unfold InCall in *; clear - H4. *)
+          (*    dest. *)
+          (*    simpl in *. *)
+          (*    destruct H0; subst; simpl in *; tauto. *)
+          (* -- intros. *)
+          (*    destruct H4; dest. *)
+          (*    ++ unfold InExec in H4; simpl in *. *)
+          (*       destruct H4; [discriminate | tauto]. *)
+          (*    ++ right. *)
+          (*       split; repeat intro. *)
+          (*       ** unfold InExec, InCall in *; simpl in *; tauto. *)
+          (*       ** unfold InExec, InCall in *; simpl in *; dest; tauto. *)
+          (* -- intros. *)
+          (*    destruct H4; dest. *)
+          (*    ++ unfold InExec in H4; simpl in *; tauto. *)
+          (*    ++ right. *)
+          (*       split; repeat intro. *)
+          (*       ** unfold InExec, InCall in *; simpl in *. destruct H6; [discriminate | tauto]. *)
+          (*       ** unfold InExec, InCall in *; simpl in *; dest; destruct H6; subst; simpl in *; tauto. *)
+          (* -- intros. *)
+          (*    dest. *)
+          (*    simpl in *. *)
+          (*    tauto. *)
         * exists [(x, (Rle x0, cs))], x1.
           repeat split; auto.
           -- constructor; auto.
-             unfold MatchingExecCalls; intros.
-             simpl in *.
+             unfold MatchingExecCalls_Base; intros.
              rewrite NoMethsSpec in *; simpl in *; tauto.
           -- unfold UpdRegs in *; dest.
              auto.
@@ -1955,79 +1954,84 @@ Section DecompositionZero.
              unfold UpdRegs in *; dest.
              simpl in *.
              eapply H6; eauto.
-          -- dest.
-             unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto].
-          -- dest.
-             unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto].
-          -- dest.
-             unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto].
-          -- dest.
-             unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto].
-          -- intro.
-             dest.
-             unfold InExec in *; simpl in *; destruct H6; [discriminate | tauto].
-          -- dest.
-             unfold InCall in *; simpl in *; destruct H6; dest.
-             eexists.
-             split; [apply (or_introl eq_refl)|].
-             simpl.
-             destruct H6; subst; simpl in *; auto.
-             tauto.
-          -- intro.
-             dest.
-             unfold InExec in *; simpl in *; destruct H6; [discriminate | tauto].
-          -- dest.
-             unfold InCall in *; simpl in *; destruct H6; dest.
-             eexists.
-             split; [apply (or_introl eq_refl)|].
-             simpl.
-             destruct H6; subst; simpl in *; auto.
-             tauto.
           -- intros; dest.
-             destruct H5; dest.
-             ++ dest.
-                unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto].
-             ++ right.
-                split; repeat intro.
-                ** unfold InExec in *; simpl in *; destruct H7; [discriminate | tauto].
-                **unfold InCall in *; dest; simpl in *.
-                   assert (sth2: (exists v, (exists x, ((u, (Rle rn, cs)) = x \/ False) /\ In (fst f, v) (snd (snd x))))).
-                   { eexists.
-                     eexists.
-                     split.
-                     - left; reflexivity.
-                     - simpl.
-                       destruct H7; [|tauto].
-                       subst; simpl in *; auto.
-                       apply H8.
-                   }
-                   dest.
-                   eapply H6; eauto.
-          -- intros; dest.
-             destruct H5; dest.
-             ++ dest.
-                unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto].
-             ++ right.
-                split; repeat intro.
-                ** unfold InExec in *; simpl in *; destruct H7; [discriminate | tauto].
-                ** unfold InCall in *; dest; simpl in *.
-                   assert (sth2: (exists v, exists x1, ((x, (Rle x0, cs)) = x1 \/ False) /\ In (fst f, v) (snd (snd x1)))).
-                   { eexists.
-                     eexists.
-                     split.
-                     - left; reflexivity.
-                     - simpl.
-                       destruct H7; [|tauto].
-                       subst; simpl in *; auto.
-                       apply H8.
-                   }
-                   dest; eapply H6; eauto.
-          -- intros.
-             simpl in *.
-             dest.
-             destruct H5; [|tauto].
-             exists rn.
-             left; auto.
+             destruct H5;simpl in *; inv H5.
+             exists rn; left; reflexivity.
+      (* +  *)
+             
+      (*     -- dest. *)
+      (*        unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto]. *)
+      (*     -- dest. *)
+      (*        unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto]. *)
+      (*     -- dest. *)
+      (*        unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto]. *)
+      (*     -- dest. *)
+      (*        unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto]. *)
+      (*     -- intro. *)
+      (*        dest. *)
+      (*        unfold InExec in *; simpl in *; destruct H6; [discriminate | tauto]. *)
+      (*     -- dest. *)
+      (*        unfold InCall in *; simpl in *; destruct H6; dest. *)
+      (*        eexists. *)
+      (*        split; [apply (or_introl eq_refl)|]. *)
+      (*        simpl. *)
+      (*        destruct H6; subst; simpl in *; auto. *)
+      (*        tauto. *)
+      (*     -- intro. *)
+      (*        dest. *)
+      (*        unfold InExec in *; simpl in *; destruct H6; [discriminate | tauto]. *)
+      (*     -- dest. *)
+      (*        unfold InCall in *; simpl in *; destruct H6; dest. *)
+      (*        eexists. *)
+      (*        split; [apply (or_introl eq_refl)|]. *)
+      (*        simpl. *)
+      (*        destruct H6; subst; simpl in *; auto. *)
+      (*        tauto. *)
+      (*     -- intros; dest. *)
+      (*        destruct H5; dest. *)
+      (*        ++ dest. *)
+      (*           unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto]. *)
+      (*        ++ right. *)
+      (*           split; repeat intro. *)
+      (*           ** unfold InExec in *; simpl in *; destruct H7; [discriminate | tauto]. *)
+      (*           **unfold InCall in *; dest; simpl in *. *)
+      (*              assert (sth2: (exists v, (exists x, ((u, (Rle rn, cs)) = x \/ False) /\ In (fst f, v) (snd (snd x))))). *)
+      (*              { eexists. *)
+      (*                eexists. *)
+      (*                split. *)
+      (*                - left; reflexivity. *)
+      (*                - simpl. *)
+      (*                  destruct H7; [|tauto]. *)
+      (*                  subst; simpl in *; auto. *)
+      (*                  apply H8. *)
+      (*              } *)
+      (*              dest. *)
+      (*              eapply H6; eauto. *)
+      (*     -- intros; dest. *)
+      (*        destruct H5; dest. *)
+      (*        ++ dest. *)
+      (*           unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto]. *)
+      (*        ++ right. *)
+      (*           split; repeat intro. *)
+      (*           ** unfold InExec in *; simpl in *; destruct H7; [discriminate | tauto]. *)
+      (*           ** unfold InCall in *; dest; simpl in *. *)
+      (*              assert (sth2: (exists v, exists x1, ((x, (Rle x0, cs)) = x1 \/ False) /\ In (fst f, v) (snd (snd x1)))). *)
+      (*              { eexists. *)
+      (*                eexists. *)
+      (*                split. *)
+      (*                - left; reflexivity. *)
+      (*                - simpl. *)
+      (*                  destruct H7; [|tauto]. *)
+      (*                  subst; simpl in *; auto. *)
+      (*                  apply H8. *)
+      (*              } *)
+      (*              dest; eapply H6; eauto. *)
+      (*     -- intros. *)
+      (*        simpl in *. *)
+      (*        dest. *)
+      (*        destruct H5; [|tauto]. *)
+      (*        exists rn. *)
+      (*        left; auto. *)
       + specialize (HNoRle _ (or_introl eq_refl)); simpl in *; tauto.
     - rewrite NoMeths in *.
       simpl in *; tauto.
