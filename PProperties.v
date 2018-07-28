@@ -4,6 +4,7 @@ Import ListNotations.
 Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
+Require Import ZArith.
 
 Lemma PSemAction_SemAction o k:
   forall (a : ActionT type k) (readRegs newRegs : RegsT) (calls : MethsT) (fret : type k),
@@ -19,8 +20,8 @@ Proof.
     repeat split; eauto.
     + rewrite <- H2; assumption.
     + econstructor 1; auto.
-      * unfold key_not_In in HDisjCalls.
-        intro; specialize (HDisjCalls v); rewrite H2 in HDisjCalls; eauto.
+      (* * unfold key_not_In in HDisjCalls. *)
+      (*   intro; specialize (HDisjCalls v); rewrite H2 in HDisjCalls; eauto. *)
   - exists x, x0, x1.
     repeat split; eauto.
     econstructor 2; assumption.
@@ -29,7 +30,7 @@ Proof.
     repeat split; auto.
     + econstructor 3; eauto.
       * intro; specialize (HDisjRegs k0); rewrite <- H6, <- H2; assumption.
-      * intro; specialize (HDisjCalls k0); rewrite <- H7, <- H3; assumption.
+      (* * intro; specialize (HDisjCalls k0); rewrite <- H7, <- H3; assumption. *)
   - exists x, x0, x1.
     repeat split; auto.
     econstructor 4; eauto.
@@ -47,7 +48,7 @@ Proof.
     repeat split; auto.
     econstructor 7; auto.
     + intro; specialize (HDisjRegs k); rewrite H2, H6 in HDisjRegs; apply HDisjRegs.
-    + intro; specialize (HDisjCalls k); rewrite H3, H7 in HDisjCalls; apply HDisjCalls.
+    (* + intro; specialize (HDisjCalls k); rewrite H3, H7 in HDisjCalls; apply HDisjCalls. *)
     + apply H8.
     + assumption.
   - exists (x2++x), (x3++x0), (x4++x1).
@@ -55,7 +56,7 @@ Proof.
     repeat split; auto.
     econstructor 8; auto.
     + intro; specialize (HDisjRegs k); rewrite H2, H6 in HDisjRegs; apply HDisjRegs.
-    + intro; specialize (HDisjCalls k); rewrite H3, H7 in HDisjCalls; apply HDisjCalls.
+    (* + intro; specialize (HDisjCalls k); rewrite H3, H7 in HDisjCalls; apply HDisjCalls. *)
     + apply H8.
     + assumption.
   - exists x, x0, x1.
@@ -559,9 +560,9 @@ Proof.
       * intros.
         specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H1) _ H8) as TMP; dest;specialize (HNoRle _ H10);
           inversion H9;rewrite <- H15 in HNoRle; simpl in *;rewrite H12;assumption.
-      * intros;rewrite <- H6 in H8.
-        rewrite <- H1 in H9.
-        specialize (HNoCall _ H8 _ H9); contradiction.
+      (* * intros;rewrite <- H6 in H8. *)
+      (*   rewrite <- H1 in H9. *)
+      (*   specialize (HNoCall _ H8 _ H9); contradiction. *)
   -  dest; apply (PSemAction_rewrite_state H0) in HPAction; apply PSemAction_SemAction in HPAction; dest.
     exists x, ((x2, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), x3))::x0); repeat split; auto;[destruct l|].
     + apply Permutation_nil in HLabel; discriminate.
@@ -576,13 +577,13 @@ Proof.
         -- rewrite <- H15; simpl.
            rewrite <- H11; assumption.
         -- rewrite H5; assumption.
-      * intros;rewrite <- H6 in H8;unfold InCall in H9; dest; specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H1) _ H9) as TMP;
-          dest;inv H11;eapply HNoCall.
-        -- apply H8.
-        -- rewrite H1;unfold InCall;exists (u0, (rm', cs0));split; auto; simpl in *.
-           apply H10.
+      (* * intros;rewrite <- H6 in H8;unfold InCall in H9; dest; specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H1) _ H9) as TMP; *)
+      (*     dest;inv H11;eapply HNoCall. *)
+      (*   -- apply H8. *)
+      (*   -- rewrite H1;unfold InCall;exists (u0, (rm', cs0));split; auto; simpl in *. *)
+      (*      apply H10. *)
       * rewrite <- H6; assumption.
-      * rewrite <- H1; assumption.
+      (* * rewrite <- H1; assumption. *)
 Qed.
 
 Lemma Substeps_PSubsteps m:
@@ -590,8 +591,8 @@ Lemma Substeps_PSubsteps m:
     Substeps m o l -> PSubsteps m o l.
   induction 1; subst.
   - econstructor 1; rewrite HRegs; reflexivity.
-  - econstructor 2;[rewrite HRegs|apply HInRules| apply (SemAction_PSemAction HAction)| | | | | | | ]; eauto.
-  - econstructor 3;[rewrite HRegs|apply HInMeths| apply (SemAction_PSemAction HAction)| | | | | | | | ]; eauto.
+  - econstructor 2;[rewrite HRegs|apply HInRules| apply (SemAction_PSemAction HAction)| | | | | | ]; eauto.
+  - econstructor 3;[rewrite HRegs|apply HInMeths| apply (SemAction_PSemAction HAction)| | | | | | ]; eauto.
 Qed.
 
 Lemma List_FullLabel_perm_nil l :
@@ -724,9 +725,9 @@ Proof.
       * specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H0) _ H2) as TMP; dest.
         specialize (HNoRle _ H5).
         inv H4; simpl in *; assumption.
-      * rewrite <- H9 in H2.
-        rewrite <- H0 in H4.
-        specialize (HNoCall _ H2 _ H4); contradiction.
+      (* * rewrite <- H9 in H2. *)
+      (*   rewrite <- H0 in H4. *)
+      (*   specialize (HNoCall _ H2 _ H4); contradiction. *)
   - intros; rewrite HLabel in *.
     specialize (List_FullLabel_perm_in H0 (u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs)) (in_eq _ _)) as TMP; dest.
       inversion H1; subst; apply (PSemAction_rewrite_newRegs H6) in HPAction;
@@ -738,11 +739,11 @@ Proof.
       * specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H0) _ H2) as TMP; dest.
         specialize (HDisjRegs _ H5).
         intro; destruct (HDisjRegs k);[left|right];intro; apply H7; inv H4; simpl in *;[rewrite <- H10| rewrite H6]; assumption.
-      * rewrite <- H9 in H2.
-        rewrite <- H0 in H4.
-        specialize (HNoCall _ H2 _ H4); contradiction.
+      (* * rewrite <- H9 in H2. *)
+      (*   rewrite <- H0 in H4. *)
+      (*   specialize (HNoCall _ H2 _ H4); contradiction. *)
       * rewrite <- H9; assumption.
-      * apply HNoExec; rewrite H0; assumption.
+      (* * apply HNoExec; rewrite H0; assumption. *)
 Qed.
 
 Global Instance PSubsteps_List_FullLabel_perm_rewrite' :
@@ -750,55 +751,131 @@ Global Instance PSubsteps_List_FullLabel_perm_rewrite' :
 repeat red; intros; split; intros; subst; eauto using List_FullLabel_perm_sym, PSubsteps_List_FullLabel_perm_rewrite.
 Qed.
 
+Lemma List_FullLabel_perm_getRleOrMeth_perm l l' :
+  List_FullLabel_perm l l' ->
+  (map getRleOrMeth l) [=] (map getRleOrMeth l').
+Proof.
+  induction 1; auto.
+  - inv H; simpl; apply perm_skip; assumption.
+  - inv H; inv H0; simpl.
+    rewrite perm_swap; repeat apply perm_skip; assumption.
+  - eauto using Permutation_trans.
+Qed.
+
+Lemma List_FullLabel_perm_getNumExecs_rewrite f l l' :
+  List_FullLabel_perm l l' ->
+  (getNumExecs f l = getNumExecs f l')%Z.
+Proof.
+  unfold getNumExecs; intros;
+    rewrite (List_FullLabel_perm_getRleOrMeth_perm H); reflexivity.
+Qed.
+
+Lemma List_FullLabel_perm_getNumCalls_rewrite f l l' :
+  List_FullLabel_perm l l' ->
+  (getNumCalls f l = getNumCalls f l').
+Proof.
+  induction 1; auto.
+  - inv H; unfold getNumCalls in *; simpl.
+    rewrite H3;repeat rewrite getNumFromCalls_app.
+    rewrite IHList_FullLabel_perm; reflexivity.
+  - inv H; inv H0; unfold getNumCalls in *; simpl.
+    repeat rewrite getNumFromCalls_app.
+    rewrite H4, H5, IHList_FullLabel_perm; ring.
+  - eauto using eq_trans.
+Qed.
+
+Global Instance ListFullLabel_perm_getNumExecs_rewrite' :
+  Proper (eq ==> List_FullLabel_perm ==> eq) (@getNumExecs) | 10.
+Proof.
+  repeat red; intros; subst; eauto using List_FullLabel_perm_getNumExecs_rewrite.
+Qed.
+
+Global Instance ListFullLabel_perm_getNumCalls_rewrite' :
+  Proper (eq ==> List_FullLabel_perm ==> eq) (@getNumCalls) | 10.
+Proof.
+  repeat red; intros; subst; eauto using List_FullLabel_perm_getNumCalls_rewrite.
+Qed.
+
 Lemma List_FullLabel_perm_WeakInclusion l l' :
   List_FullLabel_perm l l' ->
   WeakInclusion l l'.
 Proof.
   unfold WeakInclusion.
-  intros; repeat split; dest;
-    eauto using List_FullLabel_perm_InExec_rewrite, List_FullLabel_perm_InCall_rewrite, List_FullLabel_perm_sym.
-  - intro; destruct H0;[left|right];setoid_rewrite <-H;firstorder.
-  - intro; destruct H0;[left|right];setoid_rewrite H;firstorder.
-  - induction H; auto; intro; dest.
-    + inv H; destruct H1.
-      * exists x; subst; rewrite <- H; simpl in *.
-        left; reflexivity.
-      * simpl in *.
-        specialize (ex_intro (fun x => In (Rle x) (map getRleOrMeth ls2)) x H).
-        specialize (IHList_FullLabel_perm  (ex_intro (fun x => In (Rle x) (map getRleOrMeth ls2)) x H)); dest.
-        intro; exists x0; auto.
-    + simpl in *; destruct H2;[exists x; right;left;inv H0|destruct H2;[exists x;left;inv H|]];auto.
-      specialize (IHList_FullLabel_perm (ex_intro (fun x => In (Rle x) (map getRleOrMeth ls2)) x H2)); dest.
-      exists x0; right; right; assumption.
+  intros; split; intros.
+  (* eauto using List_FullLabel_perm_InExec_rewrite, List_FullLabel_perm_InCall_rewrite, List_FullLabel_perm_sym. *)
+  - unfold getListFullLabel_diff;
+      rewrite (List_FullLabel_perm_getNumExecs_rewrite _ H),
+      (List_FullLabel_perm_getNumCalls_rewrite _ H); reflexivity.
+  (* - intro; destruct H0;[left|right];setoid_rewrite <-H;firstorder. *)
+  (* - intro; destruct H0;[left|right];setoid_rewrite H;firstorder. *)
+  (* - induction H; auto; intro; dest. *)
+  (*   + inv H; destruct H1. *)
+  (*     * exists x; subst; rewrite <- H; simpl in *. *)
+  (*       left; reflexivity. *)
+  (*     * simpl in *. *)
+  (*       specialize (ex_intro (fun x => In (Rle x) (map getRleOrMeth ls2)) x H). *)
+  (*       specialize (IHList_FullLabel_perm  (ex_intro (fun x => In (Rle x) (map getRleOrMeth ls2)) x H)); dest. *)
+  (*       intro; exists x0; auto. *)
+  (*   + simpl in *; destruct H2;[exists x; right;left;inv H0|destruct H2;[exists x;left;inv H|]];auto. *)
+  (*     specialize (IHList_FullLabel_perm (ex_intro (fun x => In (Rle x) (map getRleOrMeth ls2)) x H2)); dest. *)
+    (*     exists x0; right; right; assumption. *)
+  - setoid_rewrite (List_FullLabel_perm_getRleOrMeth_perm H); assumption.
 Qed.
 
-Lemma MatchingExecCalls_List_FullLabel_perm_rewrite_1 m l l' l'':
-  List_FullLabel_perm l' l'' ->
-  MatchingExecCalls l l' m ->
-  MatchingExecCalls l l'' m.
+Lemma MatchingExecCalls_Base_List_FullLabel_perm_rewrite m l l' :
+  List_FullLabel_perm l l' ->
+  MatchingExecCalls_Base l m ->
+  MatchingExecCalls_Base l' m.
 Proof.
-  induction m;unfold MatchingExecCalls;simpl;intros;split;
-    eauto; try intro; try eapply H0; eauto;
-      try apply (List_FullLabel_perm_InExec_rewrite _ H);
-      try eapply H0; eauto.
+  unfold MatchingExecCalls_Base.
+  intros; rewrite <-H; apply H0; auto.
+  (* induction m;unfold MatchingExecCalls_Base;simpl;intros;split; *)
+  (*   eauto; try intro; try eapply H0; eauto; *)
+  (*     try apply (List_FullLabel_perm_InExec_rewrite _ H); *)
+  (*     try eapply H0; eauto. *)
 Qed.
 
-Lemma MatchingExecCalls_List_FullLabel_perm_rewrite_2 m l l' l'':
-  List_FullLabel_perm l' l'' ->
-  MatchingExecCalls l' l m ->
-  MatchingExecCalls l'' l m.
+Lemma MatchingExecCalls_Concat_List_FullLabel_perm_rewrite_1 m l l' l'':
+  List_FullLabel_perm l l' ->
+  MatchingExecCalls_Concat l l'' m ->
+  MatchingExecCalls_Concat l' l'' m.
 Proof.
-  induction m;unfold MatchingExecCalls;simpl;intros;split;eauto; eapply H0;
-    eauto using List_FullLabel_perm_InCall_rewrite, List_FullLabel_perm_sym.
+  unfold MatchingExecCalls_Concat; intros.
+  rewrite <-H; apply H0; auto.
+  rewrite H; assumption.
 Qed.
 
-Global Instance MatchingExecCalls_List_FullLabel_perm_rewrite' :
-  Proper (List_FullLabel_perm ==> List_FullLabel_perm ==> Logic.eq ==> iff) (@MatchingExecCalls) | 10.
+Lemma MatchingExecCalls_Concat_List_FullLabel_perm_rewrite_2 m l l' l'':
+  List_FullLabel_perm l l' ->
+  MatchingExecCalls_Concat l'' l m ->
+  MatchingExecCalls_Concat l'' l' m.
+Proof.
+  unfold MatchingExecCalls_Concat; intros.
+  rewrite <-H; apply H0; auto.
+Qed.
+
+(* Lemma MatchingExecCalls_List_FullLabel_perm_rewrite_2 m l l' l'': *)
+(*   List_FullLabel_perm l' l'' -> *)
+(*   MatchingExecCalls l' l m -> *)
+(*   MatchingExecCalls l'' l m. *)
+(* Proof. *)
+(*   induction m;unfold MatchingExecCalls;simpl;intros;split;eauto; eapply H0; *)
+(*     eauto using List_FullLabel_perm_InCall_rewrite, List_FullLabel_perm_sym. *)
+(* Qed. *)
+
+Global Instance MatchingExecCalls_Base_List_FullLabel_perm_rewrite' :
+  Proper (List_FullLabel_perm ==> Logic.eq ==> iff) (@MatchingExecCalls_Base) | 10.
 Proof.
   repeat red; intros; split; intros; subst;
-    eauto using  MatchingExecCalls_List_FullLabel_perm_rewrite_1,
-    MatchingExecCalls_List_FullLabel_perm_rewrite_2,
-    List_FullLabel_perm_sym.
+    eauto using MatchingExecCalls_Base_List_FullLabel_perm_rewrite, List_FullLabel_perm_sym.
+Qed.
+
+Global Instance MatchingExecCalls_Concat_List_FullLabel_perm_rewrite' :
+  Proper (List_FullLabel_perm ==> List_FullLabel_perm ==> Logic.eq ==> iff) (@MatchingExecCalls_Concat) | 10.
+Proof.
+  repeat red; intros; split; intros; subst;
+    eauto using MatchingExecCalls_Concat_List_FullLabel_perm_rewrite_1,
+    MatchingExecCalls_Concat_List_FullLabel_perm_rewrite_2, List_FullLabel_perm_sym.
 Qed.
   
 Lemma PStep_Step m o l:
@@ -818,10 +895,11 @@ Proof.
   - dest.
     exists x, x0; repeat split; eauto.
     econstructor 2; auto.
-    intros.
-    apply (List_FullLabel_perm_InCall_rewrite H2).
-    eapply HHidden; eauto.
-    apply (List_FullLabel_perm_InExec_rewrite _ (List_FullLabel_perm_sym H2)); assumption.
+    intros; unfold getListFullLabel_diff in *.
+    rewrite <-H2; apply HHidden; auto.
+    (* apply (List_FullLabel_perm_InCall_rewrite H2). *)
+    (* eapply HHidden; eauto. *)
+    (* apply (List_FullLabel_perm_InExec_rewrite _ (List_FullLabel_perm_sym H2)); assumption. *)
   - dest.
     exists (x1++x), (x2++x0).
     repeat split.
@@ -837,10 +915,10 @@ Proof.
           apply (List_FullLabel_perm_in (List_FullLabel_perm_sym H3)) in H10; dest.
         specialize (HNoRle _ _ H12 H11).
         inv H9; inv H10; subst; simpl in *; assumption.
-      * intros.
-        rewrite <- H3 in H10.
-        rewrite <- H7 in H9.
-        specialize (HNoCall _ H9 _ H10); contradiction.
+      (* * intros. *)
+      (*   rewrite <- H3 in H10. *)
+      (*   rewrite <- H7 in H9. *)
+      (*   specialize (HNoCall _ H9 _ H10); contradiction. *)
 Qed.
 
 Lemma Step_PStep m o l:
@@ -1104,8 +1182,8 @@ Section PSubsteps_rewrite.
     induction 2.
     - econstructor 1.
       rewrite <- H; assumption.
-    - econstructor 2;[rewrite <- H|apply HInRules|apply (PSemAction_rewrite_state H) in HPAction; apply HPAction| | |apply HLabel| | | | ];assumption.
-    - econstructor 3;[rewrite <- H|apply HInMeths|apply (PSemAction_rewrite_state H) in HPAction; apply HPAction| | |apply HLabel| | | | | ];assumption.
+    - econstructor 2;[rewrite <- H|apply HInRules|apply (PSemAction_rewrite_state H) in HPAction; apply HPAction| | |apply HLabel| | | ];assumption.
+    - econstructor 3;[rewrite <- H|apply HInMeths|apply (PSemAction_rewrite_state H) in HPAction; apply HPAction| | |apply HLabel| | | ];assumption.
   Qed.
 
   Lemma PSubsteps_rewrite_lists m o l1 l2:
@@ -1235,43 +1313,43 @@ End InExec_InCall_perm.
 
 Section PStep_rewrite.
   
-  Lemma MatchingExecCalls_perm1 l1 l2 l3 m:
-    l1 [=] l3 -> MatchingExecCalls l1 l2 m -> MatchingExecCalls l3 l2 m.
-  Proof.
-    repeat intro.
-    specialize (H0 f).
-    apply H0; auto.
-    rewrite H; assumption.
-  Qed.
+  (* Lemma MatchingExecCalls_perm1 l1 l2 l3 m: *)
+  (*   l1 [=] l3 -> MatchingExecCalls l1 l2 m -> MatchingExecCalls l3 l2 m. *)
+  (* Proof. *)
+  (*   repeat intro. *)
+  (*   specialize (H0 f). *)
+  (*   apply H0; auto. *)
+  (*   rewrite H; assumption. *)
+  (* Qed. *)
 
-  Lemma MatchingExecCalls_perm2 l1 l2 l3 m:
-    l2 [=] l3 -> MatchingExecCalls l1 l2 m -> MatchingExecCalls l1 l3 m.
-  Proof.
-    repeat intro.
-    specialize (H0 f).
-    rewrite <- H.
-    apply H0; auto.
-  Qed.
+  (* Lemma MatchingExecCalls_perm2 l1 l2 l3 m: *)
+  (*   l2 [=] l3 -> MatchingExecCalls l1 l2 m -> MatchingExecCalls l1 l3 m. *)
+  (* Proof. *)
+  (*   repeat intro. *)
+  (*   specialize (H0 f). *)
+  (*   rewrite <- H. *)
+  (*   apply H0; auto. *)
+  (* Qed. *)
 
-  Lemma MatchingExecCalls_perm l1 l2 l3 l4 m:
-    l1 [=] l3 ->
-    l2 [=] l4 ->
-    MatchingExecCalls l1 l2 m ->
-    MatchingExecCalls l3 l4 m.
-  Proof.
-    intros; eauto using MatchingExecCalls_perm1, MatchingExecCalls_perm2.
-  Qed.
+  (* Lemma MatchingExecCalls_perm l1 l2 l3 l4 m: *)
+  (*   l1 [=] l3 -> *)
+  (*   l2 [=] l4 -> *)
+  (*   MatchingExecCalls l1 l2 m -> *)
+  (*   MatchingExecCalls l3 l4 m. *)
+  (* Proof. *)
+  (*   intros; eauto using MatchingExecCalls_perm1, MatchingExecCalls_perm2. *)
+  (* Qed. *)
     
-  Global Instance MatchingExecCalls_perm' :
-    Proper (@Permutation (FullLabel) ==>
-                         @Permutation (FullLabel) ==>
-                         Logic.eq ==>
-                         iff) (@MatchingExecCalls) | 10.
-  Proof.
-    repeat red; split; intros; subst;
-      specialize (Permutation_sym H) as TMP; specialize (Permutation_sym H0) as TMP1;
-        eauto using MatchingExecCalls_perm.
-  Qed.
+  (* Global Instance MatchingExecCalls_perm' : *)
+  (*   Proper (@Permutation (FullLabel) ==> *)
+  (*                        @Permutation (FullLabel) ==> *)
+  (*                        Logic.eq ==> *)
+  (*                        iff) (@MatchingExecCalls) | 10. *)
+  (* Proof. *)
+  (*   repeat red; split; intros; subst; *)
+  (*     specialize (Permutation_sym H) as TMP; specialize (Permutation_sym H0) as TMP1; *)
+  (*       eauto using MatchingExecCalls_perm. *)
+  (* Qed. *)
   
   Lemma PStep_rewrite m o1 o2 l1 l2 :
     (o1 [=] o2) ->
@@ -1288,9 +1366,10 @@ Section PStep_rewrite.
       assumption.
     - econstructor 2; eauto.
       intros.
+      unfold getListFullLabel_diff in *.
       rewrite <- H0.
       eapply HHidden; eauto.
-      rewrite H0; assumption.
+      (* rewrite H0; assumption. *)
     - econstructor 3; eauto.
       + rewrite <- H; assumption.
       + rewrite <- H0; assumption.
