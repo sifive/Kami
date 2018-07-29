@@ -1258,6 +1258,34 @@ Section PSubsteps_rewrite.
     apply (PSubsteps_rewrite_both H0 H1) in H2.
     assumption.
   Qed.
+
+  Lemma List_FullLabel_perm_app_rewrite_l l1 l2 l3 :
+    List_FullLabel_perm l1 l2 ->
+    List_FullLabel_perm (l1++l3) (l2++l3).
+  Proof.
+    induction 1; simpl;
+      eauto using List_FullLabel_perm_refl,
+      LFL_eq_cons_1, LFL_eq_cons_2, LFL_eq_trans.
+  Qed.
+
+  Lemma List_FullLabel_perm_app_rewrite_r l1 l2 l3 :
+    List_FullLabel_perm l1 l2 ->
+    List_FullLabel_perm (l3++l1) (l3++l2).
+  Proof.
+    intros.
+    rewrite Permutation_app_comm; apply List_FullLabel_perm_sym;
+    rewrite Permutation_app_comm; apply List_FullLabel_perm_sym.
+    apply List_FullLabel_perm_app_rewrite_l; auto.
+  Qed.
+
+  Global Instance List_FullLabel_perm_app_rewrite :
+    Proper (List_FullLabel_perm ==> List_FullLabel_perm ==> List_FullLabel_perm) (@app FullLabel) | 10.
+  Proof.
+    repeat red; intros.
+    specialize (List_FullLabel_perm_app_rewrite_l x0 H) as P1.
+    specialize (List_FullLabel_perm_app_rewrite_r y H0) as P2.
+    eauto using List_FullLabel_perm_trans.
+  Qed.
     
   Global Instance PSubsteps_rewrite' :
     Proper (@BaseModule_perm ==>
@@ -1375,13 +1403,62 @@ Section PStep_rewrite.
       + rewrite <- H0; assumption.
   Qed.
 
-  Global Instance Step_perm_rewrite' :
+  Lemma List_FullLabel_perm_app_split l1 l2 :
+    forall l3,
+      List_FullLabel_perm (l1++l2) l3 ->
+      exists l1' l2',
+        List_FullLabel_perm l1 l1' /\
+        List_FullLabel_perm l2 l2' /\
+        l3 [=] l1'++l2'.
+  Proof.
+    induction l1; simpl.
+    - intros; exists nil, l3.
+      repeat split; auto.
+      reflexivity.
+    - intros.
+      specialize (List_FullLabel_perm_in H _ (in_eq _ _)) as TMP; dest.
+      apply in_split in H1; dest; subst.
+      rewrite <-Permutation_middle in H.
+      apply List_FullLabel_perm_cons_inv in H; auto.
+      specialize (IHl1 _ H); dest.
+      exists (x::x2), x3; repeat split;auto.
+      + constructor 2; auto.
+      + rewrite <-Permutation_middle, H3; simpl; reflexivity.
+  Qed.
+
+  Lemma PStep_rewrite2 m o l1 :
+    PStep m o l1 ->
+    forall l2,
+      List_FullLabel_perm l1 l2 ->
+      PStep m o l2.
+  Proof.
+    induction 1; auto.
+    - econstructor 1; rewrite <-H; auto.
+    - econstructor 2; auto.
+      unfold getListFullLabel_diff in *; setoid_rewrite <-H0; auto.
+    - intros; rewrite HLabels in H1.
+      specialize (List_FullLabel_perm_app_split _ _ H1) as TMP; dest.
+      econstructor 3; auto.
+      + eapply IHPStep1; eauto.
+      + eapply IHPStep2; eauto.
+      + rewrite H2, H3 in HMatching1; assumption.
+      + rewrite H2, H3 in HMatching2; assumption.
+      + intros.
+        specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H2) _ H5) as TMP; dest.
+        specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H3) _ H6) as TMP; dest.
+        specialize (HNoRle _ _ H8 H10).
+        inv H7; inv H9; simpl in *; assumption.
+      + assumption.
+      + assumption.
+  Qed.
+  
+  Global Instance PStep_perm_rewrite' :
     Proper (Logic.eq ==> @Permutation (string * {x : FullKind & fullType type x})
-                     ==> @Permutation FullLabel
+                     ==> @List_FullLabel_perm
                      ==> iff) (@PStep) | 10.
   repeat red; split; intros; subst;
-    specialize (Permutation_sym H0) as TMP; specialize (Permutation_sym H1) as TMP1;
-      eauto using PStep_rewrite.
+    specialize (Permutation_sym H0) as TMP; specialize (List_FullLabel_perm_sym H1) as TMP1;
+      eauto using PStep_rewrite, PStep_rewrite2.
   Qed.
 End PStep_rewrite.
 
@@ -1509,133 +1586,22 @@ Lemma PSubsteps_combine m1 o1 l1:
                                                          | Rle _, Rle _ => False
                                                          | _, _ => True
                                                          end)
-         (HNoCall: forall x, InCall x l1 -> forall v, InCall (fst x, v) l2 -> False),
+         (* (HNoCall: forall x, InCall x l1 -> forall v, InCall (fst x, v) l2 -> False) *),
     PSubsteps m2 o2 l2 ->
     PSubsteps (BaseMod (getRegisters m1 ++ getRegisters m2) (getRules m1 ++ getRules m2) (getMethods m1 ++ getMethods m2)) (o1 ++ o2) (l1 ++ l2).
 Proof.
-  induction 1; intros.
-  - induction H; simpl in *.
-    + constructor 1; auto; simpl.
-      rewrite ?map_app; rewrite HRegs0; rewrite HRegs. reflexivity.
-    + econstructor 2; eauto; simpl; rewrite ?map_app; try congruence.
-      * rewrite HRegs; rewrite HRegs0; reflexivity.
-      * rewrite in_app_iff; right; eassumption.
-      * specialize (PSemAction_SemAction HPAction) as TMP; dest.
-        pose proof (SemActionReadsSub (BaseMod (getRegisters m1 ++ getRegisters m2) (getRules m1 ++ getRules m2) (getMethods m1 ++ getMethods m2)) H3).
-        pose proof (SemActionUpdSub H3).
-        eapply PSemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; right.
-        -- eapply H4; rewrite <- H0; eauto.
-        -- eapply H5; rewrite <- H1; eauto.
-      * unfold SubList in *; intros.
-        rewrite in_app_iff; right; eapply HReadsGood; eauto.
-      * unfold SubList in *; intros.
-        rewrite in_app_iff; right; eapply HUpdGood; eauto.
-      * eapply IHPSubsteps; intros;
-          unfold InCall in *; simpl in *; dest; tauto.
-    + econstructor 3; eauto; simpl; rewrite ?map_app; try congruence.
-      * rewrite HRegs; rewrite HRegs0; reflexivity.
-      * rewrite in_app_iff; right; eassumption.
-      * specialize (PSemAction_SemAction HPAction) as TMP; dest.
-        pose proof (SemActionReadsSub (BaseMod (getRegisters m1 ++ getRegisters m2) (getRules m1 ++ getRules m2) (getMethods m1 ++ getMethods m2)) H3).
-        pose proof (SemActionUpdSub H3).
-        eapply PSemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; right.
-        -- eapply H4; rewrite <- H0; eauto.
-        -- eapply H5; rewrite <- H1; eauto.
-      * unfold SubList in *; intros.
-        rewrite in_app_iff; right; eapply HReadsGood; eauto.
-      * unfold SubList in *; intros.
-        rewrite in_app_iff; right; eapply HUpdGood; eauto.
-      * eapply IHPSubsteps; intros;
-          unfold InCall in *; simpl in *; dest; tauto.
-  - subst; simpl; rewrite HLabel.
-    assert (sth_else: forall x1 x2, In x1 ls -> In x2 l2 -> match fst (snd x1), fst (snd x2) with
-                                                            | Rle _, Rle _ => False
-                                                            | _, _ => True
-                                                            end);[intros x1 x2; specialize (HOneRle x1 x2); rewrite HLabel in *; clear - HOneRle; firstorder fail|].
-    assert (sth2_else: forall x, InCall x ls -> forall v, InCall (fst x, v) l2 -> False);[intros x; specialize (HNoCall0 x); rewrite HLabel in *;clear - HNoCall0; firstorder fail|].
-    specialize (IHPSubsteps _ _ _ DisjRegs DisjMeths sth_else sth2_else H0).
-    simpl; econstructor 2; eauto; simpl; rewrite ?map_app; try congruence.
-    + inv H0; rewrite HRegs; rewrite HRegs0; reflexivity.
-    + rewrite in_app_iff; left; eassumption.
-    + specialize (PSemAction_SemAction HPAction) as TMP;dest.
-      pose proof (SemActionReadsSub (BaseMod (getRegisters m1 ++ getRegisters m2) (getRules m1 ++ getRules m2) (getMethods m1 ++ getMethods m2)) H4).
-      pose proof (SemActionUpdSub H4).
-      eapply PSemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; left.
-      * eapply H5; rewrite <- H1; eauto.
-      * eapply H6; rewrite <- H2; eauto.
-    + unfold SubList in *; intros.
-      rewrite in_app_iff; left; eapply HReadsGood; eauto.
-    + unfold SubList in *; intros.
-      rewrite in_app_iff; left; eapply HUpdGood; eauto.
-    + intros.
-      rewrite in_app_iff in *.
-      destruct H1; [eapply HDisjRegs; eauto| ].
-      rewrite DisjKeyWeak_same by apply string_dec; intro; intros.
-      rewrite in_map_iff in H2; dest; subst.   
-      pose proof (PSubsteps_upd_In H0 _ (in_map fst _ _ H1) _ (in_map fst _ _ H4)).
-      apply (SubList_map fst) in HUpdGood.
-      rewrite ?map_map in *; simpl in *.
-      rewrite ?(functional_extensionality (fun x => fst x) fst) in HUpdGood by tauto.
-      setoid_rewrite (functional_extensionality (fun x => fst x) fst) in HUpdGood; [|tauto].
-      specialize (HUpdGood _ H3).
-      clear - H2 DisjRegs HUpdGood; firstorder fail.
-    + intros.
-      rewrite in_app_iff in *.
-      destruct H1; [eapply HNoRle; eauto| ].
-      unfold SubList in *.
-      specialize (HOneRle (u, (Rle rn, cs)) x); rewrite HLabel in HOneRle.
-      specialize (HOneRle (or_introl eq_refl) H1); simpl in *; assumption.
-    + intros.
-      rewrite InCall_app_iff in *.
-      destruct H2; [eapply HNoCall; eauto|].
-      eapply HNoCall0; eauto.
-      rewrite HLabel.
-      unfold InCall.
-      eexists; split; simpl; eauto.
-  - subst; simpl.
-    assert (sth_else: forall x1 x2, In x1 ls -> In x2 l2 -> match fst (snd x1), fst (snd x2) with
-                                                            | Rle _, Rle _ => False
-                                                            | _, _ => True
-                                                            end);[intros;specialize (HOneRle x1 x2);rewrite HLabel in * ; firstorder fail|].
-    assert (sth2_else: forall x, InCall x ls -> forall v, InCall (fst x, v) l2 -> False);[intros; specialize (HNoCall0 x); rewrite HLabel in *; firstorder fail|].
-    specialize (IHPSubsteps _ _ _ DisjRegs DisjMeths sth_else sth2_else H0).
-    rewrite HLabel;simpl; econstructor 3; eauto; simpl; rewrite ?map_app; try congruence.
-    + inv H0;rewrite HRegs; rewrite HRegs0; reflexivity.
-    + rewrite in_app_iff; left; eassumption.
-    + specialize (PSemAction_SemAction HPAction) as TMP; dest.
-      pose proof (SemActionReadsSub (BaseMod (getRegisters m1 ++ getRegisters m2) (getRules m1 ++ getRules m2) (getMethods m1 ++ getMethods m2)) H4).
-      pose proof (SemActionUpdSub H4).
-      eapply PSemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; left.
-      * eapply H5; rewrite <- H1; eauto.
-      * eapply H6; rewrite <- H2; eauto.
-    + unfold SubList in *; intros.
-      rewrite in_app_iff; left; eapply HReadsGood; eauto.
-    + unfold SubList in *; intros.
-      rewrite in_app_iff; left; eapply HUpdGood; eauto.
-    + intros.
-      rewrite in_app_iff in *.
-      destruct H1; [eapply HDisjRegs; eauto| ].
-      rewrite DisjKeyWeak_same by apply string_dec; intro; intros.
-      rewrite in_map_iff in H2; dest; subst.
-      pose proof (PSubsteps_upd_In H0 _ (in_map fst _ _ H1) _ (in_map fst _ _ H4)).
-      apply (SubList_map fst) in HUpdGood.
-      rewrite ?map_map in *; simpl in *.
-      rewrite ?(functional_extensionality (fun x => fst x) fst) in HUpdGood by tauto.
-      setoid_rewrite (functional_extensionality (fun x => fst x) fst) in HUpdGood; [|tauto].
-      specialize (HUpdGood _ H3).
-      clear - H2 DisjRegs HUpdGood; firstorder fail.
-    + intros.
-      rewrite InCall_app_iff in *.
-      destruct H2; [eapply HNoCall; eauto|].
-      eapply HNoCall0; eauto.
-      unfold InCall.
-      eexists; rewrite HLabel;split; simpl; eauto.
-    + rewrite InExec_app_iff; intros; destruct H1; auto.
-      unfold InExec in H1; rewrite in_map_iff in H1; dest.
-      destruct x, p; simpl in *; subst.
-      eapply PSubsteps_meth_In in H2; eauto.
-      destruct (DisjMeths fn);auto.
-      apply (in_map fst) in HInMeths; contradiction.
+  intros.
+  apply PSubsteps_Substeps in H; apply PSubsteps_Substeps in H0.
+  dest; rewrite H, H0.
+  rewrite H1, H4.
+  apply Substeps_PSubsteps.
+  eapply Substeps_combine; eauto.
+  intros; clear - H1 H4 H7 H8 HOneRle.
+  apply (in_map getRleOrMeth) in H7; apply (in_map getRleOrMeth) in H8.
+  rewrite <-(List_FullLabel_perm_getRleOrMeth H4) in H7.
+  rewrite <-(List_FullLabel_perm_getRleOrMeth H1) in H8.
+  rewrite in_map_iff in H7, H8; dest.
+  specialize (HOneRle _ _ H3 H0); rewrite H, H2 in HOneRle; assumption.
 Qed.
 
 Corollary PStep_meth_InExec m o l :
@@ -1649,65 +1615,49 @@ Proof.
   apply (List_FullLabel_perm_InExec_rewrite f H2); assumption.
 Qed.
 
+Lemma List_FullLabel_perm_MatchingExecCalls_Base_rewrite l l' m :
+  List_FullLabel_perm l l' ->
+  MatchingExecCalls_Base l m ->
+  MatchingExecCalls_Base l' m.
+Proof.
+  intros LFL_perm HMec1 f HInDef.
+  specialize (HMec1 f HInDef).
+  rewrite <-LFL_perm; assumption.
+Qed.
+
+Lemma List_FullLabel_perm_MatchingExecCalls_Concat_rewrite1 l1 l2 l3 m :
+  List_FullLabel_perm l1 l2 ->
+  MatchingExecCalls_Concat l1 l3 m ->
+  MatchingExecCalls_Concat l2 l3 m.
+Proof.
+  unfold MatchingExecCalls_Concat.
+  intros; rewrite <-H.
+  apply H0; auto.
+  rewrite H; assumption.
+Qed.
+
+Lemma List_FullLabel_perm_MatchingExecCalls_Concat_rewrite2 l1 l2 l3 m :
+  List_FullLabel_perm l1 l2 ->
+  MatchingExecCalls_Concat l3 l1 m ->
+  MatchingExecCalls_Concat l3 l2 m.
+Proof.
+  unfold MatchingExecCalls_Concat.
+  intros; rewrite <-H.
+  apply H0; auto.
+Qed.
+
 Lemma PStep_substitute' m o l:
   PStep m o l -> forall (HWfMod: WfMod m), PStepSubstitute m o l.
 Proof.
-  unfold StepSubstitute.
-  induction 1; auto; simpl; intros; dest; unfold MatchingExecCalls in *; simpl in *.
-  - repeat split.
-    clear HMatching.
-    induction HPSubsteps.
-    + econstructor 1; eauto.
-    + econstructor 2; eauto.
-    + econstructor 3; eauto.
-    + simpl; tauto.
-    + specialize (HMatching f); tauto.
-    + simpl in *; tauto.
-  - inv HWfMod.
-    specialize (IHPStep HWf); unfold PStepSubstitute in IHPStep; dest.
-    repeat split; auto.
-    + specialize (H1 f); tauto.
-    + intros.
-      destruct H4; simpl in *; subst.
-      -- apply HHidden; auto.
-      -- apply H2; auto.
-  - inv HWfMod.
-    specialize (IHPStep1 HWf1).
-    specialize (IHPStep2 HWf2).
-    unfold PStepSubstitute in *; dest.
-    subst; repeat split; auto.
-    + pose proof (PSubsteps_combine H4  HDisjRegs HDisjMeths HNoRle HNoCall H1 (m2 := BaseMod (getAllRegisters m2) _ _)).
-      simpl in *.
-      rewrite HLabels; rewrite HRegs.
-      assumption.
-    + rewrite HLabels in *.
-      unfold MatchingExecCalls in *; simpl in *.
-      rewrite ?InExec_app_iff, ?InCall_app_iff, ?map_app, ?in_app_iff in *.
-      repeat match goal with
-             | H: forall x: MethT, _ |- _ => specialize (H f)
-             end; tauto.
-    + intros.
-      rewrite HLabels in *.
-      unfold MatchingExecCalls in *; simpl in *.
-      rewrite ?InExec_app_iff, ?InCall_app_iff, ?map_app, ?in_app_iff in *.
-      repeat match goal with
-             | H: forall x: string, _ |- _ => specialize (H s)
-             | H: forall x: MethT, _ |- _ => specialize (H (s, v))
-             end.
-      specialize (H6 v); specialize (H3 v).
-      destruct H7, H8, H9; try tauto.
-      * pose proof (PStep_meth_InExec H0 _ H9); simpl in *.
-        clear - HDisjMeths H7 H10; firstorder fail.
-      * pose proof (WfMod_Hidden HWf2 s H8).
-        clear - HDisjMeths H7 H10; firstorder fail.
-      * pose proof (WfMod_Hidden HWf2 s H8).
-        clear - HDisjMeths H7 H10; firstorder fail.
-      * pose proof (WfMod_Hidden HWf1 s H8).
-        clear - HDisjMeths H7 H10; firstorder fail.
-      * pose proof (WfMod_Hidden HWf1 s H8).
-        clear - HDisjMeths H7 H10; firstorder fail.
-      * pose proof (PStep_meth_InExec H _ H9); simpl in *.
-        clear - HDisjMeths H7 H10; firstorder fail.
+  intros.
+  apply PStep_Step in H; dest.
+  apply Step_substitute' in H2; auto.
+  unfold StepSubstitute in H2; dest.
+  unfold PStepSubstitute; repeat split.
+  - rewrite H, H1; apply Substeps_PSubsteps; auto.
+  - rewrite H1; assumption.
+  - intros; unfold getListFullLabel_diff in *; rewrite H1.
+    apply H4; auto.
 Qed.
 
 Lemma PStepSubstitute_flatten m o l (HWfMod: WfMod m):
@@ -1724,12 +1674,12 @@ Proof.
       specialize (IHl0 HPStep); dest.
       split; [auto| split; [auto| intros]].
       rewrite createHide_Meths in *; simpl in *.
-      destruct H3; [subst |clear - H1 H2 H3 H4; firstorder fail].
+      destruct H3; [subst |clear - H1 H2 H3; firstorder fail].
       firstorder fail.
   - induction (getHidden m); simpl; auto; dest.
     + constructor; auto.
     + assert (sth: PStep (createHide (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) l0) o l) by firstorder fail.
-      assert (sth2: forall v, In a (map fst (getAllMethods m)) -> InExec (a, v) l -> InCall (a, v) l) by firstorder fail.
+      assert (sth2: forall v, In a (map fst (getAllMethods m)) -> (getListFullLabel_diff (a, v) l = 0%Z)) by firstorder fail.
       constructor; auto.
       rewrite createHide_Meths.
       auto.
@@ -1743,7 +1693,7 @@ Proof.
   rewrite PStepSubstitute_flatten in *; auto.
 Qed.
 
-Lemma splitRegs o m1 m2 (DisjRegisters: DisjKey (getRegisters m1) (getRegisters m2)):
+Lemma splitRegs_perm o m1 m2 (DisjRegisters: DisjKey (getRegisters m1) (getRegisters m2)):
   getKindAttr o [=] getKindAttr (getRegisters m1 ++ getRegisters m2) ->
   getKindAttr (filter (fun x : string * {x : FullKind & fullType type x} => getBool (in_dec string_dec (fst x) (map fst (getRegisters m1)))) o) [=] getKindAttr (getRegisters m1).
 Proof.
@@ -1947,6 +1897,45 @@ Section SplitSubsteps.
           apply Permutation_cons_app.
           assumption.
   Qed.
+
+  Lemma List_FullLabel_perm_filter_rewrite m l l' :
+    List_FullLabel_perm l l' ->
+    List_FullLabel_perm (ModuleFilterLabels m l) (ModuleFilterLabels m l').
+  Proof.
+    induction 1; auto.
+    - reflexivity.
+    - inv H; simpl; unfold BaseModuleFilter; simpl.
+      destruct rm'.
+      + destruct (existsb (strcmp rn) (map fst (getRules m))); auto.
+        constructor 2; auto.
+        constructor; auto.
+      + destruct (existsb (strcmp (fst f)) (map fst (getMethods m))); auto.
+        constructor 2; auto.
+        constructor; auto.
+    - inv H; inv H0; simpl; unfold BaseModuleFilter; simpl.
+      destruct rm', rm'0.
+      + destruct (existsb (strcmp rn) (map fst (getRules m))),
+        (existsb (strcmp rn0) (map fst (getRules m))); auto.
+        * apply LFL_eq_cons_2; auto; constructor; auto.
+        * apply LFL_eq_cons_1; auto; constructor; auto.
+        * apply LFL_eq_cons_1; auto; constructor; auto.
+      + destruct (existsb (strcmp rn) (map fst (getRules m))),
+        (existsb (strcmp (fst f)) (map fst (getMethods m))); auto.
+        * apply LFL_eq_cons_2; auto; constructor; auto.
+        * apply LFL_eq_cons_1; auto; constructor; auto.
+        * apply LFL_eq_cons_1; auto; constructor; auto.
+      + destruct (existsb (strcmp rn) (map fst (getRules m))),
+        (existsb (strcmp (fst f)) (map fst (getMethods m))); auto.
+        * apply LFL_eq_cons_2; auto; constructor; auto.
+        * apply LFL_eq_cons_1; auto; constructor; auto.
+        * apply LFL_eq_cons_1; auto; constructor; auto.
+      + destruct (existsb (strcmp (fst f0)) (map fst (getMethods m))),
+        (existsb (strcmp (fst f)) (map fst (getMethods m))); auto.
+        * apply LFL_eq_cons_2; auto; constructor; auto.
+        * apply LFL_eq_cons_1; auto; constructor; auto.
+        * apply LFL_eq_cons_1; auto; constructor; auto.
+    - eauto using List_FullLabel_perm_trans.
+  Qed.
   
   Lemma split_PSubsteps1 o l:
     NoDup (map fst (getRegisters m1)) ->
@@ -1958,88 +1947,21 @@ Section SplitSubsteps.
                    PSubsteps m1 o1 (ModuleFilterLabels m1 l) /\
                    PSubsteps m2 o2 (ModuleFilterLabels m2 l)).
   Proof.
-    unfold concatFlat; induction 3; simpl in *.
-    - rewrite map_app in *; apply split_f in HRegs; dest.
-      exists x, x0;split;[|split;[|split;[|split;[constructor|constructor]]]];assumption.
-    - rewrite map_app in *;apply in_app_iff in HInRules; specialize (DisjRules rn).
-      assert (NoDup (map fst o));[setoid_rewrite GKA_fst;setoid_rewrite HRegs; rewrite <- map_app; rewrite <- GKA_fst; apply (NoDupKey_Expand H H0 DisjRegs)|].
-      destruct HInRules as [HInRules|HInRules];generalize (in_map fst _ _ HInRules);destruct DisjRules;try contradiction.
-      + subst; dest; exists x, x0;split;[|split;[|split;[|split]]];auto.
-        rewrite HLabel in *.
-        rewrite (InRules_Filter _ _ _ _ _ _ HInRules).
-        destruct WfMod1 as [WfMod_Rle1 WfMod_Meth1];destruct WfMod2 as [WfMod_Rle2 WfMod_Meth2];
-          specialize (WfActionT_ReadsWellDefined_perm (WfMod_Rle1 _ HInRules) HPAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined_perm (WfMod_Rle1 _ HInRules) HPAction) as Writes_sublist.
-        constructor 2 with (rn:= rn)(rb:=rb)(reads:=reads)(u:=u)(cs:=cs)(ls:=(ModuleFilterLabels m1 ls)); auto.
-        * specialize (papp_sublist_l _ _ H6) as SL_o_x.
-          specialize (WfMod_Rle1 (rn, rb) HInRules); specialize (WfActionT_PSemAction WfMod_Rle1 H2 HPAction SL_o_x H4).
-          simpl; auto.
-        * unfold ModuleFilterLabels;intros;apply HDisjRegs;
-            destruct (filter_In (BaseModuleFilter m1) x1 ls) as [L R];
-            destruct (L H10);assumption.
-        * intros; apply HNoRle;
-            destruct (filter_In (BaseModuleFilter m1) x1 ls) as [L R];
-            destruct (L H10);assumption.
-        * intros; apply InCall_split_InCall in H11; specialize (HNoCall _ H10 _ H11); contradiction.
-        * rewrite HLabel,(NotInRules_Filter _ _ _ _ _ H3); assumption.
-      + subst; dest; exists x, x0; split;[|split;[|split;[|split]]];auto.
-        rewrite HLabel,(NotInRules_Filter _ _ _ _ _ H3); assumption.
-        rewrite HLabel,(InRules_Filter _ _ _ _ _ _ HInRules).
-        destruct WfMod1 as [WfMod_Rle1 WfMod_Meth1];destruct WfMod2 as [WfMod_Rle2 WfMod_Meth2];
-          specialize (WfActionT_ReadsWellDefined_perm (WfMod_Rle2 _ HInRules) HPAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined_perm (WfMod_Rle2 _ HInRules) HPAction) as Writes_sublist.
-        constructor 2 with (rn:= rn)(rb:=rb)(reads:=reads)(u:=u)(cs:=cs)(ls:=(ModuleFilterLabels m2 ls)); auto.
-        * specialize (papp_sublist_r _ _ H6) as SL_o_x.
-          specialize (WfMod_Rle2 (rn, rb) HInRules); specialize (WfActionT_PSemAction WfMod_Rle2 H2 HPAction SL_o_x H5).
-          simpl; auto.
-        * unfold ModuleFilterLabels;intros;apply HDisjRegs;
-            destruct (filter_In (BaseModuleFilter m2) x1 ls) as [L R];
-            destruct (L H10);assumption.
-        * intros; apply HNoRle;
-            destruct (filter_In (BaseModuleFilter m2) x1 ls) as [L R];
-            destruct (L H10);assumption.
-        * intros; apply InCall_split_InCall in H11.
-          specialize (HNoCall _ H10 _ H11); contradiction.
-    - rewrite map_app in *;apply in_app_iff in HInMeths; specialize (DisjMeths fn).
-      assert (NoDup (map fst o));[setoid_rewrite GKA_fst;setoid_rewrite HRegs; rewrite <- map_app; rewrite <- GKA_fst; apply (NoDupKey_Expand H H0 DisjRegs)|].
-      destruct HInMeths as [HInMeths|HInMeths];generalize (in_map fst _ _ HInMeths);destruct DisjMeths;try contradiction;intros.
-      + subst; dest; exists x, x0;split;[|split;[|split;[|split]]];auto.
-        * rewrite HLabel,(InMethods_Filter _ _ _ _ _ _ _ _ HInMeths).
-          destruct WfMod1 as [WfMod_Rle1 WfMod_Meth1];destruct WfMod2 as [WfMod_Rle2 WfMod_Meth2]; specialize (WfActionT_ReadsWellDefined_perm (WfMod_Meth1 (fn, fb) HInMeths argV) HPAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined_perm (WfMod_Meth1 (fn, fb) HInMeths argV) HPAction) as Writes_sublist.
-          constructor 3 with (fn:=fn)(fb:=fb)(reads:=reads)(u:=u)(cs:=cs)(argV:=argV)(retV:=retV)(ls:=(ModuleFilterLabels m1 ls)); auto.
-          -- specialize (papp_sublist_l _ _ H7) as SL_o_x.
-             specialize (WfMod_Meth1 (fn, fb) HInMeths argV); specialize (WfActionT_PSemAction WfMod_Meth1 H2 HPAction SL_o_x H5).
-             simpl; auto.
-          -- intros; apply HDisjRegs;
-               destruct (filter_In (BaseModuleFilter m1) x1 ls) as [L R];
-               destruct (L H10); assumption.
-          -- intros; apply InCall_split_InCall in H11.
-             specialize (HNoCall _ H10 _ H11); contradiction.
-          -- intros; apply HNoExec; unfold InExec in *.
-             rewrite in_map_iff in H10; dest; destruct x1, p; simpl in *; subst.
-             unfold ModuleFilterLabels in H11; rewrite filter_In in H11; dest.
-             apply (in_map getRleOrMeth) in H10; assumption.
-        * rewrite HLabel,(NotInMethods_Filter _ _ _ _ _ _ _ _ H3); assumption.
-      + subst; dest; exists x, x0;split;[|split;[|split;[|split]]]; auto.
-        * rewrite HLabel,(NotInMethods_Filter _ _ _ _ _ _ _ _ H3); assumption.
-        * rewrite HLabel,(InMethods_Filter _ _ _ _ _ _ _ _ HInMeths).
-          destruct WfMod1 as [WfMod_Rle1 WfMod_Meth1];destruct WfMod2 as [WfMod_Rle2 WfMod_Meth2];
-            specialize (WfActionT_ReadsWellDefined_perm (WfMod_Meth2 (fn, fb) HInMeths argV) HPAction) as Reads_sublist;
-            specialize (WfActionT_WritesWellDefined_perm (WfMod_Meth2 (fn, fb) HInMeths argV) HPAction) as Writes_sublist.
-          constructor 3 with (fn:=fn)(fb:=fb)(reads:=reads)(u:=u)(cs:=cs)(argV:=argV)(retV:=retV)(ls:=(ModuleFilterLabels m2 ls)); auto.
-          -- specialize (papp_sublist_r _ _ H7) as SL_o_x.
-             specialize (WfMod_Meth2 (fn, fb) HInMeths argV); specialize (WfActionT_PSemAction WfMod_Meth2 H2 HPAction SL_o_x H6).
-             simpl; auto.
-          -- intros; apply HDisjRegs;
-               destruct (filter_In (BaseModuleFilter m2) x1 ls) as [L R];
-               destruct (L H10); assumption.
-          -- intros; apply InCall_split_InCall in H11.
-             specialize (HNoCall _ H10 _ H11); contradiction.
-          -- intros; apply HNoExec; unfold InExec in *.
-             rewrite in_map_iff in H10; dest; destruct x1, p; simpl in *; subst.
-             unfold ModuleFilterLabels in H11; rewrite filter_In in H11; dest.
-             apply (in_map getRleOrMeth) in H10; assumption.
+    intros.
+    apply PSubsteps_Substeps in H1; dest.
+    apply split_Substeps1 in H4; dest; auto.
+    exists x1, x2.
+    repeat split.
+    - rewrite H4; reflexivity.
+    - rewrite H5; reflexivity.
+    - rewrite H1, <- H6; reflexivity.
+    - rewrite (List_FullLabel_perm_filter_rewrite m1 H2).
+      apply Substeps_PSubsteps; assumption.
+    - rewrite (List_FullLabel_perm_filter_rewrite m2 H2).
+      apply Substeps_PSubsteps; assumption.
   Qed.
   
-  Lemma split_Substeps2 o l:
+  Lemma split_PSubsteps2 o l:
     PSubsteps (concatFlat m1 m2) o l ->
       (forall x y : FullLabel,
           In x (ModuleFilterLabels m1 l) ->
@@ -2050,83 +1972,18 @@ Section SplitSubsteps.
                      | Meth _ => True
                      end
           | Meth _ => True
-          end) /\
-      (forall x : MethT, InCall x (ModuleFilterLabels m1 l) -> forall v, InCall (fst x, v) (ModuleFilterLabels m2 l)
-                         -> False).
+          end)(*  /\ *)
+      (* (forall x : MethT, InCall x (ModuleFilterLabels m1 l) -> forall v, InCall (fst x, v) (ModuleFilterLabels m2 l) *)
+      (*                    -> False) *).
   Proof.
-    induction 1; intros; split; auto; subst.
-    - intros; contradiction.
-    - unfold InCall; intros; dest; contradiction.
-    - simpl in HInRules.
-      destruct (in_app_or _ _ _ HInRules) as [Rle_in | Rle_in]; specialize (in_map fst _ _ Rle_in) as map_Rle_in; destruct (DisjRules rn); try contradiction;
-        intros x y; rewrite HLabel,(InRules_Filter u _ _ ls cs _ Rle_in);rewrite (NotInRules_Filter u _ ls cs _ H0); intros.
-        * destruct H1.
-          -- rewrite <- H1; simpl.
-             apply HNoRle.
-             unfold ModuleFilterLabels in H2; apply filter_In in H2; destruct H2; assumption.
-          -- eapply IHPSubsteps; eauto.
-        * destruct H2.
-          -- rewrite <- H2; simpl.
-             apply HNoRle.
-             unfold ModuleFilterLabels in H1; apply filter_In in H1; destruct H1; assumption.
-          -- eapply IHPSubsteps; eauto.
-    - destruct (in_app_or _ _ _ HInRules) as [Rle_in | Rle_in]; specialize (in_map fst _ _ Rle_in) as map_Rle_in; destruct (DisjRules rn); try contradiction;
-        intros x; setoid_rewrite HLabel; setoid_rewrite (InRules_Filter u _ _ ls cs _ Rle_in);rewrite (NotInRules_Filter u _ ls cs _ H0); intros.
-      + destruct (InCall_app_iff x (((u, (Rle rn, cs)))::nil) (ModuleFilterLabels m1 ls)) as [L R]; clear R.
-        destruct (L H1); clear L.
-        * unfold InCall in H3. dest.
-          destruct H3;[subst|contradiction].
-          apply InCall_split_InCall in H2.
-          destruct x; simpl in *.
-          specialize (HNoCall _ H6 _ H2); contradiction.
-        * eapply IHPSubsteps; eauto.
-      + destruct (InCall_app_iff (fst x, v) (((u, (Rle rn, cs)))::nil) (ModuleFilterLabels m2 ls)) as [L R]; clear R.
-        destruct (L H2); clear L.
-        * unfold InCall in H3. dest.
-          destruct H3;[subst|contradiction].
-          apply InCall_split_InCall in H1.
-          destruct x; simpl in *.
-          specialize (HNoCall _ H6 _ H1); contradiction.
-        * eapply IHPSubsteps; eauto.
-    - intros.
-      unfold ModuleFilterLabels in *.
-      rewrite HLabel in *.
-      specialize (filter_app (BaseModuleFilter m1) ((u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))::nil) ls) as TMP; setoid_rewrite TMP in H0; clear TMP.
-      specialize (filter_app (BaseModuleFilter m2) ((u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))::nil) ls) as TMP; setoid_rewrite TMP in H1; clear TMP.
-      destruct (in_app_or _ _ _ H0); destruct (in_app_or _ _ _ H1).
-      + apply filter_In in H3; apply filter_In in H2. dest.
-        destruct H2, H3; try contradiction.
-        subst; simpl; auto.
-      + apply filter_In in H2; destruct H2.
-        destruct H2;[|contradiction].
-        subst; simpl; auto.
-      + apply filter_In in H3; destruct H3.
-        destruct H3;[|contradiction].
-        subst; simpl; auto.
-        destruct (fst (snd x)); auto.
-      + eapply IHPSubsteps; eauto.
-    - intros.
-      destruct (DisjMeths fn).
-      + rewrite HLabel in *; setoid_rewrite (NotInMethods_Filter u _ fb argV retV ls cs _ H2) in H0.
-        unfold ModuleFilterLabels in *.
-        specialize (filter_app (BaseModuleFilter m2) ((u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))::nil) ls) as TMP; setoid_rewrite TMP in H1; clear TMP.
-        destruct (InCall_app_iff (fst x, v) (filter (BaseModuleFilter m2) [(u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))]) (filter (BaseModuleFilter m2) ls)) as [L R]; clear R; destruct (L H1); clear L.
-        * unfold InCall in H3; dest; apply filter_In in H3; destruct H3.
-          destruct H3;[subst|contradiction].
-          apply InCall_split_InCall in H0.
-          destruct x; simpl in *.
-          specialize (HNoCall _ H6 _ H0); contradiction.
-        * eapply IHPSubsteps; eauto.
-      + rewrite HLabel in *; setoid_rewrite (NotInMethods_Filter u _ fb argV retV ls cs _ H2) in H1.
-        unfold ModuleFilterLabels in *.
-        specialize (filter_app (BaseModuleFilter m1) ((u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))::nil) ls) as TMP; setoid_rewrite TMP in H0; clear TMP.
-        destruct (InCall_app_iff x (filter (BaseModuleFilter m1) [(u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))]) (filter (BaseModuleFilter m1) ls)) as [L R]; clear R; destruct (L H0); clear L.
-        * unfold InCall in H3; dest; apply filter_In in H3; destruct H3.
-          destruct H3;[subst|contradiction].
-          destruct x.
-          apply InCall_split_InCall in H1.
-          eapply HNoCall; eauto.
-        * eapply IHPSubsteps; eauto.
+    intros.
+    apply PSubsteps_Substeps in H; dest.
+    specialize (List_FullLabel_perm_filter_rewrite m1 H2) as P1;
+      specialize (List_FullLabel_perm_filter_rewrite m2 H2) as P2.
+    specialize (List_FullLabel_perm_in P1 _ H0) as TMP; dest.
+    specialize (List_FullLabel_perm_in P2 _ H1) as TMP; dest.
+    specialize (split_Substeps2 DisjRules DisjMeths H4 _ _ H6 H8) as P3.
+    inv H5; inv H7; simpl in *; auto.
   Qed.
 
 End SplitSubsteps.
@@ -2150,18 +2007,18 @@ Lemma flatten_PSubsteps m o l:
   - econstructor 3; eauto.
 Qed.
 
-Lemma PWfConcats m1 m2 o l:
-  WfConcat m2 m1 -> PSubsteps (getFlat m2) o l ->
-  forall s v,
-    In s (getHidden m1) -> ~InCall (s, v) l.
-Proof.
-  intros.
-  specialize (PSubsteps_Substeps H0) as TMP; dest.
-  specialize (WfConcats H H5 H1 (v:=v)).
-  repeat intro.
-  apply H6.
-  apply (List_FullLabel_perm_InCall_rewrite H3); assumption.
-Qed.
+(* Lemma PWfConcats m1 m2 o l: *)
+(*   WfConcat m2 m1 -> PSubsteps (getFlat m2) o l -> *)
+(*   forall s v, *)
+(*     In s (getHidden m1) -> ~InCall (s, v) l. *)
+(* Proof. *)
+(*   intros. *)
+(*   specialize (PSubsteps_Substeps H0) as TMP; dest. *)
+(*   specialize (WfConcats H H5 H1 (v:=v)). *)
+(*   repeat intro. *)
+(*   apply H6. *)
+(*   apply (List_FullLabel_perm_InCall_rewrite H3); assumption. *)
+(* Qed. *)
 
 Lemma substitute_PStep' m (HWfMod: WfMod m):
   forall o l,
@@ -2169,70 +2026,17 @@ Lemma substitute_PStep' m (HWfMod: WfMod m):
     PStep m o l.
 Proof.
   unfold PStepSubstitute.
-  induction m; simpl in *; intros; dest.
-  - constructor 1; auto; eapply PSubsteps_flatten; eauto.
-  - constructor; auto.
-    inv HWfMod;eapply IHm; eauto.
-  - inv HWfMod.
-    specialize (IHm1 HWf1).
-    specialize (IHm2 HWf2).
-    destruct (WfNoDups HWf1) as [ND_Regs1 [ND_Meths1 ND_Rules1]].
-    destruct (WfNoDups HWf2) as [ND_Regs2 [ND_Meths2 ND_Rules2]].
-    specialize (WfMod_WfBaseMod_flat HWf1) as WfBaseMod1.
-    specialize (WfMod_WfBaseMod_flat HWf2) as WfBaseMod2.
-    pose proof (@split_PSubsteps1 (getFlat m1) (getFlat m2) HDisjRegs HDisjRules HDisjMeths WfBaseMod1 WfBaseMod2 _ _  ND_Regs1 ND_Regs2 H);dest.
-    rewrite H4 in *.
-    assert (DisjKey (getRules (getFlat m1)) (getRules (getFlat m2)));[repeat intro; apply HDisjRules|].
-    assert (DisjKey (getMethods (getFlat m1))(getMethods (getFlat m2)));[repeat intro;apply HDisjMeths|].
-    specialize (pfilter_perm H7 H8 H) as P1.
-    rewrite P1. rewrite P1 in H.
-    econstructor 3.
-    + eapply IHm1; eauto.
-      Opaque MatchingExecCalls.
-      repeat split; eauto.
-      * unfold getFlat in H0; simpl in *.
-        assert (MatchingExecCalls l l (Base (concatFlat (getFlat m1) (getFlat m2))));[unfold concatFlat, getFlat;simpl; assumption|].
-        eapply MatchingExecCalls_Split; eauto.
-      * intros; specialize (H1 s v).
-        intros; specialize (PWfConcats WfConcat2 H6 H10 (v:=v));intro.
-        rewrite map_app in H1.
-        specialize (H1 (in_or_app _ _ s (or_introl H9)) (in_or_app _ _ s (or_introl H10)) (InExec_split_InExec _ _ _ H11)).
-        assert (DisjKey (getRules (getFlat m1)) (getRules (getFlat m2)));[repeat intro; apply HDisjRules|].
-        assert (DisjKey (getMethods (getFlat m1))(getMethods (getFlat m2)));[repeat intro;apply HDisjMeths|].
-        rewrite P1 in H1; apply InCall_app_iff in H1; destruct H1;[assumption|contradiction].
-    + eapply IHm2; eauto.
-      repeat split; eauto.
-      * unfold getFlat in H0; simpl in *.
-        assert (MatchingExecCalls l l (Base (concatFlat (getFlat m1) (getFlat m2))));[unfold concatFlat, getFlat;simpl; assumption|].
-        apply MatchingExecCalls_Concat_comm in H9.
-        eapply MatchingExecCalls_Split; eauto.
-      * intros; specialize (H1 s v).
-        intros; specialize (PWfConcats WfConcat1 H5 H10 (v:=v));intro.
-        rewrite map_app in H1.
-        specialize (H1 (in_or_app _ _ s (or_intror H9)) (in_or_app _ _ s (or_intror H10)) (InExec_split_InExec _ _ _ H11)).
-        assert (DisjKey (getRules (getFlat m1)) (getRules (getFlat m2)));[repeat intro; apply HDisjRules|].
-        assert (DisjKey (getMethods (getFlat m1))(getMethods (getFlat m2)));[repeat intro;apply HDisjMeths|].
-        rewrite P1 in H1; apply InCall_app_iff in H1; destruct H1;[contradiction|assumption].
-    + assert (MatchingExecCalls l l (Base (concatFlat (getFlat m1) (getFlat m2)))); auto.
-      specialize (MatchingExecCalls_Mix H9); intros.
-      Transparent MatchingExecCalls.
-      repeat intro.
-      destruct (H10 f H11 H12).
-      split; auto.
-      intro; apply (PWfConcats WfConcat1 H5 H15 (v:=(snd f))); destruct f ;assumption.
-    + assert (MatchingExecCalls l l (Base (concatFlat (getFlat m1) (getFlat m2)))); auto.
-      specialize (MatchingExecCalls_Mix (MatchingExecCalls_Concat_comm H9)); intros.
-      repeat intro.
-      destruct (H10 f H11 H12).
-      split; auto.
-      intro; apply (PWfConcats WfConcat2 H6 H15 (v:=(snd f))); destruct f ;assumption.
-    + intros.
-      eapply split_Substeps2; eauto; rewrite <- P1; assumption.
-    + eapply split_Substeps2; eauto; rewrite P1; apply H.
-    + reflexivity.
-    + reflexivity.
+  intros; dest.
+  apply PSubsteps_Substeps in H; dest.
+  rewrite H2 in H0.
+  unfold getListFullLabel_diff in H1.
+  setoid_rewrite H2 in H1.
+  assert (StepSubstitute m x x0).
+  - unfold StepSubstitute; auto.
+  - specialize (substitute_Step' HWfMod H5) as TMP; dest.
+    rewrite H6 in H2; rewrite H, H2.
+    apply Step_PStep; auto.
 Qed.
-
 
 Lemma substitute_PStep m o l (HWfMod: WfMod m):
   PStep (flatten m) o l ->
@@ -2343,8 +2147,8 @@ Section WfModule_rewrite.
     - intros.
       inv H0; econstructor 1.
       + rewrite <- H; assumption.
-      + repeat intro.
-        apply (HMatching f H0); simpl in *.
+      + intros f InDefm2.
+        apply (HMatching f); simpl in *.
         inversion H; subst.
         rewrite HMethsPerm; assumption.
     - intros.

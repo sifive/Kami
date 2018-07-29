@@ -1944,7 +1944,10 @@ Definition flatten m := createHide (getFlat m) (getHidden m).
 Definition PStepSubstitute m o l :=
   PSubsteps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
   MatchingExecCalls_Base l (getFlat m) /\
-  (forall s v, In s (map fst (getAllMethods m)) -> In s (getHidden m) -> InExec (s, v) l -> InCall (s, v) l).
+  (forall s v, In s (map fst (getAllMethods m)) ->
+               In s (getHidden m) ->
+               (getListFullLabel_diff (s, v) l = 0%Z)).
+  (* (forall s v, In s (map fst (getAllMethods m)) -> In s (getHidden m) -> InExec (s, v) l -> InCall (s, v) l). *)
 
 Definition StepSubstitute m o l :=
   Substeps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
