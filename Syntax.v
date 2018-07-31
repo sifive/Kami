@@ -148,6 +148,10 @@ Section Phoas.
                                  | right _ => ReadStruct e i'
                                  end).
 
+  Inductive LetExprSyntax k :=
+  | NormExpr (e: Expr (SyntaxKind k)): LetExprSyntax k
+  | LetE k' (e: Expr (SyntaxKind k')) (cont: ty k' -> LetExprSyntax k): LetExprSyntax k.
+
   Section BitOps.
     Definition castBits ni no (pf: ni = no) (e: Expr (SyntaxKind (Bit ni))) :=
       nat_cast (fun n => Expr (SyntaxKind (Bit n))) pf e.
@@ -355,7 +359,14 @@ Section Phoas.
   | Assertion: Expr (SyntaxKind Bool) -> ActionT lretT -> ActionT lretT
   | Sys: list SysT -> ActionT lretT -> ActionT lretT
   | Return: Expr (SyntaxKind lretT) -> ActionT lretT.
+
+  Fixpoint convertLetExprSyntax_ActionT k (e: LetExprSyntax k) :=
+    match e in LetExprSyntax _ return ActionT k with
+    | NormExpr e' => Return e'
+    | LetE _ e' cont => LetExpr e' (fun v => convertLetExprSyntax_ActionT (cont v))
+    end.
 End Phoas.
+
 
 Definition Action (retTy : Kind) := forall ty, ActionT ty retTy.
 
@@ -663,6 +674,15 @@ Notation "'System' sysexpr ; cont " :=
 Notation "'Ret' expr" :=
   (Return expr%kami_expr) (at level 12) : kami_action_scope.
 Notation "'Retv'" := (Return (Const _ (k := Void) Default)) : kami_action_scope.
+
+Notation "'LETE' name <- expr ; cont " :=
+  (LetE expr%kami_expr (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_expr_scope.
+Notation "'LETE' name : t <- expr ; cont " :=
+  (LetE (k' := t) expr%kami_expr (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_expr_scope.
+Notation "'RetE' expr" :=
+  (NormExpr expr%kami_expr) (at level 12) : kami_expr_scope.
 
 Delimit Scope kami_action_scope with kami_action.
 
@@ -1134,6 +1154,12 @@ Section Semantics.
         (@evalExpr _ fv) i
       | BuildArray n k fv => fun i => @evalExpr _ (fv i)
     end.
+  
+  Fixpoint evalLetExpr k (e: LetExprSyntax type k) :=
+    match e in LetExprSyntax _ _ return type k with
+    | NormExpr e' => evalExpr e'
+    | LetE _ e' cont => evalLetExpr (cont (evalExpr e'))
+    end.
 
   Variable o: RegsT.
 
@@ -1418,6 +1444,12 @@ Section Semantics.
     destruct evalA; eauto; repeat eexists; try destruct (evalExpr p); eauto; try discriminate.
   Qed.
 
+  Lemma convertLetExprSyntax_ActionT_same k (e: LetExprSyntax type k):
+    SemAction (convertLetExprSyntax_ActionT e) nil nil nil (evalLetExpr e).
+  Proof.
+    induction e; simpl; constructor; auto.
+  Qed.
+  
   Lemma SemActionReadsSub k a reads upds calls ret:
     @SemAction k a reads upds calls ret ->
     SubList reads o.
