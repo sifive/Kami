@@ -1521,6 +1521,13 @@ Proof.
            (*    apply HNoExec; right; assumption. *)
 Qed.
 
+
+Global Instance Substeps_perm_rewrite' :
+  Proper (eq ==> eq ==> @Permutation FullLabel ==> iff) (@Substeps) | 10.
+Proof.
+  repeat red; intros; split; intro; subst; eauto using Permutation_sym, Substeps_permutation_invariant.
+Qed.
+
 Lemma extract_exec (f : DefMethT) m o l u cs fb:
   NoDup (map fst (getMethods m)) ->
   In f (getMethods m) ->
@@ -1658,6 +1665,32 @@ Proof.
     rewrite map_app, concat_app; repeat rewrite app_assoc; apply Permutation_app_tail; rewrite Permutation_app_comm; reflexivity.
 Qed.
 
+Lemma getNumFromExecs_gt_0 f execs :
+  (0 < getNumFromExecs f execs)%Z ->
+  In (Meth f) execs.
+Proof.
+  induction execs; intros;[inv H|].
+  destruct a;[|destruct (MethT_dec f f0)].
+  - rewrite getNumFromExecs_Rle_cons in H.
+    specialize (IHexecs H).
+    right; assumption.
+  - subst; left; reflexivity.
+  - rewrite getNumFromExecs_neq_cons in H; auto.
+    specialize (IHexecs H).
+    right; assumption.
+Qed.
+
+Lemma getNumFromCalls_gt_0 f calls :
+  (0 < getNumFromCalls f calls)%Z ->
+  In f calls.
+  induction calls; intros;[inv H|].
+  destruct (MethT_dec f a).
+  - subst; left; reflexivity.
+  - rewrite getNumFromCalls_neq_cons in H; auto.
+    specialize (IHcalls H).
+    right; assumption.
+Qed.
+
 Lemma rewrite_called_execs:
   forall calls execs,
     (forall f, getNumFromCalls f calls <= getNumFromExecs f execs)%Z ->
@@ -1668,39 +1701,15 @@ Proof.
   - exists execs; reflexivity.
   - specialize (H a) as P1.
     rewrite getNumFromCalls_eq_cons in P1; auto.
-    assert (getNumFromCalls a calls <= getNumFromExecs a execs)%Z;[Omega.omega|].
-    specialize (IHcalls H0).
-    simpl in P1; destruct (MethT_dec a a);[|apply False_ind, n; reflexivity].
-    
-    
-    (forall f, In f calls -> In (Meth f) execs) ->
-    NoDup execs ->
-    NoDup calls ->
-    (filter (called_execs calls) execs) [=] (map Meth calls).
-Proof.
-  induction calls; intros.
-  - unfold called_execs; simpl.
-    assert ((fun x => match x with |Rle _ | _ => false end) = (fun _ => false));[
-      apply functional_extensionality; destruct x; reflexivity|].
-    rewrite H2; rewrite filter_false; reflexivity.
-  - unfold called_execs in *; simpl in *.
-    specialize (H a (or_introl _ eq_refl)) as H'.
-    apply in_split in H'; dest; rewrite H2,<-Permutation_middle.
-    simpl; unfold methcmp; destruct MethT_dec;[simpl|apply False_ind; apply n; reflexivity].
-    apply Permutation_cons;[reflexivity|].
-    assert (~In (Meth a) (x++x0)).
-    + rewrite H2 in H0; rewrite <- Permutation_middle in H0.
-      inv H0; assumption.
-    + specialize (reduce_called_execs_list _ _ H3 calls) as TMP.
-      unfold called_execs, methcmp in *; simpl in *.
-      rewrite TMP.
-      eapply IHcalls.
-      * intros.
-        rewrite H2 in H; specialize (H _ (or_intror _ H4)).
-        rewrite <- Permutation_middle in H.
-        destruct H;[inv H; inv H1; contradiction| assumption].
-      * rewrite H2, <-Permutation_middle in H0; inv H0; assumption.
-      * inv H1; assumption.
+    assert ((0 < getNumFromExecs a execs)%Z) as P2;[specialize (getNumFromCalls_nonneg a calls) as TMP1;Omega.omega|].
+    specialize (in_split _ _ (getNumFromExecs_gt_0 _ _ P2)) as TMP; dest.
+    rewrite H0 in H; setoid_rewrite <-Permutation_middle in H.
+    assert (forall f, (getNumFromCalls f calls <= getNumFromExecs f (x++x0))%Z).
+    + intros; specialize (H f); destruct (MethT_dec f a);[rewrite getNumFromCalls_eq_cons, getNumFromExecs_eq_cons in H
+                                                         |rewrite getNumFromCalls_neq_cons, getNumFromExecs_neq_cons in H];auto;Omega.omega.
+    + specialize (IHcalls _ H1); dest.
+      exists x1; rewrite H0, <-Permutation_middle.
+      simpl; rewrite H2; reflexivity.
 Qed.
 
 Lemma MatchingExecCalls_flat_surjective f calls execs m :
@@ -1712,615 +1721,22 @@ Proof.
   unfold MatchingExecCalls_flat.
   induction calls; intros.
   - contradiction.
-  - unfold called_by in H1; simpl in *.
-    destruct string_dec; subst; simpl in *.
+  - unfold called_by in H1; simpl in H1.
+    destruct string_dec; subst; simpl in H1.
     + destruct H1; subst.
       * apply (in_map fst) in H; rewrite e in H.
-        apply (H0 _ (or_introl _ (eq_refl)) H).
-      * eapply IHcalls; eauto.
-    + eapply IHcalls;eauto.
-Qed.
-
-Lemma filter_preserves_NoDup A (f : A -> bool) l :
-  NoDup l ->
-  NoDup (filter f l).
-Proof.
-  induction 1.
-  - simpl; constructor.
-  - unfold filter; destruct (f x); fold (filter f l); auto.
-    + econstructor; eauto.
-      intro; apply H.
-      rewrite filter_In in H1; dest; assumption.
-Qed.
-
-Lemma PPlusSubsteps_inline_In f m o upds execs calls :
-  NoDup (map fst (getMethods m)) ->
-  In f (getMethods m) ->
-  MatchingExecCalls_flat calls execs m ->
-  PPlusSubsteps m o upds execs calls ->
-  PPlusSubsteps (inlinesingle_BaseModule m f) o upds (filter (complement (called_execs (filter (called_by f) calls))) execs) (filter (complement (called_by f)) calls).
-Proof.
-  induction 4; simpl.
-  - econstructor 1; auto.
-  - rewrite HUpds, HExecs, HCalls; simpl.
-    rewrite filter_app.
-    destruct (in_dec string_dec (fst f) (map fst cs)).
-    + specialize (fst_produce_snd _ _ i) as TMP; dest.
-      unfold MatchingExecCalls_flat in H1; setoid_rewrite HCalls in H1.
-      specialize (H1 _ (in_or_app _ _ _ (or_introl _ H3))) as TMP; simpl in *.
-      specialize (TMP (in_map fst _ _ H0)); simpl in *.
-      rewrite HExecs in TMP; destruct TMP;[discriminate|].
-      specialize (in_split _ _ H4) as TMP; dest.
-      rewrite H5, <- Permutation_middle in H2.
-      admit.
-    + admit.
-  - admit.
-Admitted.
-
-Lemma PSemAction_inline_In (f : DefMethT) o readRegs' newRegs' calls' argV retV1:
-    PSemAction o (projT2 (snd f) type argV) readRegs' newRegs' calls' retV1 ->
-    forall {retK2} a readRegs newRegs calls (retV2 : type retK2),
-      DisjKey newRegs' newRegs ->
-      DisjKey calls' calls ->
-      In (fst f,  (existT _ (projT1 (snd f)) (argV, retV1))) calls ->
-      PSemAction o a readRegs newRegs calls retV2 ->
-      PSemAction o (inlineSingle f a) (readRegs' ++ readRegs) (newRegs' ++ newRegs)
-                 (calls' ++ filter (remove_calls f) calls) retV2.
-Proof.
-  induction a.
-  - intros; simpl; destruct string_dec;[destruct Signature_dec|]; subst.
-    + assert (DisjKey calls' (filter (remove_calls f) calls));[
-      intro; destruct (H2 k); auto; right;
-      intro; apply H5; rewrite in_map_iff in H6; dest; rewrite filter_In in H7; dest;
-      rewrite in_map_iff; exists x; firstorder|].
-      clear H2.
-      econstructor; eauto; inv H4; EqDep_subst; rewrite HAcalls in H3; destruct H3.
-      * econstructor; eauto.
-        -- inversion H2; EqDep_subst.
-           apply H.
-      * apply False_ind.
-        specialize (HDisjCalls (existT SignT (projT1 (snd f)) (argV, retV1))); contradiction.
-      * inversion H2; EqDep_subst.
-        apply PSemAction_inline_notIn.
-        -- assert (filter (fun y : string * {x : Kind * Kind & SignT x} =>
-                             negb (getBool (string_dec (fst f) (fst y)))) calls [=]
-                          calls0);
-             [rewrite HAcalls; simpl; destruct string_dec;[|exfalso; apply n; reflexivity];
-              simpl;rewrite key_not_In_filter; auto|].
-           apply (PSemAction_rewrite_calls (Permutation_sym H3) HPSemAction).
-        -- intro.
-           rewrite in_map_iff in H3; dest; rewrite filter_In in H4; dest.
-           rewrite H3 in H6; destruct string_dec; simpl in *;[discriminate|apply n; reflexivity].
-      * apply False_ind.
-        specialize (HDisjCalls (existT SignT (projT1 (snd f)) (argV, retV1))); contradiction.
-    + apply False_ind.
-      inv H4; EqDep_subst.
-      rewrite HAcalls in H3; destruct H3.
-      * inv H3; EqDep_subst; apply n; reflexivity.
-      * specialize (HDisjCalls (existT SignT (projT1 (snd f)) (argV, retV1))); contradiction.
-    + inv H4; EqDep_subst.
-      assert (DisjKey calls' (filter (remove_calls f) calls));
-        [intro; destruct (H2 k); auto; right;
-         intro; apply H4; rewrite in_map_iff in H5; dest; rewrite filter_In in H6; dest;
-         rewrite in_map_iff; exists x; firstorder|].
-      assert (key_not_In meth (calls'++(filter (remove_calls f) calls0))).
-      * repeat intro; rewrite in_app_iff in H5; destruct H5.
-        -- rewrite HAcalls in H2; destruct (H2 meth).
-           ++ apply H6; rewrite in_map_iff; exists (meth, v); firstorder fail.
-           ++ apply H6; simpl; left; reflexivity.
-        -- rewrite filter_In in H5; dest.
-           specialize (HDisjCalls v); contradiction.
-      * econstructor.
-        -- apply H5.
-        -- rewrite HAcalls.
-           simpl; destruct string_dec;[contradiction|simpl].
-           symmetry; apply Permutation_middle.
-        -- eapply H0; eauto.
-           ++ repeat intro; destruct (H2 k);[left|right; intro; apply H6; rewrite HAcalls; right]; assumption.
-           ++ rewrite HAcalls in H3.
-              destruct H3;[inv H3; EqDep_subst; apply False_ind; apply n; reflexivity| assumption].
-  - intros; inv H4; EqDep_subst; simpl in *; econstructor 2.
-    eapply H0; eauto.
-  - intros; inv H4; EqDep_subst; simpl in *.
-    rewrite HUCalls, in_app_iff in H3; destruct H3; econstructor 3.
-    + rewrite HUNewRegs in H1.
-      assert (DisjKey (newRegs'++newRegs0) newRegsCont).
-      * intro; specialize (H1 k0); specialize (HDisjRegs k0); rewrite map_app, in_app_iff, DeM1 in *;
-          destruct H1, HDisjRegs;[left| right| right|right]; dest; auto.
-      * apply H4.
-    + rewrite HUCalls in H2.
-      assert (DisjKey (calls'++(filter (remove_calls f) calls0)) callsCont).
-      * intro; specialize (H2 k0); specialize (HDisjCalls k0); rewrite map_app, in_app_iff, DeM1 in *.
-        destruct H2, HDisjCalls;[left| right| right|right]; dest; auto.
-        split;[assumption|].
-        intro; apply H4; rewrite in_map_iff in H5; dest; rewrite filter_In in H6; dest.
-        rewrite <- H5; rewrite in_map_iff; exists x; firstorder.
-      * apply H4.
-    + eapply IHa; eauto.
-      * rewrite HUNewRegs in H1; intro; specialize (H1 k0); rewrite map_app, in_app_iff, DeM1 in H1.
-        destruct H1;[left|right];dest;auto.
-      * rewrite HUCalls in H2; intro; specialize (H2 k0); rewrite map_app, in_app_iff, DeM1 in H2.
-        destruct H2;[left|right];dest;auto.
-    + rewrite HUReadRegs; rewrite app_assoc; reflexivity.
-    + rewrite HUNewRegs; rewrite app_assoc; reflexivity.
-    + rewrite HUCalls.
-      rewrite filter_app, app_assoc.
-      apply Permutation_app_head.
-      assert (key_not_In (fst f) callsCont);
-        [repeat intro;apply (in_map fst) in H4; apply (in_map fst) in  H3; simpl in *;
-         specialize (HDisjCalls (fst f)); firstorder|].
-      rewrite (key_not_In_filter _ H4); reflexivity.
-    + apply PSemAction_inline_notIn; auto.
-      apply (in_map fst) in H3; simpl in *.
-      destruct (HDisjCalls (fst f)); auto.
-    + rewrite HUNewRegs in H1.
-      assert (DisjKey newRegs0 (newRegs'++newRegsCont)).
-      * intro; specialize (H1 k0); specialize (HDisjRegs k0); rewrite map_app, in_app_iff, DeM1 in *;
-          destruct H1, HDisjRegs; dest; auto.
-      * apply H4.
-    + rewrite HUCalls in H2.
-      assert (DisjKey calls0 (calls'++(filter (remove_calls f) callsCont))).
-      * intro; specialize (H2 k0); specialize (HDisjCalls k0); rewrite map_app, in_app_iff, DeM1 in *.
-        destruct H2, HDisjCalls; dest; auto.
-        right; split;[assumption|].
-        intro; apply H4; rewrite in_map_iff in H5; dest; rewrite filter_In in H6; dest.
-        rewrite <- H5; rewrite in_map_iff; exists x; firstorder.
-      * apply H4.
-    + apply PSemAction_inline_notIn; eauto.
-      intro; apply (in_map fst) in H3; destruct (HDisjCalls (fst f)); simpl;auto.
-    + rewrite HUReadRegs,Permutation_app_comm, <- app_assoc.
-      apply Permutation_app_head.
-      rewrite Permutation_app_comm; reflexivity.
-    + rewrite HUNewRegs; repeat rewrite app_assoc. apply Permutation_app_tail.
-      rewrite Permutation_app_comm; reflexivity.
-    + rewrite HUCalls, filter_app.
-      assert (key_not_In (fst f) calls0);
-        [repeat intro; apply (in_map fst) in H4; apply (in_map fst) in H3; simpl in *;
-         specialize (HDisjCalls (fst f));firstorder|].
-      rewrite (key_not_In_filter _ H4).
-      repeat rewrite app_assoc; apply Permutation_app_tail.
-      rewrite Permutation_app_comm; reflexivity.
-    + eapply H0; eauto.
-      * rewrite HUNewRegs in H1; intro; specialize (H1 k0); rewrite map_app, in_app_iff, DeM1 in H1.
-        destruct H1;[left|right];dest;auto.
-      * rewrite HUCalls in H2; intro; specialize (H2 k0); rewrite map_app, in_app_iff, DeM1 in H2.
-        destruct H2;[left|right];dest;auto.
-  - intros; simpl; inv H4; EqDep_subst; econstructor 4; eauto.
-  - intros; simpl; inv H4; EqDep_subst; econstructor 5; eauto.
-    rewrite HNewReads; symmetry; apply Permutation_middle.
-  - intros; simpl; inv H3; EqDep_subst; econstructor 6; auto.
-    + rewrite HANewRegs in H0; specialize (H0 r); destruct H0;
-        [|apply False_ind; apply H0;left;reflexivity].
-      assert (key_not_In r (newRegs'++newRegs0));
-        [intro;specialize (HDisjRegs v);rewrite in_app_iff,DeM1;
-         split;auto;intro;apply H0;apply (in_map fst) in H3; assumption|].
-      apply H3.
-    + rewrite HANewRegs.
-      symmetry; apply Permutation_middle.
-    + eapply IHa; eauto.
-      rewrite HANewRegs in H0.
-      intro; specialize (H0 k0); simpl in *; firstorder fail.
-  - intros; inv H4; EqDep_subst; simpl in *.
-    rewrite HUCalls, in_app_iff in H3; destruct H3; econstructor 7.
-    + rewrite HUNewRegs in H1.
-      assert (DisjKey (newRegs'++newRegs1) newRegs2).
-      * intro; specialize (H1 k0); specialize (HDisjRegs k0); rewrite map_app, in_app_iff, DeM1 in *;
-          destruct H1, HDisjRegs;[left| right| right|right]; dest; auto.
-      * apply H4.
-    + rewrite HUCalls in H2.
-      assert (DisjKey (calls'++(filter (remove_calls f) calls1)) calls2).
-      * intro; specialize (H2 k0); specialize (HDisjCalls k0); rewrite map_app, in_app_iff, DeM1 in *.
-        destruct H2, HDisjCalls;[left| right| right|right]; dest; auto.
-        split;[assumption|].
-        intro; apply H4; rewrite in_map_iff in H5; dest; rewrite filter_In in H6; dest.
-        rewrite <- H5; rewrite in_map_iff; exists x; firstorder.
-      * apply H4.
-    + assumption.
-    + eapply IHa1; eauto.
-      * rewrite HUNewRegs in H1; intro; specialize (H1 k0); rewrite map_app, in_app_iff, DeM1 in H1.
-        destruct H1;[left|right];dest;auto.
-      * rewrite HUCalls in H2; intro; specialize (H2 k0); rewrite map_app, in_app_iff, DeM1 in H2.
-        destruct H2;[left|right];dest;auto.
-    + apply PSemAction_inline_notIn.
-      * apply HPSemAction.
-      * apply (in_map fst) in H3; destruct (HDisjCalls (fst f));tauto.
-    + rewrite HUReadRegs; rewrite app_assoc; reflexivity.
-    + rewrite HUNewRegs; rewrite app_assoc; reflexivity.
-    + rewrite HUCalls.
-      rewrite filter_app, app_assoc.
-      apply Permutation_app_head.
-      assert (key_not_In (fst f) calls2);
-        [repeat intro;apply (in_map fst) in H4; apply (in_map fst) in  H3; simpl in *;
-         specialize (HDisjCalls (fst f)); firstorder|].
-      rewrite (key_not_In_filter _ H4); reflexivity.
-
-    + rewrite HUNewRegs in H1.
-      assert (DisjKey newRegs1 (newRegs'++newRegs2)).
-      * intro; specialize (H1 k0); specialize (HDisjRegs k0); rewrite map_app, in_app_iff, DeM1 in *;
-          destruct H1, HDisjRegs; dest; auto.
-      * apply H4.
-    + rewrite HUCalls in H2.
-      assert (DisjKey calls1 (calls'++(filter (remove_calls f) calls2))).
-      * intro; specialize (H2 k0); specialize (HDisjCalls k0); rewrite map_app, in_app_iff, DeM1 in *.
-        destruct H2, HDisjCalls; dest; auto.
-        right;split;[assumption|].
-        intro; apply H4; rewrite in_map_iff in H5; dest; rewrite filter_In in H6; dest.
-        rewrite <- H5; rewrite in_map_iff; exists x; firstorder.
-      * apply H4.
-    + assumption.
-    + apply PSemAction_inline_notIn.
-      * apply HAction.
-      * apply (in_map fst) in H3; destruct (HDisjCalls (fst f));tauto.
-    + eapply H0; eauto.
-      * rewrite HUNewRegs in H1; intro; specialize (H1 k0); rewrite map_app, in_app_iff, DeM1 in H1.
-        destruct H1;[left|right];dest;auto.
-      * rewrite HUCalls in H2; intro; specialize (H2 k0); rewrite map_app, in_app_iff, DeM1 in H2.
-        destruct H2;[left|right];dest;auto.
-    + rewrite HUReadRegs; repeat rewrite app_assoc; apply Permutation_app_tail;
-        rewrite Permutation_app_comm; reflexivity.
-    + rewrite HUNewRegs; repeat rewrite app_assoc; apply Permutation_app_tail;
-        rewrite Permutation_app_comm; reflexivity.
-    + rewrite HUCalls.
-      rewrite filter_app; repeat rewrite app_assoc.
-      apply Permutation_app_tail.
-      assert (key_not_In (fst f) calls1);
-        [repeat intro;apply (in_map fst) in H4; apply (in_map fst) in  H3; simpl in *;
-         specialize (HDisjCalls (fst f)); firstorder|].
-      rewrite (key_not_In_filter _ H4), Permutation_app_comm; reflexivity.
-    + rewrite HUCalls, in_app_iff in H3; destruct H3; econstructor 8.
-      * rewrite HUNewRegs in H1.
-        assert (DisjKey (newRegs'++newRegs1) newRegs2).
-        -- intro; specialize (H1 k0); specialize (HDisjRegs k0); rewrite map_app, in_app_iff, DeM1 in *;
-             destruct H1, HDisjRegs;[left| right| right|right]; dest; auto.
-        -- apply H4.
-      * rewrite HUCalls in H2.
-        assert (DisjKey (calls'++(filter (remove_calls f) calls1)) calls2).
-        -- intro; specialize (H2 k0); specialize (HDisjCalls k0); rewrite map_app, in_app_iff, DeM1 in *.
-           destruct H2, HDisjCalls;[left| right| right|right]; dest; auto.
-           split;[assumption|].
-           intro; apply H4; rewrite in_map_iff in H5; dest; rewrite filter_In in H6; dest.
-           rewrite <- H5; rewrite in_map_iff; exists x; firstorder.
-        -- apply H4.
-      * assumption.
-      * eapply IHa2; eauto.
-        -- rewrite HUNewRegs in H1; intro; specialize (H1 k0); rewrite map_app, in_app_iff, DeM1 in H1.
-           destruct H1;[left|right];dest;auto.
-        -- rewrite HUCalls in H2; intro; specialize (H2 k0); rewrite map_app, in_app_iff, DeM1 in H2.
-           destruct H2;[left|right];dest;auto.
-      * apply PSemAction_inline_notIn.
-        -- apply HPSemAction.
-        -- apply (in_map fst) in H3; destruct (HDisjCalls (fst f));tauto.
-      * rewrite HUReadRegs; rewrite app_assoc; reflexivity.
-      * rewrite HUNewRegs; rewrite app_assoc; reflexivity.
-      * rewrite HUCalls.
-        rewrite filter_app, app_assoc.
-        apply Permutation_app_head.
-        assert (key_not_In (fst f) calls2);
-          [repeat intro;apply (in_map fst) in H4; apply (in_map fst) in  H3; simpl in *;
-           specialize (HDisjCalls (fst f)); firstorder|].
-        rewrite (key_not_In_filter _ H4); reflexivity.
-
-      * rewrite HUNewRegs in H1.
-        assert (DisjKey newRegs1 (newRegs'++newRegs2)).
-        -- intro; specialize (H1 k0); specialize (HDisjRegs k0); rewrite map_app, in_app_iff, DeM1 in *;
-          destruct H1, HDisjRegs; dest; auto.
-        -- apply H4.
-      * rewrite HUCalls in H2.
-        assert (DisjKey calls1 (calls'++(filter (remove_calls f) calls2))).
-        -- intro; specialize (H2 k0); specialize (HDisjCalls k0); rewrite map_app, in_app_iff, DeM1 in *.
-           destruct H2, HDisjCalls; dest; auto.
-           right;split;[assumption|].
-           intro; apply H4; rewrite in_map_iff in H5; dest; rewrite filter_In in H6; dest.
-           rewrite <- H5; rewrite in_map_iff; exists x; firstorder.
-        -- apply H4.
-      * assumption.
-      * apply PSemAction_inline_notIn.
-        -- apply HAction.
-        -- apply (in_map fst) in H3; destruct (HDisjCalls (fst f));tauto.
-      * eapply H0; eauto.
-        -- rewrite HUNewRegs in H1; intro; specialize (H1 k0); rewrite map_app, in_app_iff, DeM1 in H1.
-           destruct H1;[left|right];dest;auto.
-        -- rewrite HUCalls in H2; intro; specialize (H2 k0); rewrite map_app, in_app_iff, DeM1 in H2.
-           destruct H2;[left|right];dest;auto.
-      * rewrite HUReadRegs; repeat rewrite app_assoc; apply Permutation_app_tail;
-          rewrite Permutation_app_comm; reflexivity.
-      * rewrite HUNewRegs; repeat rewrite app_assoc; apply Permutation_app_tail;
-          rewrite Permutation_app_comm; reflexivity.
-      * rewrite HUCalls.
-        rewrite filter_app; repeat rewrite app_assoc.
-        apply Permutation_app_tail.
-        assert (key_not_In (fst f) calls1);
-          [repeat intro;apply (in_map fst) in H4; apply (in_map fst) in  H3; simpl in *;
-           specialize (HDisjCalls (fst f)); firstorder|].
-        rewrite (key_not_In_filter _ H4), Permutation_app_comm; reflexivity.
-  - intros; simpl; inv H3; EqDep_subst; econstructor 9; eauto.
-  - intros; simpl; inv H3; EqDep_subst; econstructor 10; eauto.
-  - intros; simpl; inv H3; contradiction.
-Qed.
-
-Lemma PPlusSubsteps_inline_notIn f m o upds execs calls:
-  PPlusSubsteps m o upds execs calls ->
-  ~In (fst f) (map fst calls) ->
-  PPlusSubsteps (inlinesingle_BaseModule m f) o upds execs calls.
-Proof.
-  induction 1; simpl; intros.
-  - econstructor 1; eauto.
-  - rewrite HUpds, HExecs, HCalls.
-    apply (in_map (inlinesingle_Rule f)) in HInRules.
-    econstructor 2 with (u := u) (reads := reads); eauto.
-    + eapply PSemAction_inline_notIn; eauto.
-      intro; apply H0; rewrite HCalls, map_app, in_app_iff; left; assumption.
-    + eapply IHPPlusSubsteps.
-      intro; apply H0; rewrite HCalls, map_app, in_app_iff; right; assumption.
-  - rewrite HUpds, HExecs, HCalls.
-    apply (in_map (inlinesingle_Meth f)) in HInMeths; destruct fb.
-    econstructor 3 with (u := u) (reads := reads); simpl; eauto.
-    + simpl; eapply PSemAction_inline_notIn; eauto.
-      intro; apply H0; rewrite HCalls, map_app, in_app_iff; left; assumption.
-    + eapply IHPPlusSubsteps.
-      intro; apply H0; rewrite HCalls, map_app, in_app_iff; right; assumption.
-Qed.
-
-Lemma KeyMatching2 (l : list DefMethT) (a b : DefMethT):
-  NoDup (map fst l) -> In a l -> In b l -> fst a = fst b -> a = b.
-Proof.
-  induction l; intros.
-  - inv H0.
-  - destruct H0, H1; subst; auto; simpl in *.
-    + inv H.
-      apply False_ind, H4.
-      rewrite H2, in_map_iff.
-      exists b; firstorder.
-    + inv H.
-      apply False_ind, H4.
-      rewrite <- H2, in_map_iff.
-      exists a; firstorder.
-    + inv H.
-      eapply IHl; eauto.
-Qed.
-
-Lemma Substeps_permutation_invariant m o l l' :
-  l [=] l' ->
-  Substeps m o l ->
-  Substeps m o l'.
-Proof.
-  induction 1; intros; auto.
-  - inv H0.
-    + inv HLabel.
-      econstructor 2; eauto; setoid_rewrite <- H; auto.
-    + inv HLabel.
-      econstructor 3; eauto; setoid_rewrite <- H; auto.
-  - inv H.
-    + inv HLabel.
-      inv HSubstep; inv HLabel.
-      * specialize (HNoRle _ (in_eq _ _)); simpl in *; contradiction.
-      * econstructor 3; eauto; intros.
-        -- destruct H; subst.
-           ++ simpl.
-              specialize (HDisjRegs _ (in_eq _ _)); simpl in *.
-              apply DisjKey_Commutative; assumption.
-           ++ eapply HDisjRegs0; auto.
-        -- rewrite Permutation_cons_append, InCall_app_iff in H0.
-           destruct H0.
-           ++ apply (HNoCall0 _ H _ H0).
-           ++ unfold InCall in H0; dest.
-              destruct H0;[subst|contradiction].
-              destruct f; simpl in *.
-              apply (HNoCall _ H1 s0).
-              unfold InCall;
-                exists (u0, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs0));simpl; auto.
-        -- unfold InExec in *; simpl in *.
-           destruct H;[discriminate|auto].
-        -- econstructor 2; eauto; intros.
-           ++ eapply HDisjRegs; right; assumption.
-           ++ eapply HNoRle; right; assumption.
-           ++ apply (HNoCall _ H v2).
-              rewrite Permutation_cons_append, InCall_app_iff;left; assumption.
-    + inv HLabel.
-      inv HSubsteps; inv HLabel.
-      * econstructor 2; eauto; intros.
-        -- destruct H; subst.
-           ++ simpl.
-              specialize (HDisjRegs _ (in_eq _ _)); simpl in *.
-              apply DisjKey_Commutative; assumption.
-           ++ eapply HDisjRegs0; auto.
-        -- destruct H; subst; simpl in *; auto.
-           eapply HNoRle; eauto.
-        -- destruct H0; dest; destruct H0; subst; simpl in *.
-           ++ destruct f; apply (HNoCall _ H1 s0); simpl.
-              exists (u0, (Rle rn, cs0)); simpl; auto.
-           ++ apply (HNoCall0 _ H v2).
-              exists x; auto.
-        -- econstructor 3; eauto; intros.
-           ++ eapply HDisjRegs; right; assumption.
-           ++ apply (HNoCall _ H v2).
-              rewrite Permutation_cons_append, InCall_app_iff; auto.
-           ++ unfold InExec in *; simpl in *.
-              eapply HNoExec; right; assumption.
-      * econstructor 3; eauto; intros.
-        -- destruct H; subst; simpl.
-           ++ specialize (HDisjRegs _ (in_eq _ _)); simpl in *.
-              apply DisjKey_Commutative; assumption.
-           ++ eapply HDisjRegs0; eauto.
-        -- destruct H0; dest; destruct H0; subst; simpl in *.
-           ++ destruct f; apply (HNoCall _ H1 s0).
-              exists (u0, (Meth (fn0, existT SignT (projT1 fb0) (argV0, retV0)), cs0));
-                simpl; auto.
-           ++ apply (HNoCall0 _ H v2).
-              exists x; auto.
-        -- unfold InExec in *; simpl in *.
-           destruct H.
-           ++ inv H; EqDep_subst.
-              destruct fb, fb0; simpl in *; subst; EqDep_subst.
-              apply HNoExec; left; reflexivity.
-           ++ apply HNoExec0; auto.
-        -- econstructor 3; auto; auto;[apply HAction | | | | ]; auto; intros.
-           ++ eapply HDisjRegs; right; assumption.
-           ++ apply (HNoCall _ H v2).
-              rewrite Permutation_cons_append, InCall_app_iff; auto.
-           ++ unfold InExec in *; simpl in *.
-              apply HNoExec; right; assumption.
-Qed.
-
-Global Instance Substeps_perm_rewrite' :
-  Proper (eq ==> eq ==> @Permutation FullLabel ==> iff) (@Substeps) | 10.
-Proof.
-  repeat red; intros; split; intro; subst; eauto using Permutation_sym, Substeps_permutation_invariant.
-Qed.
-
-Lemma extract_exec (f : DefMethT) m o l u cs fb:
-  NoDup (map fst (getMethods m)) ->
-  In f (getMethods m) ->
-  Substeps m o ((u, (Meth ((fst f), fb), cs))::l) ->
-  exists reads e mret,
-    fb =  existT SignT (projT1 (snd f)) (e, mret) /\
-    DisjKey u (getLabelUpds l) /\
-    DisjKey cs (getLabelCalls l) /\
-    SemAction o ((projT2 (snd f) type) e) reads u cs mret /\
-    (~In (fst f) (map fst cs)) /\
-    (SubList (getKindAttr reads) (getKindAttr (getRegisters m))) /\
-    (SubList (getKindAttr u) (getKindAttr (getRegisters m))) /\
-    Substeps m o l.
-Proof.
-  intros.
-  inv H1.
-  - inv HLabel.
-  - inv HLabel.
-    destruct f, s0, fb0; simpl in *; subst;EqDep_subst.
-    specialize (KeyMatching2 _ _ _ H HInMeths H0 (eq_refl)) as TMP.
-    inv TMP; EqDep_subst.
-    exists reads, argV, retV; repeat split; auto.
-    + apply DisjKey_Commutative.
-      clear - HDisjRegs.
-      induction ls.
-      * intro; left; auto.
-      * unfold getLabelUpds in *; simpl.
-        intro; rewrite map_app, in_app_iff, DeM1.
-        specialize (HDisjRegs a (in_eq _ _) k) as TMP; simpl in *.
-        assert (forall x, In x ls -> DisjKey (fst x) u0);[intros; eapply HDisjRegs; eauto|].
-        specialize (IHls H k) as TMP2; destruct TMP, TMP2; firstorder fail.
-    + intro x0; destruct (in_dec string_dec x0 (map fst cs0)),
-                (in_dec string_dec x0 (map fst (getLabelCalls ls))); auto.
-      apply False_ind.
-      destruct (fst_produce_snd _ _ i), (fst_produce_snd _ _ i0).
-      rewrite <-InCall_getLabelCalls_iff in H2.
-      apply (HNoCall _ H1 _ H2).
-Qed.
-
-Lemma List_FullLabel_perm_getLabelUpds_perm l1 l2:
-  List_FullLabel_perm l1 l2 ->
-  getLabelUpds l1 [=] getLabelUpds l2.
-Proof.
-  induction 1.
-  - reflexivity.
-  - unfold getLabelUpds in *; inv H; simpl in *.
-    rewrite H1, IHList_FullLabel_perm; reflexivity.
-  - unfold getLabelUpds in *; inv H; inv H0; simpl in *.
-    rewrite H2, H, IHList_FullLabel_perm; repeat rewrite app_assoc.
-    apply Permutation_app_tail.
-    apply Permutation_app_comm.
-  - rewrite IHList_FullLabel_perm1, IHList_FullLabel_perm2; reflexivity.
-Qed.
-
-Lemma List_FullLabel_perm_getLabelCalls_perm l1 l2:
-  List_FullLabel_perm l1 l2 ->
-  getLabelCalls l1 [=] getLabelCalls l2.
-Proof.
-  induction 1.
-  - reflexivity.
-  - unfold getLabelCalls in *; inv H; simpl in *.
-    rewrite H3, IHList_FullLabel_perm; reflexivity.
-  - unfold getLabelCalls in *; inv H; inv H0; simpl in *.
-    rewrite H4, H5, IHList_FullLabel_perm; repeat rewrite app_assoc.
-    apply Permutation_app_tail.
-    apply Permutation_app_comm.
-  - rewrite IHList_FullLabel_perm1, IHList_FullLabel_perm2; reflexivity.
-Qed.
-
-Lemma List_FullLabel_perm_getLabelExecs_perm l1 l2:
-  List_FullLabel_perm l1 l2 ->
-  getLabelExecs l1 [=] getLabelExecs l2.
-Proof.
-  induction 1.
-  - reflexivity.
-  - unfold getLabelExecs in *; inv H; simpl in *.
-    rewrite IHList_FullLabel_perm; reflexivity.
-  - unfold getLabelExecs in *; inv H; inv H0; simpl in *.
-    rewrite IHList_FullLabel_perm.
-    apply perm_swap.
-  - rewrite IHList_FullLabel_perm1, IHList_FullLabel_perm2; reflexivity.
-Qed.
-
-Lemma extract_exec_P (f : DefMethT) m o l u cs fb:
-  NoDup (map fst (getMethods m)) ->
-  In f (getMethods m) ->
-  PSubsteps m o ((u, (Meth ((fst f),fb), cs))::l) ->
-  exists reads e mret,
-    fb = existT SignT (projT1 (snd f)) (e, mret) /\
-    DisjKey u (getLabelUpds l) /\
-    DisjKey cs (getLabelCalls l) /\
-    PSemAction o ((projT2 (snd f) type) e) reads u cs mret /\
-    (~In (fst f) (map fst cs)) /\
-    (SubList (getKindAttr reads) (getKindAttr (getRegisters m))) /\
-    (SubList (getKindAttr u) (getKindAttr (getRegisters m))) /\
-    PSubsteps m o l.
-Proof.
-  intros.
-  apply (PSubsteps_Substeps) in H1; dest.
-  specialize (List_FullLabel_perm_in H2 _ (in_eq _ _)) as TMP; dest.
-  specialize (in_split _ _ H6) as TMP; dest.
-  rewrite H7, <- Permutation_middle in H2.
-  specialize (List_FullLabel_perm_cons_inv H5 H2) as P2.
-  inv H5.
-  apply (Substeps_permutation_invariant (Permutation_sym (Permutation_middle _ _ _))) in H4.
-  apply (extract_exec f) in H4; auto; dest.
-  exists x0, x1, x4; repeat split; auto.
-  + rewrite H11.
-    rewrite (List_FullLabel_perm_getLabelUpds_perm P2).
-    assumption.
-  + setoid_rewrite H14.
-    setoid_rewrite (List_FullLabel_perm_getLabelCalls_perm P2).
-    assumption.
-  + symmetry in H1, H11, H14.
-    apply (PSemAction_rewrite_state H1).
-    apply (PSemAction_rewrite_newRegs H11).
-    apply (PSemAction_rewrite_calls H14).
-    apply SemAction_PSemAction; assumption.
-  + rewrite H14; assumption.
-  + rewrite H11; assumption.
-  + rewrite P2, H1.
-    apply Substeps_PSubsteps; assumption.
-Qed.
-
-Corollary extract_exec_PPlus (f : DefMethT) m o upds execs calls fb:
-  NoDup (map fst (getMethods m)) ->
-  In f (getMethods m) ->
-  PPlusSubsteps m o upds ((Meth ((fst f),fb))::execs) calls ->
-  exists reads upds1 upds2 calls1 calls2 e mret,
-    fb = existT SignT (projT1 (snd f)) (e, mret) /\
-    PSemAction o ((projT2 (snd f) type) e) reads upds1 calls1 mret /\
-    upds [=] upds1++upds2 /\
-    calls [=] calls1++calls2 /\
-    DisjKey upds1 upds2 /\
-    DisjKey calls1 calls2 /\
-    (~In (fst f) (map fst calls1)) /\
-    (SubList (getKindAttr reads) (getKindAttr (getRegisters m))) /\
-    (SubList (getKindAttr upds1) (getKindAttr (getRegisters m))) /\
-    PPlusSubsteps m o upds2 execs calls2.
-Proof.
-  intros.
-  apply (PPlusSubsteps_PSubsteps) in H1; dest.
-  unfold getLabelExecs, getLabelUpds, getLabelCalls in *.
-  specialize (Permutation_in _ H3 (in_eq _ _)) as H3'.
-  rewrite (in_map_iff) in H3'; dest; destruct x0, p.
-  apply in_split in H6; dest; rewrite H6,map_app in H4, H3, H2;rewrite concat_app in *; simpl in *.
-  rewrite H5 in *;rewrite H6, <-Permutation_middle in H1.
-  rewrite <- Permutation_middle, <- map_app in H3.
-  apply Permutation_cons_inv in H3.
-  apply extract_exec_P in H1; eauto; dest.
-  exists x2, r, (getLabelUpds (x0++x1)), m0, (getLabelCalls (x0++x1)), x3, x4; repeat split; auto;
-    [rewrite H2; unfold getLabelUpds| rewrite H4; unfold getLabelCalls | rewrite H3; apply PSubsteps_PPlusSubsteps; assumption];
-    rewrite map_app, concat_app; repeat rewrite app_assoc; apply Permutation_app_tail; rewrite Permutation_app_comm; reflexivity.
+        specialize (H0 _ H).
+        rewrite getNumFromCalls_eq_cons in H0; auto.
+        specialize (getNumFromCalls_nonneg g calls) as P1.
+        apply getNumFromExecs_gt_0; Omega.omega.
+      * apply IHcalls; auto.
+        intros f0 P1; specialize (H0 _ P1).
+        destruct (MethT_dec f0 a);[rewrite getNumFromCalls_eq_cons in H0
+                                  |rewrite getNumFromCalls_neq_cons in H0]; auto; Omega.omega.
+    + apply IHcalls; auto.
+      intros f0 P1; specialize (H0 _ P1).
+        destruct (MethT_dec f0 a);[rewrite getNumFromCalls_eq_cons in H0
+                                  |rewrite getNumFromCalls_neq_cons in H0]; auto; Omega.omega.
 Qed.
 
 Lemma filter_preserves_NoDup A (f : A -> bool) l :
@@ -2411,7 +1827,6 @@ Proof.
     apply (IHPSubsteps H1).
 Qed.
 
-
 Lemma Substeps_inline_Rule_NoExec_PSubsteps f m o rn (l : list FullLabel) :
   NoDup (map fst (getMethods m)) ->
   In f (getMethods m) ->
@@ -2483,7 +1898,6 @@ Proof.
     rewrite H2 in HNoRle; contradiction.
 Qed.
 
-
 Lemma PSubsteps_inline_Rule_NoCall_PSubsteps f m o rn u cs (l : list FullLabel) :
   NoDup (map fst (getMethods m)) ->
   In f (getMethods m) ->
@@ -2498,7 +1912,7 @@ Proof.
   inv H6; apply in_split in H7; dest; subst.
   rewrite <-Permutation_middle in *.
   rewrite H14 in H1.
-  apply (Substeps_inline_Rule_NoCall_PSubsteps f) in H5; auto.
+  apply Substeps_inline_Rule_NoCall_PSubsteps; auto.
 Qed.
 
 Lemma Substeps_inline_Rule_PSubsteps f m o rn fb u1 u2 cs1 cs2 cs3(l : list FullLabel) :
@@ -2508,30 +1922,30 @@ Lemma Substeps_inline_Rule_PSubsteps f m o rn fb u1 u2 cs1 cs2 cs3(l : list Full
   PSubsteps (inlineSingle_Rule_BaseModule f rn m) o ((u1++u2, (Rle rn, cs1++cs2++cs3))::l).
 Proof.
   intros.
-  specialize (PPlusSubsteps_NoDup_Key_Calls (PSubsteps_PPlusSubsteps(Substeps_PSubsteps H1))) as NDup_Calls.
+  (* specialize (PPlusSubsteps_NoDup_Key_Calls (PSubsteps_PPlusSubsteps(Substeps_PSubsteps H1))) as NDup_Calls. *)
   apply extract_exec in H1; auto; dest; subst; simpl in *.
-  inv H8.
+  inv H4.
   - inv HLabel.
     assert (DisjKey u1 u) as P1;
       [unfold getLabelUpds in H2; simpl in *; intro k; specialize (H2 k);
        rewrite map_app, in_app_iff, DeM1 in H2; clear - H2; firstorder fail|].
-    assert (DisjKey cs1 (cs2++(fst f,  existT _ (projT1 (snd f))(x0, x1))::cs3)) as P2;
-      [unfold getLabelCalls in H3; simpl in *; intro k; specialize (H3 k); simpl in *;
-       rewrite map_app, in_app_iff in H3;tauto|].
-    assert (In ((fst f, existT SignT (projT1 (snd f)) (x0, x1))) (cs2++((fst f, existT SignT (projT1 (snd f)) (x0, x1)))::cs3)) as P3;
+    (* assert (DisjKey cs1 (cs2++(fst f,  existT _ (projT1 (snd f))(x0, x1))::cs3)) as P2; *)
+    (*   [unfold getLabelCalls in H3; simpl in *; intro k; specialize (H3 k); simpl in *; *)
+    (*    rewrite map_app, in_app_iff in H3;tauto|]. *)
+    assert (In ((fst f, existT SignT (projT1 (snd f)) (x0, x1))) (cs2++((fst f, existT SignT (projT1 (snd f)) (x0, x1)))::cs3)) as P2;
     [rewrite in_app_iff; right;left; reflexivity|].
-    assert (key_not_In (fst f) (cs2++cs3)) as P4;
-      [apply SemAction_PSemAction,PSemAction_NoDup_Key_Calls in HAction; rewrite map_app, NoDup_app_iff in HAction;dest;
-       inv H8; repeat intro; apply (in_map fst) in H8; rewrite map_app,in_app_iff in H8; destruct H8; auto;
-       specialize (H10 (fst f) (in_eq _ _)); contradiction|].
-    apply key_not_In_filter in P4.
+    (* assert (key_not_In (fst f) (cs2++cs3)) as P4; *)
+    (*   [apply SemAction_PSemAction,PSemAction_NoDup_Key_Calls in HAction; rewrite map_app, NoDup_app_iff in HAction;dest; *)
+    (*    inv H8; repeat intro; apply (in_map fst) in H8; rewrite map_app,in_app_iff in H8; destruct H8; auto; *)
+    (*    specialize (H10 (fst f) (in_eq _ _)); contradiction|]. *)
+    (* apply key_not_In_filter in P4. *)
     econstructor 2; simpl; auto.
     + rewrite HRegs; reflexivity.
     + apply (InRule_In_inlined f _ _ _ HInRules).
     + simpl.
-      apply SemAction_PSemAction in H4.
+      apply SemAction_PSemAction in H3.
       apply SemAction_PSemAction in HAction.
-      specialize (PSemAction_inline_In _ _ H4 P1 P2 P3 HAction) as P5.
+      specialize (PSemAction_inline_In _ _ H3 P1 P2 HAction) as P5.
       assert ((cs1 ++ (filter (remove_calls f) (cs2 ++ (fst f, existT SignT (projT1 (snd f)) (x0, x1)) :: cs3)))
                 [=] cs1 ++ (filter (remove_calls f) ((fst f, existT _ (projT1 (snd f)) (x0, x1))::cs2++cs3)));
         [apply Permutation_app_head; rewrite Permutation_app_comm; simpl; destruct string_dec; simpl;rewrite Permutation_app_comm;[|apply perm_skip];reflexivity|].
