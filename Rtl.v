@@ -205,7 +205,7 @@ Local Ltac findStructIdx v f :=
 
 Local Ltac getStructList fs f := match fs with
                                  | (fun i: Fin.t _ =>
-                                      fst (Vector.nth ?v i)): Fin.t _ -> string =>
+                                      fst (Vector.nth ?v i)) =>
                                    findStructIdx v f
                                  | _ => let y := eval hnf in fs in
                                             getStructList y f
@@ -226,8 +226,8 @@ Local Ltac getStructFull v f := match v with
 
 
 Notation "s @% f" := (RtlReadStruct s ltac:(let typeS := type of s in
-                                            getStructFull typeS f))
+                                            getStructFull typeS f)) (only parsing)
                      : rtl_expr_scope.
 
-Definition testFieldAccess := 
+Local Definition testFieldAccess := 
   (testStructVal @% "hello")%rtl_expr.

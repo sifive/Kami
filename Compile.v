@@ -28,7 +28,7 @@ Definition getActionEn r := (r ++ "#_enable", nil_nat).
 
 Local Close Scope string.
 
-Local Notation cast k' v := v.
+Local Notation cast k' v := v (only parsing).
 
 
 Section Compile.

@@ -485,9 +485,9 @@ Notation Default := (getDefaultConst _).
 
 Notation "k @# ty" := (Expr ty (SyntaxKind k)) (no associativity, at level 98, only parsing).
 
-Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (at level 0) : kami_expr_scope.
+Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (only parsing) : kami_expr_scope.
 Notation "$ n" := (Const _ (natToWord _ n)): kami_expr_scope.
-Notation "$$ e" := (Const ltac:(assumption) e) (at level 8) : kami_expr_scope.
+Notation "$$ e" := (Const ltac:(assumption) e) (at level 8, only parsing) : kami_expr_scope.
 
 Local Definition testStruct :=
   (STRUCT {
@@ -518,7 +518,7 @@ Notation "a $[ i : j ]":=
                        (i + 1 - j)%nat
                        (w - 1 - i)%nat
                        (@castBits _ w (j + (i + 1 - j) + (w - 1 - i)) ltac:(abstract (lia || nia)) a))
-            end) (at level 100, i at level 99) : kami_expr_scope.
+            end) (at level 100, i at level 99, only parsing) : kami_expr_scope.
 Notation "e1 + e2" := (CABit (Add) (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 * e2" := (CABit (Mul) (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 & e2" := (CABit (Band) (e1 :: e2 :: nil)) (at level 201)
@@ -555,7 +555,7 @@ Local Ltac findStructIdx v f :=
 
 Local Ltac getStructList fs f := match fs with
                                  | (fun i: Fin.t _ =>
-                                      fst (Vector.nth ?v i)): Fin.t _ -> string =>
+                                      fst (Vector.nth ?v i)) =>
                                    findStructIdx v f
                                  | _ => let y := eval hnf in fs in
                                             getStructList y f
@@ -575,21 +575,21 @@ Local Ltac getStructFull v f := match v with
 
 Notation "s @% f" := (ReadStruct s ltac:(let typeS := type of s in
                                          getStructFull typeS f))
-                       (at level 38) : kami_expr_scope.
+                       (at level 38, only parsing) : kami_expr_scope.
 
 Notation "name ::= value" :=
   (name, value) (only parsing): kami_switch_init_scope.
 Delimit Scope kami_switch_init_scope with switch_init.
 
-Definition testFieldAccess ty := 
+Local Definition testFieldAccess ty := 
   ((testStructVal ty) @% "hello")%kami_expr.
 
 Notation "s '@%[' f <- v ]" := (UpdateStruct s%kami_expr (ltac:(let typeS := type of s in
                                                                getStructFull typeS f))
                                              v%kami_expr)
-                                 (at level 100) : kami_expr_scope.
+                                 (at level 100, only parsing) : kami_expr_scope.
 
-Definition testFieldUpd ty := 
+Local Definition testFieldUpd ty := 
   ((testStructVal ty) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
 
 Local Definition testExtract ty n n1 n2 (pf1: n > n1) (pf2: n1 > n2) (a: Bit n @# ty) := (a $[n1 : n2])%kami_expr.
@@ -2052,10 +2052,10 @@ Definition Maybe k :=
     }.
 
 Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_expr
-    (at level 100) : kami_expr_scope.
+    (at level 100, only parsing) : kami_expr_scope.
 
 Notation "'Invalid'" := (STRUCT { "valid" ::= $$ false ; "data" ::= getDefaultConst _ })%kami_expr
-    (at level 100) : kami_expr_scope.
+    (at level 100, only parsing) : kami_expr_scope.
 
 Definition inlinesingle_Rule  (f : DefMethT) (rle : RuleT): RuleT.
 Proof.
@@ -2096,7 +2096,7 @@ Definition WriteRegFile n dataT := STRUCT {
                                        "data" :: dataT }.
 
 Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_expr
-    (at level 100) : kami_expr_scope.
+    (at level 100, only parsing) : kami_expr_scope.
 
 (*
  * Kami Rewrite
