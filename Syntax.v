@@ -1,6 +1,8 @@
 Require Export Bool String List FunctionalExtensionality Psatz PeanoNat.
 Require Export bbv.Word Lib.VectorFacts Lib.EclecticLib.
 
+Export Word.Notations.
+
 Require Import Permutation.
 Require Import ZArith.
 Import ListNotations.
@@ -150,7 +152,7 @@ Section Phoas.
 
   Inductive LetExprSyntax k :=
   | NormExpr (e: Expr (SyntaxKind k)): LetExprSyntax k
-  | LetE k' (e: Expr (SyntaxKind k')) (cont: ty k' -> LetExprSyntax k): LetExprSyntax k.
+  | LetE k' (e: LetExprSyntax k') (cont: ty k' -> LetExprSyntax k): LetExprSyntax k.
 
   Section BitOps.
     Definition castBits ni no (pf: ni = no) (e: Expr (SyntaxKind (Bit ni))) :=
@@ -363,7 +365,7 @@ Section Phoas.
   Fixpoint convertLetExprSyntax_ActionT k (e: LetExprSyntax k) :=
     match e in LetExprSyntax _ return ActionT k with
     | NormExpr e' => Return e'
-    | LetE _ e' cont => LetExpr e' (fun v => convertLetExprSyntax_ActionT (cont v))
+    | LetE _ e' cont => LetAction (convertLetExprSyntax_ActionT e') (fun v => convertLetExprSyntax_ActionT (cont v))
     end.
 End Phoas.
 
@@ -484,7 +486,7 @@ Notation Default := (getDefaultConst _).
 Notation "k @# ty" := (Expr ty (SyntaxKind k)) (no associativity, at level 98, only parsing).
 
 Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (at level 0) : kami_expr_scope.
-Notation "$ n" := (Const _ (natToWord _ n)) (at level 0): kami_expr_scope.
+Notation "$ n" := (Const _ (natToWord _ n)): kami_expr_scope.
 Notation "$$ e" := (Const ltac:(assumption) e) (at level 8) : kami_expr_scope.
 
 Local Definition testStruct :=
@@ -1158,7 +1160,7 @@ Section Semantics.
   Fixpoint evalLetExpr k (e: LetExprSyntax type k) :=
     match e in LetExprSyntax _ _ return type k with
     | NormExpr e' => evalExpr e'
-    | LetE _ e' cont => evalLetExpr (cont (evalExpr e'))
+    | LetE _ e' cont => evalLetExpr (cont (evalLetExpr e'))
     end.
 
   Variable o: RegsT.
@@ -1444,10 +1446,20 @@ Section Semantics.
     destruct evalA; eauto; repeat eexists; try destruct (evalExpr p); eauto; try discriminate.
   Qed.
 
+  Lemma DisjKey_nils A B: @DisjKey A B nil nil.
+  Proof.
+    unfold DisjKey; intro.
+    left; simpl; auto.
+  Qed.
+  
   Lemma convertLetExprSyntax_ActionT_same k (e: LetExprSyntax type k):
     SemAction (convertLetExprSyntax_ActionT e) nil nil nil (evalLetExpr e).
   Proof.
-    induction e; simpl; constructor; auto.
+    induction e; simpl; try constructor; auto.
+    specialize (H (evalLetExpr e)).
+    pose proof (SemLetAction (fun v => convertLetExprSyntax_ActionT (cont v)) (@DisjKey_nils string _) IHe H) as sth.
+    rewrite ?(app_nil_l nil) in sth.
+    auto.
   Qed.
   
   Lemma SemActionReadsSub k a reads upds calls ret:
