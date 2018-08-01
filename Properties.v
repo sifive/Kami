@@ -1538,143 +1538,6 @@ Proof.
         firstorder fail.
 Qed.
 
-Section ModularSubstition.
-  Variable a b a' b': Mod.
-  Variable DisjRegs: DisjKey (getAllRegisters a) (getAllRegisters b).
-  Variable DisjRules: DisjKey (getAllRules a) (getAllRules b).
-  Variable DisjMeths: DisjKey (getAllMethods a) (getAllMethods b).
-  Variable DisjRegs': DisjKey (getAllRegisters a') (getAllRegisters b').
-  Variable DisjMeths': DisjKey (getAllMethods a') (getAllMethods b').
-  Variable SameList_a: forall x, (In x (map fst (getAllMethods a)) /\
-                                  ~ In x (getHidden a)) <->
-                                 (In x (map fst (getAllMethods a')) /\
-                                  ~ In x (getHidden a')).
-  Variable Subset_a: forall x, In x (map fst (getAllMethods a')) ->
-                               In x (map fst (getAllMethods a)).
-  Variable SameList_b: forall x, (In x (map fst (getAllMethods b)) /\
-                                  ~ In x (getHidden b)) <->
-                                 (In x (map fst (getAllMethods b')) /\
-                                  ~ In x (getHidden b')).
-  Variable Subset_b: forall x, In x (map fst (getAllMethods b')) ->
-                               In x (map fst (getAllMethods b)).
-
-  Lemma ModularSubstition: TraceInclusion a a' ->
-                           TraceInclusion b b' ->
-                           TraceInclusion (ConcatMod a b) (ConcatMod a' b').
-  Proof.
-    unfold TraceInclusion, WeakInclusion,getListFullLabel_diff in *; intros.
-    pose proof (SplitTrace DisjRegs DisjRules DisjMeths H1); dest.
-    specialize (@H _ _ H2).
-    specialize (@H0 _ _ H3).
-    dest.
-    exists (x1 ++ x).
-    exists (map (fun x => fst x ++ snd x) (zip x2 x0)).
-    pose proof H9 as sth1.
-    pose proof H7 as sth2.
-    rewrite map_length in H9, H7.
-    rewrite H9 in H7.
-    rewrite mapProp_nthProp in H5.
-    repeat split.
-    - apply JoinTrace; auto; unfold nthProp, nthProp2 in *; intros; auto.
-      specialize (H10 i); specialize (H8 i); specialize (H5 i).
-      rewrite nth_error_map in H10, H8;
-        case_eq (nth_error x2 i);
-        case_eq (nth_error x0 i);
-        case_eq (nth_error ls1 i);
-        intros;
-        try congruence; auto;
-          [rewrite H11, H12, H13 in *; dest|
-           solve [exfalso; apply (nth_error_len _ _ _ H11 H13 H9)]].
-      Opaque MatchingExecCalls_Concat.
-      repeat split; intros.
-      Transparent MatchingExecCalls_Concat.
-      + unfold MatchingExecCalls_Concat in *; intros.
-        repeat match goal with
-               | H : forall (x: MethT), _ |- _ => specialize (H f)
-               end; try specialize (DisjMeths (fst f));
-          try specialize (DisjMeths' (fst f));
-          try specialize (SameList_a (fst f));
-          try specialize (SameList_b (fst f));
-          try specialize (Subset_a (fst f));
-          try specialize (Subset_b (fst f)).
-        specialize (Subset_b H20).
-        specialize (getNumExecs_nonneg f l1) as P1;
-          rewrite Z.lt_eq_cases in P1; destruct P1;
-            [specialize (Trace_meth_InExec' H _ _ H13 H21) as P2; clear - DisjMeths' P2 H20; tauto|].
-        specialize (getNumCalls_nonneg f l1) as P1; rewrite Z.lt_eq_cases in P1; destruct P1;[|symmetry in H22; contradiction].
-        rewrite <- H21 in H10; simpl in H10.
-        specialize (getNumExecs_nonneg f (filterExecs id a l)) as P1.
-        specialize (getNumCalls_nonneg f (filterExecs id a l)) as P2.
-        assert (getNumCalls f (filterExecs id a l) <> 0%Z);[clear - P1 P2 H22 H10;Omega.omega|].
-        specialize (H5 H23 Subset_b); dest.
-        specialize (conj Subset_b H5) as P3; rewrite SameList_b in P3; dest; split; auto.
-        assert (getNumCalls f l1 <= getNumCalls f (filterExecs id a l))%Z;[clear - H10 P1 P2 H22; Omega.omega|].
-        clear - H24 H8 H27; Omega.omega.
-      + unfold MatchingExecCalls_Concat in *; intros.
-        repeat match goal with
-               | H : forall (x: MethT), _ |- _ => specialize (H f)
-               end; try specialize (DisjMeths (fst f));
-          try specialize (DisjMeths' (fst f));
-          try specialize (SameList_a (fst f));
-          try specialize (SameList_b (fst f));
-          try specialize (Subset_a (fst f));
-          try specialize (Subset_b (fst f)).
-        specialize (Subset_a H20).
-        specialize (getNumExecs_nonneg f l0) as P1;
-          rewrite Z.lt_eq_cases in P1; destruct P1;
-            [specialize (Trace_meth_InExec' H0 _ _ H12 H21) as P2; clear - DisjMeths' P2 H20; tauto|].
-        specialize (getNumCalls_nonneg f l0) as P1; rewrite Z.lt_eq_cases in P1; destruct P1;[|symmetry in H22; contradiction].
-        rewrite <- H21 in H8; simpl in H8.
-        specialize (getNumExecs_nonneg f (filterExecs id b l)) as P1.
-        specialize (getNumCalls_nonneg f (filterExecs id b l)) as P2.
-        assert (getNumCalls f (filterExecs id b l) <> 0%Z);[clear - P1 P2 H22 H8;Omega.omega|].
-        specialize (H14 H23 Subset_a); dest.
-        specialize (conj Subset_a H14) as P3; rewrite SameList_a in P3; dest; split; auto.
-        assert (getNumCalls f l0 <= getNumCalls f (filterExecs id b l))%Z;[clear - H8 P1 P2 H22; Omega.omega|].
-        clear - H24 H10 H27; Omega.omega.
-      + destruct x3, x4, p, p0, r1, r2; simpl; auto.
-        pose proof (in_map (fun x => fst (snd x)) _ _ H19) as sth3.
-        pose proof (in_map (fun x => fst (snd x)) _ _ H20) as sth4.
-        simpl in *.
-        assert (sth5: exists rle, In (Rle rle)
-                                     (map (fun x => fst (snd x))
-                                          (filterExecs id a l))) by
-            (clear - H18 sth3; firstorder fail).
-        assert (sth6: exists rle, In (Rle rle)
-                                     (map (fun x => fst (snd x))
-                                          (filterExecs id b l))) by
-            (clear - H17 sth4; firstorder fail).
-        dest.
-        rewrite in_map_iff in *; dest.
-        specialize (H15 _ _ H24 H23).
-        rewrite H22, H21 in *.
-        assumption.
-    - rewrite map_length.
-      rewrite length_zip; congruence.
-    - unfold nthProp, nthProp2 in *; intros.
-      specialize (H10 i); specialize (H8 i); specialize (H5 i).
-      rewrite nth_error_map in *.
-      simpl in *.
-      case_eq (nth_error ls1 i); intros; rewrite H11 in *; auto.
-      setoid_rewrite (nth_error_zip (fun x3 => fst x3 ++ snd x3) _ i x2 x0); auto.
-      case_eq (nth_error x2 i);
-        case_eq (nth_error x0 i);
-        intros; auto; rewrite H12, H13 in *; simpl in *; intros.
-      split; intros.
-      + dest.
-        rewrite H16 at 1 2.
-        repeat rewrite getNumExecs_app, getNumCalls_app.
-        specialize (H8 f);specialize (H10 f).
-        clear - H8 H10; Omega.omega.
-      + dest.
-        rewrite H17. rewrite map_app, in_app_iff in *; setoid_rewrite in_app_iff.
-        clear - H19 H18 H14.
-        firstorder fail.
-Qed.
-
-End ModularSubstition.
-
-
 Lemma TraceInclusion_refl: forall m, TraceInclusion m m.
 Proof.
   unfold TraceInclusion; intros.
@@ -3467,6 +3330,78 @@ Proof.
     (* simpl; assumption. *)
 Qed.
 
+Lemma WfConcats_Substeps : forall (m1 : Mod) m2 (o : RegsT)(l : list FullLabel),
+    WfConcat (Base m2) m1 ->
+    Substeps m2 o l ->
+    forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z) (* ~InCall (s, v) l *).
+Proof.
+  intros.
+  induction H0; subst.
+  - reflexivity.
+    (* intro; unfold InCall in H0. dest; contradiction. *)
+  - inversion H; simpl in HInRules;specialize (H2 _ HInRules).
+    rewrite getNumCalls_cons; rewrite IHSubsteps;simpl.
+    assert (In (fst f) (getHidden m1)) as P1;auto.
+    rewrite (getNumFromCalls_notIn _ _ (WfConcatNotInCalls _ H2 HAction P1)); ring.
+    (* intro T1. destruct (InCall_app_iff (s, v) ((u, (Rle rn, cs))::nil) ls) as [L R]; clear R; apply L in T1; clear L. *)
+    (* destruct T1;[unfold InCall in H4;dest|contradiction]. *)
+    (* destruct H4;[subst|contradiction]. *)
+    (* eapply WfConcatNotInCalls; eauto. *)
+    (* simpl; assumption. *)
+  - inversion H; simpl in HInMeths;specialize (H3 _ HInMeths argV).
+    rewrite getNumCalls_cons; rewrite IHSubsteps;simpl.
+    assert (In (fst f) (getHidden m1)) as P1;auto.
+    rewrite (getNumFromCalls_notIn _ _ (WfConcatNotInCalls _ H3 HAction P1)); ring.
+    (* intro T1. destruct (InCall_app_iff (s, v) ((u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))::nil) ls) as [L R]; clear R; apply L in T1; clear L. *)
+    (* destruct T1;[unfold InCall in H4; dest|contradiction]. *)
+    (* destruct H4;[subst|contradiction]. *)
+    (* eapply WfConcatNotInCalls; eauto. *)
+    (* simpl; assumption. *)
+Qed.
+
+
+
+Lemma WfConcats_Step : forall (m1 m2 : Mod) (o : RegsT) (l : list FullLabel),
+    WfConcat m2 m1 ->
+    Step m2 o l ->
+    (forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z) (* ~InCall (s, v) l *)).
+Proof.
+  intros.
+  induction H0; subst.
+  - eapply WfConcats_Substeps; eauto.
+  - unfold WfConcat in *; simpl in *.
+    specialize (IHStep H); auto.
+  - unfold WfConcat in *; simpl in *.
+    setoid_rewrite in_app_iff in H.
+    assert (sth1: (forall rule : RuleT, In rule (getAllRules m0) -> WfConcatActionT (snd rule type) m1) /\
+                  (forall meth : string * {x : Signature & MethodT x},
+                      In meth (getAllMethods m0) -> forall v : type (fst (projT1 (snd meth))), WfConcatActionT (projT2 (snd meth) type v) m1)) by
+        (firstorder fail).
+    assert (sth2: (forall rule : RuleT, In rule (getAllRules m2) -> WfConcatActionT (snd rule type) m1) /\
+                  (forall meth : string * {x : Signature & MethodT x},
+                      In meth (getAllMethods m2) -> forall v : type (fst (projT1 (snd meth))), WfConcatActionT (projT2 (snd meth) type v) m1) ) by
+        (firstorder fail).
+    specialize (IHStep1 sth1).
+    specialize (IHStep2 sth2).
+    rewrite getNumCalls_app; Omega.omega.
+Qed.
+
+Lemma WfConcats_Trace : forall (m1 m2 : Mod) (o : RegsT) ls (l : list FullLabel),
+    Trace m2 o ls ->
+    WfConcat m2 m1 ->
+    forall i,
+      nth_error ls i = Some l ->
+      (forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z) (* ~InCall (s, v) l *)).
+Proof.
+  induction 1; subst; auto; intros.
+  - destruct i; discriminate.
+  - destruct i; simpl in *.
+    + inv H1.
+      eapply WfConcats_Step; eauto.
+    + eapply IHTrace; eauto.
+Qed.
+    
+
 Lemma substitute_Step' m (HWfMod: WfMod m):
   forall o l,
     StepSubstitute m o l ->
@@ -4382,3 +4317,196 @@ Lemma separateBaseModule_flatten_Hides (m : Mod) :
   repeat rewrite app_nil_r.
   reflexivity.
 Qed.
+
+Lemma dec_def_notHidden f m:
+  (In f (map fst (getAllMethods m)) /\ ~ In f (getHidden m)) \/
+  (~ In f (map fst (getAllMethods m))) \/ (In f (map fst (getAllMethods m)) /\ In f (getHidden m)).
+Proof.
+  destruct (in_dec string_dec f (map fst (getAllMethods m))), (in_dec string_dec f (getHidden m)); auto.
+Qed.
+
+Lemma NotInDef_ZeroExecs_Trace:
+  forall (m : Mod) (o : RegsT) lss (ls : list FullLabel) (f : string * {x : Kind * Kind & SignT x}),
+    Trace m o lss ->
+    ~ In (fst f) (map fst (getAllMethods m)) ->
+    forall i,
+      nth_error lss i = Some ls ->
+      getNumExecs f ls = 0%Z.
+Proof.
+  induction 1; subst; simpl; auto; intros; simpl in *.
+  - destruct i; simpl in *; discriminate.
+  - specialize (IHTrace H0).
+    destruct i; simpl in *.
+    + inv H1.
+      eapply NotInDef_ZeroExecs_Step; eauto.
+    + eauto.
+Qed.
+
+
+Section ModularSubstition.
+  Variable a b a' b': Mod.
+  Variable SameList_a: forall x, (In x (map fst (getAllMethods a)) /\
+                                  ~ In x (getHidden a)) <->
+                                 (In x (map fst (getAllMethods a')) /\
+                                  ~ In x (getHidden a')).
+  Variable SameList_b: forall x, (In x (map fst (getAllMethods b)) /\
+                                  ~ In x (getHidden b)) <->
+                                 (In x (map fst (getAllMethods b')) /\
+                                  ~ In x (getHidden b')).
+
+  Variable wfAConcatB: WfMod (ConcatMod a b).
+  Variable wfA'ConcatB': WfMod (ConcatMod a' b').
+
+  Lemma ModularSubstition: TraceInclusion a a' ->
+                           TraceInclusion b b' ->
+                           TraceInclusion (ConcatMod a b) (ConcatMod a' b').
+  Proof.
+    inv wfAConcatB.
+    inv wfA'ConcatB'.
+    unfold TraceInclusion, WeakInclusion,getListFullLabel_diff in *; intros.
+    pose proof (SplitTrace HDisjRegs HDisjRules HDisjMeths H1); dest.
+    specialize (@H _ _ H2).
+    specialize (@H0 _ _ H3).
+    dest.
+    exists (x1 ++ x).
+    exists (map (fun x => fst x ++ snd x) (zip x2 x0)).
+    pose proof H9 as sth1.
+    pose proof H7 as sth2.
+    rewrite map_length in H9, H7.
+    rewrite H9 in H7.
+    rewrite mapProp_nthProp in H5.
+    repeat split.
+    - apply JoinTrace; auto; unfold nthProp, nthProp2 in *; intros; auto.
+      specialize (H10 i); specialize (H8 i); specialize (H5 i).
+      rewrite nth_error_map in H10, H8;
+        case_eq (nth_error x2 i);
+        case_eq (nth_error x0 i);
+        case_eq (nth_error ls1 i);
+        intros;
+        try congruence; auto;
+          [rewrite H11, H12, H13 in *; dest|
+           solve [exfalso; apply (nth_error_len _ _ _ H11 H13 H9)]].
+      Opaque MatchingExecCalls_Concat.
+      repeat split; intros.
+      Transparent MatchingExecCalls_Concat.
+      + unfold MatchingExecCalls_Concat in *; intros.
+        repeat match goal with
+               | H : forall (x: MethT), _ |- _ => specialize (H f)
+               end; try specialize (HDisjMeths (fst f));
+          try specialize (HDisjMeths0 (fst f));
+          try specialize (SameList_a (fst f));
+          try specialize (SameList_b (fst f));
+          try specialize (Subset_a (fst f));
+          try specialize (Subset_b (fst f)).
+        (* specialize (Subset_b H20). *)
+        specialize (getNumExecs_nonneg f l1) as P1;
+          rewrite Z.lt_eq_cases in P1; destruct P1;
+            [specialize (Trace_meth_InExec' H _ _ H13 H21) as P2; clear - HDisjMeths0 P2 H20; tauto|].
+        specialize (getNumCalls_nonneg f l1) as P1; rewrite Z.lt_eq_cases in P1; destruct P1;[|symmetry in H22; contradiction].
+        rewrite <- H21 in H10; simpl in H10.
+        specialize (getNumExecs_nonneg f (filterExecs id a l)) as P1.
+        specialize (getNumCalls_nonneg f (filterExecs id a l)) as P2.
+        assert (getNumCalls f (filterExecs id a l) <> 0%Z);[clear - P1 P2 H22 H10;Omega.omega|].
+        specialize (H5 H23).
+        assert (helper: (getNumExecs f (filterExecs id a l) < getNumCalls f (filterExecs id a l))%Z) by Omega.omega.
+        pose proof (Trace_meth_InCall_InDef_InExec H2 f i) as sth10.
+        pose proof (map_nth_error (filterExecs id a) _ _ H11) as sth11.
+        specialize (sth10 _ sth11).
+        pose proof (in_dec string_dec (fst f) (map fst (getAllMethods a))) as [th1 | th2].
+        * clear - H11 H2 helper th1 sth10 sth11.
+          specialize (sth10 th1).
+          pose proof (Trace_meth_InCall_InDef_InExec H2 f i) as sth0.
+          Omega.omega.
+        * pose proof (NotInDef_ZeroExecs_Trace f H2 th2 _ sth11) as sth12.
+          assert (sth13: (getNumCalls f (filterExecs id a l) > 0)%Z) by (Omega.omega).
+          rewrite sth12 in *.
+          assert (sth14: getNumCalls f (filterExecs id a l) = getNumCalls f l1) by Omega.omega.
+          destruct (in_dec string_dec (fst f) (map fst (getAllMethods b))) as [ez|hard].
+          -- specialize (H5 ez); dest.
+             rewrite sth14 in *.
+             split; [tauto|Omega.omega].
+          -- destruct (in_dec string_dec (fst f) (getHidden b')) as [lhs | rhs]; [ | tauto].
+             pose proof (WfConcats_Trace H WfConcat0 _ H13 f lhs).
+             Omega.omega.
+      + unfold MatchingExecCalls_Concat in *; intros.
+        repeat match goal with
+               | H : forall (x: MethT), _ |- _ => specialize (H f)
+               end; try specialize (HDisjMeths (fst f));
+          try specialize (HDisjMeths0 (fst f));
+          try specialize (SameList_a (fst f));
+          try specialize (SameList_b (fst f));
+          try specialize (Subset_a (fst f));
+          try specialize (Subset_b (fst f)).
+        (* specialize (Subset_a H20). *)
+        specialize (getNumExecs_nonneg f l0) as P1;
+          rewrite Z.lt_eq_cases in P1; destruct P1;
+            [specialize (Trace_meth_InExec' H0 _ _ H12 H21) as P2; clear - HDisjMeths0 P2 H20; tauto|].
+        specialize (getNumCalls_nonneg f l0) as P1; rewrite Z.lt_eq_cases in P1; destruct P1;[|symmetry in H22; contradiction].
+        rewrite <- H21 in H8; simpl in H8.
+        specialize (getNumExecs_nonneg f (filterExecs id b l)) as P1.
+        specialize (getNumCalls_nonneg f (filterExecs id b l)) as P2.
+        assert (getNumCalls f (filterExecs id b l) <> 0%Z);[clear - P1 P2 H22 H8;Omega.omega|].
+        specialize (H14 H23).
+        assert (helper: (getNumExecs f (filterExecs id b l) < getNumCalls f (filterExecs id b l))%Z) by Omega.omega.
+        pose proof (Trace_meth_InCall_InDef_InExec H3 f i) as sth10.
+        pose proof (map_nth_error (filterExecs id b) _ _ H11) as sth11.
+        specialize (sth10 _ sth11).
+        pose proof (in_dec string_dec (fst f) (map fst (getAllMethods b))) as [th1 | th2].
+        * clear - H11 H3 helper th1 sth10 sth11.
+          specialize (sth10 th1).
+          pose proof (Trace_meth_InCall_InDef_InExec H3 f i) as sth0.
+          Omega.omega.
+        * pose proof (NotInDef_ZeroExecs_Trace f H3 th2 _ sth11) as sth12.
+          assert (sth13: (getNumCalls f (filterExecs id b l) > 0)%Z) by (Omega.omega).
+          rewrite sth12 in *.
+          assert (sth14: getNumCalls f (filterExecs id b l) = getNumCalls f l0) by Omega.omega.
+          destruct (in_dec string_dec (fst f) (map fst (getAllMethods a))) as [ez|hard].
+          -- specialize (H14 ez); dest.
+             rewrite sth14 in *.
+             split; [tauto|Omega.omega].
+          -- destruct (in_dec string_dec (fst f) (getHidden a')) as [lhs | rhs]; [ | tauto].
+             pose proof (WfConcats_Trace H0 WfConcat3 _ H12 f lhs).
+             Omega.omega.
+      + destruct x3, x4, p, p0, r1, r2; simpl; auto.
+        pose proof (in_map (fun x => fst (snd x)) _ _ H19) as sth3.
+        pose proof (in_map (fun x => fst (snd x)) _ _ H20) as sth4.
+        simpl in *.
+        assert (sth5: exists rle, In (Rle rle)
+                                     (map (fun x => fst (snd x))
+                                          (filterExecs id a l))) by
+            (clear - H18 sth3; firstorder fail).
+        assert (sth6: exists rle, In (Rle rle)
+                                     (map (fun x => fst (snd x))
+                                          (filterExecs id b l))) by
+            (clear - H17 sth4; firstorder fail).
+        dest.
+        rewrite in_map_iff in *; dest.
+        specialize (H15 _ _ H24 H23).
+        rewrite H22, H21 in *.
+        assumption.
+    - rewrite map_length.
+      rewrite length_zip; congruence.
+    - unfold nthProp, nthProp2 in *; intros.
+      specialize (H10 i); specialize (H8 i); specialize (H5 i).
+      rewrite nth_error_map in *.
+      simpl in *.
+      case_eq (nth_error ls1 i); intros; rewrite H11 in *; auto.
+      setoid_rewrite (nth_error_zip (fun x3 => fst x3 ++ snd x3) _ i x2 x0); auto.
+      case_eq (nth_error x2 i);
+        case_eq (nth_error x0 i);
+        intros; auto; rewrite H12, H13 in *; simpl in *; intros.
+      split; intros.
+      + dest.
+        rewrite H16 at 1 2.
+        repeat rewrite getNumExecs_app, getNumCalls_app.
+        specialize (H8 f);specialize (H10 f).
+        clear - H8 H10; Omega.omega.
+      + dest.
+        rewrite H17. rewrite map_app, in_app_iff in *; setoid_rewrite in_app_iff.
+        clear - H19 H18 H14.
+        firstorder fail.
+Qed.
+
+End ModularSubstition.
+
+
