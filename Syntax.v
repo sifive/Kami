@@ -1,6 +1,8 @@
 Require Export Bool String List FunctionalExtensionality Psatz PeanoNat.
 Require Export bbv.Word Lib.VectorFacts Lib.EclecticLib.
 
+Export Word.Notations.
+
 Require Import Permutation.
 Require Import ZArith.
 Import ListNotations.
@@ -484,7 +486,7 @@ Notation Default := (getDefaultConst _).
 Notation "k @# ty" := (Expr ty (SyntaxKind k)) (no associativity, at level 98, only parsing).
 
 Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (at level 0) : kami_expr_scope.
-Notation "$ n" := (Const _ (natToWord _ n)) (at level 0): kami_expr_scope.
+Notation "$ n" := (Const _ (natToWord _ n)): kami_expr_scope.
 Notation "$$ e" := (Const ltac:(assumption) e) (at level 8) : kami_expr_scope.
 
 Local Definition testStruct :=
