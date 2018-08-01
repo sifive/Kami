@@ -1665,6 +1665,48 @@ Proof.
     rewrite map_app, concat_app; repeat rewrite app_assoc; apply Permutation_app_tail; rewrite Permutation_app_comm; reflexivity.
 Qed.
 
+Corollary extract_execs_PPlus (f : DefMethT) m o execs fcalls:
+  NoDup (map fst (getMethods m)) ->
+  In f (getMethods m) ->
+  (forall g, In g fcalls -> (fst g = fst f)) ->
+  forall upds calls, 
+    PPlusSubsteps m o upds ((map Meth fcalls)++execs) calls ->
+    exists reads upds1 upds2 calls1 calls2,
+      PSemAction_meth_collector f o reads upds1 calls1 fcalls /\
+      calls [=] calls1++calls2 /\
+      upds [=] upds1++upds2 /\
+      DisjKey upds1 upds2 /\
+      PPlusSubsteps m o upds2 execs calls2.
+Proof.
+  induction fcalls; simpl; intros.
+  - exists nil, nil, upds, nil, calls.
+    repeat split; auto.
+    + constructor.
+    + intro; left; intro; contradiction.
+  - assert (forall g, In g fcalls -> fst g = fst f) as P1;[auto|].
+    destruct a; specialize (H1 (s, s0) (or_introl _ eq_refl)) as P2; simpl in P2; rewrite P2 in H2.
+    specialize (extract_exec_PPlus _ H H0 H2) as TMP; dest.
+    specialize (IHfcalls H H0 P1 _ _ H8); dest.
+    exists (x++x6), (x0++x7), x8, (x2++x9), x10.
+    repeat split.
+    + econstructor 2.
+      * apply H9.
+      * assert (DisjKey x7 x0) as goal;[|apply goal].
+        intro k; specialize (H7 k); rewrite H11, map_app, in_app_iff in H7; clear -H7; firstorder fail.
+      * apply Permutation_app_comm.
+      * apply Permutation_app_comm.
+      * apply Permutation_app_comm.
+      * rewrite P2, H3; reflexivity.
+      * assumption.
+    + rewrite H6, H10, app_assoc; reflexivity.
+    + rewrite H5, H11, app_assoc; reflexivity.
+    + intro k; specialize (H12 k); specialize (H7 k).
+      rewrite H11 in H7.
+      rewrite map_app, in_app_iff in *.
+      clear -H12 H7; firstorder fail.
+    + assumption.
+Qed.
+
 Lemma getNumFromExecs_gt_0 f execs :
   (0 < getNumFromExecs f execs)%Z ->
   In (Meth f) execs.
@@ -1915,10 +1957,56 @@ Proof.
   apply Substeps_inline_Rule_NoCall_PSubsteps; auto.
 Qed.
 
-(* Lemma Substeps_inline_Rule_PSubsteps f m o rn fb u1 u2 cs1 cs2 cs3(l : list FullLabel) : *)
+Lemma KeyMatching3 A B:
+  forall (ab1 ab2 : A*B)(l : list (A*B)),
+    NoDup (map fst l) ->
+    In ab1 l ->
+    In ab2 l ->
+    (fst ab1 = fst ab2) ->
+    ab1 = ab2.
+Proof.
+  induction l; intros.
+  - inv H0.
+  - destruct H0, H1; subst; simpl in *; auto.
+    + inv H; apply (in_map fst) in H1; rewrite <-H2 in H1; contradiction.
+    + inv H; apply (in_map fst) in H0; rewrite H2 in H0; contradiction.
+    + inv H; apply IHl; auto.
+Qed.
+
+Lemma ExtractRuleAction m o (rle : RuleT) upds execs calls :
+  NoDup (map fst (getRules m)) ->
+  In rle (getRules m) ->
+  In (Rle (fst rle)) execs ->
+  PPlusSubsteps m o upds execs calls ->
+  exists reads upds1 upds2 calls1 calls2 retV,
+    PSemAction o (snd rle type) reads upds1 calls1 retV /\
+    upds [=] upds1++upds2 /\
+    calls [=] calls1++calls2.
+Proof.
+  induction 4.
+  - inv H1.
+  - rewrite HExecs in H1.
+    destruct H1;[| specialize (HNoRle _ H1); contradiction].
+    inv H1.
+    specialize (KeyMatching3 _ _ _ H H0 HInRules (eq_refl)) as P1.
+    destruct rle; simpl in *; inv P1; subst.
+    exists reads, u, oldUpds, cs, oldCalls, WO.
+    repeat split; auto.
+  - rewrite HExecs in H1.
+    destruct H1;[discriminate|].
+    specialize (IHPPlusSubsteps H1); dest.
+    exists x, x0, (u++x1), x2, (cs++x3), x4.
+    repeat split; auto.
+    + rewrite HUpds, H4.
+      repeat rewrite app_assoc; apply Permutation_app_tail, Permutation_app_comm.
+    + rewrite HCalls, H5.
+      repeat rewrite app_assoc; apply Permutation_app_tail, Permutation_app_comm.
+Qed.
+
+(* Lemma Substeps_inline_Rule_PSubsteps f m o rn fb u1 u2 cs (l : list FullLabel) : *)
 (*   NoDup (map fst (getMethods m)) -> *)
 (*   In f (getMethods m) -> *)
-(*   Substeps m o ((u1, (Meth ((fst f),fb), cs1))::(u2, (Rle rn, cs2++((fst f), fb)::cs3))::l) -> *)
+(*   PSubsteps m o ((u1, (Meth ((fst f),fb), cs1))::(u2, (Rle rn, fcalls++cs))::l) -> *)
 (*   PSubsteps (inlineSingle_Rule_BaseModule f rn m) o ((u1++u2, (Rle rn, cs1++cs2++cs3))::l). *)
 (* Proof. *)
 (*   intros. *)
