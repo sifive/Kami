@@ -1814,6 +1814,7 @@ Proof.
   rewrite (separate_calls_by_filter x2 (called_by f)) in H8.
   apply (PSemAction_rewrite_calls (separate_calls_by_filter x2 (called_by f))) in H6.
   exists (filter (called_by f) x2).
+Admitted.
   
 (* Lemma Substeps_inline_Rule_PSubsteps f m o rn fb u1 u2 cs (l : list FullLabel) : *)
 (*   NoDup (map fst (getMethods m)) -> *)
