@@ -918,7 +918,7 @@ Proof.
       intro.
       injection H as H.
       apply (n1 H).
-Qed.
+Defined.
 
 Lemma Kind_eq: forall k, Kind_dec k k = left eq_refl.
 Proof.
