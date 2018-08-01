@@ -1537,6 +1537,8 @@ Lemma extract_exec (f : DefMethT) m o l u cs fb:
     DisjKey u (getLabelUpds l) /\
     (* DisjKey cs (getLabelCalls l) /\ *)
     SemAction o ((projT2 (snd f) type) e) reads u cs mret /\
+    SubList (getKindAttr u) (getKindAttr (getRegisters m)) /\
+    SubList (getKindAttr reads) (getKindAttr (getRegisters m)) /\
     Substeps m o l.
 Proof.
   intros.
@@ -1610,6 +1612,8 @@ Lemma extract_exec_P (f : DefMethT) m o l u cs fb:
     fb = existT SignT (projT1 (snd f)) (e, mret) /\
     DisjKey u (getLabelUpds l) /\
     PSemAction o ((projT2 (snd f) type) e) reads u cs mret /\
+    SubList (getKindAttr u) (getKindAttr (getRegisters m)) /\
+    SubList (getKindAttr reads) (getKindAttr (getRegisters m)) /\
     PSubsteps m o l.
 Proof.
   intros.
@@ -1633,6 +1637,7 @@ Proof.
     apply (PSemAction_rewrite_newRegs H11).
     apply (PSemAction_rewrite_calls H14).
     apply SemAction_PSemAction; assumption.
+  + rewrite H11; assumption.
   + rewrite P2, H1.
     apply Substeps_PSubsteps; assumption.
 Qed.
@@ -1647,6 +1652,8 @@ Corollary extract_exec_PPlus (f : DefMethT) m o upds execs calls fb:
     upds [=] upds1++upds2 /\
     calls [=] calls1++calls2 /\
     DisjKey upds1 upds2 /\
+    SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) /\
+    SubList (getKindAttr reads) (getKindAttr (getRegisters m)) /\
     (* DisjKey calls1 calls2 /\ *)
     PPlusSubsteps m o upds2 execs calls2.
 Proof.
@@ -1665,6 +1672,13 @@ Proof.
     rewrite map_app, concat_app; repeat rewrite app_assoc; apply Permutation_app_tail; rewrite Permutation_app_comm; reflexivity.
 Qed.
 
+Lemma SubList_app_l_iff (A : Type) (l1 l2 l : list A) :
+  SubList (l1++l2) l <-> SubList l1 l /\ SubList l2 l.
+Proof.
+  split; intros;[apply SubList_app_l; auto|].
+  destruct H; repeat intro; rewrite in_app_iff in H1; destruct H1; eauto.
+Qed.
+
 Corollary extract_execs_PPlus (f : DefMethT) m o execs fcalls:
   NoDup (map fst (getMethods m)) ->
   In f (getMethods m) ->
@@ -1676,6 +1690,8 @@ Corollary extract_execs_PPlus (f : DefMethT) m o execs fcalls:
       calls [=] calls1++calls2 /\
       upds [=] upds1++upds2 /\
       DisjKey upds1 upds2 /\
+      SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) /\
+      SubList (getKindAttr reads) (getKindAttr (getRegisters m)) /\
       PPlusSubsteps m o upds2 execs calls2.
 Proof.
   induction fcalls; simpl; intros.
@@ -1683,27 +1699,31 @@ Proof.
     repeat split; auto.
     + constructor.
     + intro; left; intro; contradiction.
+    + repeat intro; contradiction.
+    + repeat intro; contradiction.
   - assert (forall g, In g fcalls -> fst g = fst f) as P1;[auto|].
     destruct a; specialize (H1 (s, s0) (or_introl _ eq_refl)) as P2; simpl in P2; rewrite P2 in H2.
     specialize (extract_exec_PPlus _ H H0 H2) as TMP; dest.
-    specialize (IHfcalls H H0 P1 _ _ H8); dest.
+    specialize (IHfcalls H H0 P1 _ _ H10); dest.
     exists (x++x6), (x0++x7), x8, (x2++x9), x10.
     repeat split.
     + econstructor 2.
-      * apply H9.
+      * apply H11.
       * assert (DisjKey x7 x0) as goal;[|apply goal].
-        intro k; specialize (H7 k); rewrite H11, map_app, in_app_iff in H7; clear -H7; firstorder fail.
+        intro k; specialize (H7 k); rewrite H13, map_app, in_app_iff in H7; clear -H7; firstorder fail.
       * apply Permutation_app_comm.
       * apply Permutation_app_comm.
       * apply Permutation_app_comm.
       * rewrite P2, H3; reflexivity.
       * assumption.
-    + rewrite H6, H10, app_assoc; reflexivity.
-    + rewrite H5, H11, app_assoc; reflexivity.
-    + intro k; specialize (H12 k); specialize (H7 k).
-      rewrite H11 in H7.
+    + rewrite H6, H12, app_assoc; reflexivity.
+    + rewrite H5, H13, app_assoc; reflexivity.
+    + intro k; specialize (H14 k); specialize (H7 k).
+      rewrite H13 in H7.
       rewrite map_app, in_app_iff in *.
-      clear -H12 H7; firstorder fail.
+      clear -H14 H7; firstorder fail.
+    + rewrite map_app, SubList_app_l_iff; auto.
+    + rewrite map_app, SubList_app_l_iff; auto.
     + assumption.
 Qed.
 
@@ -1791,12 +1811,6 @@ Proof.
     + econstructor; eauto.
       intro; apply H.
       rewrite filter_In in H1; dest; assumption.
-Qed.
-
-Lemma SubList_app_l_iff:
-  forall (A : Type) (l1 l2 ls : list A), SubList (l1 ++ l2) ls <-> SubList l1 ls /\ SubList l2 ls.
-Proof.
-  split; intro;[apply SubList_app_l; assumption|dest; repeat intro; auto; rewrite in_app_iff in *; firstorder fail].
 Qed.
 
 Fixpoint inlineSingle_Rule_in_list (f : DefMethT) (rn : string) (lr : list RuleT) : list RuleT :=
@@ -1920,6 +1934,21 @@ Proof.
   apply Substeps_inline_Rule_NoExec_PSubsteps; auto.
 Qed.
 
+Corollary PPlusSubsteps_inline_Rule_NoExec_PPlusSubsteps f m o rn upds execs calls :
+  NoDup (map fst (getMethods m)) ->
+  In f (getMethods m) ->
+  ~In (Rle rn) execs ->
+  PPlusSubsteps m o upds execs calls ->
+  PPlusSubsteps (inlineSingle_Rule_BaseModule f rn m) o upds execs calls.
+Proof.
+  intros.
+  apply PPlusSubsteps_PSubsteps in H2; dest.
+  rewrite H3, H4, H5.
+  apply PSubsteps_PPlusSubsteps.
+  rewrite H4 in H1; unfold getLabelExecs in H1.
+  apply PSubsteps_inline_Rule_NoExec_PSubsteps; auto.
+Qed.
+
 Lemma Substeps_inline_Rule_NoCall_PSubsteps f m o rn u cs (l : list FullLabel) :
   NoDup (map fst (getMethods m)) ->
   In f (getMethods m) ->
@@ -1981,7 +2010,10 @@ Lemma ExtractRuleAction m o (rle : RuleT) upds execs calls :
   exists reads upds1 upds2 calls1 calls2 retV,
     PSemAction o (snd rle type) reads upds1 calls1 retV /\
     upds [=] upds1++upds2 /\
-    calls [=] calls1++calls2.
+    calls [=] calls1++calls2 /\
+    DisjKey upds2 upds1 /\
+    SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) /\
+    SubList (getKindAttr reads) (getKindAttr (getRegisters m)).
 Proof.
   induction 4.
   - inv H1.
@@ -2001,8 +2033,54 @@ Proof.
       repeat rewrite app_assoc; apply Permutation_app_tail, Permutation_app_comm.
     + rewrite HCalls, H5.
       repeat rewrite app_assoc; apply Permutation_app_tail, Permutation_app_comm.
+    + rewrite H4 in HDisjRegs; intro k; specialize (HDisjRegs k); specialize (H6 k).
+      clear - HDisjRegs H6.
+      rewrite map_app, in_app_iff in *; firstorder fail.
 Qed.
 
+Lemma PPlus_inline_Rule_with_action f m o rn rb upds1 upds2 execs calls1 calls2 reads:
+  In (rn, rb) (getRules m) ->
+  In f (getMethods m) ->
+  NoDup (map fst (getMethods m)) ->
+  (forall rn', ~In (Rle rn') execs) ->
+  SubList (getKindAttr reads) (getKindAttr (getRegisters m)) ->
+  SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) ->
+  DisjKey upds2 upds1 ->
+  PSemAction o (inlineSingle f (rb type)) reads upds1 calls1 WO ->
+  PPlusSubsteps m o upds2 execs calls2 ->
+  PPlusSubsteps (inlineSingle_Rule_BaseModule f rn m) o (upds1++upds2) ((Rle rn)::execs) (calls1++calls2).
+Proof.
+  intros.
+  econstructor; auto.
+  - inv H7; simpl in *; auto.
+  - apply InRule_In_inlined, H.
+  - simpl; apply H6.
+  - auto.
+  - auto.
+  - intros; destruct x; auto.
+    apply (H2 rn0); assumption.
+  - apply PPlusSubsteps_inline_Rule_NoExec_PPlusSubsteps; auto.
+Qed.
+
+Lemma PPlus_inline_Rule_In f m o rn rb upds execs calls :
+  In (rn, rb) (getRules m) ->
+  In f (getMethods m) ->
+  NoDup (map fst (getMethods m)) ->
+  NoDup (map fst (getRules m)) ->
+  In (Rle rn) execs ->
+  (forall g, In g calls -> In (Meth g) execs) ->
+  PPlusSubsteps m o upds execs calls ->
+  exists fcalls execs' calls',
+    execs [=] (map Meth fcalls)++execs' /\
+    calls [=] fcalls++calls' /\
+    PPlusSubsteps (inlineSingle_Rule_BaseModule f rn m) o upds execs' calls'.
+Proof.
+  intros.
+  specialize (ExtractRuleAction _ H2 H H3 H5) as TMP; dest.
+  rewrite (separate_calls_by_filter x2 (called_by f)) in H8.
+  apply (PSemAction_rewrite_calls (separate_calls_by_filter x2 (called_by f))) in H6.
+  exists (filter (called_by f) x2).
+  
 (* Lemma Substeps_inline_Rule_PSubsteps f m o rn fb u1 u2 cs (l : list FullLabel) : *)
 (*   NoDup (map fst (getMethods m)) -> *)
 (*   In f (getMethods m) -> *)
