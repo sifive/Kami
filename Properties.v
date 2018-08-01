@@ -84,15 +84,6 @@ Section evalExpr.
 
 
 
-  (* Lemma evalExpr_pack: forall k (e1 e2: k @# type), *)
-  (*     evalExpr e1 = evalExpr e2 -> *)
-  (*     evalExpr (pack e1) = evalExpr (pack e2). *)
-  (* Proof. *)
-  (*   intros. *)
-  (*   induction k; simpl; rewrite ?H; try auto. *)
-  (*   admit. *)
-  (*   admit. *)
-  (* Admitted. *)
 End evalExpr.
 
 
@@ -337,39 +328,6 @@ Proof.
   setoid_rewrite (functional_extensionality (fun x => fst x) fst) in H; tauto.
 Qed.
 
-
-(* Lemma SignT_dec: forall k1 k2 (s1 s2: SignT (k1, k2)), {s1 = s2} + {s1 <> s2}. *)
-(* Proof. *)
-(*   intros. *)
-(*   destruct s1, s2. *)
-(*   simpl in *. *)
-(*   apply prod_dec; simpl; auto; apply isEq. *)
-(* Qed. *)
-
-(* Lemma sigT_SignT_dec: forall s1 s2: (sigT SignT), {s1 = s2} + {s1 <> s2}. *)
-(* Proof. *)
-(*   intros. *)
-(*   destruct s1, s2. *)
-(*   destruct (Signature_dec x x0); subst. *)
-(*   - destruct (SignT_dec s s0); subst. *)
-(*     + left; reflexivity. *)
-(*     + right; intro. *)
-(*       apply EqdepFacts.eq_sigT_eq_dep in H. *)
-(*       apply (Eqdep_dec.eq_dep_eq_dec (Signature_dec)) in H. *)
-(*       tauto. *)
-(*   - right; intro. *)
-(*     inversion H. *)
-(*     tauto. *)
-(* Qed. *)
-
-(* Lemma MethT_dec: forall s1 s2: MethT, {s1 = s2} + {s1 <> s2}. *)
-(* Proof. *)
-(*   intros. *)
-(*   destruct s1, s2. *)
-(*   apply prod_dec. *)
-(*   - apply string_dec. *)
-(*   - apply sigT_SignT_dec. *)
-(* Qed. *)
 
 Lemma getKindAttr_map_fst A (P Q: A -> Type)
   : forall (l2: list (Attribute (sigT P))) (l1: list (Attribute (sigT Q))),
@@ -926,7 +884,6 @@ Section SplitJoin.
                    end
         | Meth _ => True
         end) /\
-    (* (forall f, InCall f (filterExecs id m1 l) -> forall v2, InCall (fst f,v2) (filterExecs id m2 l) -> False) /\ *)
     l = filterExecs id m1 l ++ filterExecs id m2 l.
   Proof.
     intros H.
@@ -1006,7 +963,6 @@ Section SplitJoin.
                         end
              | Meth _ => True
              end) /\
-         (* (forall f, InCall f (filterExecs id m1 l) -> forall v2, InCall (fst f,v2) (filterExecs id m2 l) -> False) /\ *)
          l = filterExecs id m1 l ++ filterExecs id m2 l) ls /\
   map fst o = map fst (getAllRegisters (ConcatMod m1 m2)).
   Proof.
@@ -1117,7 +1073,6 @@ Section SplitJoin.
                                            | Rle _, Rle _ => False
                                            | _, _ => True
                                            end) ->
-    (* (forall f, InCall f l1 -> forall v2, InCall (fst f,v2) l2 -> False) -> *)
     Step (ConcatMod m1 m2) (o1 ++ o2) (l1 ++ l2).
   Proof.
     intros.
@@ -1139,9 +1094,6 @@ Section SplitJoin.
                                                         end
                                              | Meth _ => True
                                              end)) l) ->
-    (* (mapProp2 (fun l1 l2 => *)
-    (*              (forall f, InCall f l1 -> *)
-    (*                         forall v2, InCall (fst f,v2) l2 -> False)) l) -> *)
     Trace (ConcatMod m1 m2) (o1 ++ o2) (map (fun x => fst x ++ snd x) l).
   Proof.
     induction l; simpl; intros.
@@ -1212,8 +1164,6 @@ Section SplitJoin.
                                                              end
                                                   | Meth _ => True
                                                   end)) l1 l2) ->
-      (* (mapProp_len (fun l1 l2 => *)
-      (*                 (forall f, InCall f l1 -> forall v2, InCall (fst f,v2) l2 -> False)) l1 l2) -> *)
       Trace (ConcatMod m1 m2) (o1 ++ o2) (map (fun x => fst x ++ snd x) (zip l1 l2)).
   Proof.
     intros.
@@ -1235,8 +1185,7 @@ Section SplitJoin.
                                                                     | Meth _ => True
                                                                     end
                                                          | Meth _ => True
-                                                         end)(*  /\ *)
-                             (* (forall f, InCall f l1 -> forall v2, InCall (fst f,v2) l2 -> False) *)) l1 l2 ->
+                                                         end)) l1 l2 ->
       Trace (ConcatMod m1 m2) (o1 ++ o2) (map (fun x => fst x ++ snd x) (zip l1 l2)).
   Proof.
     intros ? ? ? ?.
@@ -1408,8 +1357,6 @@ Lemma Step_meth_InCall_InDef_InExec m o ls:
   forall (f : MethT),
     In (fst f) (map fst (getAllMethods m)) ->
     (getNumCalls f ls <= getNumExecs f ls)%Z.
-    (* InCall f ls -> *)
-    (* In (fst f) (map fst (getAllMethods m)) -> InExec f ls. *)
 Proof.
   induction 1.
   - unfold MatchingExecCalls_Base in *.
@@ -1451,8 +1398,6 @@ Lemma Trace_meth_InCall_not_InExec_not_InDef m o ls:
   Trace m o ls ->
   forall (f : MethT) (i : nat) (l : list (RegsT * (RuleOrMeth * MethsT))),
     nth_error ls i = Some l ->
-    (* InCall f l -> *)
-    (* ~ InExec f l -> *)
     ~(getNumCalls f l <= getNumExecs f l)%Z ->
     ~ In (fst f) (map fst (getAllMethods m)).
 Proof.
@@ -1703,11 +1648,6 @@ Section StepSimulation.
           Step spec oSpec lSpec /\
           UpdRegs (map fst lSpec) oSpec oSpec' /\
           simRel oImp' oSpec' /\ WeakInclusion lImp lSpec.
-          (* (forall f : MethT, InExec f lImp /\ ~ InCall f lImp <-> InExec f lSpec /\ ~ InCall f lSpec) /\ *)
-          (* (forall f : MethT, ~ InExec f lImp /\ InCall f lImp <-> ~ InExec f lSpec /\ InCall f lSpec) /\ *)
-          (* (forall f : MethT, InExec f lImp /\ InCall f lImp \/ (forall v, ~ InExec (fst f, v) lImp) /\ (forall v, ~ InCall (fst f, v) lImp) <-> *)
-          (*                    InExec f lSpec /\ InCall f lSpec \/ (forall v, ~ InExec (fst f, v) lSpec) /\ (forall v, ~ InCall (fst f, v) lSpec)) /\ *)
-          (* ((exists rle : string, In (Rle rle) (map getRleOrMeth lSpec)) -> (exists rle : string, In (Rle rle) (map getRleOrMeth lImp))). *)
 
   Lemma StepDecomposition':
     forall (oImp : RegsT) (lsImp : list (list FullLabel)),
@@ -1717,13 +1657,6 @@ Section StepSimulation.
         Datatypes.length lsImp = Datatypes.length lsSpec /\
         nthProp2 WeakInclusion lsImp lsSpec /\
         simRel oImp oSpec.
-        (*   (fun l1 l2 : list FullLabel => *)
-        (*      (forall f : MethT, InExec f l1 /\ ~ InCall f l1 <-> InExec f l2 /\ ~ InCall f l2) /\ *)
-        (*      (forall f : MethT, ~ InExec f l1 /\ InCall f l1 <-> ~ InExec f l2 /\ InCall f l2) /\ *)
-        (*      (forall f : MethT, InExec f l1 /\ InCall f l1 \/ (forall v, ~ InExec (fst f, v) l1 )/\ (forall v, ~ InCall (fst f, v) l1) <-> InExec f l2 /\ InCall f l2 \/ (forall v, ~ InExec (fst f, v) l2) /\ (forall v, ~ InCall (fst f, v) l2)) /\ *)
-        (*      ((exists rle : string, In (Rle rle) (map getRleOrMeth l2)) -> (exists rle : string, In (Rle rle) (map getRleOrMeth l1))) *)
-        (*   ) lsImp lsSpec /\ *)
-        (* simRel oImp oSpec. *)
   Proof.
     induction 1; subst; simpl; auto; intros.
     - pose proof (initRel HUpdRegs) as [rspec rspecProp].
@@ -1825,43 +1758,6 @@ Section DecompositionZero.
              right; split; try intro; dest; simpl in *; try tauto.
           -- intros; dest. inv H4.
         
-          (*   dest; unfold InExec in *; dest; try tauto; simpl in *. *)
-          (*    destruct H4; congruence. *)
-          (* -- dest; unfold InExec in *; dest; try tauto; simpl in *. *)
-          (*    destruct H4; congruence. *)
-          (* -- dest; unfold InExec in *; dest; try tauto; simpl in *; tauto. *)
-          (* -- dest; unfold InExec in *; dest; try tauto; simpl in *; tauto. *)
-          (* -- unfold InCall in *; clear - H4. *)
-          (*    dest. *)
-          (*    simpl in *. *)
-          (*    destruct H0; subst; simpl in *; tauto. *)
-          (* -- unfold InCall in *; clear - H4. *)
-          (*    dest. *)
-          (*    simpl in *. *)
-          (*    destruct H0; subst; simpl in *; tauto. *)
-          (* -- unfold InCall in *; clear - H4. *)
-          (*    dest. *)
-          (*    simpl in *. *)
-          (*    destruct H0; subst; simpl in *; tauto. *)
-          (* -- intros. *)
-          (*    destruct H4; dest. *)
-          (*    ++ unfold InExec in H4; simpl in *. *)
-          (*       destruct H4; [discriminate | tauto]. *)
-          (*    ++ right. *)
-          (*       split; repeat intro. *)
-          (*       ** unfold InExec, InCall in *; simpl in *; tauto. *)
-          (*       ** unfold InExec, InCall in *; simpl in *; dest; tauto. *)
-          (* -- intros. *)
-          (*    destruct H4; dest. *)
-          (*    ++ unfold InExec in H4; simpl in *; tauto. *)
-          (*    ++ right. *)
-          (*       split; repeat intro. *)
-          (*       ** unfold InExec, InCall in *; simpl in *. destruct H6; [discriminate | tauto]. *)
-          (*       ** unfold InExec, InCall in *; simpl in *; dest; destruct H6; subst; simpl in *; tauto. *)
-          (* -- intros. *)
-          (*    dest. *)
-          (*    simpl in *. *)
-          (*    tauto. *)
         * exists [(x, (Rle x0, cs))], x1.
           repeat split; auto.
           -- constructor; auto.
@@ -1876,81 +1772,6 @@ Section DecompositionZero.
           -- intros; dest.
              destruct H5;simpl in *; inv H5.
              exists rn; left; reflexivity.
-      (* +  *)
-             
-      (*     -- dest. *)
-      (*        unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto]. *)
-      (*     -- dest. *)
-      (*        unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto]. *)
-      (*     -- dest. *)
-      (*        unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto]. *)
-      (*     -- dest. *)
-      (*        unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto]. *)
-      (*     -- intro. *)
-      (*        dest. *)
-      (*        unfold InExec in *; simpl in *; destruct H6; [discriminate | tauto]. *)
-      (*     -- dest. *)
-      (*        unfold InCall in *; simpl in *; destruct H6; dest. *)
-      (*        eexists. *)
-      (*        split; [apply (or_introl eq_refl)|]. *)
-      (*        simpl. *)
-      (*        destruct H6; subst; simpl in *; auto. *)
-      (*        tauto. *)
-      (*     -- intro. *)
-      (*        dest. *)
-      (*        unfold InExec in *; simpl in *; destruct H6; [discriminate | tauto]. *)
-      (*     -- dest. *)
-      (*        unfold InCall in *; simpl in *; destruct H6; dest. *)
-      (*        eexists. *)
-      (*        split; [apply (or_introl eq_refl)|]. *)
-      (*        simpl. *)
-      (*        destruct H6; subst; simpl in *; auto. *)
-      (*        tauto. *)
-      (*     -- intros; dest. *)
-      (*        destruct H5; dest. *)
-      (*        ++ dest. *)
-      (*           unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto]. *)
-      (*        ++ right. *)
-      (*           split; repeat intro. *)
-      (*           ** unfold InExec in *; simpl in *; destruct H7; [discriminate | tauto]. *)
-      (*           **unfold InCall in *; dest; simpl in *. *)
-      (*              assert (sth2: (exists v, (exists x, ((u, (Rle rn, cs)) = x \/ False) /\ In (fst f, v) (snd (snd x))))). *)
-      (*              { eexists. *)
-      (*                eexists. *)
-      (*                split. *)
-      (*                - left; reflexivity. *)
-      (*                - simpl. *)
-      (*                  destruct H7; [|tauto]. *)
-      (*                  subst; simpl in *; auto. *)
-      (*                  apply H8. *)
-      (*              } *)
-      (*              dest. *)
-      (*              eapply H6; eauto. *)
-      (*     -- intros; dest. *)
-      (*        destruct H5; dest. *)
-      (*        ++ dest. *)
-      (*           unfold InExec in *; simpl in *; destruct H5; [discriminate | tauto]. *)
-      (*        ++ right. *)
-      (*           split; repeat intro. *)
-      (*           ** unfold InExec in *; simpl in *; destruct H7; [discriminate | tauto]. *)
-      (*           ** unfold InCall in *; dest; simpl in *. *)
-      (*              assert (sth2: (exists v, exists x1, ((x, (Rle x0, cs)) = x1 \/ False) /\ In (fst f, v) (snd (snd x1)))). *)
-      (*              { eexists. *)
-      (*                eexists. *)
-      (*                split. *)
-      (*                - left; reflexivity. *)
-      (*                - simpl. *)
-      (*                  destruct H7; [|tauto]. *)
-      (*                  subst; simpl in *; auto. *)
-      (*                  apply H8. *)
-      (*              } *)
-      (*              dest; eapply H6; eauto. *)
-      (*     -- intros. *)
-      (*        simpl in *. *)
-      (*        dest. *)
-      (*        destruct H5; [|tauto]. *)
-      (*        exists rn. *)
-      (*        left; auto. *)
       + specialize (HNoRle _ (or_introl eq_refl)); simpl in *; tauto.
     - rewrite NoMeths in *.
       simpl in *; tauto.
@@ -2075,7 +1896,6 @@ Lemma Substeps_combine m1 o1 l1:
                                                          | Rle _, Rle _ => False
                                                          | _, _ => True
                                                          end),
-         (* (HNoCall: forall x, InCall x l1 -> forall v, InCall (fst x, v) l2 -> False), *)
     Substeps m2 o2 l2 ->
     Substeps (BaseMod (getRegisters m1 ++ getRegisters m2) (getRules m1 ++ getRules m2) (getMethods m1 ++ getMethods m2)) (o1 ++ o2) (l1 ++ l2).
 Proof.
@@ -2114,9 +1934,6 @@ Proof.
                                                             | Rle _, Rle _ => False
                                                             | _, _ => True
                                                             end) by (clear - HOneRle; firstorder fail).
-    (* assert (sth2_else: forall x, InCall x ls -> forall v, InCall (fst x, v) l2 -> False) by *)
-    (*     (clear - HNoCall0; unfold InCall in *; simpl in *; intros; dest; eapply HNoCall0; eauto). *)
-    (* specialize (IHSubsteps _ _ _ DisjRegs DisjMeths sth_else sth2_else H0). *)
     econstructor 2; eauto; simpl; rewrite ?map_app; try congruence.
     + inv H0; congruence.
     + rewrite in_app_iff; left; eassumption.
@@ -2146,20 +1963,11 @@ Proof.
       destruct H1; [eapply HNoRle; eauto| ].
       unfold SubList in *.
       specialize (HOneRle _ x (or_introl eq_refl) H1); simpl in *; assumption.
-    (* + intros. *)
-    (*   rewrite InCall_app_iff in *. *)
-    (*   destruct H2; [eapply HNoCall; eauto|]. *)
-    (*   eapply HNoCall0; eauto. *)
-    (*   unfold InCall. *)
-    (*   eexists; split; simpl; eauto. *)
   - subst; simpl.
     assert (sth_else: forall x1 x2, In x1 ls -> In x2 l2 -> match fst (snd x1), fst (snd x2) with
                                                             | Rle _, Rle _ => False
                                                             | _, _ => True
                                                             end) by (clear - HOneRle; firstorder fail).
-    (* assert (sth2_else: forall x, InCall x ls -> forall v, InCall (fst x, v) l2 -> False) by *)
-    (*     (clear - HNoCall0; unfold InCall in *; simpl in *; intros; dest; eapply HNoCall0; eauto). *)
-    (* specialize (IHSubsteps _ _ _ DisjRegs DisjMeths sth_else sth2_else H0). *)
     econstructor 3; eauto; simpl; rewrite ?map_app; try congruence.
     + inv H0; congruence.
     + rewrite in_app_iff; left; eassumption.
@@ -2184,24 +1992,6 @@ Proof.
       setoid_rewrite (functional_extensionality (fun x => fst x) fst) in HUpdGood; [|tauto].
       specialize (HUpdGood _ H3).
       clear - H2 DisjRegs HUpdGood; firstorder fail.
-    (* + intros. *)
-    (*   rewrite InCall_app_iff in *. *)
-    (*   destruct H2; [eapply HNoCall; eauto|]. *)
-    (*   eapply HNoCall0; eauto. *)
-    (*   unfold InCall. *)
-    (*   eexists; split; simpl; eauto. *)
-    (* + intro. *)
-    (*   rewrite InExec_app_iff in H1. *)
-    (*   destruct H1. *)
-    (*   * tauto. *)
-    (*   * unfold InExec in H1. *)
-    (*     rewrite in_map_iff in H1; dest. *)
-    (*     destruct x, p. *)
-    (*     simpl in *; subst. *)
-    (*     eapply Substeps_meth_In in H2; eauto. *)
-    (*     simpl in *. *)
-    (*     destruct (DisjMeths fn);[|contradiction]. *)
-    (*     apply (in_map fst) in HInMeths; contradiction. *)
 Qed.
 
 Lemma Substeps_flatten m o l:
@@ -2242,14 +2032,6 @@ Proof.
     + subst.
       apply HHidden; auto.
     + apply H2; auto.
-    (* intros; destruct H4; simpl in *; subst. *)
-    (* *  *)
-    (*   apply H2; auto. *)
-    (* + specialize (H1 f); tauto. *)
-    (* + intros. *)
-    (*   destruct H4; simpl in *; subst. *)
-    (*   -- apply HHidden; auto. *)
-    (*   -- apply H2; auto. *)
   - inv HWfMod.
     specialize (IHStep1 HWf1).
     specialize (IHStep2 HWf2).
@@ -2258,11 +2040,6 @@ Proof.
     + pose proof (Substeps_combine H4 HDisjRegs HDisjMeths HNoRle H1 (m2 := BaseMod (getAllRegisters m2) _ _)).
       simpl in *.
       assumption.
-    (* + rewrite ?InExec_app_iff, ?InCall_app_iff, ?map_app, ?in_app_iff in *. *)
-    (*   rewrite ?InExec_app_iff, ?InCall_app_iff, ?map_app, ?in_app_iff in *. *)
-    (*   repeat match goal with *)
-    (*          | H: forall x: MethT, _ |- _ => specialize (H f) *)
-    (*          end; tauto. *)
     + intros.
       rewrite getNumCalls_app, getNumExecs_app.
       rewrite map_app, in_app_iff in H7.
@@ -2305,26 +2082,6 @@ Proof.
         destruct (Z.eq_dec (getNumCalls (s, v) l1) 0%Z);
           [specialize (H3 _ v H7 H8);Omega.omega|].
         destruct (HMatching1 _ n H7); contradiction.
-    (* + intros. *)
-    (*   rewrite ?InExec_app_iff, ?InCall_app_iff, ?map_app, ?in_app_iff in *. *)
-    (*   repeat match goal with *)
-    (*          | H: forall x: string, _ |- _ => specialize (H s) *)
-    (*          | H: forall x: MethT, _ |- _ => specialize (H (s, v)) *)
-    (*          end. *)
-    (*   specialize (H6 v); specialize (H3 v). *)
-    (*   destruct H7, H8, H9; try tauto. *)
-    (*   * pose proof (Step_meth_InExec H0 _ H9); simpl in *. *)
-    (*     clear - HDisjMeths H7 H10; firstorder fail. *)
-    (*   * pose proof (WfMod_Hidden HWf2 s H8). *)
-    (*     clear - HDisjMeths H7 H10; firstorder fail. *)
-    (*   * pose proof (WfMod_Hidden HWf2 s H8). *)
-    (*     clear - HDisjMeths H7 H10; firstorder fail. *)
-    (*   * pose proof (WfMod_Hidden HWf1 s H8). *)
-    (*     clear - HDisjMeths H7 H10; firstorder fail. *)
-    (*   * pose proof (WfMod_Hidden HWf1 s H8). *)
-    (*     clear - HDisjMeths H7 H10; firstorder fail. *)
-    (*   * pose proof (Step_meth_InExec H _ H9); simpl in *. *)
-    (*     clear - HDisjMeths H7 H10; firstorder fail. *)
 Qed.
 
 Lemma StepSubstitute_flatten m o l (HWfMod: WfMod m):
@@ -2541,21 +2298,9 @@ Proof.
   repeat red; intros; split; intro; subst; eauto using MatchingExecCalls_Concat_rewrite, Permutation_sym.
 Qed.
 
-(* Lemma MatchingExecCalls_perm l l' m1 : *)
-(*   MatchingExecCalls l l (Base m1) -> Permutation l l' -> MatchingExecCalls l' l' (Base m1). *)
-(*   repeat intro. *)
-(*   specialize (H f). *)
-(*   split; auto. *)
-(*   apply (InExec_perm f (l := l) (l' := l')). *)
-(*   - apply (Permutation_sym) in H0; specialize (H (InCall_perm (l := l') (l' := l) H1 H0) H2). destruct H. assumption. *)
-(*   - assumption. *)
-(* Qed. *)
-
 Lemma InExec_ModuleFilterLabels : forall (f : MethT)(m : BaseModule)(l : list FullLabel),
-    (* InExec f l -> *)
     In (fst f) (map fst (getMethods m)) ->
     (getNumExecs f l = getNumExecs f (ModuleFilterLabels m l)).
-    (* InExec f (ModuleFilterLabels m l). *)
 Proof.
   intros.
   assert (existsb (strcmp (fst f)) (map fst (getMethods m)) = true);[apply (existsb_exists (strcmp (fst f))(map fst (getMethods m)));exists (fst f);split;
@@ -2917,8 +2662,6 @@ Section SplitSubsteps.
         * intros; apply HNoRle;
             destruct (filter_In (BaseModuleFilter m1) x1 ls) as [L R];
             destruct (L H10);assumption.
-        (* * intros; apply (HNoCall f H10 v2). destruct H11 as [x1 [L R]];exists x1;split;[|assumption]. *)
-        (*   destruct (filter_In (BaseModuleFilter m1) x1 ls) as [L1 R1]; destruct (L1 L); assumption. *)
         * rewrite (NotInRules_Filter _ _ _ _ _ H3); assumption.
       + subst; dest; exists x, x0; split;[|split;[|split;[|split]]];auto.
         rewrite (NotInRules_Filter _ _ _ _ _ H3); assumption.
@@ -2934,8 +2677,6 @@ Section SplitSubsteps.
         * intros; apply HNoRle;
             destruct (filter_In (BaseModuleFilter m2) x1 ls) as [L R];
             destruct (L H10);assumption.
-        (* * intros; apply (HNoCall f H10 v2). destruct H11 as [x1 [L R]];exists x1;split;[|assumption]. *)
-        (*   destruct (filter_In (BaseModuleFilter m2) x1 ls) as [L1 R1]; destruct (L1 L); assumption. *)
     - rewrite map_app in *;apply in_app_iff in HInMeths; specialize (DisjMeths fn).
       assert (NoDup (map fst o));[setoid_rewrite GKA_fst;setoid_rewrite HRegs; rewrite <- map_app; rewrite <- GKA_fst; apply (NoDupKey_Expand H H0 DisjRegs)|].
       destruct HInMeths as [HInMeths|HInMeths];generalize (in_map fst _ _ HInMeths);destruct DisjMeths;try contradiction;intros.
@@ -2949,12 +2690,6 @@ Section SplitSubsteps.
           -- intros; apply HDisjRegs;
                destruct (filter_In (BaseModuleFilter m1) x1 ls) as [L R];
                destruct (L H10); assumption.
-          (* -- intros; apply (HNoCall f H10 v2). destruct H11 as [x1 [L R]];exists x1;split;[|assumption]. *)
-          (*    destruct (filter_In (BaseModuleFilter m1) x1 ls) as [L1 R1]; destruct (L1 L); assumption. *)
-          (* -- intros; apply HNoExec. unfold InExec in *. *)
-          (*    rewrite in_map_iff in H10; dest;destruct x1, p; simpl in *; subst. *)
-          (*    unfold ModuleFilterLabels in H11; rewrite filter_In in H11; dest. *)
-          (*    apply (in_map getRleOrMeth) in H7; assumption. *)
         * rewrite (NotInMethods_Filter _ _ _ _ _ _ _ _ H3); assumption.
       + subst; dest; exists x, x0;split;[|split;[|split;[|split]]]; auto.
         * rewrite (NotInMethods_Filter _ _ _ _ _ _ _ _ H3); assumption.
@@ -2967,12 +2702,6 @@ Section SplitSubsteps.
           -- intros; apply HDisjRegs;
                destruct (filter_In (BaseModuleFilter m2) x1 ls) as [L R];
                destruct (L H10); assumption.
-          (* -- intros; apply (HNoCall f H10 v2). destruct H11 as [x1 [L R]];exists x1;split;[|assumption]. *)
-          (*    destruct (filter_In (BaseModuleFilter m2) x1 ls) as [L1 R1]; destruct (L1 L); assumption. *)
-          (* -- intros; apply HNoExec; unfold InExec in *. *)
-          (*    rewrite in_map_iff in H10; dest; destruct x1,p; simpl in *; subst. *)
-          (*    unfold ModuleFilterLabels in H11; rewrite filter_In in H11; dest. *)
-          (*    apply (in_map getRleOrMeth) in H7; assumption. *)
   Qed.
   
   Lemma split_Substeps2 o l:
@@ -2986,12 +2715,10 @@ Section SplitSubsteps.
                      | Meth _ => True
                      end
           | Meth _ => True
-          end)(*  /\ *)
-      (* (forall x : MethT, InCall x (ModuleFilterLabels m1 l) -> (forall v, InCall (fst x, v) (ModuleFilterLabels m2 l) *)
-      (*                    -> False)) *).
-    induction 1; intros; (* split; *) auto; subst.
+          end).
+  Proof.
+    induction 1; intros; auto; subst.
     - intros; contradiction.
-    (* - unfold InCall; intros; dest; contradiction. *)
     - simpl in HInRules.
       destruct (in_app_or _ _ _ HInRules) as [Rle_in | Rle_in]; specialize (in_map fst _ _ Rle_in) as map_Rle_in; destruct (DisjRules rn); try contradiction; rewrite (InRules_Filter u _ _ ls cs _ Rle_in) in *;rewrite (NotInRules_Filter u _ ls cs _ H2) in *; intros.
       + destruct H0.
@@ -3004,39 +2731,6 @@ Section SplitSubsteps.
           apply HNoRle.
           unfold ModuleFilterLabels in H0; apply filter_In in H0; destruct H0; assumption.
         * eapply IHSubsteps; eauto.
-    (* - destruct (in_app_or _ _ _ HInRules) as [Rle_in | Rle_in]; specialize (in_map fst _ _ Rle_in) as map_Rle_in; destruct (DisjRules rn); try contradiction; rewrite (InRules_Filter u _ _ ls cs _ Rle_in);rewrite (NotInRules_Filter u _ ls cs _ H0); intros. *)
-    (*   + destruct (InCall_app_iff x (((u, (Rle rn, cs)))::nil) (ModuleFilterLabels m1 ls)) as [L R]; clear R. *)
-    (*     destruct (L H1); clear L. *)
-    (*     * unfold InCall in H3. dest. *)
-    (*       destruct H3;[subst|contradiction]. *)
-    (*       apply InCall_split_InCall in H2. *)
-    (*       eapply HNoCall; eauto. *)
-    (*     * eapply IHSubsteps; eauto. *)
-    (*   + eapply IHSubsteps; eauto. *)
-    (*     assert (((u, (Rle rn, cs)) :: ModuleFilterLabels m2 ls) = ([(u, (Rle rn, cs))] ++ ModuleFilterLabels m2 ls)); auto. *)
-    (*     rewrite H3 in H2; setoid_rewrite InCall_app_iff in H2. *)
-    (*     clear H3. *)
-    (*     destruct H2; eauto. *)
-    (*     unfold InCall in H2; dest; destruct x; simpl in *. *)
-    (*     destruct H2; [subst; simpl in *|contradiction]. *)
-    (*     apply InCall_split_InCall in H1. *)
-    (*     specialize (HNoCall _ H5 _ H1); contradiction. *)
-    (* - intros. *)
-    (*   unfold ModuleFilterLabels in *. *)
-    (*   specialize (filter_app (BaseModuleFilter m1) ((u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))::nil) ls) as TMP; setoid_rewrite TMP in H0; clear TMP. *)
-    (*   specialize (filter_app (BaseModuleFilter m2) ((u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))::nil) ls) as TMP; setoid_rewrite TMP in H1; clear TMP. *)
-    (*   destruct (in_app_or _ _ _ H0); destruct (in_app_or _ _ _ H1). *)
-    (*   + apply filter_In in H3; apply filter_In in H2. dest. *)
-    (*     destruct H2, H3; try contradiction. *)
-    (*     subst; simpl; auto. *)
-    (*   + apply filter_In in H2; destruct H2. *)
-    (*     destruct H2;[|contradiction]. *)
-    (*     subst; simpl; auto. *)
-    (*   + apply filter_In in H3; destruct H3. *)
-    (*     destruct H3;[|contradiction]. *)
-    (*     subst; simpl; auto. *)
-    (*     destruct (fst (snd x)); auto. *)
-    (*   + eapply IHSubsteps; eauto. *)
     - simpl in HInMeths; rewrite in_app_iff in HInMeths; destruct HInMeths, (DisjMeths fn);specialize (in_map fst _ _ H2) as P1 ; try contradiction.
       + setoid_rewrite (NotInMethods_Filter u _ fb argV retV ls cs _ H3) in H1.
         setoid_rewrite (InMethods_Filter _ _ _ _ _ _ _ _ H2) in H0.
@@ -3046,27 +2740,6 @@ Section SplitSubsteps.
         setoid_rewrite (InMethods_Filter _ _ _ _ _ _ _ _ H2) in H1.
         destruct H1;[subst;simpl in *;destruct x,p,r0;simpl;auto|].
         apply IHSubsteps;auto.
-      (*   unfold ModuleFilterLabels in *. *)
-        
-      (*   specialize (filter_app (BaseModuleFilter m2) ((u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))::nil) ls) as TMP; setoid_rewrite TMP in H1; clear TMP. *)
-      (*   (* setoid_rewrite InCall_app_iff in H1. *) *)
-      (*   destruct H1. *)
-      (*   * destruct x; unfold BaseModuleFilter in H1; simpl in *. *)
-      (*     destruct existsb in H1; unfold InCall in H1;dest;[simpl in *|contradiction]. *)
-      (*     destruct H1;[subst|contradiction]; simpl in *. *)
-      (*     (* apply InCall_split_InCall in H0. *) *)
-      (*     specialize (HNoCall _ H5 _ H0); contradiction. *)
-      (*   * eapply IHSubsteps; eauto. *)
-      (* + setoid_rewrite (NotInMethods_Filter u _ fb argV retV ls cs _ H2) in H1. *)
-      (*   unfold ModuleFilterLabels in *. *)
-      (*   specialize (filter_app (BaseModuleFilter m1) ((u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))::nil) ls) as TMP; setoid_rewrite TMP in H0; clear TMP. *)
-      (*   rewrite InCall_app_iff in H0; destruct H0. *)
-      (*   * unfold InCall in H0; dest; apply filter_In in H0; destruct H0. *)
-      (*     destruct H0;[subst|contradiction]. *)
-      (*     simpl in H5. *)
-      (*     apply InCall_split_InCall in H1. *)
-      (*     specialize (HNoCall _ H5 _ H1); contradiction. *)
-      (*   * eapply IHSubsteps; eauto. *)
   Qed.
 
 End SplitSubsteps.
@@ -3100,15 +2773,6 @@ Proof.
   unfold WeakInclusion;split;intros.
   - unfold getListFullLabel_diff; repeat rewrite getNumExecs_app, getNumCalls_app; ring.
   - dest; exists x; rewrite map_app,in_app_iff in *; firstorder fail.
-  (* repeat try split; try destruct H; try intro; try apply H0; try apply H; try apply InCall_app_comm; try apply InExec_app_comm; try assumption. *)
-  (* - destruct H; dest. *)
-  (*   + left; split;[apply InExec_app_comm|apply InCall_app_comm]; assumption. *)
-  (*   + right; split; intro;intro TMP;[apply InExec_app_comm in TMP;eapply H|apply InCall_app_comm in TMP; eapply H0]; eauto. *)
-  (* -destruct H; dest. *)
-  (*   + left; split;[apply InExec_app_comm|apply InCall_app_comm]; assumption. *)
-  (*   + right; split; intro;intro TMP;[apply InExec_app_comm in TMP;eapply H|apply InCall_app_comm in TMP; eapply H0]; eauto. *)
-  (* -dest; exists x. *)
-  (*  rewrite map_app in *; apply in_app_iff; apply in_app_iff in H; firstorder. *)
 Qed.
 
 Definition WeakEquality (l1 l2 : list FullLabel) : Prop :=
@@ -3134,7 +2798,6 @@ Proof.
   destruct p. destruct p0.
   simpl in *.
   destruct r2. assumption. destruct r1. assumption. assumption.
-  (* intros. destruct f; simpl in *; eapply HNoCall;simpl in *; eauto. *)
   reflexivity.
   reflexivity.
   subst.
@@ -3161,28 +2824,10 @@ Lemma WeakInclusionTrans : forall l1 l2 l3, WeakInclusion l1 l2 -> WeakInclusion
   unfold WeakInclusion in *.
   dest.
   split;intros;eauto using eq_trans.
-  (* eauto using eq_trans. *)
-  (* specialize (H f)(H0 f); eauto using eq_trans. *)
-  (* split. intros. *)
-  (* apply H0. apply H. assumption. *)
-  (* intros. apply H. apply H0. assumption. *)
-  (* split. intros. *)
-  (* split. intros. apply H1. apply H4. assumption. *)
-  (* intros. apply H4; apply H1; assumption. *)
-  (* split. *)
-  (* intros. split. intros. *)
-  (* apply H2. apply H5. assumption. *)
-  (* intros. *)
-  (* apply H5; apply H2; assumption. *)
-  (* intros. *)
-  (* apply H6. apply H3. assumption. *)
 Qed.
 
 Corollary WeakEqualityTrans : forall l1 l2 l3, WeakEquality l1 l2 -> WeakEquality l2 l3 -> WeakEquality l1 l3.
   unfold WeakEquality; intros;dest; split; eauto using WeakInclusionTrans.
-  (* unfold WeakEquality in *. dest. *)
-  (* split. apply (WeakInclusionTrans H H0). *)
-  (* apply (WeakInclusionTrans H1 H2). *)
 Qed.
 
 Lemma WeakEqualitySym : forall l1 l2, WeakEquality l1 l2 -> WeakEquality l2 l1.
@@ -3304,59 +2949,37 @@ Qed.
 Lemma WfConcats : forall (m1 m2 : Mod) (o : RegsT)(l : list FullLabel),
     WfConcat m2 m1 ->
     Substeps (getFlat m2) o l ->
-    (forall (s: string)(v : {x : Kind*Kind & SignT x}), In s (getHidden m1) -> (getNumCalls (s, v) l = 0%Z) (* ~InCall (s, v) l *)).
+    (forall (s: string)(v : {x : Kind*Kind & SignT x}), In s (getHidden m1) -> (getNumCalls (s, v) l = 0%Z)).
 Proof.
   intros.
   induction H0; subst.
   - reflexivity.
-    (* intro; unfold InCall in H0. dest; contradiction. *)
   - inversion H; simpl in HInRules;specialize (H2 _ HInRules).
     rewrite getNumCalls_cons; rewrite IHSubsteps;simpl.
     assert (In (fst (s, v)) (getHidden m1)) as P1;auto.
     rewrite (getNumFromCalls_notIn _ _ (WfConcatNotInCalls _ H2 HAction P1)); ring.
-    (* intro T1. destruct (InCall_app_iff (s, v) ((u, (Rle rn, cs))::nil) ls) as [L R]; clear R; apply L in T1; clear L. *)
-    (* destruct T1;[unfold InCall in H4;dest|contradiction]. *)
-    (* destruct H4;[subst|contradiction]. *)
-    (* eapply WfConcatNotInCalls; eauto. *)
-    (* simpl; assumption. *)
   - inversion H; simpl in HInMeths;specialize (H3 _ HInMeths argV).
     rewrite getNumCalls_cons; rewrite IHSubsteps;simpl.
     assert (In (fst (s, v)) (getHidden m1)) as P1;auto.
     rewrite (getNumFromCalls_notIn _ _ (WfConcatNotInCalls _ H3 HAction P1)); ring.
-    (* intro T1. destruct (InCall_app_iff (s, v) ((u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))::nil) ls) as [L R]; clear R; apply L in T1; clear L. *)
-    (* destruct T1;[unfold InCall in H4; dest|contradiction]. *)
-    (* destruct H4;[subst|contradiction]. *)
-    (* eapply WfConcatNotInCalls; eauto. *)
-    (* simpl; assumption. *)
 Qed.
 
 Lemma WfConcats_Substeps : forall (m1 : Mod) m2 (o : RegsT)(l : list FullLabel),
     WfConcat (Base m2) m1 ->
     Substeps m2 o l ->
-    forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z) (* ~InCall (s, v) l *).
+    forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z).
 Proof.
   intros.
   induction H0; subst.
   - reflexivity.
-    (* intro; unfold InCall in H0. dest; contradiction. *)
   - inversion H; simpl in HInRules;specialize (H2 _ HInRules).
     rewrite getNumCalls_cons; rewrite IHSubsteps;simpl.
     assert (In (fst f) (getHidden m1)) as P1;auto.
     rewrite (getNumFromCalls_notIn _ _ (WfConcatNotInCalls _ H2 HAction P1)); ring.
-    (* intro T1. destruct (InCall_app_iff (s, v) ((u, (Rle rn, cs))::nil) ls) as [L R]; clear R; apply L in T1; clear L. *)
-    (* destruct T1;[unfold InCall in H4;dest|contradiction]. *)
-    (* destruct H4;[subst|contradiction]. *)
-    (* eapply WfConcatNotInCalls; eauto. *)
-    (* simpl; assumption. *)
   - inversion H; simpl in HInMeths;specialize (H3 _ HInMeths argV).
     rewrite getNumCalls_cons; rewrite IHSubsteps;simpl.
     assert (In (fst f) (getHidden m1)) as P1;auto.
     rewrite (getNumFromCalls_notIn _ _ (WfConcatNotInCalls _ H3 HAction P1)); ring.
-    (* intro T1. destruct (InCall_app_iff (s, v) ((u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))::nil) ls) as [L R]; clear R; apply L in T1; clear L. *)
-    (* destruct T1;[unfold InCall in H4; dest|contradiction]. *)
-    (* destruct H4;[subst|contradiction]. *)
-    (* eapply WfConcatNotInCalls; eauto. *)
-    (* simpl; assumption. *)
 Qed.
 
 
@@ -3364,7 +2987,7 @@ Qed.
 Lemma WfConcats_Step : forall (m1 m2 : Mod) (o : RegsT) (l : list FullLabel),
     WfConcat m2 m1 ->
     Step m2 o l ->
-    (forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z) (* ~InCall (s, v) l *)).
+    (forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z)).
 Proof.
   intros.
   induction H0; subst.
@@ -3391,7 +3014,7 @@ Lemma WfConcats_Trace : forall (m1 m2 : Mod) (o : RegsT) ls (l : list FullLabel)
     WfConcat m2 m1 ->
     forall i,
       nth_error ls i = Some l ->
-      (forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z) (* ~InCall (s, v) l *)).
+      (forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z)).
 Proof.
   induction 1; subst; auto; intros.
   - destruct i; discriminate.
@@ -3412,10 +3035,7 @@ Proof.
   induction m; simpl in *; intros; dest.
   - exists l; split;[apply Permutation_refl|constructor; auto].
     eapply Substeps_flatten; eauto.
-  - (* assert ((forall (s : string) (v : {x : Kind * Kind & SignT x}), In s (map fst (getAllMethods m)) -> In s (getHidden m) -> InExec (s, v) l -> InCall (s, v) l)). *)
-    (* intros. *)
-    (* apply (H1 s); auto. *)
-    inv HWfMod.
+  - inv HWfMod.
     assert (exists l' : list FullLabel, l [=] l' /\ Step m o l');[apply IHm;auto|dest;exists x;split;auto].
     constructor 2; auto.
     intros.
@@ -3434,8 +3054,6 @@ Proof.
             (forall (s : string) (v : {x : Kind * Kind & SignT x}), In s (map fst (getAllMethods m1)) ->
                                                                     In s (getHidden m1) ->
                                                                     (getListFullLabel_diff (s, v) (ModuleFilterLabels (getFlat m1) l) = 0%Z))).
-                                                                    (* InExec (s, v) (ModuleFilterLabels (getFlat m1) l) -> *)
-                                                                    (* InCall (s, v) (ModuleFilterLabels (getFlat m1) l))). *)
     + split;unfold getFlat at 1 in H5. assumption.
       split.
       * unfold getFlat in H0. simpl in H0.
@@ -3455,16 +3073,11 @@ Proof.
         setoid_rewrite (NotInDef_ZeroExecs_Substeps _ P6 H6) in H1; rewrite <-H1.
         repeat rewrite Z.add_0_r.
         reflexivity.
-    (* + *)
-    (*     specialize (InCall_perm H1 P1) as InCall_filter. *)
-    (*     apply InCall_app_iff in InCall_filter. *)
-    (*     destruct InCall_filter;[assumption|contradiction]. *)
     + assert (Substeps (BaseMod (getAllRegisters m2) (getAllRules m2) (getAllMethods m2)) x0 (ModuleFilterLabels (getFlat m2) l) /\
               MatchingExecCalls_Base (ModuleFilterLabels (getFlat m2) l) (getFlat m2) /\
               (forall (s : string) (v : {x : Kind * Kind & SignT x}), In s (map fst (getAllMethods m2)) ->
                                                                       In s (getHidden m2) ->
                                                                       (getListFullLabel_diff (s, v) (ModuleFilterLabels (getFlat m2) l) = 0%Z))).
-    (* InExec (s, v) (ModuleFilterLabels (getFlat m2) l) -> *)
       * split;unfold getFlat at 1 in H6. assumption.
         split.
         -- unfold getFlat in H0. simpl in H0.
@@ -3485,23 +3098,6 @@ Proof.
            setoid_rewrite (NotInDef_ZeroExecs_Substeps _ P6 H5) in H1; rewrite <-H1.
            repeat rewrite Z.add_0_r.
            reflexivity.
-      (* InCall (s, v) (ModuleFilterLabels (getFlat m2) l))). *)
-      (* * split;unfold getFlat at 1 in H6. assumption. *)
-      (*   split. *)
-      (*   -- unfold getFlat in H0. simpl in H0. *)
-      (*      unfold getFlat; simpl. *)
-      (*      assert (MatchingExecCalls l l (Base (concatFlat (getFlat m1) (getFlat m2))));[unfold concatFlat, getFlat;simpl; assumption|]. *)
-      (*      apply MatchingExecCalls_Concat_comm in H8. *)
-      (*      apply (MatchingExecCalls_Split H8). *)
-      (*   --  intros; specialize (WfConcats WfConcat1 H5 H9 (v:=v));intro. *)
-      (*       rewrite map_app in H1. *)
-      (*       specialize (H1 s v (in_or_app _ _ s (or_intror H8)) (in_or_app _ _ s (or_intror H9)) (InExec_split_InExec _ _ _ H10)). *)
-      (*       assert (DisjKey (getRules (getFlat m1)) (getRules (getFlat m2)));[repeat intro; apply HDisjRules|]. *)
-      (*       assert (DisjKey (getMethods (getFlat m1))(getMethods (getFlat m2)));[repeat intro;apply HDisjMeths|]. *)
-      (*       specialize (filter_perm H12 H13 H) as P1. *)
-      (*       specialize (InCall_perm H1 P1) as InCall_filter. *)
-      (*       apply InCall_app_iff in InCall_filter. *)
-      (*       destruct InCall_filter;[contradiction|assumption]. *)
       * specialize (IHm1 x (ModuleFilterLabels (getFlat m1) l) H7).
         specialize (IHm2 x0 (ModuleFilterLabels (getFlat m2) l) H8). dest.
         exists (x2++x1).
@@ -3516,8 +3112,6 @@ Proof.
               split.
               ** intro;specialize (WfConcats WfConcat1 H5 _ (snd f) H20);intro.
                  rewrite <-H15 in H18; destruct f; simpl in *; contradiction.
-                 (* specialize (InCall_perm H18 (Permutation_sym H15)). *)
-                 (* destruct f; simpl in *; intro; contradiction. *)
               ** assert (MatchingExecCalls_Base l (concatFlat (getFlat m1) (getFlat m2)));[apply H0|].
                  rewrite <-H15, <-H13.
                  assert (DisjKey (getRules (getFlat m1)) (getRules (getFlat m2))) as P1; auto.
@@ -3536,20 +3130,6 @@ Proof.
                  specialize (MatchingExecCalls_Mix1 P1 P2 H H20) as P3.
                  rewrite <-H13 in H18.
                  specialize (P3 _ H18 H19); dest; assumption.
-           (* ++ repeat intro. *)
-           (*    split. *)
-           (*    ** intro;specialize (WfConcats WfConcat2 H6 H20 (v:=(snd f)));intro;specialize (InCall_perm H18 (Permutation_sym H13)). *)
-           (*       destruct f; simpl in *; intro; contradiction. *)
-           (*    ** assert (MatchingExecCalls l l (Base (concatFlat (getFlat m1) (getFlat m2)))). *)
-           (*       apply H0. *)
-           (*       apply MatchingExecCalls_Concat_comm in H20. *)
-           (*       specialize (MatchingExecCalls_Mix H20). *)
-           (*       intro. *)
-           (*       destruct (MatchingExecCalls_perm2 (MatchingExecCalls_perm1 H21 H13) H15 H18 H19); assumption. *)
-           (* ++ repeat intro. *)
-           (*    specialize (Permutation_in x3 (Permutation_sym H15) H18); intro. *)
-           (*    specialize (Permutation_in y (Permutation_sym H13) H19); intro. *)
-           (*    eapply H17; eauto. *)
            ++  rewrite <- H15 in H18; rewrite <- H13 in H19.
                specialize (H17 _ _ H18 H19); assumption.
 Qed.
@@ -3664,36 +3244,11 @@ Proof.
   intros; split; repeat intro; apply H0; specialize (Permutation_sym H) as TMP; eapply PermutationInExec; eauto.
 Qed.
 
-(* Ltac Permutation_replace := *)
-(*   match goal with *)
-(*   |[H : InExec ?f ?l |- InExec ?f ?l'] => *)
-(*    match goal with *)
-(*    |[H1 : Permutation ?l ?l' |- _] => apply (PermutationInExec H1); assumption *)
-(*    |[H1 : Permutation ?l' ?l |- _] => apply (PermutationInExec (Permutation_sym H1)); assumption *)
-(*    end *)
-(*   |[H : InCall ?f ?l |- InCall ?f ?l'] => *)
-(*    match goal with *)
-(*    |[H1 : Permutation ?l ?l' |- _] => apply (PermutationInCall H1); assumption *)
-(*    |[H1 : Permutation ?l' ?l |- _] => apply (PermutationInCall (Permutation_sym H1)); assumption *)
-(*    end *)
-(*   |[H : ~InCall ?f ?l |- ~InCall ?f ?l'] => *)
-(*    match goal with *)
-(*    |[H1 : Permutation ?l ?l' |- _] => apply (neg_PermutationInCall H1); assumption *)
-(*    |[H1 : Permutation ?l' ?l |- _] => apply (neg_PermutationInCall (Permutation_sym H1)); assumption *)
-(*    end *)
-(*   |[H : ~InExec ?f ?l |- ~InExec ?f ?l'] => *)
-(*    match goal with *)
-(*    |[H1 : Permutation ?l ?l' |- _] => apply (neg_PermutationInExec H1); assumption *)
-(*    |[H1 : Permutation ?l' ?l |- _] => apply (neg_PermutationInExec (Permutation_sym H1)); assumption *)
-(*    end *)
-(*   end. *)
-
 Lemma PermutationWI : forall (l l' : list FullLabel), Permutation l l' -> WeakInclusion l l'.
 Proof.
   unfold WeakInclusion; repeat split; intros.
   - unfold getListFullLabel_diff; rewrite H; reflexivity.
   - setoid_rewrite H; assumption.
-  (* repeat split; dest; intros;[| | | | | | | |destruct H0;dest;[left;split|right;split;intro;specialize (H0 v2);specialize (H1 v2)]|destruct H0;dest;[left;split|right;split;intro;specialize (H0 v2); specialize (H1 v2)]|dest; exists x; induction H; auto; destruct H0;firstorder];Permutation_replace. *)
 Qed.
 
 Corollary PermutationWE : forall (l l' : list FullLabel), Permutation l l' -> WeakEquality l l'.
@@ -4398,7 +3953,6 @@ Section ModularSubstition.
           try specialize (SameList_b (fst f));
           try specialize (Subset_a (fst f));
           try specialize (Subset_b (fst f)).
-        (* specialize (Subset_b H20). *)
         specialize (getNumExecs_nonneg f l1) as P1;
           rewrite Z.lt_eq_cases in P1; destruct P1;
             [specialize (Trace_meth_InExec' H _ _ H13 H21) as P2; clear - HDisjMeths0 P2 H20; tauto|].
@@ -4437,7 +3991,6 @@ Section ModularSubstition.
           try specialize (SameList_b (fst f));
           try specialize (Subset_a (fst f));
           try specialize (Subset_b (fst f)).
-        (* specialize (Subset_a H20). *)
         specialize (getNumExecs_nonneg f l0) as P1;
           rewrite Z.lt_eq_cases in P1; destruct P1;
             [specialize (Trace_meth_InExec' H0 _ _ H12 H21) as P2; clear - HDisjMeths0 P2 H20; tauto|].
