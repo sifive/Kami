@@ -1,4 +1,4 @@
-Require Import Kami.Syntax.
+Require Import Kami.Syntax Lib.Fold.
 
 Import ListNotations.
 Require Import Coq.Sorting.Permutation.
@@ -4062,4 +4062,101 @@ Qed.
 
 End ModularSubstition.
 
+Require Import Coq.Program.Equality.
+Section Fold.
+  Variable k: Kind.
 
+  Variable f: LetExprSyntax type k -> LetExprSyntax type k -> LetExprSyntax type k.
+  Variable fEval: type k -> type k -> type k.
+  Variable fEval_f: forall x y, evalLetExpr (f x y) = fEval (evalLetExpr x) (evalLetExpr y).
+
+  Lemma evalFoldLeft_Let ls:
+    forall seed,
+      evalLetExpr (fold_left f ls seed) =
+      fold_left (fun x y => fEval x y) (map (@evalLetExpr _) ls) (evalLetExpr seed).
+  Proof.
+    induction ls; simpl; auto; intros.
+    rewrite IHls; simpl.
+    rewrite fEval_f.
+    reflexivity.
+  Qed.
+
+  Lemma evalFoldRight_Let ls:
+    forall seed,
+      evalLetExpr (fold_right f seed ls) =
+      fold_right (fun x y => fEval x y) (evalLetExpr seed) (map (@evalLetExpr _) ls).
+  Proof.
+    induction ls; simpl; auto; intros.
+    rewrite fEval_f.
+    rewrite IHls; simpl.
+    reflexivity.
+  Qed.
+
+  Local  Ltac name_term n t H := 
+    assert (H: exists n', n' = t);
+    try (exists t; reflexivity);
+    destruct H as [n H]. 
+
+
+  Lemma evalFoldTree_Let ls:
+    forall seed,
+      evalLetExpr (fold_tree f seed ls) =
+      fold_tree (fun x y => fEval x y) (evalLetExpr seed) (map (@evalLetExpr _) ls).
+  Proof.
+    assert (exists l, length ls <= l) 
+      as [l K] by (exists (length ls); auto). 
+    revert ls K.
+    induction l as [| l]; intros * K.
+    - assert (A1: length ls = 0) by omega. 
+      apply length_zero_iff_nil in A1.
+      now subst ls.
+    - destruct ls as [| x1 xs]. now simpl.
+      destruct xs as [| x2 xs].
+      intros.
+      simpl.
+      rewrite ?fold_tree_equation.
+      auto.
+
+      intros.
+      rewrite fold_tree_equation.
+      name_term tpl (unapp_half (x1::x2::xs)) Tpl;
+        rewrite <- Tpl; destruct tpl as [m1 m2].
+      simpl in K. 
+      assert (K': S (length xs) <= l) by (rewrite le_S_n; auto); 
+        clear K; rename K' into K.
+      assert (length m1 <= length (x2::xs) 
+              /\ length m2 <= length (x2::xs))
+        as [A1 A2]. {
+        symmetry in Tpl.
+        apply unapp_half_nonnil_reduces in Tpl; auto.
+        2: simpl; omega. 
+        simpl in *.
+        omega. 
+      }
+      simpl in A1, A2.
+      assert (A3: length m1 <= l) by omega; clear A1.
+      assert (A4: length m2 <= l) by omega; clear A2.
+      remember (evalLetExpr (f (fold_tree f seed m1) (fold_tree f seed m2))) as sth.
+      rewrite fold_tree_equation.
+      simpl.
+      apply unapp_half_map with (f := (@evalLetExpr _)) in Tpl.
+      simpl in Tpl.
+      rewrite <- Tpl.
+      rewrite Heqsth; clear Heqsth.
+      rewrite <- ?IHl; auto.
+  Qed.
+
+  Variable fComm: forall a b, fEval a b = fEval b a.
+  Variable fAssoc: forall a b c, fEval (fEval a b) c = fEval a (fEval b c).
+  Variable unit: LetExprSyntax type k.
+  Variable fUnit: forall x, fEval (evalLetExpr unit) x = x.
+  
+  Lemma evalFoldTree_evalFoldLeft ls:
+    evalLetExpr (fold_tree f unit ls) =
+    evalLetExpr (fold_left f ls unit).
+  Proof.
+    rewrite evalFoldLeft_Let.
+    rewrite evalFoldTree_Let.
+    rewrite fold_left_fold_tree; auto.
+  Qed.
+End Fold.
