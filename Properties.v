@@ -4159,4 +4159,14 @@ Section Fold.
     rewrite evalFoldTree_Let.
     rewrite fold_left_fold_tree; auto.
   Qed.
+
+  
+  Lemma evalFoldTree_evalFoldRight ls:
+    evalLetExpr (fold_tree f unit ls) =
+    evalLetExpr (fold_right f unit ls).
+  Proof.
+    rewrite evalFoldRight_Let.
+    rewrite evalFoldTree_Let.
+    rewrite fold_right_fold_tree; auto.
+  Qed.
 End Fold.
