@@ -769,11 +769,13 @@ Section Positive.
         end.
 End Positive.
 
-Definition IndexReg name idx := (name ++ "_" ++ natToHexStr idx)%string.
+Definition AddIndexToName name idx := (name ++ "_" ++ natToHexStr idx)%string.
+
+Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) idxs.
 
 Fixpoint nameList name size : list string :=
     match size with
-    | S n => (IndexReg name n) :: (nameList name n)
+    | S n => (AddIndexToName name n) :: (nameList name n)
     | O   => nil
     end.
 
