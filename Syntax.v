@@ -1689,7 +1689,7 @@ Section BaseModule.
                                (getKindAttr (getRegisters m)))
             l ls (HLabel: l = (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
-            (HNoCycle: ~In fn (map fst cs))
+            (* (HNoCycle: ~In fn (map fst cs)) *)
             (HSubsteps: Substeps ls):
       Substeps l.
 
@@ -1723,7 +1723,7 @@ Section BaseModule.
                                (getKindAttr (getRegisters m)))
             l ls (HLabel: l [=] (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
-            (HNoCycle: ~In fn (map fst cs))
+            (* (HNoCycle: ~In fn (map fst cs)) *)
             (HPSubsteps: PSubsteps ls):
       PSubsteps l.
 End BaseModule.

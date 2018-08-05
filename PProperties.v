@@ -569,7 +569,7 @@ Proof.
         -- rewrite <- H15; simpl.
            rewrite <- H11; assumption.
         -- rewrite H5; assumption.
-      * rewrite <- H6; assumption.
+      (* * rewrite <- H6; assumption. *)
 Qed.
 
 Lemma Substeps_PSubsteps m:
@@ -578,7 +578,7 @@ Lemma Substeps_PSubsteps m:
   induction 1; subst.
   - econstructor 1; rewrite HRegs; reflexivity.
   - econstructor 2;[rewrite HRegs|apply HInRules| apply (SemAction_PSemAction HAction)| | | | | | ]; eauto.
-  - econstructor 3;[rewrite HRegs|apply HInMeths| apply (SemAction_PSemAction HAction)| | | | | | ]; eauto.
+  - econstructor 3;[rewrite HRegs|apply HInMeths| apply (SemAction_PSemAction HAction)| | | | | ]; eauto.
 Qed.
 
 Lemma List_FullLabel_perm_nil l :
@@ -721,7 +721,7 @@ Proof.
       * specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H0) _ H2) as TMP; dest.
         specialize (HDisjRegs _ H5).
         intro; destruct (HDisjRegs k);[left|right];intro; apply H7; inv H4; simpl in *;[rewrite <- H10| rewrite H6]; assumption.
-      * rewrite <- H9; assumption.
+      (* * rewrite <- H9; assumption. *)
 Qed.
 
 Global Instance PSubsteps_List_FullLabel_perm_rewrite' :
@@ -1127,7 +1127,7 @@ Section PSubsteps_rewrite.
     - econstructor 1.
       rewrite <- H; assumption.
     - econstructor 2;[rewrite <- H|apply HInRules|apply (PSemAction_rewrite_state H) in HPAction; apply HPAction| | |apply HLabel| | | ];assumption.
-    - econstructor 3;[rewrite <- H|apply HInMeths|apply (PSemAction_rewrite_state H) in HPAction; apply HPAction| | |apply HLabel| | | ];assumption.
+    - econstructor 3;[rewrite <- H|apply HInMeths|apply (PSemAction_rewrite_state H) in HPAction; apply HPAction| | |apply HLabel| | ];assumption.
   Qed.
 
   Lemma PSubsteps_rewrite_lists m o l1 l2:
