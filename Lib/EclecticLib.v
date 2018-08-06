@@ -10,7 +10,7 @@ Section fold_left_map.
   Variable f: A -> B -> A.
   Variable g: C -> B.
   
-  Lemma fold_left_map ls:
+  Lemma fold_left_dist_map ls:
     forall init,
       fold_left f (map g ls) init = fold_left (fun acc x => f acc (g x)) ls init.
   Proof.
@@ -62,7 +62,7 @@ Section map_fold_eq.
     induction ls; simpl; auto.
     rewrite IHls.
     rewrite zeroToSN; simpl.
-    rewrite fold_left_map.
+    rewrite fold_left_dist_map.
     clear IHls.
     remember (f a) as x.
     remember (zeroToN (length ls)) as ys.
