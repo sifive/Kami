@@ -425,3 +425,152 @@ Section Folds.
 
 End Folds.
 
+Section FoldWhich.
+  Variable A: Type.
+  Variable decA: forall a b: A, {a = b} + {a <> b}.
+  Variable which: A -> A -> bool.
+  Variable whichRefl: forall a, which a a = true.
+  Variable whichSym: forall x y, x = y \/ which x y = negb (which y x).
+  Variable whichTrans: forall a b c, which a b = which b c -> which a c = which a b.
+  
+  Definition pick x y := if which x y then x else y.
+
+  Local Lemma pickComm: forall a b, pick a b = pick b a.
+  Proof.
+    unfold pick; intros.
+    specialize (whichSym a b).
+    destruct whichSym; subst; auto.
+    rewrite H.
+    destruct (which b a); auto.
+  Qed.
+
+  Local Lemma pickAssoc: forall a b c, pick (pick a b) c = pick a (pick b c).
+  Proof.
+    unfold pick; intros.
+    case_eq (which b c); case_eq (which a b); intros; auto.
+    - erewrite whichTrans; eauto.
+      rewrite H; auto.
+    - rewrite H0; auto.
+    - rewrite H0.
+      erewrite whichTrans; eauto.
+      rewrite H; auto.
+  Qed.
+      
+  Variable unit: A.
+  Variable whichUnit: forall x, x <> unit -> which unit x = false.
+  
+  Local Lemma pickUnit: forall x, pick unit x = x.
+  Proof.
+    unfold pick; intros.
+    destruct (decA unit x); subst.
+    destruct (which x x); auto.
+    assert (sth: x <> unit) by (intro; subst; tauto).
+    specialize (whichUnit sth).
+    rewrite whichUnit; auto.
+  Qed.
+
+  Local Lemma pickUnit_both: forall x y, pick x y = unit -> x = unit /\ y = unit.
+  Proof.
+    intros.
+    unfold pick in *.
+    case_eq (which x y); intros sth; rewrite sth in *; subst.
+    - split; auto.
+      destruct (decA y unit); auto.
+      specialize (whichUnit n).
+      congruence.
+    - split; auto.
+      specialize (whichSym x unit).
+      destruct whichSym; auto.
+      rewrite H in sth.
+      rewrite Bool.negb_false_iff in sth.
+      rewrite sth in *; simpl in *.
+      destruct (decA x unit); auto.
+      specialize (whichUnit n).
+      congruence.
+  Qed.
+
+  Lemma fold_right_unit ls:
+    fold_right pick unit ls = unit -> forall x, In x ls -> x = unit.
+  Proof.
+    induction ls; simpl; auto; intros.
+    - tauto.
+    - destruct H0; subst.
+      apply pickUnit_both in H.
+      destruct H as [s1 s2]; subst; auto.
+      apply pickUnit_both in H.
+      destruct H as [s3 s4].
+      eapply IHls; eauto.
+  Qed.
+
+  Theorem whichNonUnit_fold_right:
+    forall ls val,
+      val = fold_right pick unit ls ->
+      val <> unit ->
+      exists n, n < length ls /\ nth n ls unit = val /\ forall i, i < length ls -> i <> n -> which val (nth i ls unit) = true.
+  Proof.
+    induction ls; simpl; auto; intros.
+    - tauto.
+    - destruct (decA (fold_right pick unit ls) unit); simpl in *.
+      + rewrite e in *.
+        rewrite pickComm in *.
+        rewrite pickUnit in *; subst.
+        exists 0; repeat split; auto; try Omega.omega; intros.
+        destruct i; auto.
+        pose proof (fold_right_unit _ e) as sth.
+        specialize (sth (nth i ls unit) (nth_In (n := i) ls unit ltac:(Omega.omega))).
+        rewrite sth.
+        specialize (whichSym a unit).
+        destruct whichSym as [whichSym0 | whichSym0]; auto.
+        rewrite whichSym0.
+        rewrite Bool.negb_true_iff.
+        auto.
+      + specialize (IHls _ eq_refl n).
+        destruct IHls as [j [jLen [cond1 cond2]]].
+        subst.
+        rewrite <- cond1 in *.
+        unfold pick in *.
+        case_eq (which a (nth j ls unit)); intros sth; rewrite sth in *; subst.
+        * exists 0; repeat split; auto; try Omega.omega; intros.
+          destruct i; auto.
+          destruct (Nat.eq_dec i j); subst; [auto|].
+          specialize (cond2 i ltac:(Omega.omega) n0).
+          rewrite <- cond2 in sth.
+          pose proof (whichTrans sth).
+          congruence.
+        * exists (S j); repeat split; auto; try Omega.omega; intros.
+          destruct i; auto.
+          -- specialize (whichSym (nth j ls unit) a).
+             destruct whichSym as [whichSym0 | whichSym0]; auto.
+             ++ rewrite whichSym0 in *.
+                eapply whichRefl; eauto.
+             ++ rewrite whichSym0.
+                rewrite Bool.negb_true_iff; auto.
+          -- eapply cond2; eauto; Omega.omega.
+  Qed.
+
+  Theorem whichNonUnit_fold_left:
+    forall ls val,
+      val = fold_left pick ls unit ->
+      val <> unit ->
+      exists n, n < length ls /\ nth n ls unit = val /\ forall i, i < length ls -> i <> n -> which val (nth i ls unit) = true.
+  Proof.
+    intros.
+    rewrite fold_left_fold_right in H; auto; intros.
+    - eapply whichNonUnit_fold_right; eauto.
+    - apply pickComm.
+    - apply pickAssoc.
+  Qed.
+
+  Theorem whichNonUnit_fold_tree:
+    forall ls val,
+      val = fold_tree pick unit ls ->
+      val <> unit ->
+      exists n, n < length ls /\ nth n ls unit = val /\ forall i, i < length ls -> i <> n -> which val (nth i ls unit) = true.
+  Proof.
+    intros.
+    rewrite <- fold_right_fold_tree in H; auto; intros.
+    - eapply whichNonUnit_fold_right; eauto.
+    - apply pickAssoc.
+    - apply pickUnit.
+  Qed.
+End FoldWhich.

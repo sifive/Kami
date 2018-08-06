@@ -4073,7 +4073,7 @@ Section Fold.
   Lemma evalFoldLeft_Let ls:
     forall seed,
       evalLetExpr (fold_left f ls seed) =
-      fold_left (fun x y => fEval x y) (map (@evalLetExpr _) ls) (evalLetExpr seed).
+      fold_left fEval (map (@evalLetExpr _) ls) (evalLetExpr seed).
   Proof.
     induction ls; simpl; auto; intros.
     rewrite IHls; simpl.
@@ -4084,7 +4084,7 @@ Section Fold.
   Lemma evalFoldRight_Let ls:
     forall seed,
       evalLetExpr (fold_right f seed ls) =
-      fold_right (fun x y => fEval x y) (evalLetExpr seed) (map (@evalLetExpr _) ls).
+      fold_right fEval (evalLetExpr seed) (map (@evalLetExpr _) ls).
   Proof.
     induction ls; simpl; auto; intros.
     rewrite fEval_f.
@@ -4101,7 +4101,7 @@ Section Fold.
   Lemma evalFoldTree_Let ls:
     forall seed,
       evalLetExpr (fold_tree f seed ls) =
-      fold_tree (fun x y => fEval x y) (evalLetExpr seed) (map (@evalLetExpr _) ls).
+      fold_tree fEval (evalLetExpr seed) (map (@evalLetExpr _) ls).
   Proof.
     assert (exists l, length ls <= l) 
       as [l K] by (exists (length ls); auto). 
