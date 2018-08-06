@@ -256,32 +256,33 @@ Section Folds.
     match ls with
     | nil => unit
     | [x] => f x unit
+    | [x;y] => f x y
     | _ => let (m1, m2) := unapp_half ls in
            f (fold_tree m1) (fold_tree m2)
     end.
   Proof.
     - abstract (intros;
-                unfold unapp_half in teq1;
-                symmetry in teq1;
-                name_term len_x_n_l0 (length (x::a::l0)) LEN;
+                unfold unapp_half in teq2;
+                symmetry in teq2;
+                name_term len_x_n_l0 (length (x::y::a::l1)) LEN;
                 rewrite <- LEN in *;
                 simpl in LEN;
                 assert (L0: len_x_n_l0 > 0) by omega;
                 apply lt_div2 in L0;
                 assert (len_x_n_l0 - div2 len_x_n_l0 > 0) by omega;
-                symmetry in teq1;
-                apply unapp_reduce_m2 in teq1; auto;
-                simpl in teq1;
+                symmetry in teq2;
+                apply unapp_reduce_m2 in teq2; auto;
+                simpl in teq2;
                 [rewrite <- LEN in *;
-                 apply teq1|
+                 apply teq2|
                  simpl;
                  auto with arith]).
     - abstract (intros;
-                unfold unapp_half in teq1;
-                apply unapp_reduce_m1 in teq1;
-                [apply teq1|
-                 clear teq1;
-                 name_term len_x_n_l0 (length (x::a::l0)) LEN;
+                unfold unapp_half in teq2;
+                apply unapp_reduce_m1 in teq2;
+                [apply teq2|
+                 clear teq2;
+                 name_term len_x_n_l0 (length (x::y::a::l1)) LEN;
                  rewrite <- LEN in *;
                  simpl in LEN;
                  assert (L0: len_x_n_l0 > 0) by omega;
@@ -398,8 +399,14 @@ Section Folds.
       simpl in A1, A2.
       assert (A3: length m1 <= k) by omega; clear A1.
       assert (A4: length m2 <= k) by omega; clear A2. 
-      rewrite <- (IHk m1 A3); rewrite <- (IHk m2 A4).      
-      rewrite fold_right_homomorphism_unapp with (m:=(x1::x2::xs)) (m1 := m1) (m2 := m2); auto.
+      rewrite <- (IHk m1 A3); rewrite <- (IHk m2 A4).
+      rewrite fold_right_homomorphism_unapp with (m:=(x1::x2::xs)) (m1 := m1) (m2 := m2); destruct xs; auto.
+      unfold unapp_half in Tpl; simpl in *.
+      inversion Tpl; clear Tpl; subst.
+      simpl.
+      rewrite (fComm x1 unit), (fComm x2 unit).
+      rewrite ?fUnit.
+      auto.
   Qed.
 
   Theorem fold_left_fold_right:
@@ -570,6 +577,7 @@ Section FoldWhich.
     intros.
     rewrite <- fold_right_fold_tree in H; auto; intros.
     - eapply whichNonUnit_fold_right; eauto.
+    - apply pickComm.
     - apply pickAssoc.
     - apply pickUnit.
   Qed.

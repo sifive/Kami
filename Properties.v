@@ -4136,7 +4136,7 @@ Section Fold.
       simpl in A1, A2.
       assert (A3: length m1 <= l) by omega; clear A1.
       assert (A4: length m2 <= l) by omega; clear A2.
-      remember (evalLetExpr (f (fold_tree f seed m1) (fold_tree f seed m2))) as sth.
+      remember (f (fold_tree f seed m1) (fold_tree f seed m2)) as sth.
       rewrite fold_tree_equation.
       simpl.
       apply unapp_half_map with (f := (@evalLetExpr _)) in Tpl.
@@ -4144,6 +4144,7 @@ Section Fold.
       rewrite <- Tpl.
       rewrite Heqsth; clear Heqsth.
       rewrite <- ?IHl; auto.
+      destruct xs; simpl; auto.
   Qed.
 
   Variable fComm: forall a b, fEval a b = fEval b a.
