@@ -569,7 +569,6 @@ Proof.
         -- rewrite <- H15; simpl.
            rewrite <- H11; assumption.
         -- rewrite H5; assumption.
-      (* * rewrite <- H6; assumption. *)
 Qed.
 
 Lemma Substeps_PSubsteps m:
@@ -721,7 +720,6 @@ Proof.
       * specialize (List_FullLabel_perm_in (List_FullLabel_perm_sym H0) _ H2) as TMP; dest.
         specialize (HDisjRegs _ H5).
         intro; destruct (HDisjRegs k);[left|right];intro; apply H7; inv H4; simpl in *;[rewrite <- H10| rewrite H6]; assumption.
-      (* * rewrite <- H9; assumption. *)
 Qed.
 
 Global Instance PSubsteps_List_FullLabel_perm_rewrite' :

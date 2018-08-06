@@ -47,7 +47,6 @@ Section BaseModule.
             (HExecs: execs [=] Meth (fn, existT _ _ (argV, retV)) :: oldExecs)
             (HCalls: calls [=] cs ++ oldCalls)
             (HDisjRegs: DisjKey oldUpds u)
-            (* (HNoCycle: ~In fn (map fst cs)) *)
             (HPSubstep: PPlusSubsteps oldUpds oldExecs oldCalls):
       PPlusSubsteps upds execs calls.
   
