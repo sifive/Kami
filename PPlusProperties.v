@@ -2770,7 +2770,6 @@ Proof.
       apply (P3 (or_intror _ H0)).
 Qed.
 
-
 Lemma PPlusStep_inline_Meth_In f m o gn gb upds execs calls :
   In (gn, gb) (getMethods m) ->
   In f (getMethods m) ->
@@ -2791,6 +2790,125 @@ Proof.
   simpl; rewrite SameKeys_inline_Meth; intros; specialize (H5 _ H9).
   rewrite H6, H7, getNumFromCalls_app, getNumFromExecs_app, call_execs_counts_eq in H5.
   Omega.omega.
+Qed.
+
+Lemma PPlusSubsteps_inline_Meth_NotInDef f m o gn upds execs calls :
+  ~In gn (map fst (getMethods m)) ->
+  PPlusSubsteps m o upds execs calls ->
+  PPlusSubsteps (inlineSingle_Meth_BaseModule f gn m) o upds execs calls.
+Proof.
+  induction 2.
+  - econstructor 1; auto.
+  - econstructor 2; simpl; eauto.
+  - econstructor 3; simpl; eauto.
+    clear - H HInMeths.
+    induction (getMethods m);[contradiction|].
+    destruct HInMeths; subst.
+    + simpl; destruct string_dec;
+        [|destruct string_dec; subst;[apply False_ind; simpl in H; apply H|]];left;reflexivity.
+    + simpl; destruct string_dec;
+        [|destruct string_dec];right;auto; apply IHl; auto; simpl in *; firstorder fail.
+Qed.
+
+Corollary PPlusStep_inline_Meth_NotInDef f m o gn upds execs calls :
+  ~In gn (map fst (getMethods m)) ->
+  PPlusStep m o upds execs calls ->
+  PPlusStep (inlineSingle_Meth_BaseModule f gn m) o upds execs calls.
+Proof.
+  induction 2.
+  constructor;[apply PPlusSubsteps_inline_Meth_NotInDef; auto|].
+  intros g HInDef; simpl in *.
+  rewrite SameKeys_inline_Meth in HInDef.
+  specialize (H1 _ HInDef); assumption.
+Qed.
+
+Lemma PPlusSubsteps_inline_Meth_identical f m o gn upds execs calls :
+  gn = fst f ->
+  PPlusSubsteps m o upds execs calls ->
+  PPlusSubsteps (inlineSingle_Meth_BaseModule f gn m) o upds execs calls.
+Proof.
+  induction 2.
+  - econstructor 1; eauto.
+  - econstructor 2; simpl; eauto.
+  - econstructor 3; simpl; eauto.
+    clear - H HInMeths.
+    induction (getMethods m);[contradiction|].
+    destruct HInMeths; subst.
+    + simpl; destruct string_dec;[left|apply False_ind, n];reflexivity.
+    + simpl; destruct string_dec;[right|apply False_ind, n];auto.
+Qed.
+
+Corollary PPlusStep_inline_Meth_identical f m o gn upds execs calls :
+  gn = fst f ->
+  PPlusStep m o upds execs calls ->
+  PPlusStep (inlineSingle_Meth_BaseModule f gn m) o upds execs calls.
+Proof.
+  induction 2.
+  constructor;[apply PPlusSubsteps_inline_Meth_identical; auto|].
+  intros g HInDef; simpl in *.
+  rewrite SameKeys_inline_Meth in HInDef.
+  specialize (H1 _ HInDef); assumption.
+Qed.
+
+Lemma WfActionT_inline_Meth (k : Kind) m (a : ActionT type k) rn f:
+  WfActionT m a ->
+  WfActionT (inlineSingle_Meth_BaseModule f rn m) a.
+Proof.
+  intros; induction H; econstructor; auto.
+Qed.
+
+Lemma WfActionT_inline_Meth_inline_action (k : Kind) m (a : ActionT type k) gn (f : DefMethT):
+  WfActionT m a ->
+  (forall v, WfActionT m (projT2 (snd f) type v)) ->
+  WfActionT (inlineSingle_Meth_BaseModule f gn m) (inlineSingle f a).
+Proof.
+  induction 1; try econstructor; eauto.
+  simpl.
+  destruct string_dec;[destruct Signature_dec|]; subst; econstructor; eauto.
+  econstructor.
+  specialize (H1 (evalExpr e)).
+  apply (WfActionT_inline_Meth); auto.
+Qed.
+     
+Lemma inlineSingle_Meth_BaseModule_dec meth f gn l:
+  In meth (inlineSingle_Meth_in_list f gn l) ->
+  In meth l \/
+  exists meth',
+    In meth' l /\
+    (inlinesingle_Meth f meth' = meth). 
+Proof.
+  induction l.
+  - intros; simpl in H; destruct string_dec; contradiction.
+  - simpl; destruct string_dec; subst; intros.
+    + destruct H; subst.
+      * left; left; reflexivity.
+      * left; right; assumption.
+    + destruct string_dec; subst.
+      * destruct H; subst.
+        -- right; exists a.
+           split; auto.
+        -- specialize (IHl H).
+           destruct IHl;[left|destruct H0; dest; right; exists x];auto.
+      *  destruct H; subst;[left;left|destruct (IHl H); dest; subst]; auto.
+         destruct (IHl H);[left; right; auto|dest].
+         right; exists x0;split; auto.
+Qed.
+
+Lemma WfMod_Meth_inlined m f gn :
+  WfMod (Base m) ->
+  In f (getMethods m) ->
+  WfMod (Base (inlineSingle_Meth_BaseModule f gn m)).
+Proof.
+  intros; inv H; econstructor; eauto.
+  - split; intros; simpl in *; inv WfBaseModule.
+    + apply WfActionT_inline_Meth; auto.
+    + destruct (inlineSingle_Meth_BaseModule_dec _ _ _ _ H).
+      * specialize (H2 _ H3 v); apply WfActionT_inline_Meth; auto.
+      * dest.
+        destruct x, s0, meth, s1; inv H4; EqDep_subst.
+        specialize (H2 _ H3) as P1.
+        apply WfActionT_inline_Meth_inline_action; auto.
+  - simpl; rewrite SameKeys_inline_Meth; assumption.
 Qed.
 
 (* Lemma Substeps_inline_Rule_PSubsteps f m o rn fb u1 u2 cs (l : list FullLabel) : *)
