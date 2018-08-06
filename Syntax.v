@@ -1980,40 +1980,6 @@ Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_exp
 Notation "'Invalid'" := (STRUCT { "valid" ::= $$ false ; "data" ::= getDefaultConst _ })%kami_expr
     (at level 100, only parsing) : kami_expr_scope.
 
-Definition inlinesingle_Rule  (f : DefMethT) (rle : RuleT): RuleT.
-Proof.
-  unfold RuleT in *.
-  destruct rle.
-  constructor.
-  - apply s.
-  - unfold Action in *.
-    intro.
-    apply (inlineSingle f (a ty)).
-Defined.
-
-Definition inlinesingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT.
-Proof.
-  unfold DefMethT in *.
-  destruct meth.
-  constructor.
-  - apply s.
-  -  destruct s0.
-     unfold MethodT; unfold MethodT in m.
-     exists x.
-     intros.
-     apply (inlineSingle f (m ty X)).
-Defined.
-
-Definition inlinesingle_BaseModule (m : BaseModule) (f : DefMethT) : BaseModule :=
-  BaseMod (getRegisters m) (map (inlinesingle_Rule f) (getRules m)) (map (inlinesingle_Meth f) (getMethods m)).
-
-Fixpoint inlinesingle_Mod (m : Mod) (f : DefMethT) : Mod :=
-  match m with
-  |Base bm => Base (inlinesingle_BaseModule bm f)
-  |HideMeth m' s => HideMeth (inlinesingle_Mod m' f) s
-  |ConcatMod m1 m2 => ConcatMod (inlinesingle_Mod m1 f) (inlinesingle_Mod m2 f)
-  end.
-
 Definition WriteRegFile n dataT := STRUCT {
                                        "addr" :: Bit (Nat.log2_up n);
                                        "data" :: dataT }.
