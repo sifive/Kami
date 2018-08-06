@@ -5,6 +5,73 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+Section fold_left_map.
+  Variable A B C: Type.
+  Variable f: A -> B -> A.
+  Variable g: C -> B.
+  
+  Lemma fold_left_map ls:
+    forall init,
+      fold_left f (map g ls) init = fold_left (fun acc x => f acc (g x)) ls init.
+  Proof.
+    induction ls; simpl; auto.
+  Qed.
+End fold_left_map.
+    
+    
+
+Section map_fold_eq.
+  Variable A: Type.
+  Variable f: A -> A.
+
+  Fixpoint zeroToN n :=
+    match n with
+    | 0 => nil
+    | S m => zeroToN m ++ m :: nil
+    end.
+
+  Fixpoint transform_nth ls i :=
+    match ls with
+    | nil => nil
+    | x :: xs => match i with
+                 | 0 => f x :: xs
+                 | S m => x :: transform_nth xs m
+                 end
+    end.
+
+  Lemma transform_nth_tail a ls:
+    forall i,
+      transform_nth (a :: ls) (S i) = a :: transform_nth ls i.
+  Proof.
+    induction ls; destruct i; simpl; auto.
+  Qed.
+
+  Lemma zeroToSN n:
+    zeroToN n ++ [n] = 0 :: map S (zeroToN n).
+  Proof.
+    induction n; simpl; auto.
+    rewrite map_app.
+    rewrite app_comm_cons.
+    rewrite <- IHn.
+    auto.
+  Qed.
+
+                   
+  Lemma map_fold_eq ls: map f ls = fold_left (fun acc i => transform_nth acc i) (zeroToN (length ls)) ls.
+  Proof.
+    induction ls; simpl; auto.
+    rewrite IHls.
+    rewrite zeroToSN; simpl.
+    rewrite fold_left_map.
+    clear IHls.
+    remember (f a) as x.
+    remember (zeroToN (length ls)) as ys.
+    clear Heqx a Heqys.
+    generalize ls x; clear x ls.
+    induction ys; simpl; auto.
+  Qed.
+End map_fold_eq.
+
 Fixpoint getFins n :=
   match n return list (Fin.t n) with
   | 0 => nil
