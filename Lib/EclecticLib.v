@@ -1064,6 +1064,19 @@ Proof.
     apply IHi; auto.
 Qed.
 
+Fixpoint range b t :=
+  match t with
+  | S p => ((if Nat.eq_dec b p then nil else range b p) ++ p :: nil)%list
+  | 0 => nil
+  end.
+
+Infix "upto" := range (at level 15, no associativity).
+
+Definition zip4 {A B C D} (l1 : list A) (l2 : list B) (l3 : list C) (l4 : list D) :=
+  List.combine (List.combine l1 l2) (List.combine l3 l4).
+
+
+
 Lemma nthProp2_cons A B (P: A -> B -> Prop):
   forall la lb a b,
     nthProp2 P (a :: la) (b :: lb) <->
@@ -1078,6 +1091,141 @@ Proof.
     + specialize (H 0); simpl in *; auto.
   - destruct i; simpl in *; destruct H; auto.
     eapply H; eauto.
+Qed.
+
+
+Lemma combine_length A B n:
+  forall (l1: list A) (l2: list B),
+    length l1 = n ->
+    length l2 = n ->
+    length (List.combine l1 l2) = n.
+Proof.
+  induction n; simpl; intros; auto.
+  - rewrite length_zero_iff_nil in *; subst; auto.
+  - destruct l1, l2; simpl in *; try discriminate.
+    specialize (IHn l1 l2 ltac:(Omega.omega) ltac:(Omega.omega)).
+    Omega.omega.
+Qed.
+
+Lemma zip4_length A B C D n:
+  forall (l1: list A) (l2: list B) (l3: list C) (l4: list D),
+    length l1 = n ->
+    length l2 = n ->
+    length l3 = n ->
+    length l4 = n ->
+    length (zip4 l1 l2 l3 l4) = n.
+Proof.
+  unfold zip4; intros.
+  assert (length (List.combine l1 l2) = n) by (eapply combine_length; eauto).
+  assert (length (List.combine l3 l4) = n) by (eapply combine_length; eauto).
+  eapply combine_length; eauto.
+Qed.
+
+Lemma length_upto t:
+  forall b,
+    (t > b \/ t = 0)%nat ->
+    length (b upto t) = (t - b)%nat.
+Proof.
+  induction t; simpl; auto; intros.
+  destruct (Nat.eq_dec b t); simpl; subst.
+  - destruct t; auto.
+    Omega.omega.
+  - specialize (IHt b ltac:(Omega.omega)).
+    rewrite app_length.
+    rewrite IHt.
+    simpl.
+    destruct b; Omega.omega.
+Qed.
+
+Lemma nth_combine A B n:
+  forall (l1: list A) (l2: list B) a b,
+    length l1 = n ->
+    length l2 = n ->
+    forall i, (i < n)%nat ->
+              nth i (List.combine l1 l2) (a,b) = (nth i l1 a, nth i l2 b).
+Proof.
+  induction n; simpl; auto; intros.
+  - Omega.omega.
+  - destruct l1, l2; simpl in *; try discriminate.
+    destruct i; simpl in *; auto.
+    specialize (IHn l1 l2 a b ltac:(Omega.omega) ltac:(Omega.omega) i ltac:(Omega.omega)); auto.
+Qed.
+
+Lemma nth_zip4 A B C D n:
+  forall (l1: list A) (l2: list B) (l3: list C) (l4: list D) a b c d,
+    length l1 = n ->
+    length l2 = n ->
+    length l3 = n ->
+    length l4 = n ->
+    forall i, (i < n)%nat ->
+              nth i (zip4 l1 l2 l3 l4) ((a, b), (c, d)) = ((nth i l1 a, nth i l2 b), (nth i l3 c, nth i l4 d)).
+Proof.
+  unfold zip4; intros.
+  assert (length (List.combine l1 l2) = n) by (eapply combine_length; eauto).
+  assert (length (List.combine l3 l4) = n) by (eapply combine_length; eauto).
+  repeat erewrite nth_combine; eauto.
+Qed.
+
+Lemma length_minus1_nth A ls:
+  forall (a b: A),
+    nth (length ls) (ls ++ a :: nil) b = a.
+Proof.
+  induction ls; simpl; auto.
+Qed.
+
+Lemma upto_0_n_length n:
+  0 <> n ->
+  length (0 upto n) <> 0.
+Proof.
+  intros; intro.
+  destruct n; [tauto|].
+  rewrite length_upto in * by (Omega.omega).
+  Omega.omega.
+Qed.
+
+Lemma nth_0_upto_n_0 n:
+  nth 0 (0 upto n) 0 = 0.
+Proof.
+  induction n; simpl; auto.
+  match goal with
+  | |- context [if ?P then _ else _] => destruct P; simpl; auto
+  end.
+  rewrite app_nth1; auto.
+  pose proof (upto_0_n_length n0).
+  Omega.omega.
+Qed.
+
+Lemma nth_0_upto_n n:
+  forall i,
+    (i < n)%nat ->
+    nth i (0 upto n) 0 = i.
+Proof.
+  induction n; simpl; intros; auto.
+  - Omega.omega.
+  - match goal with
+    | |- context [if ?P then _ else _] => destruct P; simpl; auto; subst
+    end.
+    + destruct i; auto; try Omega.omega.
+    + destruct (Nat.eq_dec i n); subst.
+      * pose proof (@length_upto n 0 ltac:(Omega.omega)) as sth.
+        assert (sth2: (n - 0)%nat = n) by Omega.omega.
+        rewrite sth2 in *.
+        rewrite <- sth at 1.
+        rewrite length_minus1_nth.
+        auto.
+      * rewrite app_nth1.
+        -- eapply IHn; eauto.
+           Omega.omega.
+        -- rewrite (@length_upto n 0 ltac:(Omega.omega)).
+           Omega.omega.
+Qed.
+
+Lemma log2_up_pow2 n:
+  (n <= Nat.pow 2 (Nat.log2_up n))%nat.
+Proof.
+  destruct n; simpl; auto.
+  pose proof (Nat.log2_log2_up_spec (S n) ltac:(Omega.omega)).
+  Omega.omega.
 Qed.
 
 

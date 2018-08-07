@@ -1573,7 +1573,7 @@ Proof.
       rewrite filter_In in H1; dest; assumption.
 Qed.
 
-Definition inlinesingle_Rule  (f : DefMethT) (rle : RuleT): RuleT.
+Definition inlineSingle_Rule  (f : DefMethT) (rle : RuleT): RuleT.
 Proof.
   unfold RuleT in *.
   destruct rle.
@@ -1588,7 +1588,7 @@ Fixpoint inlineSingle_Rule_in_list (f : DefMethT) (rn : string) (lr : list RuleT
   match lr with
   | rle'::lr' => match string_dec rn (fst rle') with
                  | right _ => rle'::(inlineSingle_Rule_in_list f rn lr')
-                 | left _ => (inlinesingle_Rule f rle')::(inlineSingle_Rule_in_list f rn lr')
+                 | left _ => (inlineSingle_Rule f rle')::(inlineSingle_Rule_in_list f rn lr')
                  end
   | nil => nil
   end.
@@ -2165,7 +2165,7 @@ Proof.
   eauto using StrongPPlusTraceInclusion_PPlusTraceInclusion, PPlusStrongTraceInclusion_inlining_Rules_r.
 Qed.
 
-Definition inlinesingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT.
+Definition inlineSingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT.
 Proof.
   unfold DefMethT in *.
   destruct meth.
@@ -2184,7 +2184,7 @@ Fixpoint inlineSingle_Meth_in_list (f : DefMethT) (gn : string) (lm : list DefMe
   match lm with
   | meth'::lm' => match string_dec gn (fst meth') with
                   | right _ => meth'::(inlineSingle_Meth_in_list f gn lm')
-                  | left _ => (inlinesingle_Meth f meth')::(inlineSingle_Meth_in_list f gn lm')
+                  | left _ => (inlineSingle_Meth f meth')::(inlineSingle_Meth_in_list f gn lm')
                   end
   | nil => nil
   end.
@@ -2193,7 +2193,7 @@ Definition inlineSingle_Meth_BaseModule (f : DefMethT) (fn : string) (m : BaseMo
   BaseMod (getRegisters m) (getRules m) (inlineSingle_Meth_in_list f fn (getMethods m)).
 
 Lemma ProjT1_inline_eq (f g : DefMethT):
-  (projT1 (snd g)) = (projT1 (snd (inlinesingle_Meth f g))).
+  (projT1 (snd g)) = (projT1 (snd (inlineSingle_Meth f g))).
 Proof.
   destruct g, s0; simpl; destruct string_dec; simpl; reflexivity.
 Qed.
@@ -2201,7 +2201,7 @@ Qed.
 Lemma InMeth_In_inlined f gn gb m:
   gn <> (fst f) ->
   In (gn, gb) (getMethods m) ->
-  In (inlinesingle_Meth f (gn, gb)) (getMethods (inlineSingle_Meth_BaseModule f gn m)).
+  In (inlineSingle_Meth f (gn, gb)) (getMethods (inlineSingle_Meth_BaseModule f gn m)).
 Proof.
   simpl; induction (getMethods m); intros.
   - contradiction.
@@ -2694,7 +2694,7 @@ Proof.
   induction l.
   - reflexivity.
   - simpl; destruct string_dec; simpl;[|rewrite IHl; reflexivity].
-    unfold inlinesingle_Meth; destruct a, string_dec; simpl; rewrite IHl; reflexivity.
+    unfold inlineSingle_Meth; destruct a, string_dec; simpl; rewrite IHl; reflexivity.
 Qed.
 
 Lemma PPlusSubsteps_inline_Meth f m o gn gb upds execs calls :
@@ -2866,7 +2866,7 @@ Lemma inlineSingle_Meth_BaseModule_dec meth f gn l:
   In meth l \/
   exists meth',
     In meth' l /\
-    (inlinesingle_Meth f meth' = meth). 
+    (inlineSingle_Meth f meth' = meth). 
 Proof.
   induction l.
   - intros; simpl in *; contradiction.
@@ -2989,7 +2989,7 @@ Section transform_nth_right.
       i < length ls ->
       exists val,
         In val ls /\
-        transform_nth_right (inlinesingle_Meth f) i ls =
+        transform_nth_right (inlineSingle_Meth f) i ls =
         inlineSingle_Meth_in_list f (fst val) ls.
   Proof.
     induction ls; destruct i; simpl in *; auto; intros; try Omega.omega.
@@ -3014,7 +3014,7 @@ Section transform_nth_right.
       i < length ls ->
       exists val,
         In val ls /\
-        transform_nth_right (inlinesingle_Rule f) i ls =
+        transform_nth_right (inlineSingle_Rule f) i ls =
         inlineSingle_Rule_in_list f (fst val) ls.
   Proof.
     induction ls; destruct i; simpl in *; auto; intros; try Omega.omega.
@@ -3035,7 +3035,7 @@ Section transform_nth_right.
   
   Lemma inlineSingle_Meth_transform_nth_keys f ls :
     forall i,
-      map fst (transform_nth_right (inlinesingle_Meth f) i ls) =
+      map fst (transform_nth_right (inlineSingle_Meth f) i ls) =
       map fst ls.
   Proof.
     induction ls; destruct i; simpl in *; auto; intros; try Omega.omega.
@@ -3045,7 +3045,7 @@ Section transform_nth_right.
   
   Lemma inlineSingle_Rule_transform_nth_keys f ls :
     forall i,
-      map fst (transform_nth_right (inlinesingle_Rule f) i ls) =
+      map fst (transform_nth_right (inlineSingle_Rule f) i ls) =
       map fst ls.
   Proof.
     induction ls; destruct i; simpl in *; auto; intros; try Omega.omega.
@@ -3085,14 +3085,14 @@ Proof.
 Qed.
 
 Lemma SameKeys_Meth_fold_right ls xs f :
-  (map fst ls = map fst (fold_right (transform_nth_right (inlinesingle_Meth f)) ls xs)).
+  (map fst ls = map fst (fold_right (transform_nth_right (inlineSingle_Meth f)) ls xs)).
 Proof.
   induction xs; simpl; auto.
   rewrite inlineSingle_Meth_transform_nth_keys; auto.
 Qed.
 
 Lemma SameKeys_Rule_fold_right ls xs f :
-  (map fst ls = map fst (fold_right (transform_nth_right (inlinesingle_Rule f)) ls xs)).
+  (map fst ls = map fst (fold_right (transform_nth_right (inlineSingle_Rule f)) ls xs)).
 Proof.
   induction xs; simpl; auto.
   rewrite inlineSingle_Rule_transform_nth_keys; auto.
@@ -3101,18 +3101,18 @@ Qed.
 Lemma inline_Meth_not_transformed f ls :
   In f ls ->
   forall i,
-    In f (transform_nth_right (inlinesingle_Meth f) i ls).
+    In f (transform_nth_right (inlineSingle_Meth f) i ls).
 Proof.
   induction ls; destruct i; simpl; auto.
   - destruct H; subst; auto.
-    unfold inlinesingle_Meth; destruct f, string_dec; auto.
+    unfold inlineSingle_Meth; destruct f, string_dec; auto.
     apply False_ind, n; reflexivity.
   - destruct H; auto.
 Qed.
 
 Lemma inlined_Meth_not_transformed_fold_right ls xs f :
   In f ls ->
-  In f (fold_right (transform_nth_right (inlinesingle_Meth f)) ls xs).
+  In f (fold_right (transform_nth_right (inlineSingle_Meth f)) ls xs).
 Proof.
   induction xs; simpl; auto.
   intros; specialize (IHxs H).
@@ -3122,7 +3122,7 @@ Qed.
 Lemma WfMod_inline_all_Meth regs rules meths f xs:
   In f meths ->
   WfMod (Base (BaseMod regs rules meths)) ->
-  WfMod (Base (BaseMod regs rules (fold_right (transform_nth_right (inlinesingle_Meth f)) meths xs))).
+  WfMod (Base (BaseMod regs rules (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs))).
 Proof.
   induction xs; auto.
   simpl.
@@ -3131,22 +3131,22 @@ Proof.
   - pose proof H0 as H0'.
     inv H0; simpl in *.
     rewrite (SameKeys_Meth_fold_right meths xs f) in NoDupMeths.
-    rewrite <- (fold_right_len xs (inlinesingle_Meth f) meths) in l.
+    rewrite <- (fold_right_len xs (inlineSingle_Meth f) meths) in l.
     specialize (inlineSingle_Meth_transform_nth f _ NoDupMeths l) as TMP; dest.
     rewrite H1.
-    assert (In f (fold_right (transform_nth_right (inlinesingle_Meth f)) meths xs));
+    assert (In f (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs));
       [apply inlined_Meth_not_transformed_fold_right; auto|].
     specialize (WfMod_Meth_inlined _ (fst x) (IHxs H0') H2) as P1.
     unfold inlineSingle_Meth_BaseModule in P1; simpl in *; assumption.
   - apply Nat.nlt_ge in n.
-    rewrite <- (fold_right_len xs (inlinesingle_Meth f) meths) in n.
+    rewrite <- (fold_right_len xs (inlineSingle_Meth f) meths) in n.
     rewrite inlineSingle_transform_gt; auto.
 Qed.
 
 Lemma WfMod_inline_all_Rule regs rules meths f xs:
   In f meths ->
   WfMod (Base (BaseMod regs rules meths)) ->
-  WfMod (Base (BaseMod regs (fold_right (transform_nth_right (inlinesingle_Rule f)) rules xs) meths)).
+  WfMod (Base (BaseMod regs (fold_right (transform_nth_right (inlineSingle_Rule f)) rules xs) meths)).
 Proof.
   induction xs; auto.
   simpl.
@@ -3155,13 +3155,13 @@ Proof.
   - pose proof H0 as H0'.
     inv H0; simpl in *.
     rewrite (SameKeys_Rule_fold_right rules xs f) in NoDupRle.
-    rewrite <- (fold_right_len xs (inlinesingle_Rule f) rules) in l.
+    rewrite <- (fold_right_len xs (inlineSingle_Rule f) rules) in l.
     specialize (inlineSingle_Rule_transform_nth f _ NoDupRle l) as TMP; dest.
     rewrite H1.
     specialize (WfMod_Rule_inlined _ (fst x) (IHxs H0') H) as P1.
     unfold inlineSingle_Rule_BaseModule in P1; simpl in *; assumption.
   - apply Nat.nlt_ge in n.
-    rewrite <- (fold_right_len xs (inlinesingle_Rule f) rules) in n.
+    rewrite <- (fold_right_len xs (inlineSingle_Rule f) rules) in n.
     rewrite inlineSingle_transform_gt; auto.
 Qed.
 
@@ -3169,7 +3169,7 @@ Lemma inline_meth_transform f regs rules meths:
   WfMod (Base (BaseMod regs rules meths)) ->
   In f meths ->
   forall i,
-    TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (transform_nth_right (inlinesingle_Meth f) i meths))).
+    TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (transform_nth_right (inlineSingle_Meth f) i meths))).
 Proof.
   intros; destruct (lt_dec i (length meths)).
   - pose proof H as H'.
@@ -3188,7 +3188,7 @@ Lemma inline_rule_transform f regs rules meths:
   WfMod (Base (BaseMod regs rules meths)) ->
   In f meths ->
   forall i,
-    TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (transform_nth_right (inlinesingle_Rule f) i rules) meths)).
+    TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (transform_nth_right (inlineSingle_Rule f) i rules) meths)).
 Proof.
   intros; destruct (lt_dec i (length rules)).
   - pose proof H as H'.
@@ -3209,17 +3209,17 @@ Section inlineSingle_nth.
   Variable (Wf : WfMod (Base (BaseMod regs rules meths))).
 
   Definition inlineSingle_BaseModule : BaseModule :=
-    BaseMod regs (map (inlinesingle_Rule f) rules) (map (inlinesingle_Meth f) meths).
+    BaseMod regs (map (inlineSingle_Rule f) rules) (map (inlineSingle_Meth f) meths).
   
   Definition inlineSingle_BaseModule_nth_Meth xs : BaseModule :=
-    BaseMod regs rules (fold_right (transform_nth_right (inlinesingle_Meth f)) meths xs).
+    BaseMod regs rules (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs).
   
   Definition inlineSingle_BaseModule_nth_Rule xs : BaseModule :=
-    BaseMod regs (fold_right (transform_nth_right (inlinesingle_Rule f)) rules xs) meths.
+    BaseMod regs (fold_right (transform_nth_right (inlineSingle_Rule f)) rules xs) meths.
   
   Lemma inline_meth_fold_right xs:
     In f meths ->
-    TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (fold_right (transform_nth_right (inlinesingle_Meth f)) meths xs))).
+    TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs))).
   Proof.
     induction xs; intros.
     - simpl; apply TraceInclusion_refl.
@@ -3233,7 +3233,7 @@ Section inlineSingle_nth.
 
   Lemma inline_rule_fold_right xs:
     In f meths ->
-    TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (fold_right (transform_nth_right (inlinesingle_Rule f)) rules xs) meths)).
+    TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (fold_right (transform_nth_right (inlineSingle_Rule f)) rules xs) meths)).
   Proof.
     induction xs; intros.
     - simpl; apply TraceInclusion_refl.
@@ -3245,16 +3245,146 @@ Section inlineSingle_nth.
   Qed.
 End inlineSingle_nth.
 
-Corollary TraceInclusion_inline_BaseModule_r regs rules meths f:
+Corollary TraceInclusion_inline_BaseModule_rules regs rules meths f:
+  WfMod (Base (BaseMod regs rules meths)) ->
+  In f meths ->
+  TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (map (inlineSingle_Rule f) rules) meths)).
+Proof.
+  intros.
+  unfold inlineSingle_BaseModule.
+  specialize (inline_rule_fold_right f H (zeroToN (length rules)) H0) as P1.
+  specialize (WfMod_inline_all_Rule _ (zeroToN (length rules)) H0 H) as P2.
+  repeat rewrite map_fold_right_eq in *.
+  assumption.
+Qed.
+
+Corollary TraceInclusion_inline_BaseModule_meths regs rules meths f:
+  WfMod (Base (BaseMod regs rules meths)) ->
+  In f meths ->
+  TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (map (inlineSingle_Meth f) meths))).
+Proof.
+  intros.
+  unfold inlineSingle_BaseModule.
+  specialize (inline_meth_fold_right f H (zeroToN (length meths)) H0) as P1.
+  repeat rewrite map_fold_right_eq in *.
+  assumption.
+Qed.
+
+
+
+Corollary TraceInclusion_inline_BaseModule_all regs rules meths f:
   WfMod (Base (BaseMod regs rules meths)) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs rules meths)) (Base (inlineSingle_BaseModule f regs rules meths)).
 Proof.
   intros.
   unfold inlineSingle_BaseModule.
-  specialize (inline_rule_fold_right f H (zeroToN (length rules)) H0) as P1.
+  specialize (TraceInclusion_inline_BaseModule_rules f H H0) as P1.
   specialize (WfMod_inline_all_Rule _ (zeroToN (length rules)) H0 H) as P2.
-  specialize (inline_meth_fold_right f P2 (zeroToN (length meths)) H0) as P3.
-  repeat rewrite map_fold_right_eq.
+  specialize (TraceInclusion_inline_BaseModule_meths f P2 H0) as P3.
+  repeat rewrite map_fold_right_eq in *.
   apply (TraceInclusion_trans P1 P3).
-Qed.          
+Qed.
+
+
+
+Section inline_all_all.
+  Definition inlineSingle_Meths_pos newMeths n :=
+    match nth_error newMeths n with
+    | Some f => map (inlineSingle_Meth f) newMeths
+    | None => newMeths
+    end.
+
+  Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (zeroToN (length meths)) meths.
+
+  Definition inlineSingle_Rules_pos meths n rules :=
+    match nth_error meths n with
+    | Some f => map (inlineSingle_Rule f) rules
+    | None => rules
+    end.
+
+  Definition inlineAll_Rules meths rules := fold_left (fun newRules n => inlineSingle_Rules_pos meths n newRules) (zeroToN (length meths)) rules.
+
+  Definition inlineAll_All regs rules meths :=
+    (Base (BaseMod regs (inlineAll_Rules (inlineAll_Meths meths) rules) (inlineAll_Meths meths))).
+  
+  Lemma TraceInclusion_inlineSingle_pos_Rules regs rules meths:
+    WfMod (Base (BaseMod regs rules meths)) ->
+    forall n,
+      WfMod (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths)) /\
+      TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths)).
+  Proof.
+    intros WfH n.
+    unfold inlineSingle_Rules_pos.
+    case_eq (nth_error meths n); intros sth; [intros sthEq|split; [assumption | apply TraceInclusion_refl]].
+    split.
+    - apply nth_error_In in sthEq.
+      pose proof (WfMod_inline_all_Rule sth (zeroToN (length rules)) sthEq WfH).
+      repeat rewrite map_fold_right_eq in *.
+      assumption.
+    - apply TraceInclusion_inline_BaseModule_rules; auto.
+      eapply nth_error_In; eauto.
+  Qed.
+
+  Lemma TraceInclusion_inlineAll_pos_Rules regs rules meths:
+    WfMod (Base (BaseMod regs rules meths)) ->
+    WfMod (Base (BaseMod regs (inlineAll_Rules meths rules) meths)) /\
+    TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (inlineAll_Rules meths rules) meths)).
+  Proof.
+    intros WfH.
+    unfold inlineAll_Rules.
+    induction (Datatypes.length meths); simpl; [split; [assumption | apply TraceInclusion_refl]|].
+    rewrite fold_left_app; simpl.
+    destruct IHn as [IHn1 IHn2].
+    pose proof (TraceInclusion_inlineSingle_pos_Rules IHn1 n) as [sth1 sth2].
+    split; auto.
+    eapply TraceInclusion_trans; eauto.
+  Qed.
+  
+  Lemma TraceInclusion_inlineSingle_pos_Meths regs rules meths:
+    WfMod (Base (BaseMod regs rules meths)) ->
+    forall n,
+      WfMod (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n))) /\
+      TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n))).
+  Proof.
+    intros WfH n.
+    unfold inlineSingle_Meths_pos.
+    case_eq (nth_error meths n); intros sth; [intros sthEq|split; [assumption | apply TraceInclusion_refl]].
+    split.
+    - apply nth_error_In in sthEq.
+      pose proof (WfMod_inline_all_Meth sth (zeroToN (length meths)) sthEq WfH).
+      repeat rewrite map_fold_right_eq in *.
+      assumption.
+    - apply TraceInclusion_inline_BaseModule_meths; auto.
+      eapply nth_error_In; eauto.
+  Qed.
+
+  Lemma TraceInclusion_inlineAll_pos_Meths regs rules meths:
+    WfMod (Base (BaseMod regs rules meths)) ->
+    WfMod (Base (BaseMod regs rules (inlineAll_Meths meths))) /\
+    TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (inlineAll_Meths meths))).
+  Proof.
+    intros WfH.
+    unfold inlineAll_Meths.
+    induction (Datatypes.length meths); simpl; [split; [assumption | apply TraceInclusion_refl]|].
+    rewrite fold_left_app; simpl.
+    destruct IHn as [IHn1 IHn2].
+    pose proof (TraceInclusion_inlineSingle_pos_Meths IHn1 n) as [sth1 sth2].
+    split; auto.
+    eapply TraceInclusion_trans; eauto.
+  Qed.
+
+  Lemma TraceInclusion_inlineAll_pos regs rules meths:
+    WfMod (Base (BaseMod regs rules meths)) ->
+    WfMod (inlineAll_All regs rules meths) /\
+    TraceInclusion (Base (BaseMod regs rules meths)) (inlineAll_All regs rules meths).
+  Proof.
+    unfold inlineAll_All in *.
+    intros WfH1.
+    pose proof (TraceInclusion_inlineAll_pos_Meths WfH1) as [WfH2 P2].
+    pose proof (TraceInclusion_inlineAll_pos_Rules WfH2) as [WfH3 P3].
+    split; auto.
+    eapply TraceInclusion_trans; eauto.
+  Qed.
+End inline_all_all.
+
