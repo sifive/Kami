@@ -1964,12 +1964,6 @@ Section PTraceSubstitute.
     exists o.
     apply PTrace_flatten_same1; assumption.
   Qed.
-
-  Corollary TraceInclusion_flatten_r' : TraceInclusion m (flatten m).
-  Proof.
-    apply PTraceInclusion_TraceInclusion; eauto using flatten_WfMod.
-    apply PTraceInclusion_flatten_r.
-  Qed.
   
   Lemma PTraceInclusion_flatten_l: PTraceInclusion (flatten m) m.
   Proof.
@@ -1979,12 +1973,6 @@ Section PTraceSubstitute.
     split.
     - unfold PTraceList; exists o; auto.
     - apply WeakInclusionsRefl.
-  Qed.
-
-  Corollary TraceInclusion_flatten_l' : TraceInclusion (flatten m) m.
-  Proof.
-    apply PTraceInclusion_TraceInclusion; eauto using flatten_WfMod.
-    apply PTraceInclusion_flatten_l.
   Qed.
   
 End PTraceSubstitute.
