@@ -509,7 +509,109 @@ Section FoldWhich.
       eapply IHls; eauto.
   Qed.
 
-  Theorem whichNonUnit_fold_right:
+  Theorem which1_fold_right:
+    forall ls,
+      forall i, i < length ls -> which (fold_right pick unit ls) (nth i ls unit) = true.
+  Proof.
+    induction ls; simpl; auto; intros.
+    - Omega.omega.
+    - unfold pick in *.
+      remember (fold_right (fun x y => if which x y then x else y) unit ls) as sth.
+      destruct i; simpl in *.
+      + case_eq (which a sth); intros sth2.
+        * subst; eapply whichRefl; eauto.
+        * destruct (decA sth a); simpl in *.
+          -- subst; rewrite whichRefl; auto.
+          -- specialize (whichSym sth a).
+             destruct whichSym; [tauto|].
+             rewrite H0 in *.
+             rewrite Bool.negb_true_iff.
+             auto.
+      + case_eq (which a sth); intros sth2.
+        * specialize (IHls i ltac:(Omega.omega)).
+          rewrite <- IHls in sth2.
+          pose proof (@whichTrans _ _ _ sth2).
+          congruence.
+        * specialize (IHls i ltac:(Omega.omega)).
+          auto.
+  Qed.
+
+  Theorem which1_fold_tree:
+    forall ls,
+      forall i, i < length ls -> which (fold_tree pick unit ls) (nth i ls unit) = true.
+  Proof.
+    intros.
+    rewrite <- fold_right_fold_tree; auto; intros.
+    - eapply which1_fold_right; eauto.
+    - apply pickComm.
+    - apply pickAssoc.
+    - apply pickUnit.
+  Qed.
+
+  Theorem which1_fold_left:
+    forall ls,
+      forall i, i < length ls -> which (fold_left pick ls unit) (nth i ls unit) = true.
+  Proof.
+    intros.
+    rewrite fold_left_fold_right; auto; intros.
+    - eapply which1_fold_right; eauto.
+    - apply pickComm.
+    - apply pickAssoc.
+  Qed.
+
+  Theorem which2_fold_right:
+    forall ls,
+      fold_right pick unit ls <> unit ->
+      exists n, n < length ls /\ nth n ls unit = fold_right pick unit ls.
+  Proof.
+    induction ls; simpl; auto; intros.
+    - tauto.
+    - destruct (decA (fold_right pick unit ls) unit); simpl in *.
+      + rewrite e in *.
+        rewrite pickComm in *.
+        rewrite pickUnit in *; subst.
+        exists 0; repeat split; auto; try Omega.omega; intros.
+      + specialize (IHls n).
+        destruct IHls as [j [jLen cond1]].
+        subst.
+        rewrite <- cond1 in *.
+        unfold pick in *.
+        case_eq (which a (nth j ls unit)); intros sth; rewrite sth in *; subst.
+        * exists 0; repeat split; auto; try Omega.omega; intros.
+        * exists (S j); repeat split; auto; try Omega.omega; intros.
+  Qed.
+
+  Theorem which2_fold_tree:
+    forall ls,
+      fold_tree pick unit ls <> unit ->
+      exists n, n < length ls /\ nth n ls unit = fold_tree pick unit ls.
+  Proof.
+    intros.
+    rewrite <- fold_right_fold_tree in *; auto; intros.
+    - eapply which2_fold_right; eauto; auto.
+    - apply pickComm.
+    - apply pickAssoc.
+    - apply pickUnit.
+    - apply pickComm.
+    - apply pickAssoc.
+    - apply pickUnit.
+  Qed.
+
+  Theorem which2_fold_left:
+    forall ls,
+      fold_left pick ls unit <> unit ->
+      exists n, n < length ls /\ nth n ls unit = fold_left pick ls unit.
+  Proof.
+    intros.
+    rewrite fold_left_fold_right in *; auto; intros.
+    - eapply which2_fold_right; eauto; auto.
+    - apply pickComm.
+    - apply pickAssoc.
+    - apply pickComm.
+    - apply pickAssoc.
+  Qed.
+
+   Theorem whichNonUnit_fold_right:
     forall ls val,
       val = fold_right pick unit ls ->
       val <> unit ->

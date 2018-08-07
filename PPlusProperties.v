@@ -2995,10 +2995,10 @@ Section inlineSingle_nth.
     BaseMod regs (map (inlinesingle_Rule f) rules) (map (inlinesingle_Meth f) meths).
   
   Definition inlineSingle_BaseModule_nth_Meth xs : BaseModule :=
-    BaseMod regs rules (fold_left (transform_nth (inlinesingle_Meth f)) xs meths).
+    BaseMod regs rules (fold_right (transform_nth_right (inlinesingle_Meth f)) meths xs).
   
   Definition inlineSingle_BaseModule_nth_Rule xs : BaseModule :=
-    BaseMod regs (fold_left (transform_nth (inlinesingle_Rule f)) xs rules) meths.
+    BaseMod regs (fold_right (transform_nth_right (inlinesingle_Rule f)) rules xs) meths.
 
 
   Lemma inline_meth_step xs:
