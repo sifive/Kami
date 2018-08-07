@@ -4,7 +4,7 @@ Import ListNotations.
 Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
-Require Import ZArith.
+Require Import ZArith Lib.EclecticLib.
 
 
 Section BaseModule.
@@ -2942,236 +2942,77 @@ Proof.
   eauto using StrongPPlusTraceInclusion_PPlusTraceInclusion, PPlusStrongTraceInclusion_inlining_Meth_r.
 Qed.
 
-Definition inlineSingle_BaseModule  (f : DefMethT) (m : BaseModule) : BaseModule :=
-  BaseMod (getRegisters m) (map (inlinesingle_Rule f) (getRules m)) (map (inlinesingle_Meth f) (getMethods m)).
+Section Rel.
+  Variable A B: Type.
+  Variable f: B -> A  -> A.
 
-(* Fixpoint inlinesingle_Mod (m : Mod) (f : DefMethT) : Mod := *)
-(*   match m with *)
-(*   |Base bm => Base (inlinesingle_BaseModule bm f) *)
-(*   |HideMeth m' s => HideMeth (inlinesingle_Mod m' f) s *)
-(*   |ConcatMod m1 m2 => ConcatMod (inlinesingle_Mod m1 f) (inlinesingle_Mod m2 f) *)
-(*   end. *)
+  Variable R: A -> A -> Prop.
+
+  Lemma fold_right_Rel ls:
+    forall x b,
+      (forall x b, R x (f b x)) ->
+      R (fold_right f x ls) (f b (fold_right f x ls)).
+  Proof.
+    induction ls; simpl; auto; intros.
+  Qed.
+End Rel.
 
 
-(* Lemma WfActionT_inlinesingle_f (k : Kind) (a : ActionT type k) (f : DefMethT) m : *)
-(*   WfActionT m a -> *)
-(*   WfActionT (inlinesingle_BaseModule m f) a. *)
-(* Proof. *)
-(*   intros. *)
-(*   induction H; econstructor; auto. *)
-(* Qed. *)
+Section transform_nth_right.
+  Lemma inlineSingle_Meth_transform_nth f ls:
+    NoDup (map fst ls) ->
+    forall i,
+      i < length ls ->
+      exists val,
+        In val ls /\
+        transform_nth_right (inlinesingle_Meth f) i ls =
+        inlineSingle_Meth_in_list f (fst val) ls.
+  Proof.
+    induction ls; destruct i; simpl in *; auto; intros; try Omega.omega.
+    - exists a; repeat split; auto.
+      destruct (string_dec (fst a) (fst a)); [| tauto].
+      f_equal.
+      admit.
+    - inv H.
+      specialize (IHls H4 i ltac:(Omega.omega)); dest.
+      exists x.
+      repeat split; auto.
+      destruct (string_dec (fst x) (fst a)).
+      apply in_map with (f := fst) in H.
+      + rewrite e in *; tauto.
+      + rewrite H1; auto.
+  Admitted.
+End transform_nth_right.
+  
 
-(* Lemma inline_preserves_key_Meth (f : DefMethT) (meth : DefMethT): *)
-(*   fst (inlinesingle_Meth f meth) = fst meth. *)
-(* Proof. *)
-(*   destruct meth; auto. *)
-(* Qed. *)
+Section inlineSingle_nth.
+  Variable (f : DefMethT).
+  Variable (regs: list RegInitT) (rules: list RuleT) (meths: list DefMethT).
+  Variable (Wf : WfMod (Base (BaseMod regs rules meths))).
 
-(* Corollary inline_preserves_keys_Meth (f : DefMethT) (l : list DefMethT) : *)
-(*   (map fst (map (inlinesingle_Meth f) l)) = (map fst l). *)
-(* Proof. *)
-(*   induction l; auto. *)
-(*   simpl;rewrite inline_preserves_key_Meth; rewrite IHl; reflexivity. *)
-(* Qed. *)
 
-(* Lemma inline_preserves_key_Rule (f : DefMethT) (rle : RuleT) : *)
-(*   fst (inlinesingle_Rule f rle) = fst rle. *)
-(* Proof. *)
-(*   destruct rle; auto. *)
-(* Qed. *)
+  Definition inlineSingle_BaseModule : BaseModule :=
+    BaseMod regs (map (inlinesingle_Rule f) rules) (map (inlinesingle_Meth f) meths).
+  
+  Definition inlineSingle_BaseModule_nth_Meth xs : BaseModule :=
+    BaseMod regs rules (fold_left (transform_nth (inlinesingle_Meth f)) xs meths).
+  
+  Definition inlineSingle_BaseModule_nth_Rule xs : BaseModule :=
+    BaseMod regs (fold_left (transform_nth (inlinesingle_Rule f)) xs rules) meths.
 
-(* Corollary inline_preserves_keys_Rule (f : DefMethT) (l : list RuleT) : *)
-(*   (map fst (map (inlinesingle_Rule f) l)) = (map fst l). *)
-(* Proof. *)
-(*   induction l; auto. *)
-(*   simpl; rewrite inline_preserves_key_Rule; rewrite IHl; reflexivity. *)
-(* Qed. *)
 
-(* Lemma inline_preserves_Regs_BaseMod m f: *)
-(*   getRegisters m = getRegisters (inlinesingle_BaseModule m f). *)
-(* Proof. *)
-(*   unfold inlinesingle_BaseModule;eauto. *)
-(* Qed. *)
-
-(* Lemma inline_preserves_Regs_Mod m f: *)
-(*   (getAllRegisters m) = getAllRegisters (inlinesingle_Mod m f). *)
-(* Proof. *)
-(*   intros. *)
-(*   induction m; simpl;eauto using inline_preserves_Regs_BaseMod. *)
-(*   rewrite IHm1, IHm2; reflexivity. *)
-(* Qed. *)
-
-(* Lemma WfActionT_inlinesingle (k :Kind) (a : ActionT type k) (f : DefMethT) m: *)
-(*   WfActionT m a -> *)
-(*   (forall v, WfActionT m (projT2 (snd f) type v)) -> *)
-(*   WfActionT (inlinesingle_BaseModule m f) (inlineSingle f a). *)
-(*   induction 1; try econstructor;eauto. *)
-(*   simpl. *)
-(*   destruct (string_dec (fst f) meth),(Signature_dec s (projT1 (snd f))); subst; econstructor; eauto. *)
-(*   econstructor. *)
-(*   specialize (H1 (evalExpr e)). *)
-(*   apply (WfActionT_inlinesingle_f);eauto. *)
-(* Qed. *)
-
-(* Lemma DefMethT_body_Wf m f (Wfm : WfMod m): *)
-(*   In f (getAllMethods m) -> *)
-(*   (forall v, WfActionT (getFlat m) (projT2 (snd f) type v)). *)
-(* Proof. *)
-(*   induction m; intros. *)
-(*   - inversion Wfm; subst. *)
-(*     destruct (WfBaseModule) as [WfRule WfMeth]; clear WfRule; specialize (WfMeth _ H v). *)
-(*     apply WfActionT_flatten in WfMeth; assumption. *)
-(*   - inversion Wfm; subst. *)
-(*     unfold getFlat in *; simpl in *. *)
-(*     eapply IHm; eauto. *)
-(*   - simpl in H; apply in_app_or in H. *)
-(*     unfold getFlat in *; simpl in *. *)
-(*     destruct H; inversion Wfm; subst; [specialize (IHm1 HWf1 H v) as TMP|specialize (IHm2 HWf2 H v) as TMP]; *)
-(*       induction (projT2 (snd f) type v); inv TMP; EqDep_subst; econstructor; eauto; *)
-(*         simpl in *; rewrite map_app; apply in_or_app;[left|left|right|right]; assumption. *)
-(* Qed. *)
-
-(* Lemma inline_createHide_push f m l: *)
-(*   inlinesingle_Mod (createHide m l) f = createHide (inlinesingle_BaseModule m f) l. *)
-(* Proof. *)
-(*   induction l; auto. *)
-(*   unfold createHide; simpl; fold (createHide). *)
-(*   rewrite IHl; reflexivity. *)
-(* Qed. *)
-
-(* Lemma inline_flattening_AllRegs f m : *)
-(*   getAllRegisters (inlinesingle_Mod (flatten m) f) = getAllRegisters m. *)
-(* Proof. *)
-(*   unfold flatten. *)
-(*   induction getHidden; simpl; auto. *)
-(* Qed. *)
-
-(* Lemma inline_flattening_Meths f m : *)
-(*   getAllMethods (inlinesingle_Mod m f) = (map (inlinesingle_Meth f) (getAllMethods m)). *)
-(* Proof. *)
-(*   induction m; simpl; auto. *)
-(*   rewrite map_app; rewrite IHm1, IHm2; reflexivity. *)
-(* Qed. *)
-
-(* Lemma inline_flattening_Rules f m : *)
-(*   getAllRules (inlinesingle_Mod m f) = (map (inlinesingle_Rule f) (getAllRules m)). *)
-(* Proof. *)
-(*   induction m; simpl; auto. *)
-(*   rewrite map_app; rewrite IHm1, IHm2; reflexivity. *)
-(* Qed. *)
-
-(* Lemma inline_getHidden f m : *)
-(*   getHidden (inlinesingle_Mod m f) = getHidden m. *)
-(* Proof. *)
-(*   induction m; simpl; eauto. *)
-(*   - rewrite IHm; reflexivity. *)
-(*   - rewrite IHm1, IHm2; reflexivity. *)
-(* Qed. *)
-
-(* Corollary inline_flattening_Hidden f m : *)
-(*   getHidden (inlinesingle_Mod (flatten m) f) = getHidden (inlinesingle_Mod m f). *)
-(* Proof. *)
-(*   repeat rewrite inline_getHidden. *)
-(*   unfold flatten; rewrite createHide_hides; reflexivity. *)
-(* Qed. *)
-
-(* Lemma inline_flattening_flattens_inline f m: *)
-(*   (flatten (inlinesingle_Mod m f)) = (inlinesingle_Mod (flatten m) f). *)
-(* Proof. *)
-(*   unfold flatten, getFlat. *)
-(*   rewrite inline_getHidden. *)
-(*   rewrite inline_flattening_Rules. *)
-(*   rewrite inline_flattening_Meths. *)
-(*   rewrite <- inline_preserves_Regs_Mod. *)
-(*   rewrite inline_createHide_push. *)
-(*   unfold inlinesingle_BaseModule; simpl. *)
-(*   reflexivity. *)
-(* Qed. *)
-
-(* Lemma ActionT_rules rule f: *)
-(*   (snd (inlinesingle_Rule f rule) type) = (inlineSingle f (snd rule type)). *)
-(* Proof. *)
-(*   destruct rule; simpl. *)
-(*   reflexivity. *)
-(* Qed. *)
-
-(* Lemma ActionT_meths f m1 m2 m: *)
-(*   inlinesingle_Meth f m1 = m2 -> *)
-(*   (forall (v : type (fst (projT1 (snd f)))), WfActionT m (projT2 (snd f) type v)) -> *)
-(*   (forall (v : type (fst (projT1 (snd m1)))), WfActionT m (projT2 (snd m1) type v)) -> *)
-(*   (forall (v : type (fst (projT1 (snd m2)))), WfActionT (inlinesingle_BaseModule m f) (projT2 (snd m2) type v)). *)
-(* Proof. *)
-(*   intros. *)
-(*   destruct m1, m2, s0; simpl in *. *)
-(*   inversion H; subst; simpl in *. *)
-(*   specialize (H1 v). *)
-(*   eapply WfActionT_inlinesingle; eauto. *)
-(* Qed. *)
-
-(* Lemma WfMod_inline_WfMod m f : *)
-(*   WfMod (Base m) -> *)
-(*   In f (getMethods m) -> *)
-(*   WfMod (Base (inlinesingle_BaseModule m f)). *)
-(* Proof. *)
-(*   intros; inv H; econstructor; eauto. *)
-(*   - split; intros; simpl in *;inv WfBaseModule; eauto; pose proof (H2 _ H0); rewrite in_map_iff in H; dest. *)
-(*     + specialize (H1 _ H4). *)
-(*       specialize (WfActionT_inlinesingle _ H1 H3); intro; rewrite <- H. *)
-(*       rewrite ActionT_rules; apply WfActionT_inlinesingle; eauto. *)
-(*     + specialize (H2 _ H4). *)
-(*       eapply ActionT_meths; eauto. *)
-(*   - rewrite <- (inline_preserves_keys_Meth f (getMethods m)) in NoDupMeths; assumption. *)
-(*   - rewrite <- (inline_preserves_keys_Rule f (getRules m)) in NoDupRle; assumption. *)
-(* Qed. *)
-      
-
-(* Lemma inline_preserves_keys_Meth_Mod s m f: *)
-(*   In s (map fst (getAllMethods m)) <-> In s (map fst (getAllMethods (inlinesingle_Mod m f))). *)
-(* Proof. *)
-(*   induction m; simpl; split; intros; eauto. *)
-(*   - rewrite inline_preserves_keys_Meth; assumption. *)
-(*   - rewrite inline_preserves_keys_Meth in H; assumption. *)
-(*   - rewrite <- IHm; assumption. *)
-(*   - rewrite IHm; assumption. *)
-(*   - rewrite map_app in *; rewrite in_app_iff in *. *)
-(*     destruct H;[left;rewrite <- IHm1|right;rewrite <- IHm2]; assumption. *)
-(*   - rewrite map_app in *; rewrite in_app_iff in *. *)
-(*     destruct H;[left;rewrite IHm1|right; rewrite IHm2]; assumption. *)
-(* Qed. *)
-
-(* Lemma inline_preserves_keys_Rules_Mod s m f : *)
-(*   In s (map fst (getAllRules m)) <-> In s (map fst (getAllRules (inlinesingle_Mod m f))). *)
-(* Proof. *)
-(*   induction m; simpl;split; intros; eauto. *)
-(*   - rewrite inline_preserves_keys_Rule; assumption. *)
-(*   - rewrite inline_preserves_keys_Rule in H; assumption. *)
-(*   - rewrite <- IHm; assumption. *)
-(*   - rewrite IHm; assumption. *)
-(*   - rewrite map_app in *; rewrite in_app_iff in *. *)
-(*     destruct H;[left;rewrite <- IHm1|right;rewrite <- IHm2]; assumption. *)
-(*   - rewrite map_app in *; rewrite in_app_iff in *. *)
-(*     destruct H;[left;rewrite IHm1|right; rewrite IHm2]; assumption. *)
-(* Qed. *)
-
-(* Lemma PPlusSubsteps_inline_notIn f m o upds execs calls: *)
-(*   PPlusSubsteps m o upds execs calls -> *)
-(*   ~In (fst f) (map fst calls) -> *)
-(*   PPlusSubsteps (inlinesingle_BaseModule m f) o upds execs calls. *)
-(* Proof. *)
-(*   induction 1; simpl; intros. *)
-(*   - econstructor 1; eauto. *)
-(*   - rewrite HUpds, HExecs, HCalls. *)
-(*     apply (in_map (inlinesingle_Rule f)) in HInRules. *)
-(*     econstructor 2 with (u := u) (reads := reads); eauto. *)
-(*     + eapply PSemAction_inline_notIn; eauto. *)
-(*       intro; apply H0; rewrite HCalls, map_app, in_app_iff; left; assumption. *)
-(*     + eapply IHPPlusSubsteps. *)
-(*       intro; apply H0; rewrite HCalls, map_app, in_app_iff; right; assumption. *)
-(*   - rewrite HUpds, HExecs, HCalls. *)
-(*     apply (in_map (inlinesingle_Meth f)) in HInMeths; destruct fb. *)
-(*     econstructor 3 with (u := u) (reads := reads); simpl; eauto. *)
-(*     + simpl; eapply PSemAction_inline_notIn; eauto. *)
-(*       intro; apply H0; rewrite HCalls, map_app, in_app_iff; left; assumption. *)
-(*     + eapply IHPPlusSubsteps. *)
-(*       intro; apply H0; rewrite HCalls, map_app, in_app_iff; right; assumption. *)
-(* Qed. *)
+  Lemma inline_meth_step xs:
+    forall a,
+      TraceInclusion (Base (BaseMod regs rules (fold_right (transform_nth_right (inlinesingle_Meth f)) meths xs)))
+                     (Base (BaseMod regs rules
+                                    ((transform_nth_right (inlinesingle_Meth f)) a (fold_right (transform_nth_right (inlinesingle_Meth f)) meths xs)))).
+  Proof.
+    intros.
+    generalize Wf; clear Wf.
+    pose proof (fold_right_Rel (transform_nth_right (inlinesingle_Meth f))
+                               (fun x y => WfMod (Base (BaseMod regs rules x)) ->
+                                           TraceInclusion (Base (BaseMod regs rules x)) (Base (BaseMod regs rules y))) xs meths a) as sth.
+    simpl in sth.
+    admit.
+  Admitted.
+End inlineSingle_nth.

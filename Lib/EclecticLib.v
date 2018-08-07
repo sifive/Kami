@@ -5,6 +5,26 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+Section fold_left_right.
+  Variable A B: Type.
+  Variable f: A -> B -> A.
+  Variable f_comm: forall x i j, f (f x i) j = f (f x j) i.
+
+  Lemma fold_left_right_comm ls:
+    forall init,
+      fold_left f ls init = fold_right (fun x acc => f acc x) init ls.
+  Proof.
+    induction ls; simpl; auto; intros.
+    rewrite <- IHls; simpl.
+    clear IHls.
+    generalize init; clear init.
+    induction ls; simpl; auto; intros.
+    rewrite <- IHls.
+    rewrite f_comm.
+    auto.
+  Qed.
+End fold_left_right.
+
 Section fold_left_map.
   Variable A B C: Type.
   Variable f: A -> B -> A.
@@ -30,18 +50,18 @@ Section map_fold_eq.
     | S m => zeroToN m ++ m :: nil
     end.
 
-  Fixpoint transform_nth ls i :=
+  Fixpoint transform_nth_left ls i :=
     match ls with
     | nil => nil
     | x :: xs => match i with
                  | 0 => f x :: xs
-                 | S m => x :: transform_nth xs m
+                 | S m => x :: transform_nth_left xs m
                  end
     end.
 
   Lemma transform_nth_tail a ls:
     forall i,
-      transform_nth (a :: ls) (S i) = a :: transform_nth ls i.
+      transform_nth_left (a :: ls) (S i) = a :: transform_nth_left ls i.
   Proof.
     induction ls; destruct i; simpl; auto.
   Qed.
@@ -57,7 +77,7 @@ Section map_fold_eq.
   Qed.
 
                    
-  Lemma map_fold_eq ls: map f ls = fold_left (fun acc i => transform_nth acc i) (zeroToN (length ls)) ls.
+  Lemma map_fold_left_eq ls: map f ls = fold_left transform_nth_left (zeroToN (length ls)) ls.
   Proof.
     induction ls; simpl; auto.
     rewrite IHls.
@@ -71,6 +91,59 @@ Section map_fold_eq.
     induction ys; simpl; auto.
   Qed.
 End map_fold_eq.
+
+Section map_fold_eq'.
+  Variable A: Type.
+  Variable f: A -> A.
+
+  Fixpoint transform_nth_right i ls :=
+    match ls with
+    | nil => nil
+    | x :: xs => match i with
+                 | 0 => f x :: xs
+                 | S m => x :: transform_nth_right m xs
+                 end
+    end.
+
+  Lemma transform_left_right_eq x: forall y, transform_nth_left f x y = transform_nth_right y x.
+  Proof.
+    induction x; destruct y; simpl; auto; intros.
+    f_equal; auto.
+  Qed.
+
+  Lemma transform_nth_left_comm ls:
+    forall i j,
+      transform_nth_left f (transform_nth_left f ls i) j = transform_nth_left f (transform_nth_left f ls j) i.
+  Proof.
+    induction ls; destruct i, j; simpl; auto; intros; f_equal.
+    auto.
+  Qed.
+    
+  Lemma transform_nth_right_comm ls:
+    forall i j,
+      transform_nth_right j (transform_nth_right i ls) = transform_nth_right i (transform_nth_right j ls).
+  Proof.
+    intros.
+    rewrite <- ?transform_left_right_eq.
+    apply transform_nth_left_comm.
+  Qed.
+      
+  
+  Lemma map_fold_right_eq ls: map f ls = fold_right transform_nth_right ls (zeroToN (length ls)).
+  Proof.
+    rewrite <- fold_left_right_comm by apply transform_nth_right_comm.
+    rewrite map_fold_left_eq.
+    remember (zeroToN (length ls)) as xs.
+    clear Heqxs.
+    generalize ls; clear ls.
+    induction xs; simpl; auto; intros.
+    rewrite IHxs.
+    rewrite transform_left_right_eq.
+    auto.
+  Qed.
+End map_fold_eq'.
+
+
 
 Fixpoint getFins n :=
   match n return list (Fin.t n) with
