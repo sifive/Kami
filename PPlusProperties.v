@@ -3388,3 +3388,71 @@ Section inline_all_all.
   Qed.
 End inline_all_all.
 
+
+Section flatten_and_inline_all.
+  Definition flattened_WfModule (m : WfModule): WfModule :=
+    (mkWfMod (flatten_WfMod (Wf_cond m))).
+  
+  Lemma inline_preserves_key_Meth (f : DefMethT) (meth : DefMethT):
+    fst (inlineSingle_Meth f meth) = fst meth.
+  Proof.
+    destruct meth; auto.
+  Qed.
+
+  Corollary inline_preserves_keys_Meth (f : DefMethT) (l : list DefMethT) :
+    (map fst (map (inlineSingle_Meth f) l)) = (map fst l).
+  Proof.
+    induction l; auto.
+    simpl;rewrite inline_preserves_key_Meth; rewrite IHl; reflexivity.
+  Qed.
+
+  Lemma SameKeys_inlineSingle_Meth_pos meths :
+    forall n,
+      map fst meths = map fst (inlineSingle_Meths_pos meths n).
+  Proof.
+    induction meths; destruct n; simpl in *; auto.
+    - rewrite inline_preserves_key_Meth, inline_preserves_keys_Meth; reflexivity.
+    - unfold inlineSingle_Meths_pos in *; simpl in *.
+      specialize (IHmeths n); case_eq (nth_error meths n);intros;[setoid_rewrite H; setoid_rewrite H in IHmeths|].
+      + simpl; rewrite inline_preserves_key_Meth, inline_preserves_keys_Meth; reflexivity.
+      + setoid_rewrite H; simpl; reflexivity.
+  Qed.
+  
+  Lemma fold_left_nil xs :
+    fold_left inlineSingle_Meths_pos xs nil = nil.
+  Proof.
+    induction xs; simpl; auto.
+    unfold inlineSingle_Meths_pos in *; simpl.
+    case_eq (nth_error (nil: list DefMethT) a); auto.
+  Qed.
+
+  Lemma SameKeys_inlineSome_Meths :
+    forall xs meths,
+    map fst meths = map fst (fold_left inlineSingle_Meths_pos xs meths).
+  Proof.
+    induction xs; simpl; auto.
+    unfold inlineSingle_Meths_pos at 2.
+    intros.
+    case_eq (nth_error meths a);intros;setoid_rewrite H; auto.
+    erewrite <-IHxs.
+    rewrite inline_preserves_keys_Meth; reflexivity.
+  Qed.
+
+  Corollary SameKeys_inlineAll_Meths meths:
+    map fst meths = map fst (inlineAll_Meths meths).
+  Proof.
+    unfold inlineAll_Meths; rewrite <-SameKeys_inlineSome_Meths; reflexivity.
+  Qed.
+  
+  Lemma WfCreateHide_Mod (m : WfModule) :
+    WfMod (createHide (BaseMod (getAllRegisters m) (inlineAll_Rules (inlineAll_Meths (getAllMethods m)) (getAllRules m)) (inlineAll_Meths (getAllMethods m))) (getHidden m)).
+  Proof.
+    specialize (flatten_WfMod (Wf_cond m)) as HWfm.
+    unfold flatten, getFlat in *.
+    rewrite WfMod_createHide in *; dest; split; simpl in *.
+    - repeat intro; specialize (H _ H1); rewrite <-SameKeys_inlineAll_Meths; assumption.
+    - apply TraceInclusion_inlineAll_pos in H0; dest.
+      unfold inlineAll_All in H0; assumption.
+  Qed.
+    
+End flatten_and_inline_all.
