@@ -489,7 +489,27 @@ Notation "e1 && e2" := (CABool And (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 || e2" := (CABool Or (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 ^^ e2" := (CABool Xor (e1 :: e2 :: nil)) (at level 50): kami_expr_scope.
 Notation "~ x" := (UniBit (Inv _) x) : kami_expr_scope.
+
 Notation "a $[ i : j ]":=
+  ltac:(let aTy := type of a in
+        match aTy with
+        | Expr _ (SyntaxKind ?bv) =>
+          let bvSimpl := eval compute in bv in
+              match bvSimpl with
+              | Bit ?w =>
+                let middle := eval simpl in (i + 1 - j)%nat in
+                    let top := eval simpl in (w - 1 - i)%nat in
+                exact (ConstExtract j middle top a)
+              end
+        end) (at level 100, i at level 99, only parsing) : kami_expr_scope.
+
+Section testBit.
+  Variable ty: Kind -> Type.
+  Local Definition testBit := ($$ (natToWord 23 35))%kami_expr.
+  Eval simpl in (testBit $[2 : 1])%kami_expr.
+End testBit.
+
+Notation "a $#[ i : j ]":=
   ltac:(let aTy := type of a in
         let aTySimpl := eval compute in aTy in
             match aTySimpl with
@@ -500,6 +520,7 @@ Notation "a $[ i : j ]":=
                        (w - 1 - i)%nat
                        (@castBits _ w (j + (i + 1 - j) + (w - 1 - i)) ltac:(abstract (lia || nia)) a))
             end) (at level 100, i at level 99, only parsing) : kami_expr_scope.
+
 Notation "e1 + e2" := (CABit (Add) (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 * e2" := (CABit (Mul) (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 & e2" := (CABit (Band) (e1 :: e2 :: nil)) (at level 201)
@@ -573,7 +594,7 @@ Notation "s '@%[' f <- v ]" := (UpdateStruct s%kami_expr (ltac:(let typeS := typ
 Local Definition testFieldUpd ty := 
   ((testStructVal ty) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
 
-Local Definition testExtract ty n n1 n2 (pf1: n > n1) (pf2: n1 > n2) (a: Bit n @# ty) := (a $[n1 : n2])%kami_expr.
+Local Definition testExtract ty n n1 n2 (pf1: n > n1) (pf2: n1 > n2) (a: Bit n @# ty) := (a $#[n1 : n2])%kami_expr.
 
 Local Definition testConcat ty (w1: Bit 10 @# ty) (w2: Bit 2 @# ty) (w3: Bit 5 @# ty) :=
   {< w1, w2, w3 >}%kami_expr.
