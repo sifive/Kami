@@ -3454,5 +3454,194 @@ Section flatten_and_inline_all.
     - apply TraceInclusion_inlineAll_pos in H0; dest.
       unfold inlineAll_All in H0; assumption.
   Qed.
+
+  Definition inlined_WfModule (m : WfModule) : WfModule :=
+    (mkWfMod (WfCreateHide_Mod m)).
+  
+  Lemma TraceHide_Trace m o s ls:
+    Trace (HideMeth m s) o ls -> Trace m o ls.
+  Proof.
+    induction 1.
+    - econstructor 1; eauto.
+    - econstructor 2; eauto.
+      inv HStep; auto.
+  Qed.
+
+  Lemma Trace_TraceHide m o s ls :
+    Trace m o ls ->
+    (forall l, In l ls -> In s (map fst (getAllMethods m)) -> (forall v,  getListFullLabel_diff (s, v) l = 0%Z)) ->
+    Trace (HideMeth m s) o ls.
+  Proof.
+    induction 1; subst; simpl in *; intros.
+    - constructor; auto.
+    - econstructor 2; eauto.
+      econstructor 2; eauto.
+  Qed.
+
+  Lemma Trace_TraceHide' m o s ls :
+    Trace (HideMeth m s) o ls ->
+    (forall l, In l ls -> In s (map fst (getAllMethods m)) -> (forall v,  getListFullLabel_diff (s, v) l = 0%Z)) /\
+    Trace m o ls.
+  Proof.
+    induction 1; subst; simpl in *; intros.
+    -  split; intros; try contradiction.
+       constructor; auto.
+    - dest; split; intros.
+      + destruct H2;[subst|eapply H0; eauto].
+        inv HStep.
+        eapply HHidden; eauto.
+      + econstructor 2; eauto.
+        inv HStep; eauto.
+  Qed.
+
+  Lemma TraceHide_same m o ls:
+    Trace m o ls ->
+    forall s,
+      ~ In s (map fst (getAllMethods m)) ->
+      Trace (HideMeth m s) o ls.
+  Proof.
+    induction 1; simpl; subst; auto; intros.
+    - econstructor; eauto.
+    - econstructor 2; eauto.
+      constructor; auto; intros; tauto.
+  Qed.
     
+  Lemma TraceHide_same' m o ls s:
+    Trace (HideMeth m s) o ls ->
+    Trace m o ls.
+  Proof.
+    intros.
+    apply Trace_TraceHide' with (s := s) in H; auto.
+    dest.
+    auto.
+  Qed.
+
+  Lemma WeakInclusions_In_l l ls:
+    In l ls ->
+    forall ls',
+      WeakInclusions ls ls' ->
+      exists l',
+        In l' ls' /\
+        WeakInclusion l l'.
+  Proof.
+    induction ls; intros; try contradiction.
+    destruct H; subst; inv H0.
+    - exists l'; split; auto.
+      left; reflexivity.
+    - specialize (IHls H _ H3); dest.
+      exists x; split; auto.
+      right; assumption.
+  Qed.
+
+  Lemma WeakInclusions_In_r l ls':
+    In l ls' ->
+    forall ls,
+      WeakInclusions ls ls' ->
+      exists l',
+        In l' ls /\
+        WeakInclusion l' l.
+  Proof.
+    induction ls'; intros; inv H0; try contradiction.
+    destruct H; subst.
+    - exists l0; split; auto.
+      left; reflexivity.
+    - specialize (IHls' H _ H4); dest.
+      exists x; split; auto.
+      right; assumption.
+  Qed.
+  
+  Lemma TraceInclusion_createHide m m' s:
+    TraceInclusion' m m' ->
+    TraceInclusion' (HideMeth m s) (HideMeth m' s).
+  Proof.
+    unfold TraceInclusion'.
+    intros.
+    destruct (in_dec string_dec s (map fst (getAllMethods m))).
+    - specialize (H _ _ (TraceHide_Trace H0)); dest.
+      exists x; split; auto.
+      destruct H.
+      exists x0.
+      eapply Trace_TraceHide; eauto.
+      intros.
+      inv H0;[inv H1; contradiction|].
+      inv HStep.
+      apply Trace_TraceHide' in HOldTrace; dest.
+      inv H1.
+      destruct H2.
+      + subst.
+        specialize (HHidden i v).
+        destruct H9.
+        specialize (H1 (s, v)).
+        Omega.omega.
+      + specialize (WeakInclusions_In_r _ H1 H7) as TMP; dest.
+        specialize (H0 _ H2 i v).
+        destruct H5.
+        specialize (H5 (s, v)).
+        Omega.omega.
+    - apply Trace_TraceHide' in H0.
+      dest.
+      specialize (H _ _ H1).
+      dest.
+      exists x.
+      split; auto.
+      unfold TraceList in *.
+      dest.
+      exists x0.
+      eapply Trace_TraceHide; eauto.
+      intros.
+      unfold getListFullLabel_diff in *.
+      specialize (WeakInclusions_In_r _ H3 H2) as TMP; dest.
+      specialize (In_nth_error _ _ H5) as TMP; dest.
+      specialize (NotInDef_ZeroExecs_Trace (s, v) H1 n x2 H7) as P1.
+      specialize (In_nth_error _ _ H3) as TMP; dest.
+      specialize (Trace_meth_InCall_InDef_InExec H (s, v) x3 H8 H4) as P2.
+      destruct H6; unfold getListFullLabel_diff in *.
+      specialize (H6 (s, v)).
+      assert (getNumCalls (s, v) x1 = 0%Z).
+      + clear - H6 P1 P2.
+        specialize (getNumCalls_nonneg (s, v) x1) as P3.
+        Omega.omega.
+      + rewrite H10, P1 in H6; clear - H6; Omega.omega.
+  Qed.
+  
+  Lemma Trace_createHide l m m' :
+    TraceInclusion (Base m) (Base m') ->
+    TraceInclusion (createHide m l) (createHide m' l).
+  Proof.
+    induction l; simpl in *; auto.
+    intros.
+    apply TraceInclusion_TraceInclusion' in H.
+    apply TraceInclusion'_TraceInclusion.
+    apply TraceInclusion_createHide.
+    apply TraceInclusion_TraceInclusion'; apply TraceInclusion'_TraceInclusion in H; auto.
+  Qed.
+
+  Lemma WfMod_WfBase_getFlat m:
+    WfMod m ->
+    WfMod (Base (getFlat m)).
+  Proof.
+    intro.
+    induction m; simpl in *.
+    - constructor 1;[apply WfMod_WfBaseMod_flat| | | ]; auto; inv H; auto.
+    - unfold getFlat in *; simpl in *; apply IHm.
+      inv H; assumption.
+    - inv H.
+      specialize (IHm1 HWf1); specialize (IHm2 HWf2).
+      constructor 1;[apply WfMod_WfBaseMod_flat; constructor 3| | | ];
+        auto; inv IHm1; inv IHm2; unfold getFlat in *; simpl in *; apply NoDupKey_Expand; auto.
+  Qed.
+  
+  Lemma TraceInclusion_flatten_inline_r (m : WfModule) :
+    TraceInclusion m (inlined_WfModule m).
+  Proof.
+    specialize (Wf_cond (inlined_WfModule m)) as Wf1.
+    simpl.
+    specialize (TraceInclusion_flatten_r (Wf_cond m)) as P1.
+    unfold flatten, getFlat in *.
+    assert (WfMod (Base (getFlat m)));[apply (WfMod_WfBase_getFlat (Wf_cond m))| unfold getFlat in *].
+    specialize (TraceInclusion_inlineAll_pos H) as TMP; dest.
+    unfold inlineAll_All in *.
+    apply (Trace_createHide (getHidden m)) in H1.
+    eauto using TraceInclusion_trans.
+  Qed.
 End flatten_and_inline_all.
