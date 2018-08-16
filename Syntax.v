@@ -506,7 +506,6 @@ Notation "a $[ i : j ]":=
 Section testBit.
   Variable ty: Kind -> Type.
   Local Definition testBit := ($$ (natToWord 23 35))%kami_expr.
-  Eval simpl in (testBit $[2 : 1])%kami_expr.
 End testBit.
 
 Notation "a $#[ i : j ]":=
@@ -537,6 +536,10 @@ Infix ">>>" := (BinBit (Sra _ _)) (at level 100) : kami_expr_scope.
 Notation "{< a , .. , b >}" :=
   ((BinBit (Concat _ _)) a .. (BinBit (Concat _ _) b (@Const _ (Bit 0) WO)) ..)
     (at level 100, a at level 99): kami_expr_scope.
+Notation "{< a , .. , b >}" :=
+  (Word.combine b .. (Word.combine a WO) ..)
+    (at level 100, a at level 99): word_scope.
+
 Infix "<" := (BinBitBool (LessThan _)) : kami_expr_scope.
 Notation "x > y" := (BinBitBool (LessThan _) y x) : kami_expr_scope.
 Notation "x >= y" := (UniBool Neg (BinBitBool (LessThan _) x y)) : kami_expr_scope.
@@ -794,19 +797,13 @@ Definition AddIndexToName name idx := (name ++ "_" ++ natToHexStr idx)%string.
 
 Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) idxs.
 
-Fixpoint nameList name size : list string :=
-    match size with
-    | S n => (AddIndexToName name n) :: (nameList name n)
-    | O   => nil
-    end.
-
-Notation "'RegisterArray' name 'times' size : type <- init" :=
+Notation "'RegisterArray' name 'from' first 'to' last : type <- init" :=
   (MERegAry (
-    map (fun indexed_name =>
-      (indexed_name%string, existT optConstFullT (SyntaxKind type) (Some (makeConst init)))
-    ) (nameList name size)
+    map (fun idx =>
+      (AddIndexToName name idx, existT optConstFullT (SyntaxKind type) (Some (makeConst init)))
+    ) (first upto last)
   ))
-    (at level 12, name at level 9, size at level 9) : kami_scope.
+    (at level 12, name at level 9, first at level 9, last at level 9) : kami_scope.
 
 Delimit Scope kami_scope with kami.
 
