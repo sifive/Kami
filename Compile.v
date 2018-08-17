@@ -275,7 +275,10 @@ Section Compile.
                                                             end
                                              end expr
                                 | right _ => Some (RtlReadWire Bool
-                                                               (("TYPES DONT MATCH FOR REGISTER " ++ r), nil), RtlReadWire _ ("", nil))
+                                                               (("TYPES DONT MATCH FOR REGISTER " ++ r ++ " EXPECTED " ++ natToHexStr (size regKind) ++ " GOT " ++
+                                                                                                  natToHexStr (size k)), nil),
+                                                   RtlReadWire _ ("TYPES DONT MATCH FOR REGISTERS " ++ r ++ " EXPECTED " ++ natToHexStr (size regKind) ++ " GOT " ++
+                                                                                                    natToHexStr (size k), nil))
                                 end
             | _ => fun _ => wc
             end expr

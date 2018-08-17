@@ -136,17 +136,29 @@ ppRtlExpr who e =
         new <- addToTrunc (Bit n) ("($signed(" ++ x1 ++ ") >>> " ++ x2 ++ ")")
         return $ new
         -- return $ "($signed(" ++ x1 ++ ") >>> " ++ x2 ++ ")"
-    RtlBinBit _ _ _ (Concat _ n) e1 e2 ->
-      if n /= 0
-      then
-        do
+    RtlBinBit _ _ _ (Concat m n) e1 e2 ->
+      case (m, n) of
+        (0, 0)   -> return $ "0"
+        (m', 0)  -> do
+          x1 <- ppRtlExpr who e1
+          return x1
+        (0, n')  -> do
+          x2 <- ppRtlExpr who e2
+          return x2
+        (m', n') -> do
           x1 <- ppRtlExpr who e1
           x2 <- ppRtlExpr who e2
           return $ '{' : x1 ++ ", " ++ x2 ++ "}"
-      else
-        do
-          x1 <- ppRtlExpr who e1
-          return x1
+      -- if n /= 0
+      -- then
+      --   do
+      --     x1 <- ppRtlExpr who e1
+      --     x2 <- ppRtlExpr who e2
+      --     return $ '{' : x1 ++ ", " ++ x2 ++ "}"
+      -- else
+      --   do
+      --     x1 <- ppRtlExpr who e1
+      --     return x1
     RtlBinBitBool _ _ (_) e1 e2 -> binExpr e1 "<" e2
     RtlITE _ p e1 e2 -> triExpr p "?" e1 ":" e2
     RtlEq _ e1 e2 -> binExpr e1 "==" e2
