@@ -303,7 +303,7 @@ ppRfModule (bypass, rf@(RegFile name reads write idxNum dataType init)) =
                                         (if bypass
                                          then ppName write ++ "$_enable && " ++ ppName write ++ "$_argument.addr == " ++
                                               ppName read ++ "$_argument ? " ++ ppName write ++ "$_argument.data : "
-                                         else "") ++ ppDealSize0 dataType "" (ppName name ++ "$_data[" ++ ppName read ++ "$_argument];\n"))) reads ++
+                                         else "") ++ ppDealSize0 dataType "" (ppName name ++ "$_data[" ++ (if idxNum == 1 then "0" else ppName read ++ "$_argument") ++ "];\n"))) reads ++
   "  always@(posedge CLK) begin\n" ++
   (case init of
      Just initVal ->
@@ -311,10 +311,11 @@ ppRfModule (bypass, rf@(RegFile name reads write idxNum dataType init)) =
        "      for(int _i = 0; _i < " ++ show (idxNum-1) ++ "; _i=_i+1) begin\n" ++
        ppDealSize0 dataType "" ("        " ++ ppName name ++ "$_data[_i] = " ++ ppConst initVal ++ ";\n") ++
        "      end\n" ++
-       "    end\n"
+       "    end\n" ++
+       "    else "
      Nothing -> "") ++
-  "    else if(" ++ ppName write ++ "$_enable) begin\n" ++
-  ppDealSize0 dataType "" ("      " ++ ppName name ++ "$_data[" ++ ppName write ++ "$_argument.addr] <= " ++ ppName write ++ "$_argument.data;\n") ++
+  "if(" ++ ppName write ++ "$_enable) begin\n" ++
+  ppDealSize0 dataType "" ("      " ++ ppName name ++ "$_data[" ++ (if idxNum == 1 then "0" else ppName write ++ "$_argument.addr") ++ "] <= " ++ ppName write ++ "$_argument.data;\n") ++
   "    end\n" ++
   "  end\n" ++
   "endmodule\n\n"
