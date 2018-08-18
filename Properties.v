@@ -3476,27 +3476,6 @@ Proof.
       destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
 Qed.
 
-Fixpoint mergeSeparatedBaseMod (bl : list BaseModule) : Mod :=
-  match bl with
-  | b::bl' => ConcatMod (Base b) (mergeSeparatedBaseMod bl')
-  | nil => Base (BaseMod nil nil nil)
-  end.
-
-Fixpoint mergeSeparatedBaseFile (rfl : list RegFileBase) : Mod :=
-  match rfl with
-  | rf::rfl' => ConcatMod (Base (BaseRegFile rf))(mergeSeparatedBaseFile rfl')
-  | nil => Base (BaseMod nil nil nil)
-  end.
-
-Fixpoint createHide' (m : Mod) (hides : list string) : Mod :=
-  match hides with
-  | nil => m
-  | h::hides' => HideMeth (createHide' m hides') h
-  end.
-
-Definition mergeSeparatedMod (hl : list string)(rfl : list RegFileBase) (bl : list BaseModule) :=
-  createHide' (ConcatMod (mergeSeparatedBaseFile rfl) (mergeSeparatedBaseMod bl)) hl.
- 
 Lemma mergeSeparatedBaseFile_noHides (rfl : list RegFileBase) :
   getHidden (mergeSeparatedBaseFile rfl) = nil.
 Proof.
@@ -3509,15 +3488,15 @@ Proof.
   induction bl; auto.
 Qed.
 
-Lemma getHidden_createHide' (m : Mod) (hides : list string) :
-  getHidden (createHide' m hides) = hides++(getHidden m).
+Lemma getHidden_createHideMod (m : Mod) (hides : list string) :
+  getHidden (createHideMod m hides) = hides++(getHidden m).
 Proof.
   induction hides; auto.
   - simpl; rewrite IHhides; reflexivity.
 Qed.
 
-Lemma getAllRegisters_createHide' (m : Mod) (hides : list string) :
-  getAllRegisters (createHide' m hides) = getAllRegisters m.
+Lemma getAllRegisters_createHideMod (m : Mod) (hides : list string) :
+  getAllRegisters (createHideMod m hides) = getAllRegisters m.
 Proof.
   induction hides; auto.
 Qed.
@@ -3536,8 +3515,8 @@ Proof.
   simpl; rewrite IHbl; reflexivity.
 Qed.
 
-Lemma getAllMethods_createHide' (m : Mod) (hides : list string) :
-  getAllMethods (createHide' m hides) = getAllMethods m.
+Lemma getAllMethods_createHideMod (m : Mod) (hides : list string) :
+  getAllMethods (createHideMod m hides) = getAllMethods m.
 Proof.
   induction hides; auto.
 Qed.
@@ -3556,8 +3535,8 @@ Proof.
   simpl; rewrite IHbl; reflexivity.
 Qed.
 
-Lemma getAllRules_createHide' (m : Mod) (hides : list string) :
-  getAllRules (createHide' m hides) = getAllRules m.
+Lemma getAllRules_createHideMod (m : Mod) (hides : list string) :
+  getAllRules (createHideMod m hides) = getAllRules m.
 Proof.
   induction hides; auto.
 Qed.
@@ -3579,7 +3558,7 @@ Lemma separateBaseMod_flatten (m : Mod) :
   getAllRegisters m [=] getAllRegisters (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
 Proof.
   unfold mergeSeparatedMod.
-  rewrite getAllRegisters_createHide'.
+  rewrite getAllRegisters_createHideMod.
   unfold separateMod; simpl.
   rewrite getAllRegisters_mergeBaseFile, getAllRegisters_mergeBaseMod.
   induction m.
@@ -3598,7 +3577,7 @@ Lemma separateBaseModule_flatten_Methods (m : Mod) :
   getAllMethods m [=] getAllMethods (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
 Proof.
   unfold mergeSeparatedMod.
-  rewrite getAllMethods_createHide'.
+  rewrite getAllMethods_createHideMod.
   unfold separateMod; simpl.
   rewrite getAllMethods_mergeBaseFile, getAllMethods_mergeBaseMod.
   induction m.
@@ -3617,7 +3596,7 @@ Lemma separateBaseModule_flatten_Rules (m : Mod) :
   getAllRules m [=] getAllRules (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
 Proof.
   unfold mergeSeparatedMod.
-  rewrite getAllRules_createHide'.
+  rewrite getAllRules_createHideMod.
   unfold separateMod; simpl.
   rewrite getAllRules_mergeBaseFile, getAllRules_mergeBaseMod; simpl.
   induction m.
@@ -3633,7 +3612,7 @@ Qed.
 Lemma separateBaseModule_flatten_Hides (m : Mod) :
   getHidden m [=] getHidden (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
   unfold mergeSeparatedMod.
-  rewrite getHidden_createHide';simpl.
+  rewrite getHidden_createHideMod;simpl.
   rewrite mergeSeparatedBaseFile_noHides.
   rewrite mergeSeparatedBaseMod_noHides.
   repeat rewrite app_nil_r.

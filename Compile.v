@@ -1,4 +1,4 @@
-Require Import Syntax Rtl.
+Require Import Syntax Rtl PPlusProperties Properties.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
@@ -572,7 +572,8 @@ Definition computeRuleAssignsRegs regs (r: Attribute (Action Void)) :=
   convertRegsWrites (fst r) regs (snd r (fun _ => list nat)) (1 :: nil).
 
 Definition getInputs (calls: list (Attribute (Kind * Kind))) := map (fun x => (getMethRet (fst x), snd (snd x))) calls.
-                                                                    (* ++ map (fun x => (getMethGuard (fst x), Bool)) calls. *)
+
+Definition getInputGuards (calls: list (Attribute (Kind * Kind))) := map (fun x => (getMethGuard (fst x), Bool)) calls.
 
 Definition getOutputs (calls: list (Attribute (Kind * Kind))) := map (fun x => (getMethArg (fst x), fst (snd x))) calls ++
                                                                      map (fun x => (getMethEn (fst x), Bool)) calls.
@@ -641,21 +642,32 @@ Definition getAllMethodsRegFileList ls :=
 Definition SubtractList A B (f: A -> string) (g: B -> string) l1 l2 :=
   filter (filterNotInList f (map g l2)) l1.
 
-Definition setMethodGuards (ignoreMeths: list (string * {x : Signature & MethodT x})) (rules: list (Attribute (Action Void))) :=
-  map (fun m => (getMethGuard (fst m), existT _ Bool (RtlConst (ConstBool true)))) (SubtractList fst fst (getCallsPerBaseMod rules) ignoreMeths).
+Definition setMethodGuards (ignoreMeths: list string) (rules: list (Attribute (Action Void))) :=
+  map (fun m => (getMethGuard (fst m), existT _ Bool (RtlConst (ConstBool true)))) (SubtractList fst id (getCallsPerBaseMod rules) ignoreMeths).
 
 (* Inputs and outputs must be all method calls in base module - register file methods being called *)
 (* Reg File methods definitions must serve as wires *)
-Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) :=
+Definition getRtl_full (bm: (list string * (list RegFileBase * BaseModule))) (preserveGuards: list string) :=
   {| hiddenWires := map (fun x => getMethRet x) (fst bm) ++ map (fun x => getMethArg x) (fst bm) ++ map (fun x => getMethEn x) (fst bm);
      regFiles := map (fun x => (false, x)) (fst (snd bm));
      inputs := getInputs (SubtractList fst fst (getCallsPerBaseMod (getRules (snd (snd bm))))
                                        (getAllMethodsRegFileList (fst (snd bm)))
-                         );
+                         ) ++ getInputGuards (filter (fun x => getBool (in_dec string_dec (fst x) preserveGuards)) (getCallsPerBaseMod (getRules (snd (snd bm)))));
      outputs := getOutputs (SubtractList fst fst (getCallsPerBaseMod (getRules (snd (snd bm))))
                                          (getAllMethodsRegFileList (fst (snd bm))));
      regInits := map (fun x => (fst x, getRegInit (snd x))) (getRegisters (snd (snd bm)));
      regWrites := getWriteRegs (getRegisters (snd (snd bm)));
      wires := getReadRegs (getRegisters (snd (snd bm))) ++ getWires (getRegisters (snd (snd bm))) (getRules (snd (snd bm))) (map fst (getRules (snd (snd bm)))) ++
-                          setMethodGuards (getAllMethodsRegFileList (fst (snd bm))) (getRules (snd (snd bm)));
+                          setMethodGuards (map fst (getAllMethodsRegFileList (fst (snd bm))) ++ preserveGuards) (getRules (snd (snd bm)));
      sys := getSysPerBaseMod (getRules (snd (snd bm))) |}.
+
+Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) := getRtl_full bm nil.
+
+Definition flatten_inline m :=
+  let m' := flatten m in
+  (BaseMod (getAllRegisters m') (inlineAll_Rules (inlineAll_Meths (getAllMethods m')) (getAllRules m')) (inlineAll_Meths (getAllMethods m'))).
+
+
+Definition rtlGet m pgs :=
+  getRtl_full (getHidden m, (fst (separateBaseMod m), flatten_inline (mergeSeparatedBaseMod (snd (separateBaseMod m))))) pgs.
+

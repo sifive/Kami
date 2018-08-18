@@ -2314,7 +2314,7 @@ Proof.
       eauto; eapply (WfConcatSplits (m1 :=m1) (m2 := m2)); eauto.
 Qed.
 
-Lemma WfMod_createHide' l : forall m, WfMod (createHide' m l) <-> (SubList l (map fst (getAllMethods m)) /\ WfMod m).
+Lemma WfMod_createHideMod l : forall m, WfMod (createHideMod m l) <-> (SubList l (map fst (getAllMethods m)) /\ WfMod m).
 Proof.
   split.
   - induction l; simpl; intros; split; auto.
@@ -2322,13 +2322,13 @@ Proof.
     + inv H.
       specialize (IHl HWf); dest.
       repeat intro.
-      destruct H1; subst; rewrite getAllMethods_createHide' in HHideWf; auto.
+      destruct H1; subst; rewrite getAllMethods_createHideMod in HHideWf; auto.
     + inv H.
       specialize (IHl HWf); dest; auto.
   - induction l; intros; dest; simpl; eauto.
     destruct (SubList_cons H).
     econstructor; eauto.
-    rewrite getAllMethods_createHide'; auto.
+    rewrite getAllMethods_createHideMod; auto.
 Qed.
 
 Lemma SeparatedBaseMod_concat l1 l2:
@@ -2529,7 +2529,7 @@ Proof.
     destruct (HDisjRegs k).
     + rewrite separateBaseMod_flatten in H; simpl in H.
       unfold mergeSeparatedMod in H.
-      rewrite getAllRegisters_createHide' in H; simpl in *; rewrite map_app,in_app_iff, DeM1 in H; dest.
+      rewrite getAllRegisters_createHideMod in H; simpl in *; rewrite map_app,in_app_iff, DeM1 in H; dest.
       destruct (separateBaseMod m1), (separateBaseMod m2); simpl.
       rewrite SeparatedBaseMod_concat, SeparatedBaseFile_concat; repeat rewrite map_app, in_app_iff; repeat rewrite DeM1.
       destruct (IHm1 k), (IHm2 k); simpl in *.
@@ -2539,7 +2539,7 @@ Proof.
       * right; split; auto.
     + rewrite separateBaseMod_flatten in H; simpl in H.
       unfold mergeSeparatedMod in H.
-      rewrite getAllRegisters_createHide' in H; simpl in *; rewrite map_app,in_app_iff, DeM1 in H; dest.
+      rewrite getAllRegisters_createHideMod in H; simpl in *; rewrite map_app,in_app_iff, DeM1 in H; dest.
       destruct (separateBaseMod m1), (separateBaseMod m2); simpl.
       rewrite SeparatedBaseMod_concat, SeparatedBaseFile_concat; repeat rewrite map_app, in_app_iff; repeat rewrite DeM1.
       destruct (IHm1 k), (IHm2 k); simpl in *.
@@ -2578,7 +2578,7 @@ Proof.
     setoid_rewrite (separateBaseModule_flatten_Rules m1) in H; setoid_rewrite  (separateBaseModule_flatten_Rules m2) in H1.
     setoid_rewrite  (separateBaseModule_flatten_Methods m1) in H0; setoid_rewrite  (separateBaseModule_flatten_Methods m2) in H2.
     simpl in *.
-    unfold mergeSeparatedMod in *; repeat rewrite getAllRegisters_createHide' in *; repeat rewrite getAllMethods_createHide' in *; repeat rewrite getAllRules_createHide' in *; simpl in *.
+    unfold mergeSeparatedMod in *; repeat rewrite getAllRegisters_createHideMod in *; repeat rewrite getAllMethods_createHideMod in *; repeat rewrite getAllRules_createHideMod in *; simpl in *.
     remember (separateBaseMod m1) as sbm1; remember (separateBaseMod m2) as sbm2.
     destruct sbm1, sbm2; simpl in *.
     apply WfAppBaseFiles; eauto.
@@ -2624,7 +2624,7 @@ Proof.
     setoid_rewrite (separateBaseModule_flatten_Rules m1) in H; setoid_rewrite  (separateBaseModule_flatten_Rules m2) in H1.
     setoid_rewrite  (separateBaseModule_flatten_Methods m1) in H0; setoid_rewrite  (separateBaseModule_flatten_Methods m2) in H2.
     simpl in *.
-    unfold mergeSeparatedMod in *; repeat rewrite getAllRegisters_createHide' in *; repeat rewrite getAllMethods_createHide' in *; repeat rewrite getAllRules_createHide' in *; simpl in *.
+    unfold mergeSeparatedMod in *; repeat rewrite getAllRegisters_createHideMod in *; repeat rewrite getAllMethods_createHideMod in *; repeat rewrite getAllRules_createHideMod in *; simpl in *.
     remember (separateBaseMod m1) as sbm1; remember (separateBaseMod m2) as sbm2.
     destruct sbm1, sbm2; simpl in *.
     apply WfAppBaseMods; eauto.
@@ -2680,20 +2680,20 @@ Proof.
       apply WfConcatAssoc2,WfConcatNil,WfConcatComm,WfConcatNil.
       econstructor; eauto.
   - unfold mergeSeparatedMod in *.
-    rewrite WfMod_createHide' in *; dest; simpl in *; split; eauto.
+    rewrite WfMod_createHideMod in *; dest; simpl in *; split; eauto.
     + unfold SubList; intros.
       destruct H2; subst.
       * rewrite (separateBaseModule_flatten_Methods m) in HHideWf.
-        unfold mergeSeparatedMod in HHideWf. rewrite getAllMethods_createHide' in HHideWf; simpl in *; assumption.
+        unfold mergeSeparatedMod in HHideWf. rewrite getAllMethods_createHideMod in HHideWf; simpl in *; assumption.
       * eapply H0; eauto.
   - unfold mergeSeparatedMod in *.
-    rewrite WfMod_createHide' in *; dest; split.
+    rewrite WfMod_createHideMod in *; dest; split.
     + unfold separateMod in *.
       repeat intro.
       specialize (separateBaseModule_flatten_Methods (ConcatMod m1 m2)) as TMP1.
       specialize (separateBaseModule_flatten_Methods m1) as TMP2.
       specialize (separateBaseModule_flatten_Methods m2) as TMP3.
-      unfold mergeSeparatedMod in *; rewrite getAllMethods_createHide' in *.
+      unfold mergeSeparatedMod in *; rewrite getAllMethods_createHideMod in *.
       rewrite <- TMP1.
       rewrite <- TMP2 in H3.
       rewrite <- TMP3 in H1.
@@ -2705,7 +2705,7 @@ Proof.
       econstructor.
       * specialize (separateBaseMod_flatten (ConcatMod m1 m2)) as TMP1;
         specialize (separateBaseMod_flatten m1) as TMP2; specialize (separateBaseMod_flatten m2) as TMP3.
-        unfold mergeSeparatedMod in *; rewrite getAllRegisters_createHide' in *; simpl in *; intro.
+        unfold mergeSeparatedMod in *; rewrite getAllRegisters_createHideMod in *; simpl in *; intro.
         specialize (HDisjRegs k); rewrite TMP2, TMP3 in HDisjRegs.
         repeat rewrite map_app,in_app_iff,DeM1 in *.
         destruct (separateBaseMod m1), (separateBaseMod m2); simpl in *.
@@ -2713,7 +2713,7 @@ Proof.
         destruct HDisjRegs,(HDisjRegs0 k),(HDisjRegs1 k); dest;[left|right|left|right|left|left|right|right];split; auto.
       * specialize (separateBaseModule_flatten_Rules (ConcatMod m1 m2)) as TMP1;
         specialize (separateBaseModule_flatten_Rules m1) as TMP2; specialize (separateBaseModule_flatten_Rules m2) as TMP3.
-        unfold mergeSeparatedMod in *; rewrite getAllRules_createHide' in *; simpl in *; intro.
+        unfold mergeSeparatedMod in *; rewrite getAllRules_createHideMod in *; simpl in *; intro.
         specialize (HDisjRules k); rewrite TMP2, TMP3 in HDisjRules.
         repeat rewrite map_app,in_app_iff,DeM1 in *.
         destruct (separateBaseMod m1), (separateBaseMod m2); simpl in *.
@@ -2721,7 +2721,7 @@ Proof.
         destruct HDisjRules,(HDisjRules0 k),(HDisjRules1 k); dest;[left|right|left|right|left|left|right|right];split; auto.
       * specialize (separateBaseModule_flatten_Methods (ConcatMod m1 m2)) as TMP1;
         specialize (separateBaseModule_flatten_Methods m1) as TMP2; specialize (separateBaseModule_flatten_Methods m2) as TMP3.
-        unfold mergeSeparatedMod in *; rewrite getAllMethods_createHide' in *; simpl in *; intro.
+        unfold mergeSeparatedMod in *; rewrite getAllMethods_createHideMod in *; simpl in *; intro.
         specialize (HDisjMeths k); rewrite TMP2, TMP3 in HDisjMeths.
         repeat rewrite map_app,in_app_iff,DeM1 in *.
         destruct (separateBaseMod m1), (separateBaseMod m2); simpl in *.

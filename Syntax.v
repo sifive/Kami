@@ -411,6 +411,27 @@ Fixpoint getHidden m :=
 Definition separateMod (m: Mod) :=
   (getHidden m, separateBaseMod m).
     
+Fixpoint mergeSeparatedBaseMod (bl : list BaseModule) : Mod :=
+  match bl with
+  | b::bl' => ConcatMod (Base b) (mergeSeparatedBaseMod bl')
+  | nil => Base (BaseMod nil nil nil)
+  end.
+
+Fixpoint mergeSeparatedBaseFile (rfl : list RegFileBase) : Mod :=
+  match rfl with
+  | rf::rfl' => ConcatMod (Base (BaseRegFile rf))(mergeSeparatedBaseFile rfl')
+  | nil => Base (BaseMod nil nil nil)
+  end.
+
+Fixpoint createHideMod (m : Mod) (hides : list string) : Mod :=
+  match hides with
+  | nil => m
+  | h::hides' => HideMeth (createHideMod m hides') h
+  end.
+
+Definition mergeSeparatedMod (hl : list string)(rfl : list RegFileBase) (bl : list BaseModule) :=
+  createHideMod (ConcatMod (mergeSeparatedBaseFile rfl) (mergeSeparatedBaseMod bl)) hl.
+ 
 
 
 
