@@ -38,8 +38,6 @@ Section fold_left_map.
   Qed.
 End fold_left_map.
     
-    
-
 Section map_fold_eq.
   Variable A: Type.
   Variable f: A -> A.
@@ -58,6 +56,23 @@ Section map_fold_eq.
                  | S m => x :: transform_nth_left xs m
                  end
     end.
+
+  Lemma transform_nth_left_length' ls:
+    forall i,
+      length (transform_nth_left ls i) = length ls.
+  Proof.
+    induction ls; simpl; auto; intros.
+    destruct i; simpl; auto; intros.
+  Qed.
+
+  Lemma transform_nth_left_length ns:
+    forall ls,
+      length (fold_left transform_nth_left ns ls) = length ls.
+  Proof.
+    induction ns; simpl; auto; intros.
+    rewrite IHns.
+    apply transform_nth_left_length'.
+  Qed.
 
   Lemma transform_nth_tail a ls:
     forall i,
@@ -91,6 +106,21 @@ Section map_fold_eq.
     induction ys; simpl; auto.
   Qed.
 End map_fold_eq.
+
+Section map_fold_eq_gen.
+  Variable A: Type.
+  Variable f: A -> nat -> A.
+
+  Fixpoint transform_nth_left_gen ls i :=
+    match ls with
+    | nil => nil
+    | x :: xs => match i with
+                 | 0 => f x i :: xs
+                 | S m => x :: transform_nth_left_gen xs m
+                 end
+    end.
+End map_fold_eq_gen.
+    
 
 Section map_fold_eq'.
   Variable A: Type.

@@ -7,19 +7,12 @@ import Control.Monad.State.Lazy
 import qualified Data.HashMap.Lazy as H
 import Debug.Trace
 
-wordToNat :: Target.Word -> Int
-wordToNat WO = 0
-wordToNat (WS b _ w) = 2*(wordToNat w) + if b then 1 else 0
-
 instance Show Target.Word where
-  show w = show (wordToNat w)
+  show w = show (wordToNat 0 w)
 
 intToFin :: Int -> Int -> T
 intToFin m 0 = F1 (m-1)
 intToFin m n = FS (m-1) (intToFin (m-1) (n-1))
-
-getFins :: Int -> [T]
-getFins m = foldr (\n l -> intToFin m n : l) [] [0 .. (m-1)]
 
 deriving instance Eq T
 
@@ -168,7 +161,7 @@ ppRtlExpr who e =
         return $ new ++ '.' : ppName (fs i)
     RtlBuildStruct num fk fs es ->
       do
-        strs <- mapM (ppRtlExpr who) (Data.List.map es (getFins num))
+        strs <- mapM (ppRtlExpr who) (filterKind0 num fk es)  -- (Data.List.map es (getFins num))
         return $ '{': intercalate ", " strs ++ "}"
     RtlReadArray n k vec idx ->
       do
@@ -185,8 +178,9 @@ ppRtlExpr who e =
     RtlBuildArray n k fv ->
       do
         strs <- mapM (ppRtlExpr who) (reverse $ Data.List.map fv (getFins n))
-        return $ '{': intercalate ", " strs ++ "}"
+        return $ if size k == 0 || n == 0 then "0" else '{': intercalate ", " strs ++ "}"
   where
+    filterKind0 num fk es = snd (unzip (Data.List.filter (\(k,e) -> size k /= 0) (zip (Data.List.map fk (getFins num)) (Data.List.map es (getFins num)))))
     optionAddToTrunc :: Kind -> RtlExpr -> State (H.HashMap String (Int, Kind)) String
     optionAddToTrunc k e =
       case e of

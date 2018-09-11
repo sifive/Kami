@@ -726,6 +726,26 @@ Notation "'GatherActions' actionList 'as' val ; cont" :=
   (gatherActions actionList (fun val => cont) nil)
     (at level 12, right associativity, val at level 99) : kami_action_scope.
 
+Definition readNames (ty: Kind -> Type) k names := map (fun r => Read tmp: k <- r; Ret #tmp)%kami_action names.
+
+Notation "'ReadToList' names 'of' k 'as' val ; cont" :=
+  (gatherActions (readNames _ k names) (fun val => cont) nil)
+    (at level 12, right associativity, val at level 99) : kami_action_scope.
+
+Definition callNames (ty: Kind -> Type) k names := map (fun r => Call tmp : k <- r(); Ret #tmp)%kami_action names.
+
+Notation "'CallToList' names 'of' k 'as' val ; cont" :=
+  (gatherActions (callNames _ k names) (fun val => cont) nil)
+    (at level 12, right associativity, val at level 99): kami_action_scope.
+
+Definition writeNames (ty: Kind -> Type) k namesVals := map (fun r => Write (fst r) : k <- snd r; Ret (Const ty WO))%kami_action namesVals.
+
+Notation "'WriteToList' names 'of' k 'using' vals ; cont" :=
+  (gatherActions (@writeNames _ k (List.combine names vals)) (fun _ => cont) nil)
+    (at level 12, right associativity, vals at level 99) : kami_action_scope.
+
+
+
 (** * Notation for normal modules *)
 
 Inductive ModuleElt :=

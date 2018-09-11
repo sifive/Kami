@@ -609,8 +609,9 @@ Fixpoint getAllWriteReadConnections' (regs: list RegInitT) (order: list string) 
     match xs with
     | ult :: ys =>
       map (fun r => (getRegActionRead ult (fst r), existT _ _ (RtlReadWire (projT1 (getRegInit (snd r))) (getRegActionFinalWrite penult (fst r))))) regs
-          ++ getAllWriteReadConnections' regs ys
-    | nil => map (fun r => (getRegWrite (fst r), existT _ _ (RtlReadWire (projT1 (getRegInit (snd r))) (getRegActionFinalWrite penult (fst r))))) regs
+          ++ getAllWriteReadConnections' regs xs
+    | nil =>
+      map (fun r => (getRegWrite (fst r), existT _ _ (RtlReadWire (projT1 (getRegInit (snd r))) (getRegActionFinalWrite penult (fst r))))) regs
     end
   | nil => nil
   end.
