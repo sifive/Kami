@@ -94,7 +94,8 @@ ppConst :: ConstT -> String
 ppConst (ConstBool b) = if b then "1'b1" else "1'b0"
 ppConst (ConstBit sz w) = show sz ++ "\'b" ++ ppWord (reverse $ wordToList w)
 ppConst (ConstArray n k fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (getFins n))) ++ "}"
-ppConst (ConstStruct n fk fs fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (getFins n))) ++ "}"
+ppConst (ConstStruct n fk fs fv) = '{' : intercalate ", " (snd (unzip (Data.List.filter (\(k,e) -> size k /= 0) (zip (Data.List.map fk (getFins n)) (Data.List.map ppConst (Data.List.map fv (getFins n))))))) ++ "}"
+
 
 ppRtlExpr :: String -> RtlExpr -> State (H.HashMap String (Int, Kind)) String
 ppRtlExpr who e =

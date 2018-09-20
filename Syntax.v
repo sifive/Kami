@@ -281,7 +281,7 @@ Section Phoas.
     Qed.
     Local Lemma helper_array n (i: Fin.t n):
       forall size_k,
-        n * size_k = (n * size_k - ((proj1_sig (Fin.to_nat i) * size_k) + size_k)) + size_k + (proj1_sig (Fin.to_nat i) * size_k).
+        n * size_k = (proj1_sig (Fin.to_nat i) * size_k) + size_k + (n * size_k - ((proj1_sig (Fin.to_nat i) * size_k) + size_k)) .
     Proof.
       induction i; simpl; intros; auto.
       - lia.
@@ -307,7 +307,7 @@ Section Phoas.
       | Array n k =>
         fun e =>
           BuildArray
-            (fun i => unpack _ (ConstExtract _ _ (proj1_sig (Fin.to_nat i) * size k)
+            (fun i => unpack _ (ConstExtract (proj1_sig (Fin.to_nat i) * size k) _ _
                                              (@castBits _ _ (helper_array _ _) e)))
       end.
   End BitOps.
@@ -714,37 +714,43 @@ Notation "'RetE' expr" :=
 
 Delimit Scope kami_action_scope with kami_action.
 
-Definition gatherActions (ty : Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_out (cont : _ -> ActionT ty k_out):=
-  fold_left (fun acc (a : ActionT ty k_in) =>
-                (fun vals =>
-                   LETA val <- a;
-                     acc ((#val)%kami_expr :: vals)
-                )%kami_action
-             ) acts cont.
+Fixpoint gatherActions (ty: Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_out (cont: list (k_in @# ty) -> ActionT ty k_out): ActionT ty k_out :=
+  match acts with
+  | nil => cont nil
+  | x :: xs =>
+    (LETA val <- x;
+       gatherActions xs (fun vals => cont ((#val)%kami_expr :: vals)))%kami_action
+  end.
+
+(* Definition gatherActions (ty : Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_out (cont : _ -> ActionT ty k_out):= *)
+(*   fold_left (fun acc (a : ActionT ty k_in) => *)
+(*                 (fun vals => *)
+(*                    LETA val <- a; *)
+(*                      acc ((#val)%kami_expr :: vals) *)
+(*                 )%kami_action *)
+(*              ) acts cont. *)
 
 Notation "'GatherActions' actionList 'as' val ; cont" :=
-  (gatherActions actionList (fun val => cont) nil)
+  (gatherActions actionList (fun val => cont) (* nil *))
     (at level 12, right associativity, val at level 99) : kami_action_scope.
 
 Definition readNames (ty: Kind -> Type) k names := map (fun r => Read tmp: k <- r; Ret #tmp)%kami_action names.
 
 Notation "'ReadToList' names 'of' k 'as' val ; cont" :=
-  (gatherActions (readNames _ k names) (fun val => cont) nil)
+  (gatherActions (readNames _ k names) (fun val => cont) (* nil *))
     (at level 12, right associativity, val at level 99) : kami_action_scope.
 
 Definition callNames (ty: Kind -> Type) k names := map (fun r => Call tmp : k <- r(); Ret #tmp)%kami_action names.
 
 Notation "'CallToList' names 'of' k 'as' val ; cont" :=
-  (gatherActions (callNames _ k names) (fun val => cont) nil)
+  (gatherActions (callNames _ k names) (fun val => cont) (* nil *))
     (at level 12, right associativity, val at level 99): kami_action_scope.
 
 Definition writeNames (ty: Kind -> Type) k namesVals := map (fun r => Write (fst r) : k <- snd r; Ret (Const ty WO))%kami_action namesVals.
 
 Notation "'WriteToList' names 'of' k 'using' vals ; cont" :=
-  (gatherActions (@writeNames _ k (List.combine names vals)) (fun _ => cont) nil)
+  (gatherActions (@writeNames _ k (List.combine names vals)) (fun _ => cont) (* nil *))
     (at level 12, right associativity, vals at level 99) : kami_action_scope.
-
-
 
 (** * Notation for normal modules *)
 
@@ -837,6 +843,14 @@ End Positive.
 Definition AddIndexToName name idx := (name ++ "_" ++ natToHexStr idx)%string.
 
 Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) idxs.
+
+
+(* Definition test ty : ActionT ty Void := *)
+(*   (CallToList (AddIndicesToNames "ext_source" (0 upto 10 )) of Bool as ext_sources; *)
+(*      WriteToList (AddIndicesToNames "clicintip" ( 0 upto 10)) of Bool using ext_sources; Retv)%kami_action. *)
+
+(* Eval compute in test. *)
+
 
 Notation "'RegisterArray' name 'from' first 'to' last : type <- init" :=
   (MERegAry (
