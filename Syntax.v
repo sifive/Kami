@@ -126,7 +126,7 @@ Section Phoas.
              (v: Expr (SyntaxKind k)) :=
     BuildArray (fun i' : Fin.t n =>
                   ITE (Eq i (Const (natToWord _ (proj1_sig (Fin.to_nat i'))))) v
-                      (ReadArray e (Const (natToWord _ (proj1_sig (Fin.to_nat i')))))).
+                      (ReadArrayConst e i')).
 
   Definition UpdateArrayConst n k (e: Expr (SyntaxKind (Array n k)))
              (i: Fin.t n)
@@ -134,7 +134,7 @@ Section Phoas.
     BuildArray (fun i' : Fin.t n =>
                   match Fin.eq_dec i i' with
                   | left _ => v
-                  | right _ => ReadArray e (Const (natToWord _ (proj1_sig (Fin.to_nat i'))))
+                  | right _ => ReadArrayConst e i'
                   end).
 
   Definition UpdateStruct n (fk: Fin.t n -> Kind) (fs: Fin.t n -> string)
