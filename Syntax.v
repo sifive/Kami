@@ -245,7 +245,8 @@ Section Phoas.
                    (@concatStructExpr m (fun x => (sizes (Fin.FS x))) (fun x => f (Fin.FS x)))
       end.
 
-    Fixpoint pack (k: Kind): Expr (SyntaxKind k) -> Expr (SyntaxKind (Bit (size k))) :=
+    Fixpoint pack (k: Kind): Expr (SyntaxKind k) -> Expr (SyntaxKind (Bit (size k))).
+      refine
       match k return Expr (SyntaxKind k) -> Expr (SyntaxKind (Bit (size k))) with
       | Bool => fun e => (ITE e (Const (WO~1)%word) (Const (WO~0)%word))
       | Bit n => fun e => e
@@ -259,11 +260,13 @@ Section Phoas.
              match i return Expr (SyntaxKind (Bit (i * size k))) with
              | 0 => Const WO
              | S m =>
-               BinBit
-                 (Concat (m * size k) (size k)) (help m)
-                 (@pack k (ReadArray e (Const (natToWord (Nat.log2_up n) m))))
+               castBits _ (BinBit
+                             (Concat (size k) (m * size k))
+                             (@pack k (ReadArray e (Const (natToWord (Nat.log2_up n) m))))
+                             (help m))
              end) n
-      end.
+      end; abstract lia.
+    Defined.
 
     Fixpoint sumSizesMsbs n (i: Fin.t n) {struct i}: (Fin.t n -> nat) -> nat :=
       match i in Fin.t n return (Fin.t n -> nat) -> nat with

@@ -115,7 +115,7 @@ ppRtlExpr who e =
     RtlUniBit sz retSz (TruncMsb lsb msb) e -> createTrunc (Bit sz) e (sz - 1) lsb
     RtlCABit n Add es -> listExpr "+" es (show n ++ "'b0")
     RtlCABit n Mul es -> listExpr "*" es (show n ++ "'b1")
-    RtlCABit n Band es -> listExpr "&" es (show n ++ "'b" ++ replicate n '1')
+    RtlCABit n Band es -> listExpr "&" es (show n ++ "'b" ++ Data.List.replicate n '1')
     RtlCABit n Bor es -> listExpr "|" es (show n ++ "'b0")
     RtlCABit n Bxor es -> listExpr "^" es (show n ++ "'b0")
     RtlBinBit _ _ _ (Sub _) e1 e2 -> binExpr e1 "-" e2
