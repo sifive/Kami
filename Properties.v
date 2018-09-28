@@ -1164,10 +1164,10 @@ Section SplitJoin.
                                                              end
                                                   | Meth _ => True
                                                   end)) l1 l2) ->
-      Trace (ConcatMod m1 m2) (o1 ++ o2) (map (fun x => fst x ++ snd x) (zip l1 l2)).
+      Trace (ConcatMod m1 m2) (o1 ++ o2) (map (fun x => fst x ++ snd x) (List.combine l1 l2)).
   Proof.
     intros.
-    eapply JoinTrace_basic; rewrite ?fst_zip, ?snd_zip; eauto;
+    eapply JoinTrace_basic; rewrite ?fst_combine, ?snd_combine; eauto;
       eapply mapProp2_len_same; eauto.
   Qed.
 
@@ -1186,7 +1186,7 @@ Section SplitJoin.
                                                                     end
                                                          | Meth _ => True
                                                          end)) l1 l2 ->
-      Trace (ConcatMod m1 m2) (o1 ++ o2) (map (fun x => fst x ++ snd x) (zip l1 l2)).
+      Trace (ConcatMod m1 m2) (o1 ++ o2) (map (fun x => fst x ++ snd x) (List.combine l1 l2)).
   Proof.
     intros ? ? ? ?.
     setoid_rewrite <- mapProp_len_nthProp2; auto.
@@ -3670,7 +3670,7 @@ Section ModularSubstition.
     specialize (@H0 _ _ H3).
     dest.
     exists (x1 ++ x).
-    exists (map (fun x => fst x ++ snd x) (zip x2 x0)).
+    exists (map (fun x => fst x ++ snd x) (List.combine x2 x0)).
     pose proof H9 as sth1.
     pose proof H7 as sth2.
     rewrite map_length in H9, H7.
@@ -3784,13 +3784,13 @@ Section ModularSubstition.
         rewrite H22, H21 in *.
         assumption.
     - rewrite map_length.
-      rewrite length_zip; congruence.
+      rewrite length_combine_cond; congruence.
     - unfold nthProp, nthProp2 in *; intros.
       specialize (H10 i); specialize (H8 i); specialize (H5 i).
       rewrite nth_error_map in *.
       simpl in *.
       case_eq (nth_error ls1 i); intros; rewrite H11 in *; auto.
-      setoid_rewrite (nth_error_zip (fun x3 => fst x3 ++ snd x3) _ i x2 x0); auto.
+      setoid_rewrite (nth_error_combine (fun x3 => fst x3 ++ snd x3) _ i x2 x0); auto.
       case_eq (nth_error x2 i);
         case_eq (nth_error x0 i);
         intros; auto; rewrite H12, H13 in *; simpl in *; intros.

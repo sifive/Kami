@@ -37,7 +37,18 @@ Section fold_left_map.
     induction ls; simpl; auto.
   Qed.
 End fold_left_map.
-    
+
+Fixpoint range b t :=
+  match t with
+  | S p => (match Nat.eq_dec b p with
+            | left _ => nil
+            | right _ => range b p
+            end ++ p :: nil)%list
+  | 0 => nil
+  end.
+
+Infix "upto" := range (at level 15, no associativity).
+
 Section map_fold_eq.
   Variable A: Type.
   Variable f: A -> A.
@@ -48,6 +59,14 @@ Section map_fold_eq.
     | S m => zeroToN m ++ m :: nil
     end.
 
+  Lemma zeroToN_upto n: zeroToN n = 0 upto n.
+  Proof.
+    induction n; simpl; auto.
+    rewrite IHn.
+    f_equal.
+    destruct n; auto.
+  Qed.
+    
   Fixpoint transform_nth_left ls i :=
     match ls with
     | nil => nil
@@ -92,7 +111,7 @@ Section map_fold_eq.
   Qed.
 
                    
-  Lemma map_fold_left_eq ls: map f ls = fold_left transform_nth_left (zeroToN (length ls)) ls.
+  Lemma map_fold_left_eq' ls: map f ls = fold_left transform_nth_left (zeroToN (length ls)) ls.
   Proof.
     induction ls; simpl; auto.
     rewrite IHls.
@@ -104,6 +123,12 @@ Section map_fold_eq.
     clear Heqx a Heqys.
     generalize ls x; clear x ls.
     induction ys; simpl; auto.
+  Qed.
+
+  Lemma map_fold_left_eq ls: map f ls = fold_left transform_nth_left (0 upto (length ls)) ls.
+  Proof.
+    rewrite <- zeroToN_upto.
+    apply map_fold_left_eq'.
   Qed.
 End map_fold_eq.
 
@@ -159,10 +184,10 @@ Section map_fold_eq'.
   Qed.
       
   
-  Lemma map_fold_right_eq ls: map f ls = fold_right transform_nth_right ls (zeroToN (length ls)).
+  Lemma map_fold_right_eq' ls: map f ls = fold_right transform_nth_right ls (zeroToN (length ls)).
   Proof.
     rewrite <- fold_left_right_comm by apply transform_nth_right_comm.
-    rewrite map_fold_left_eq.
+    rewrite map_fold_left_eq'.
     remember (zeroToN (length ls)) as xs.
     clear Heqxs.
     generalize ls; clear ls.
@@ -170,6 +195,12 @@ Section map_fold_eq'.
     rewrite IHxs.
     rewrite transform_left_right_eq.
     auto.
+  Qed.
+
+  Lemma map_fold_right_eq ls: map f ls = fold_right transform_nth_right ls (0 upto (length ls)).
+  Proof.
+    rewrite <- zeroToN_upto.
+    eapply map_fold_right_eq'.
   Qed.
 End map_fold_eq'.
 
@@ -755,13 +786,7 @@ Qed.
 
 Section zip.
   Variable A B: Type.
-  Fixpoint zip (la: list A) (lb: list B) :=
-    match la, lb with
-    | (x :: xs), (y :: ys) => (x, y) :: zip xs ys
-    | _, _ => nil
-    end.
-
-  Lemma fst_zip la: forall lb, length la = length lb -> map fst (zip la lb) = la.
+  Lemma fst_combine (la: list A): forall (lb: list B), length la = length lb -> map fst (combine la lb) = la.
   Proof.
     induction la; simpl; intros; auto.
     destruct lb; simpl in *; try congruence.
@@ -770,7 +795,7 @@ Section zip.
     f_equal; auto.
   Qed.
 
-  Lemma snd_zip la: forall lb, length la = length lb -> map snd (zip la lb) = lb.
+  Lemma snd_combine (la: list A): forall (lb: list B), length la = length lb -> map snd (combine la lb) = lb.
   Proof.
     induction la; simpl; intros; auto.
     - destruct lb; simpl in *; try congruence.
@@ -782,7 +807,7 @@ Section zip.
 End zip.
 
 Lemma mapProp2_len_same A B (P: A -> B -> Prop) la:
-  forall lb, length la = length lb -> mapProp_len P la lb <-> mapProp2 P (zip la lb).
+  forall lb, length la = length lb -> mapProp_len P la lb <-> mapProp2 P (combine la lb).
 Proof.
   induction la; simpl; intros; try tauto.
   destruct lb; try tauto.
@@ -1072,15 +1097,15 @@ Proof.
   induction i; destruct ls; simpl; auto; intros; tauto.
 Qed.
 
-Lemma length_zip A B: forall l1 l2, length l1 = length l2 ->
-                                    length (@zip A B l1 l2) = length l1.
+Lemma length_combine_cond A B: forall l1 l2, length l1 = length l2 ->
+                                    length (@combine A B l1 l2) = length l1.
 Proof.
   induction l1; destruct l2; simpl; auto.
 Qed.
 
-Lemma nth_error_zip A B C (f: (A * B) -> C) (P: C -> Prop) i: forall l1 l2,
+Lemma nth_error_combine A B C (f: (A * B) -> C) (P: C -> Prop) i: forall l1 l2,
     length l1 = length l2 ->
-    (match nth_error (map f (zip l1 l2)) i with
+    (match nth_error (map f (combine l1 l2)) i with
      | Some c => P c
      | None => True
      end <-> match nth_error l1 i, nth_error l2 i with
@@ -1093,14 +1118,6 @@ Proof.
   - inversion H.
     apply IHi; auto.
 Qed.
-
-Fixpoint range b t :=
-  match t with
-  | S p => ((if Nat.eq_dec b p then nil else range b p) ++ p :: nil)%list
-  | 0 => nil
-  end.
-
-Infix "upto" := range (at level 15, no associativity).
 
 Definition zip4 {A B C D} (l1 : list A) (l2 : list B) (l3 : list C) (l4 : list D) :=
   List.combine (List.combine l1 l2) (List.combine l3 l4).
@@ -1257,373 +1274,3 @@ Proof.
   pose proof (Nat.log2_log2_up_spec (S n) ltac:(Omega.omega)).
   Omega.omega.
 Qed.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-(* Local Lemma rule_getRegInits_sublist1 rn m: *)
-(*   forall (HInRules: In rn (map fst (getRules m))), *)
-(*     SubList (getRegInits (in_rule_module' m rn HInRules)) *)
-(*             (getRegInits m). *)
-(* Proof. *)
-(*   induction m; simpl; intros; try firstorder. *)
-(*   destruct (in_dec string_dec rn (map fst (getRules m1))). *)
-(*   - do 2 intro. *)
-(*     specialize (IHm1 i _ H). *)
-(*     firstorder. *)
-(*   - pose proof HInRules as sth. *)
-(*     rewrite map_app in sth. *)
-(*     rewrite in_app_iff in sth. *)
-(*     destruct sth; [tauto | ]. *)
-(*     destruct (in_dec string_dec rn (map fst (getRules m2))). *)
-(*     + do 2 intro. *)
-(*       specialize (IHm2 i _ H0). *)
-(*       firstorder. *)
-(*     + firstorder. *)
-(* Qed. *)
-
-(* Local Lemma rule_getRegInits_sublist2 r ma mb (HInRules: In r (getRules ma ++ getRules mb)): *)
-(*   In r (getRules ma) -> *)
-(*   SubList (getRegInits (in_rule_module (ConcatMod ma mb) r HInRules)) *)
-(*           (getRegInits ma). *)
-(* Proof. *)
-(*   do 3 intro. *)
-(*   unfold in_rule_module in H0. *)
-(*   simpl in H0. *)
-(*   match type of H0 with *)
-(*   | In x (getRegInits match ?P with *)
-(*                       | _ => _ *)
-(*                       end) => destruct P *)
-(*   end. *)
-(*   - eapply rule_getRegInits_sublist1; eauto. *)
-(*   - rewrite in_map_iff in n. *)
-(*     firstorder. *)
-(* Qed. *)
-
-(* Local Lemma meth_getRegInits_sublist1 rn m: *)
-(*   forall (HInMeths: In rn (map fst (getDefsBodies m))), *)
-(*     SubList (getRegInits (in_meth_module' m rn HInMeths)) *)
-(*             (getRegInits m). *)
-(* Proof. *)
-(*   induction m; simpl; intros; try firstorder; unfold getDefs in *. *)
-(*   destruct (in_dec string_dec rn (map fst (getDefsBodies m1))). *)
-(*   - do 2 intro. *)
-(*     specialize (IHm1 i _ H). *)
-(*     firstorder. *)
-(*   - pose proof HInMeths as sth. *)
-(*     rewrite map_app in sth. *)
-(*     rewrite in_app_iff in sth. *)
-(*     destruct sth; [tauto | ]. *)
-(*     destruct (in_dec string_dec rn (map fst (getDefsBodies m2))). *)
-(*     + do 2 intro. *)
-(*       specialize (IHm2 i _ H0). *)
-(*       firstorder. *)
-(*     + firstorder. *)
-(* Qed. *)
-
-(* Local Lemma meth_getRegInits_sublist2 r ma mb *)
-(*       (HInMeths: In r (getDefsBodies ma ++ getDefsBodies mb)): *)
-(*   In r (getDefsBodies ma) -> *)
-(*   SubList (getRegInits (in_meth_module (ConcatMod ma mb) r HInMeths)) *)
-(*           (getRegInits ma). *)
-(* Proof. *)
-(*   do 3 intro; unfold getDefs in *. *)
-(*   unfold in_meth_module in H0. *)
-(*   simpl in H0. *)
-(*   unfold getDefs in *. *)
-(*   match type of H0 with *)
-(*   | In x (getRegInits match ?P with *)
-(*                       | _ => _ *)
-(*                       end) => destruct P *)
-(*   end. *)
-(*   - eapply meth_getRegInits_sublist1; eauto. *)
-(*   - rewrite in_map_iff in n. *)
-(*     firstorder. *)
-(* Qed. *)
-
-
-
-
-
-(* Lemma Forall_app: *)
-(*   forall {A} (l1 l2: list A) P, Forall P l1 -> Forall P l2 -> Forall P (l1 ++ l2). *)
-(* Proof. *)
-(*   induction l1; simpl; intros; auto. *)
-(*   inversion H; constructor; auto. *)
-(* Qed. *)
-
-(* Lemma NoDup_app_comm: *)
-(*   forall {A} (l1 l2: list A), NoDup (l1 ++ l2) -> NoDup (l2 ++ l1). *)
-(* Proof. *)
-(*   induction l2; simpl; intros; [rewrite app_nil_r in H; auto|]. *)
-(*   constructor. *)
-(*   - intro Hx. apply in_app_or, or_comm, in_or_app in Hx. *)
-(*     apply NoDup_remove_2 in H; elim H; auto. *)
-(*   - apply IHl2. *)
-(*     eapply NoDup_remove_1; eauto. *)
-(* Qed. *)
-
-(* Lemma NoDup_app_1: *)
-(*   forall {A} (l1 l2: list A), NoDup (l1 ++ l2) -> NoDup l1. *)
-(* Proof. *)
-(*   induction l1; simpl; intros; auto. *)
-(*   - constructor. *)
-(*   - inversion H; constructor; eauto; subst. *)
-(*     intro Hx; elim H2; apply in_or_app; auto. *)
-(* Qed. *)
-
-(* Lemma NoDup_app_2: *)
-(*   forall {A} (l1 l2: list A), NoDup (l1 ++ l2) -> NoDup l2. *)
-(* Proof. *)
-(*   induction l2; simpl; intros; auto; constructor. *)
-(*   - apply NoDup_remove_2 in H. *)
-(*     intro Hx; elim H; apply in_or_app; auto. *)
-(*   - apply IHl2; eapply NoDup_remove_1; eauto. *)
-(* Qed. *)
-
-
-(* Lemma NoDup_app_comm_ext: *)
-(*   forall {A} (l1 l2 l3 l4: list A), *)
-(*     NoDup (l1 ++ (l2 ++ l3) ++ l4) -> NoDup (l1 ++ (l3 ++ l2) ++ l4). *)
-(* Proof. *)
-(*   intros; apply NoDup_app_comm; apply NoDup_app_comm in H. *)
-(*   rewrite <-app_assoc with (n:= l1). *)
-(*   rewrite <-app_assoc with (n:= l1) in H. *)
-(*   apply NoDup_app_comm; apply NoDup_app_comm in H. *)
-(*   induction (l4 ++ l1). *)
-(*   - rewrite app_nil_l in *; apply NoDup_app_comm; auto. *)
-(*   - simpl in *; inversion H; constructor; auto. *)
-(*     intro Hx; elim H2; clear H2. *)
-(*     apply in_app_or in Hx; destruct Hx. *)
-(*     + apply in_or_app; auto. *)
-(*     + apply in_app_or in H2; destruct H2. *)
-(*       * apply in_or_app; right; apply in_or_app; auto. *)
-(*       * apply in_or_app; right; apply in_or_app; auto. *)
-(* Qed. *)
-
-(* Lemma hd_error_revcons_same A ls: forall (a: A), hd_error ls = Some a -> *)
-(*                                                  forall v, hd_error (ls ++ [v]) = Some a. *)
-(* Proof. *)
-(*   induction ls; auto; simpl; intros; discriminate. *)
-(* Qed. *)
-
-(* Lemma hd_error_revcons_holds A (P: A -> Prop) (ls: list A): *)
-(*   forall a, hd_error ls = Some a -> *)
-(*             P a -> *)
-(*             forall b v, hd_error (ls ++ [v]) = Some b -> *)
-(*                         P b. *)
-(* Proof. *)
-(*   intros. *)
-(*   rewrite hd_error_revcons_same with (a := a) in H1; auto. *)
-(*   inversion H1; subst; auto. *)
-(* Qed. *)
-
-(* Lemma single_unfold_concat A B a (f: A -> list B) (ls: list A): *)
-(*   concat (map f (a :: ls)) = (f a ++ concat (map f ls))%list. *)
-(* Proof. *)
-(*   reflexivity. *)
-(* Qed. *)
-
-(* Lemma in_single: forall A (a l: A), In a (l :: nil) -> a = l. *)
-(* Proof. *)
-(*   intros. *)
-(*   simpl in *. *)
-(*   destruct H; intuition auto. *)
-(* Qed. *)
-
-(* Lemma in_pre_suf: forall A l (a: A), In a l -> exists l1 l2, (l = l1 ++ a :: l2)%list. *)
-(* Proof. *)
-(*   induction l; simpl. *)
-(*   - intuition auto. *)
-(*   - intros. *)
-(*     destruct H; [| apply IHl in H; intuition auto]. *)
-(*     + subst. *)
-(*       exists nil, l. *)
-(*       reflexivity. *)
-(*     + destruct H as [? [? ?]]. *)
-(*       subst. *)
-(*       exists (a :: x), x0. *)
-(*       reflexivity. *)
-(* Qed. *)
-
-(* Lemma list_nil_revcons A: forall (l: list A), l = nil \/ exists l' v, l = (l' ++ [v])%list. *)
-(* Proof. *)
-(*   induction l; subst. *)
-(*   - left; auto. *)
-(*   - destruct IHl; subst. *)
-(*     + right. *)
-(*       exists nil, a. *)
-(*       reflexivity. *)
-(*     + destruct H as [? [? ?]]; *)
-(*       subst. *)
-(*       right; simpl. *)
-(*       exists (a :: x), x0. *)
-(*       reflexivity. *)
-(* Qed. *)
-
-(* Lemma list_revcons A (P: Prop): forall l (g: A), (forall l' v, g :: l = l' ++ (v :: nil) -> P) -> P. *)
-(* Proof. *)
-(*   intros. *)
-(*   destruct (list_nil_revcons (g ::l)); firstorder (discriminate || idtac). *)
-(* Qed. *)
-
-(* Lemma app_single_r: forall A (ls1 ls2: list A) v1 v2, *)
-(*                       (ls1 ++ [v1] = ls2 ++ [v2])%list -> *)
-(*                       ls1 = ls2 /\ v1 = v2. *)
-(* Proof. *)
-(*   induction ls1; simpl; auto; intros. *)
-(*   - destruct ls2; simpl in *; inversion H; auto. *)
-(*     apply app_cons_not_nil in H2. *)
-(*     intuition auto. *)
-(*   - destruct ls2; simpl in *; inversion H; auto. *)
-(*     + apply eq_sym in H2; apply app_cons_not_nil in H2. *)
-(*       intuition auto. *)
-(*     + specialize (IHls1 _ _ _ H2). *)
-(*       intuition (try f_equal; auto). *)
-(* Qed. *)
-
-(* Lemma app_cons_in A ls: *)
-(*   forall (v: A) s1 s2 beg mid last, *)
-(*     (ls ++ [v] = beg ++ s1 :: mid ++ s2 :: last)%list -> *)
-(*     In s1 ls. *)
-(* Proof. *)
-(*   induction ls; simpl; auto; intros; *)
-(*   destruct beg; simpl in *; inversion H. *)
-(*   - apply app_cons_not_nil in H2. *)
-(*     auto. *)
-(*   - apply app_cons_not_nil in H2. *)
-(*     auto. *)
-(*   - intuition auto. *)
-(*   - apply IHls in H2; intuition auto. *)
-(* Qed. *)
-
-(* Lemma beg_mid_last_add_eq A ls: *)
-(*   (forall (v: A) v1 v2 beg mid last, *)
-(*      ls ++ [v] = beg ++ v1 :: mid ++ v2 :: last -> *)
-(*      (last = nil /\ v = v2 /\ ls = beg ++ v1 :: mid) \/ *)
-(*      (exists last', last = last' ++ [v] /\ ls = beg ++ v1 :: mid ++ v2 :: last'))%list. *)
-(* Proof. *)
-(*   intros. *)
-(*   pose proof (list_nil_revcons last) as [sth1 | sth2]. *)
-(*   - subst. *)
-(*     left. *)
-(*     rewrite app_comm_cons in H. *)
-(*     rewrite app_assoc in H. *)
-(*     apply app_single_r in H. *)
-(*     destruct H as [? ?]. *)
-(*     repeat (constructor; auto). *)
-(*   - destruct sth2 as [? [? ?]]. *)
-(*     right. *)
-(*     exists x. *)
-(*     subst. *)
-(*     rewrite app_comm_cons in H. *)
-(*     rewrite app_assoc in H. *)
-(*     rewrite app_comm_cons in H. *)
-(*     rewrite app_assoc in H. *)
-(*     apply app_single_r in H. *)
-(*     destruct H as [? ?]; subst. *)
-(*     repeat (constructor; auto). *)
-(*     rewrite app_comm_cons. *)
-(*     rewrite app_assoc. *)
-(*     reflexivity. *)
-(* Qed. *)
-
-(* Lemma in_revcons A ls (a v: A): *)
-(*   In v (ls ++ (a :: nil)) -> *)
-(*   In v ls \/ v = a. *)
-(* Proof. *)
-(*   intros. *)
-(*   apply in_app_or in H. *)
-(*   simpl in *. *)
-(*   intuition. *)
-(* Qed. *)
-
-(* Lemma in_cons A ls (a v: A): *)
-(*   In v (a :: ls) -> *)
-(*   In v ls \/ v = a. *)
-(* Proof. *)
-(*   simpl. *)
-(*   intuition. *)
-(* Qed. *)
-
-(* Lemma in_revcons_converse A ls (a v: A): *)
-(*   In v ls \/ v = a -> *)
-(*   In v (ls ++ (a :: nil)). *)
-(* Proof. *)
-(*   intros. *)
-(*   apply in_or_app. *)
-(*   simpl in *. *)
-(*   intuition. *)
-(* Qed. *)
-
-(* Lemma in_cons_converse A ls (a v: A): *)
-(*   In v ls \/ v = a -> *)
-(*   In v (a :: ls). *)
-(* Proof. *)
-(*   simpl. *)
-(*   intuition. *)
-(* Qed. *)
-
-(* Lemma in_revcons_hyp A ls (a v: A) (P: A -> Prop): *)
-(*   (In v (ls ++ (a :: nil)) -> P v) -> *)
-(*   (In v ls -> P v) /\ (v = a -> P v). *)
-(* Proof. *)
-(*   intros. *)
-(*   assert ((In v ls \/ v = a) -> P v). *)
-(*   { intros K. *)
-(*     apply in_revcons_converse in K. *)
-(*     tauto. *)
-(*   }  *)
-(*   tauto. *)
-(* Qed. *)
-
-(* Lemma in_cons_hyp A ls (a v: A) (P: A -> Prop): *)
-(*   (In v (a :: ls) -> P v) -> *)
-(*   (In v ls -> P v) /\ (v = a -> P v). *)
-(*   intros. *)
-(*   assert ((In v ls \/ v = a) -> P v). *)
-(*   { intros K. *)
-(*     apply in_cons_converse in K. *)
-(*     tauto. *)
-(*   }  *)
-(*   tauto. *)
-(* Qed. *)
-
-(* Lemma app_or A: forall l1 l2 (v: A), iff (In v (l1 ++ l2)) (In v l1 \/ In v l2). *)
-(* Proof. *)
-(*   unfold iff. *)
-(*   split; intros. *)
-(*   - apply in_app_or; assumption. *)
-(*   - apply in_or_app; assumption. *)
-(* Qed. *)
-
-(* Lemma cons_or A: forall l (a v: A), iff (In a (v :: l)) (a = v \/ In a l). *)
-(* Proof. *)
-(*   unfold iff; simpl. *)
-(*   intuition auto. *)
-(* Qed. *)
-
-(* Lemma revcons_or A: forall l (a v: A), iff (In a (l ++ [v])) (a = v \/ In a l). *)
-(* Proof. *)
-(*   unfold iff; simpl; constructor; intros. *)
-(*   - apply in_revcons in H. *)
-(*     intuition auto. *)
-(*   - apply in_revcons_converse. *)
-(*     intuition auto. *)
-(* Qed. *)
-

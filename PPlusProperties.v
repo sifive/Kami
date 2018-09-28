@@ -3252,8 +3252,8 @@ Corollary TraceInclusion_inline_BaseModule_rules regs rules meths f:
 Proof.
   intros.
   unfold inlineSingle_BaseModule.
-  specialize (inline_rule_fold_right f H (zeroToN (length rules)) H0) as P1.
-  specialize (WfMod_inline_all_Rule _ (zeroToN (length rules)) H0 H) as P2.
+  specialize (inline_rule_fold_right f H (0 upto (length rules)) H0) as P1.
+  specialize (WfMod_inline_all_Rule _ (0 upto (length rules)) H0 H) as P2.
   repeat rewrite map_fold_right_eq in *.
   assumption.
 Qed.
@@ -3265,7 +3265,7 @@ Corollary TraceInclusion_inline_BaseModule_meths regs rules meths f:
 Proof.
   intros.
   unfold inlineSingle_BaseModule.
-  specialize (inline_meth_fold_right f H (zeroToN (length meths)) H0) as P1.
+  specialize (inline_meth_fold_right f H (0 upto (length meths)) H0) as P1.
   repeat rewrite map_fold_right_eq in *.
   assumption.
 Qed.
@@ -3280,7 +3280,7 @@ Proof.
   intros.
   unfold inlineSingle_BaseModule.
   specialize (TraceInclusion_inline_BaseModule_rules f H H0) as P1.
-  specialize (WfMod_inline_all_Rule _ (zeroToN (length rules)) H0 H) as P2.
+  specialize (WfMod_inline_all_Rule _ (0 upto (length rules)) H0 H) as P2.
   specialize (TraceInclusion_inline_BaseModule_meths f P2 H0) as P3.
   repeat rewrite map_fold_right_eq in *.
   apply (TraceInclusion_trans P1 P3).
@@ -3295,7 +3295,7 @@ Section inline_all_all.
     | None => newMeths
     end.
 
-  Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (zeroToN (length meths)) meths.
+  Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (0 upto (length meths)) meths.
 
   Definition inlineSingle_Rules_pos meths n rules :=
     match nth_error meths n with
@@ -3303,7 +3303,7 @@ Section inline_all_all.
     | None => rules
     end.
 
-  Definition inlineAll_Rules meths rules := fold_left (fun newRules n => inlineSingle_Rules_pos meths n newRules) (zeroToN (length meths)) rules.
+  Definition inlineAll_Rules meths rules := fold_left (fun newRules n => inlineSingle_Rules_pos meths n newRules) (0 upto (length meths)) rules.
 
   Definition inlineAll_All regs rules meths :=
     (Base (BaseMod regs (inlineAll_Rules (inlineAll_Meths meths) rules) (inlineAll_Meths meths))).
@@ -3319,7 +3319,7 @@ Section inline_all_all.
     case_eq (nth_error meths n); intros sth; [intros sthEq|split; [assumption | apply TraceInclusion_refl]].
     split.
     - apply nth_error_In in sthEq.
-      pose proof (WfMod_inline_all_Rule sth (zeroToN (length rules)) sthEq WfH).
+      pose proof (WfMod_inline_all_Rule sth (0 upto (length rules)) sthEq WfH).
       repeat rewrite map_fold_right_eq in *.
       assumption.
     - apply TraceInclusion_inline_BaseModule_rules; auto.
@@ -3333,10 +3333,11 @@ Section inline_all_all.
   Proof.
     intros WfH.
     unfold inlineAll_Rules.
-    induction (Datatypes.length meths); simpl; [split; [assumption | apply TraceInclusion_refl]|].
-    rewrite fold_left_app; simpl.
+    induction (Datatypes.length meths); simpl in *; [split; [assumption | apply TraceInclusion_refl]|].
+    rewrite fold_left_app; simpl in *.
     destruct IHn as [IHn1 IHn2].
     pose proof (TraceInclusion_inlineSingle_pos_Rules IHn1 n) as [sth1 sth2].
+    destruct n; simpl in *; auto.
     split; auto.
     eapply TraceInclusion_trans; eauto.
   Qed.
@@ -3352,7 +3353,7 @@ Section inline_all_all.
     case_eq (nth_error meths n); intros sth; [intros sthEq|split; [assumption | apply TraceInclusion_refl]].
     split.
     - apply nth_error_In in sthEq.
-      pose proof (WfMod_inline_all_Meth sth (zeroToN (length meths)) sthEq WfH).
+      pose proof (WfMod_inline_all_Meth sth (0 upto (length meths)) sthEq WfH).
       repeat rewrite map_fold_right_eq in *.
       assumption.
     - apply TraceInclusion_inline_BaseModule_meths; auto.
@@ -3370,6 +3371,7 @@ Section inline_all_all.
     rewrite fold_left_app; simpl.
     destruct IHn as [IHn1 IHn2].
     pose proof (TraceInclusion_inlineSingle_pos_Meths IHn1 n) as [sth1 sth2].
+    destruct n; simpl in *; auto.
     split; auto.
     eapply TraceInclusion_trans; eauto.
   Qed.
