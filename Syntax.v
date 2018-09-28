@@ -855,13 +855,13 @@ Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) i
 (* Eval compute in test. *)
 
 
-Notation "'RegisterArray' name 'from' first 'to' last : type <- init" :=
+Notation "'RegisterArray' name 'using' nums : type <- init" :=
   (MERegAry (
     map (fun idx =>
       (AddIndexToName name idx, existT optConstFullT (SyntaxKind type) (Some (makeConst init)))
-    ) (first upto last)
+    ) nums
   ))
-    (at level 12, name at level 9, first at level 9, last at level 9) : kami_scope.
+    (at level 12, name at level 9, nums at level 9) : kami_scope.
 
 Delimit Scope kami_scope with kami.
 
