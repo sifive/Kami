@@ -1274,3 +1274,135 @@ Proof.
   pose proof (Nat.log2_log2_up_spec (S n) ltac:(Omega.omega)).
   Omega.omega.
 Qed.
+
+Lemma append_remove_prefix a:
+  forall b c,
+    (a ++ b)%string = (a ++ c)%string <->
+    b = c.
+Proof.
+  induction a; simpl; intros; auto.
+  - reflexivity.
+  - split; intros; subst; auto.
+    inversion H.
+    eapply IHa; eauto.
+Qed.
+
+Lemma append_nil a:
+  (a ++ "")%string = a.
+Proof.
+  induction a; simpl; auto; intros.
+  rewrite IHa.
+  auto.
+Qed.
+  
+Lemma append_assoc a:
+  forall b c,
+    (a ++ (b ++ c))%string = ((a ++ b) ++ c)%string.
+Proof.
+  induction a; simpl; auto; intros.
+  f_equal; auto.
+Qed.
+
+Lemma append_cons a b:
+  (String a b)%string = (String a EmptyString ++ b)%string.
+Proof.
+  auto.
+Qed.
+
+Lemma append_eq_nil:
+  forall a b,
+    (a ++ b)%string = EmptyString <-> a = EmptyString /\ b = EmptyString.
+Proof.
+  induction a; destruct b; simpl; split; intros; auto.
+  - destruct H; congruence.
+  - congruence.
+  - destruct H; congruence.
+  - congruence.
+  - destruct H; congruence.
+Qed.
+  
+
+Lemma append_cons_suffix:
+  forall b c a,
+    (b ++ String a "")%string = (c ++ String a "")%string <->
+    b = c.
+Proof.
+  induction b; destruct c; simpl; split; intros; auto.
+  - inversion H; subst.
+    apply eq_sym in H2.
+    rewrite append_eq_nil in H2.
+    destruct H2.
+    congruence.
+  - congruence.
+  - inversion H; subst.
+    apply append_eq_nil in H2.
+    destruct H2; congruence.
+  - congruence.
+  - inversion H; subst.
+    f_equal.
+    eapply IHb; eauto.
+  - inversion H; subst.
+    auto.
+Qed.
+
+Lemma append_remove_suffix a:
+  forall b c,
+    (b ++ a)%string = (c ++ a)%string <->
+    b = c.
+Proof.
+  induction a; simpl; intros; auto; split; intros; subst; auto.
+  - rewrite ?append_nil in H.
+    auto.
+  - rewrite append_cons in H.
+    rewrite ?append_assoc in H.
+    rewrite IHa in H.
+    rewrite append_cons_suffix in H.
+    auto.
+Qed.
+
+
+Ltac discharge_DisjKey :=
+  match goal with
+  | |- DisjKey ?P ?Q => rewrite DisjKeyWeak_same by apply string_dec;
+                        let k := fresh in
+                        let H1 := fresh in
+                        let H2 := fresh in
+                        unfold DisjKeyWeak; simpl; intros k H1 H2
+  end;
+  repeat match goal with
+         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
+           rewrite append_remove_prefix in H; subst
+         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
+           rewrite append_remove_suffix in H; subst
+         | H: _ \/ _ |- _ => destruct H; subst
+         end;
+  subst;
+  auto;
+  try discriminate.
+
+
+Local Example test_normaldisj:
+  DisjKey (map (fun x => (x, 1)) ("a" :: "b" :: "c" :: nil))%string
+          (map (fun x => (x, 2)) ("d" :: "e" :: nil))%string.
+Proof.
+  simpl.
+  discharge_DisjKey.
+Qed.
+
+Local Example test_prefix_disj a:
+  DisjKey (map (fun x => ((a ++ x)%string, 1)) ("ab" :: "be" :: "cs" :: nil))%string
+          (map (fun x => ((a ++ x)%string, 2)) ("de" :: "et" :: nil))%string.
+Proof.
+  simpl.
+  discharge_DisjKey.
+Qed.
+
+Local Example test_suffix_disj a:
+  DisjKey (map (fun x => ((x ++ a)%string, 1)) ("ab" :: "be" :: "cs" :: nil))%string
+          (map (fun x => ((x ++ a)%string, 2)) ("de" :: "et" :: nil))%string.
+Proof.
+  simpl.
+  discharge_DisjKey.
+Qed.
+
+
