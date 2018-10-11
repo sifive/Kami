@@ -768,6 +768,11 @@ Proof.
       apply (n1 H).
 Defined.
 
+Lemma Signature_dec: forall (s1 s2: Signature), {s1 = s2} + {s1 <> s2}.
+Proof.
+  decide equality; apply Kind_dec.
+Defined.
+
 Lemma Kind_eq: forall k, Kind_dec k k = left eq_refl.
 Proof.
   intros; destruct (Kind_dec k k).
@@ -776,11 +781,6 @@ Proof.
     apply Kind_dec.
   - apply (match n eq_refl with end).
 Qed.
-
-Lemma Signature_dec: forall (s1 s2: Signature), {s1 = s2} + {s1 <> s2}.
-Proof.
-  decide equality; apply Kind_dec.
-Defined.
 
 Lemma Signature_eq: forall sig, Signature_dec sig sig = left eq_refl.
 Proof.
@@ -916,14 +916,15 @@ Definition evalConstFullT k (e: ConstFullT k) :=
   end.
 
 (* maps register names to the values which they currently hold *)
-Definition RegsT := list (Attribute (sigT (fullType type))).
+Notation RegT := (Attribute (sigT (fullType type))).
+Definition RegsT := (list RegT).
 
 (* a pair of the value sent to a method call and the value it returned *)
 Definition SignT k := (type (fst k) * type (snd k))%type.
 
 (* a list of simulatenous method call actions made during a single step *)
-Definition MethT := Attribute (sigT SignT).
-Definition MethsT := list MethT.
+Notation MethT := (Attribute (sigT SignT)).
+Definition MethsT := (list MethT).
 
 
 Section Semantics.
