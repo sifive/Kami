@@ -1028,7 +1028,7 @@ Proof.
 Qed.
 
 Lemma PTrace_Trace m o ls:
-  WfMod m ->
+  (forall ty, WfMod ty m) ->
   PTrace m o ls ->
   (exists o' ls',
       o' [=] o /\
@@ -1096,9 +1096,9 @@ Definition PTraceList (m : Mod) (ls : list (list FullLabel)) :=
 Definition PTraceInclusion (m m' : Mod) :=
   forall (o : RegsT)(ls : list (list FullLabel)), PTrace m o ls -> exists (ls' : list (list FullLabel)), PTraceList m' ls' /\ WeakInclusions ls ls'.
 
-Lemma PTraceInclusion_TraceInclusion m1 m2 :
-  WfMod m1 ->
-  WfMod m2 ->
+Lemma PTraceInclusion_TraceInclusion' m1 m2 :
+  (forall ty, WfMod ty m1) ->
+  (forall ty, WfMod ty m2) ->
   PTraceInclusion m1 m2 -> TraceInclusion m1 m2.
 Proof.
   intros.
@@ -1114,6 +1114,13 @@ Proof.
     apply (WeakInclusionsTrans H3 trans).
 Qed.
 
+Lemma PTraceInclusion_TraceInclusion (m1 m2: WfModule) :
+  PTraceInclusion m1 m2 -> TraceInclusion m1 m2.
+Proof.
+  destruct m1, m2;
+    eapply PTraceInclusion_TraceInclusion'; auto.
+Qed.
+  
 Section PSubsteps_rewrite.
   
   Lemma PSubsteps_rewrite_regs m o1 o2 l:
@@ -1549,11 +1556,12 @@ Proof.
 Qed.
 
 Lemma PStep_substitute' m o l:
-  PStep m o l -> forall (HWfMod: WfMod m), PStepSubstitute m o l.
+  PStep m o l -> forall (HWfMod: forall ty, WfMod ty m), PStepSubstitute m o l.
 Proof.
   intros.
   apply PStep_Step in H; dest.
-  apply Step_substitute' in H2; auto.
+  specialize (HWfMod type).
+  apply (@Step_substitute' type) in H2; auto.
   unfold StepSubstitute in H2; dest.
   unfold PStepSubstitute; repeat split.
   - rewrite H, H1; apply Substeps_PSubsteps; auto.
@@ -1562,7 +1570,7 @@ Proof.
     apply H4; auto.
 Qed.
 
-Lemma PStepSubstitute_flatten m o l (HWfMod: WfMod m):
+Lemma PStepSubstitute_flatten m o l (HWfMod: forall ty, WfMod ty m):
   PStep (flatten m) o l <-> PStepSubstitute m o l.
 Proof.
   unfold flatten, getFlat, PStepSubstitute.
@@ -1587,7 +1595,7 @@ Proof.
       auto.
 Qed.
 
-Lemma PStep_substitute m o l (HWfMod: WfMod m):
+Lemma PStep_substitute m o l (HWfMod: forall ty, WfMod ty m):
   PStep m o l -> PStep (flatten m) o l.
 Proof.
   intros Stp.
@@ -1716,8 +1724,8 @@ Section SplitSubsteps.
   Variable DisjRules: DisjKey (getRules m1) (getRules m2).
   Variable DisjMeths: DisjKey (getMethods m1) (getMethods m2).
 
-  Variable WfMod1: WfBaseMod m1.
-  Variable WfMod2: WfBaseMod m2.
+  Variable WfMod1: forall ty, WfBaseMod ty m1.
+  Variable WfMod2: forall ty, WfBaseMod ty m2.
   
   Lemma pfilter_perm o l :
     PSubsteps (concatFlat m1 m2) o l ->
@@ -1907,7 +1915,7 @@ Lemma flatten_PSubsteps m o l:
   - econstructor 3; eauto.
 Qed.
 
-Lemma substitute_PStep' m (HWfMod: WfMod m):
+Lemma substitute_PStep' m (HWfMod: forall ty, WfMod ty m):
   forall o l,
     PStepSubstitute m o l ->
     PStep m o l.
@@ -1925,7 +1933,7 @@ Proof.
     apply Step_PStep; auto.
 Qed.
 
-Lemma substitute_PStep m o l (HWfMod: WfMod m):
+Lemma substitute_PStep m o l (HWfMod: forall ty, WfMod ty m):
   PStep (flatten m) o l ->
   PStep m o l.
 Proof.
@@ -1935,7 +1943,7 @@ Qed.
 
 Section PTraceSubstitute.
   Variable m: Mod.
-  Variable WfMod_m: WfMod m.
+  Variable WfMod_m: forall ty, WfMod ty m.
 
   Lemma PTrace_flatten_same1: forall o l,  PTrace m o l -> PTrace (flatten m) o l.
   Proof.
@@ -2143,38 +2151,38 @@ Qed.
   Qed.
 End WfModule_rewrite.
 
-Lemma WfNilMod :
-  WfMod (Base (BaseMod nil nil nil)).
+Lemma WfNilMod ty :
+  WfMod ty (Base (BaseMod nil nil nil)).
 Proof.
   constructor; simpl; constructor; intros; contradiction.
 Qed.
 
-Lemma WfConcatActionTNil (k : Kind) (a : ActionT type k):
+Lemma WfConcatActionTNil ty (k : Kind) (a : ActionT ty k):
   WfConcatActionT a (Base (BaseMod nil nil nil)).
 Proof.
   induction a; econstructor; eauto.
 Qed.
 
-Lemma WfConcatNil m :
-  WfMod m ->
-  WfMod (ConcatMod m (Base (BaseMod nil nil nil))).
+Lemma WfConcatNil ty m:
+  WfMod ty m ->
+  WfMod ty (ConcatMod m (Base (BaseMod nil nil nil))).
 Proof.
   constructor; unfold DisjKey; simpl; intros; auto.
   - apply WfNilMod.
-  - split; intros; eauto using WfConcatActionTNil.
+  - split; intros; eapply WfConcatActionTNil.
   - split; intros; contradiction.
 Qed.
 
-Lemma WfNilConcat m :
-  WfMod (ConcatMod m (Base (BaseMod nil nil nil))) ->
-  WfMod m.
+Lemma WfNilConcat ty m:
+  WfMod ty (ConcatMod m (Base (BaseMod nil nil nil))) ->
+  WfMod ty m.
 Proof.
   intros; inv H; assumption.
 Qed.
 
-Lemma WfConcatComm m1 m2 :
-  WfMod (ConcatMod m1 m2) ->
-  WfMod (ConcatMod m2 m1).
+Lemma WfConcatComm ty m1 m2 :
+  WfMod ty (ConcatMod m1 m2) ->
+  WfMod ty (ConcatMod m2 m1).
 Proof.
   intros; inv H.
   econstructor; eauto using DisjKey_Commutative.
@@ -2190,7 +2198,7 @@ Proof.
     intro; destruct H1; auto.
 Qed.
 
-Lemma WfConcatSplits m1 m2 (k : Kind) (a : ActionT type k):
+Lemma WfConcatSplits ty m1 m2 (k : Kind) (a : ActionT ty k):
     WfConcatActionT a (ConcatMod m1 m2) ->
     WfConcatActionT a m1 /\
     WfConcatActionT a m2.
@@ -2211,7 +2219,7 @@ Proof.
   - intros; split; econstructor 10.
 Qed.
 
-Lemma WfConcatMerge m1 m2 (k : Kind) (a : ActionT type k) :
+Lemma WfConcatMerge ty m1 m2 (k : Kind) (a : ActionT ty k) :
   WfConcatActionT a m1 ->
   WfConcatActionT a m2 ->
   WfConcatActionT a (ConcatMod m1 m2).
@@ -2231,9 +2239,9 @@ Proof.
 Qed.
     
 
-Lemma WfConcatAssoc1 m1 m2 m3 :
-  WfMod (ConcatMod m1 (ConcatMod m2 m3)) ->
-  WfMod (ConcatMod (ConcatMod m1 m2) m3).
+Lemma WfConcatAssoc1 ty m1 m2 m3 :
+  WfMod ty (ConcatMod m1 (ConcatMod m2 m3)) ->
+  WfMod ty (ConcatMod (ConcatMod m1 m2) m3).
 Proof.
   intros; inv H; inv HWf2; inv WfConcat1; inv WfConcat2.
   econstructor; simpl in *; eauto.
@@ -2277,9 +2285,9 @@ Proof.
 Qed.
 
 
-Lemma WfConcatAssoc2 m1 m2 m3 :
-  WfMod (ConcatMod (ConcatMod m1 m2) m3) ->
-  WfMod (ConcatMod m1 (ConcatMod m2 m3)).
+Lemma WfConcatAssoc2 ty m1 m2 m3 :
+  WfMod ty (ConcatMod (ConcatMod m1 m2) m3) ->
+  WfMod ty (ConcatMod m1 (ConcatMod m2 m3)).
 Proof.
   intros.
   inv H; inv HWf1; inv WfConcat1; inv WfConcat2.
@@ -2312,7 +2320,7 @@ Proof.
       eauto; eapply (WfConcatSplits (m1 :=m1) (m2 := m2)); eauto.
 Qed.
 
-Lemma WfMod_createHideMod l : forall m, WfMod (createHideMod m l) <-> (SubList l (map fst (getAllMethods m)) /\ WfMod m).
+Lemma WfMod_createHideMod ty l : forall m, WfMod ty (createHideMod m l) <-> (SubList l (map fst (getAllMethods m)) /\ WfMod ty m).
 Proof.
   split.
   - induction l; simpl; intros; split; auto.
@@ -2412,7 +2420,7 @@ Proof.
   repeat red; intros; split; intros; eauto using DisjKey_perm_rewrite, Permutation_sym.
 Qed.
 
-Lemma WfActionTConcatAssoc1 m1 m2 m3 (k : Kind) (a : ActionT type k) :
+Lemma WfActionTConcatAssoc1 ty m1 m2 m3 (k : Kind) (a : ActionT ty k) :
   WfConcatActionT a (ConcatMod (ConcatMod m1 m2) m3) ->
   WfConcatActionT a (ConcatMod m1 (ConcatMod m2 m3)).
 Proof.
@@ -2422,7 +2430,7 @@ Proof.
 Qed.
 
 
-Lemma WfActionTConcatAssoc2 m1 m2 m3 (k : Kind) (a : ActionT type k) :
+Lemma WfActionTConcatAssoc2 ty m1 m2 m3 (k : Kind) (a : ActionT ty k) :
   WfConcatActionT a (ConcatMod m1 (ConcatMod m2 m3)) ->
   WfConcatActionT a (ConcatMod (ConcatMod m1 m2) m3).
 Proof.
@@ -2431,7 +2439,7 @@ Proof.
     rewrite <- app_assoc; assumption.
 Qed.
 
-Lemma WfConcatBaseFiles l1 l2 (k : Kind) (a : ActionT type k):
+Lemma WfConcatBaseFiles ty l1 l2 (k : Kind) (a : ActionT ty k):
   WfConcatActionT a (ConcatMod (mergeSeparatedBaseFile l1) (mergeSeparatedBaseFile l2)) ->
   WfConcatActionT a (mergeSeparatedBaseFile (l1 ++ l2)).
 Proof.
@@ -2445,7 +2453,7 @@ Proof.
     apply WfConcatMerge; eauto.
 Qed.
 
-Lemma WfConcatBaseModules l1 l2 (k : Kind) (a : ActionT type k):
+Lemma WfConcatBaseModules ty l1 l2 (k : Kind) (a : ActionT ty k):
   WfConcatActionT a (ConcatMod (mergeSeparatedBaseMod l1) (mergeSeparatedBaseMod l2)) ->
   WfConcatActionT a (mergeSeparatedBaseMod (l1 ++ l2)).
 Proof.
@@ -2459,11 +2467,11 @@ Proof.
     apply WfConcatMerge; eauto.
 Qed.
 
-Lemma WfAppBaseFiles l1 l2:
-  WfMod (mergeSeparatedBaseFile l1) ->
-  WfMod (mergeSeparatedBaseFile l2) ->
-  WfMod (ConcatMod (mergeSeparatedBaseFile l1) (mergeSeparatedBaseFile l2)) ->
-  WfMod (mergeSeparatedBaseFile (l1 ++ l2)).
+Lemma WfAppBaseFiles ty l1 l2:
+  WfMod ty (mergeSeparatedBaseFile l1) ->
+  WfMod ty (mergeSeparatedBaseFile l2) ->
+  WfMod ty (ConcatMod (mergeSeparatedBaseFile l1) (mergeSeparatedBaseFile l2)) ->
+  WfMod ty (mergeSeparatedBaseFile (l1 ++ l2)).
 Proof.
   induction l1; intros; simpl in *; auto.
   apply WfConcatAssoc2 in H1.
@@ -2484,11 +2492,11 @@ Proof.
     specialize (H3 _ H1 v); assumption.
 Qed.
 
-Lemma WfAppBaseMods l1 l2:
-  WfMod (mergeSeparatedBaseMod l1) ->
-  WfMod (mergeSeparatedBaseMod l2) ->
-  WfMod (ConcatMod (mergeSeparatedBaseMod l1) (mergeSeparatedBaseMod l2)) ->
-  WfMod (mergeSeparatedBaseMod (l1 ++ l2)).
+Lemma WfAppBaseMods ty l1 l2:
+  WfMod ty (mergeSeparatedBaseMod l1) ->
+  WfMod ty (mergeSeparatedBaseMod l2) ->
+  WfMod ty (ConcatMod (mergeSeparatedBaseMod l1) (mergeSeparatedBaseMod l2)) ->
+  WfMod ty (mergeSeparatedBaseMod (l1 ++ l2)).
 Proof.
   induction l1; intros; simpl in *; auto.
   apply WfConcatAssoc2 in H1.
@@ -2514,8 +2522,8 @@ Proof.
 Qed.
 
 
-Lemma Base_File_Disjoint_Registers m :
-  WfMod m ->
+Lemma Base_File_Disjoint_Registers ty m :
+  WfMod ty m ->
   DisjKey (getAllRegisters (mergeSeparatedBaseFile (fst (separateBaseMod m)))) (getAllRegisters (mergeSeparatedBaseMod (snd (separateBaseMod m)))).
 Proof.
   intros; induction m; inv H.
@@ -2547,23 +2555,23 @@ Proof.
       * right; split; auto.
 Qed.
 
-Lemma WfActionBreakDownFile m (k : Kind) (a : ActionT type k): 
+Lemma WfActionBreakDownFile ty m (k : Kind) (a : ActionT ty k): 
   WfConcatActionT a m -> WfConcatActionT a (mergeSeparatedBaseFile (fst (snd (separateMod m)))).
 Proof.
   induction a; simpl; intros; econstructor; intros; try inv H0; try inv H; EqDep_subst; eauto.
   - rewrite mergeSeparatedBaseFile_noHides; intro; contradiction.
 Qed.
 
-Lemma WfActionBreakDownMod m (k : Kind) (a : ActionT type k): 
+Lemma WfActionBreakDownMod ty m (k : Kind) (a : ActionT ty k): 
   WfConcatActionT a m -> WfConcatActionT a (mergeSeparatedBaseMod (snd (snd (separateMod m)))).
 Proof.
   induction a; simpl; intros; econstructor; intros; try inv H0; try inv H; EqDep_subst; eauto.
   - rewrite mergeSeparatedBaseMod_noHides; intro; contradiction.
 Qed.
 
-Lemma WfModBreakDownFile m :
-  WfMod m ->
-  WfMod (mergeSeparatedBaseFile (fst (snd (separateMod m)))).
+Lemma WfModBreakDownFile ty m :
+  WfMod ty m ->
+  WfMod ty (mergeSeparatedBaseFile (fst (snd (separateMod m)))).
 Proof.
   induction m.
   - destruct m; simpl; intros; eauto using WfConcatNil, WfNilMod.
@@ -2607,9 +2615,9 @@ Proof.
         unfold separateMod in H2; simpl in *; rewrite <- Heqsbm1 in H2; simpl in *; assumption.
 Qed.
 
-Lemma WfModBreakDownMod m :
-  WfMod m ->
-  WfMod (mergeSeparatedBaseMod (snd (snd (separateMod m)))).
+Lemma WfModBreakDownMod ty m :
+  WfMod ty m ->
+  WfMod ty (mergeSeparatedBaseMod (snd (snd (separateMod m)))).
 Proof.
   induction m.
   - destruct m; simpl; intros; eauto using WfConcatNil, WfNilMod.
@@ -2653,21 +2661,21 @@ Proof.
         unfold separateMod in H2; simpl in *; rewrite <- Heqsbm1 in H2; simpl in *; assumption.
 Qed.
 
-Lemma WfConcat_noHide m1 m2 :
+Lemma WfConcat_noHide ty m1 m2 :
   getHidden m2 = nil ->
-  WfConcat m1 m2.
+  WfConcat ty m1 m2.
 Proof.
   intros.
   split; intros.
-  - induction (snd rule type); econstructor; eauto.
+  - induction (snd rule ty); econstructor; eauto.
     rewrite H; intro; contradiction.
-  - induction (projT2 (snd meth) type v); econstructor; eauto.
+  - induction (projT2 (snd meth) ty v); econstructor; eauto.
     rewrite H; intro; contradiction.
 Qed.
 
-Lemma merged_WellFormed m:
-  WfMod m ->
-  WfMod (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+Lemma merged_WellFormed ty m:
+  WfMod ty m ->
+  WfMod ty (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
 Proof.
   induction 1.
   - destruct m; simpl in *.
@@ -2734,7 +2742,7 @@ Proof.
 Qed.
 
 Definition WfMergedMod (m : WfModule) :  WfModule :=
-  (mkWfMod (merged_WellFormed (Wf_cond m))).
+  (mkWfMod (fun ty => merged_WellFormed (Wf_cond m ty))).
 
 Lemma merged_perm_equality m :
   WfModule_perm m (WfMergedMod m).
@@ -2749,7 +2757,7 @@ Qed.
 Lemma TraceInclusion_Merge_l (m : WfModule) :
   TraceInclusion m (WfMergedMod m).
 Proof.
-  apply PTraceInclusion_TraceInclusion.
+  apply PTraceInclusion_TraceInclusion'.
   - apply (Wf_cond m).
   - apply (Wf_cond (WfMergedMod m)).
   - repeat intro.
@@ -2763,7 +2771,7 @@ Qed.
 Lemma TraceInclusion_Merge_r (m : WfModule) :
   TraceInclusion (WfMergedMod m) m.
 Proof.
-  apply PTraceInclusion_TraceInclusion.
+  apply PTraceInclusion_TraceInclusion'.
   - apply (Wf_cond (WfMergedMod m)).
   - apply (Wf_cond m).
   - repeat intro.
