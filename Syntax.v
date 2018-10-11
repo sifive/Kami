@@ -987,7 +987,7 @@ Qed.
 Lemma Signature_dec: forall (s1 s2: Signature), {s1 = s2} + {s1 <> s2}.
 Proof.
   decide equality; apply Kind_dec.
-Qed.
+Defined.
 
 Lemma Signature_eq: forall sig, Signature_dec sig sig = left eq_refl.
 Proof.
@@ -2072,8 +2072,5 @@ Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_
  * Verify FPU
    + Write Spec in a generic manner
    + Use Word library to prove things.
- * Equivalence checking
-   + Prove compiler (difficult)
-   + Match RTL (easy)
  * PUAR: Linux/Certikos
  *)
