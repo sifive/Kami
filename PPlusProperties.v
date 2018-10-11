@@ -2068,7 +2068,8 @@ Proof.
   simpl.
   destruct string_dec;[destruct Signature_dec|]; subst; econstructor; eauto.
   econstructor.
-  specialize (H1 (evalExpr e)).
+  intros.
+  specialize (H1 v).
   apply (WfActionT_inline_Rule); auto.
 Qed.
 
@@ -2857,7 +2858,8 @@ Proof.
   simpl.
   destruct string_dec;[destruct Signature_dec|]; subst; econstructor; eauto.
   econstructor.
-  specialize (H1 (evalExpr e)).
+  intros.
+  specialize (H1 v).
   apply (WfActionT_inline_Meth); auto.
 Qed.
      

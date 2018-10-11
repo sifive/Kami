@@ -2522,7 +2522,7 @@ Lemma WfActionT_SemAction : forall (k : Kind)(a : ActionT type k)(retl : type k)
   induction 3; intro; subst; inversion H; EqDep_subst.
   - intros TMP1 TMP2; specialize (IHSemAction (H4 mret) o1 TMP1 TMP2).
     econstructor 1; eauto.
-  - intros TMP1 TMP2; specialize (IHSemAction H4 o1 TMP1 TMP2).
+  - intros TMP1 TMP2; specialize (IHSemAction (H4 (evalExpr e)) o1 TMP1 TMP2).
     econstructor 2; eauto.
   - intros TMP1 TMP2; specialize (IHSemAction1 (H4) o1 TMP1 TMP2); specialize (IHSemAction2 (H6 v) o1 TMP1 TMP2).
     econstructor 3; eauto.

@@ -1940,7 +1940,7 @@ Section WfBaseMod.
   
   Inductive WfActionT: forall lretT, ActionT type lretT -> Prop :=
   | WfMCall meth s e lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (MCall meth s e c)
-  | WfLetExpr k (e: Expr type k) lretT c: WfActionT (c (evalExpr e)) -> @WfActionT lretT (LetExpr e c)
+  | WfLetExpr k (e: Expr type k) lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (LetExpr e c)
   | WfLetAction k (a: ActionT type k) lretT c: WfActionT a -> (forall v, WfActionT (c v)) -> @WfActionT lretT (LetAction a c)
   | WfReadNondet k lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (ReadNondet k c)
   | WfReadReg r k lretT c: (forall v, WfActionT (c v)) -> In (r, k) (getKindAttr (getRegisters m)) -> @WfActionT lretT (ReadReg r k c)
@@ -1957,7 +1957,7 @@ End WfBaseMod.
 
 Inductive WfConcatActionT : forall lretT, ActionT type lretT -> Mod -> Prop :=
 | WfConcatMCall meth s e lretT c m' :(forall v, WfConcatActionT (c v) m') -> ~In meth (getHidden m') -> @WfConcatActionT lretT (MCall meth s e c) m'
-| WfConcatLetExpr k (e : Expr type k) lretT c m' : WfConcatActionT (c (evalExpr e)) m' -> @WfConcatActionT lretT (LetExpr e c) m'
+| WfConcatLetExpr k (e : Expr type k) lretT c m' : (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetExpr e c) m'
 | WfConcatLetAction k (a : ActionT type k) lretT c m' : WfConcatActionT a m' -> (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetAction a c) m'
 | WfConcatReadNondet k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadNondet k c) m'
 | WfConcatReadReg r k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadReg r k c) m'
@@ -1996,16 +1996,11 @@ Ltac discharge_wf :=
          | H: _ \/ _ |- _ => destruct H; subst; simpl
          end; try tauto; discharge_appendage; try congruence.
 
-Record ModWf :=
-  { module : Mod ;
-    wfMod : WfMod module }.
+Record WfModule : Type := mkWfMod {module :> Mod; Wf_cond : WfMod module}.
 
 Record BaseModWf :=
-  { baseMod : BaseModule ;
+  { baseMod :> BaseModule ;
     wfBaseMod : WfBaseMod baseMod }.
-
-Coercion module: ModWf >-> Mod.
-Coercion baseMod: BaseModWf >-> BaseModule.
 
 Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
   {| baseMod := makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) ;
@@ -2014,7 +2009,7 @@ Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
 
 Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
   {| module := Base (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..)) ;
-     wfMod := ltac:(discharge_wf) |}
+     Wf_cond := ltac:(discharge_wf) |}
     (only parsing).
 
 Infix "++" := ConcatMod: kami_scope.

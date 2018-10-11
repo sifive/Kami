@@ -1668,7 +1668,7 @@ Lemma WfActionT_PSemAction : forall (k : Kind)(a : ActionT type k)(retl : type k
   induction 3; intro; subst; inversion H; EqDep_subst.
   - intros TMP1 TMP2; specialize (IHPSemAction (H4 mret) o1 TMP1 TMP2).
     econstructor 1; eauto.
-  - intros TMP1 TMP2; specialize (IHPSemAction (H4) o1 TMP1 TMP2).
+  - intros TMP1 TMP2; specialize (IHPSemAction (H4 (evalExpr e)) o1 TMP1 TMP2).
     econstructor 2; eauto.
   - intros TMP1 TMP2; specialize (IHPSemAction1 (H4) o1 TMP1 TMP2); specialize (IHPSemAction2 (H6 v) o1 TMP1 TMP2).
     econstructor 3; eauto.
@@ -1978,8 +1978,6 @@ Section PTraceSubstitute.
 End PTraceSubstitute.
 
 
-Record WfModule : Type := mkWfMod {module :> Mod; Wf_cond : WfMod module}.
-
 Section WfModule_rewrite.
 
   Inductive WfModule_perm : WfModule ->WfModule -> Prop :=
@@ -2200,7 +2198,7 @@ Proof.
   induction a.
   - intros; split; econstructor 1; eauto; inv H0; EqDep_subst; intro; try eapply H; eauto;
       apply H8; simpl; rewrite in_app_iff; eauto.
-  - intros; split; econstructor 2; eauto; inv H0; EqDep_subst; destruct (H (evalExpr e) H6); auto.
+  - intros; split; intros; econstructor 2; eauto; intros; inv H0; EqDep_subst; destruct (H v (H6 v)); auto.
   - intros; split; econstructor 3; eauto; inv H0; EqDep_subst; try intro; try eapply IHa; eauto;
     eapply H; eauto.
   - intros; split; econstructor 4; eauto; inv H0; EqDep_subst; intros; eapply H; eauto.
@@ -2221,7 +2219,7 @@ Proof.
   induction a; intros.
   - econstructor 1; inv H0; inv H1; EqDep_subst; intros; try eapply H; eauto; simpl; rewrite in_app_iff; intro;
       destruct H0;auto.
-  - econstructor 2; inv H0; inv H1; EqDep_subst; eapply H; eauto.
+  - econstructor 2; inv H0; inv H1; EqDep_subst; intros; eapply (H v); eauto.
   - econstructor 3; inv H0; inv H1; EqDep_subst; try eapply H; eauto.
   - econstructor 4; inv H0; inv H1; EqDep_subst; intros; eapply H; eauto.
   - econstructor 5; inv H0; inv H1; EqDep_subst; intros; eapply H; eauto.
