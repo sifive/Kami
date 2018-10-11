@@ -1361,6 +1361,15 @@ Proof.
 Qed.
 
 
+Ltac discharge_appendage :=
+  repeat match goal with
+         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
+           rewrite append_remove_prefix in H; subst
+         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
+           rewrite append_remove_suffix in H; subst
+         | H: _ \/ _ |- _ => destruct H; subst
+         end.
+
 Ltac discharge_DisjKey :=
   match goal with
   | |- DisjKey ?P ?Q => rewrite DisjKeyWeak_same by apply string_dec;
@@ -1369,13 +1378,7 @@ Ltac discharge_DisjKey :=
                         let H2 := fresh in
                         unfold DisjKeyWeak; simpl; intros k H1 H2
   end;
-  repeat match goal with
-         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
-           rewrite append_remove_prefix in H; subst
-         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
-           rewrite append_remove_suffix in H; subst
-         | H: _ \/ _ |- _ => destruct H; subst
-         end;
+  discharge_appendage;
   subst;
   auto;
   try discriminate.

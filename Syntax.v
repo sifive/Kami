@@ -426,6 +426,12 @@ Fixpoint mergeSeparatedBaseFile (rfl : list RegFileBase) : Mod :=
   | nil => Base (BaseMod nil nil nil)
   end.
 
+Fixpoint createHide (m: BaseModule) (hides: list string) :=
+  match hides with
+  | nil => Base m
+  | x :: xs => HideMeth (createHide m xs) x
+  end.
+
 Fixpoint createHideMod (m : Mod) (hides : list string) : Mod :=
   match hides with
   | nil => m
@@ -725,14 +731,6 @@ Fixpoint gatherActions (ty: Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_
        gatherActions xs (fun vals => cont ((#val)%kami_expr :: vals)))%kami_action
   end.
 
-(* Definition gatherActions (ty : Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_out (cont : _ -> ActionT ty k_out):= *)
-(*   fold_left (fun acc (a : ActionT ty k_in) => *)
-(*                 (fun vals => *)
-(*                    LETA val <- a; *)
-(*                      acc ((#val)%kami_expr :: vals) *)
-(*                 )%kami_action *)
-(*              ) acts cont. *)
-
 Notation "'GatherActions' actionList 'as' val ; cont" :=
   (gatherActions actionList (fun val => cont) (* nil *))
     (at level 12, right associativity, val at level 99) : kami_action_scope.
@@ -881,7 +879,7 @@ Notation "'Rule' name := c" :=
 
 Notation "'MODULE' { m1 'with' .. 'with' mN }" :=
   (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..))
-    (at level 12, only parsing).
+    (only parsing).
 
 Notation "'Switch' val 'Retn' retK 'With' { s1 ; .. ; sN }" :=
   (unpack retK (CABit Bor (cons (IF val == fst s1%switch_init then pack (snd s1%switch_init) else $0)%kami_expr ..
@@ -1622,18 +1620,6 @@ Fixpoint getMethods m :=
   | BaseMod regs rules dms => dms
   end.
 
-Inductive RuleOrMeth :=
-| Rle (rn: string)
-| Meth (f: MethT).
-
-Notation getRleOrMeth := (fun x => fst (snd x)).
-
-Definition InExec f (l: list (RegsT * (RuleOrMeth * MethsT))) :=
-  In (Meth f) (map getRleOrMeth l).
-
-Definition InCall f (l: list (RegsT * (RuleOrMeth * MethsT))) :=
-  exists x, In x l /\ In f (snd (snd x)).
-
 Fixpoint getAllRegisters m :=
   match m with
   | Base m' => getRegisters m'
@@ -1654,6 +1640,24 @@ Fixpoint getAllMethods m :=
   | HideMeth m' s => getAllMethods m'
   | ConcatMod m1 m2 => getAllMethods m1 ++ getAllMethods m2
   end.
+
+Definition getFlat m := BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m).
+
+Definition flatten m := createHide (getFlat m) (getHidden m).
+
+
+
+Inductive RuleOrMeth :=
+| Rle (rn: string)
+| Meth (f: MethT).
+
+Notation getRleOrMeth := (fun x => fst (snd x)).
+
+Definition InExec f (l: list (RegsT * (RuleOrMeth * MethsT))) :=
+  In (Meth f) (map getRleOrMeth l).
+
+Definition InCall f (l: list (RegsT * (RuleOrMeth * MethsT))) :=
+  exists x, In x l /\ In f (snd (snd x)).
 
 Notation FullLabel := (RegsT * (RuleOrMeth * MethsT))%type.
 
@@ -1977,15 +1981,56 @@ Inductive WfMod: Mod -> Prop :=
               (HWf1: WfMod m1) (HWf2: WfMod m2)(WfConcat1: WfConcat m1 m2)
               (WfConcat2 : WfConcat m2 m1): WfMod (ConcatMod m1 m2).
 
-Definition getFlat m := BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m).
+Ltac constructor_simpl :=
+  econstructor; eauto; simpl; unfold not; intros.
 
-Fixpoint createHide (m: BaseModule) (hides: list string) :=
-  match hides with
-  | nil => Base m
-  | x :: xs => HideMeth (createHide m xs) x
-  end.
+Ltac discharge_wf :=
+  repeat match goal with
+         | |- WfMod _ => constructor_simpl
+         | |- WfConcat _ _ => constructor_simpl
+         | |- _ /\ _ => constructor_simpl
+         | |- @WfConcatActionT _ _ _ => constructor_simpl
+         | |- WfBaseMod _ => constructor_simpl
+         | |- @WfActionT _ _ _ => constructor_simpl
+         | |- NoDup _ => constructor_simpl
+         | H: _ \/ _ |- _ => destruct H; subst; simpl
+         end; try tauto; discharge_appendage; try congruence.
 
-Definition flatten m := createHide (getFlat m) (getHidden m).
+Record ModWf :=
+  { module : Mod ;
+    wfMod : WfMod module }.
+
+Record BaseModWf :=
+  { baseMod : BaseModule ;
+    wfBaseMod : WfBaseMod baseMod }.
+
+Coercion module: ModWf >-> Mod.
+Coercion baseMod: BaseModWf >-> BaseModule.
+
+Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
+  {| baseMod := makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) ;
+     wfBaseMod := ltac:(discharge_wf) |}
+    (only parsing).
+
+Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
+  {| module := Base (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..)) ;
+     wfMod := ltac:(discharge_wf) |}
+    (only parsing).
+
+Infix "++" := ConcatMod: kami_scope.
+
+Section tets.
+  Variable a : string.
+  Local Example test := MOD_WF{
+                      Register (a ++ "x") : Bool <- true
+                        with Register (a ++ "y") : Bool <- false
+                        with Rule (a ++ "r1") := ( Read y: Bool <- a++"y";
+                                                     Write (a++"x"): Bool <- #y;
+                                                     Retv )
+                    }.
+End tets.
+
+Local Example test2 a b := (test a ++ test b)%kami.
 
 
 Definition PStepSubstitute m o l :=
