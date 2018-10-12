@@ -3218,8 +3218,8 @@ Section inline_all_all.
 
   Theorem TraceInclusion_inlineAll_pos regs rules meths:
     (forall ty, WfMod ty (Base (BaseMod regs rules meths))) ->
-    (forall ty, WfMod ty (inlineAll_All regs rules meths)) /\
-    TraceInclusion (Base (BaseMod regs rules meths)) (inlineAll_All regs rules meths).
+    (forall ty, WfMod ty (Base (inlineAll_All regs rules meths))) /\
+    TraceInclusion (Base (BaseMod regs rules meths)) (Base (inlineAll_All regs rules meths)).
   Proof.
     unfold inlineAll_All in *.
     intros WfH1.
@@ -3284,8 +3284,9 @@ Section flatten_and_inline_all.
   Qed.
   
   Lemma WfCreateHide_Mod (m : WfModule) ty :
-    WfMod ty (createHide (BaseMod (getAllRegisters m) (inlineAll_Rules (inlineAll_Meths (getAllMethods m)) (getAllRules m)) (inlineAll_Meths (getAllMethods m))) (getHidden m)).
+    WfMod ty (flatten_inline_everything m).
   Proof.
+    unfold flatten_inline_everything, inlineAll_All_module.
     pose proof (fun ty => flatten_WfMod (Wf_cond m ty)) as HWfm'.
     pose proof (HWfm' ty) as HWfm.
     unfold flatten, getFlat in *.
@@ -3496,7 +3497,7 @@ Section flatten_and_inline_all.
              simpl in *; apply NoDupKey_Expand; auto)).
   Qed.
   
-  Theorem TraceInclusion_flatten_inline_r (m : WfModule) :
+  Theorem TraceInclusion_flatten_inline_everything_r (m : WfModule) :
     TraceInclusion m (inlined_WfModule m).
   Proof.
     specialize (Wf_cond (inlined_WfModule m)) as Wf1.

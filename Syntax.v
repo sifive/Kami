@@ -1759,13 +1759,13 @@ Definition inlineSingle_Meths_pos newMeths n :=
 Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (0 upto (length meths)) meths.
 
 Definition inlineAll_All regs rules meths :=
-  (Base (BaseMod regs (inlineAll_Rules (inlineAll_Meths meths) rules) (inlineAll_Meths meths))).
+  (BaseMod regs (inlineAll_Rules (inlineAll_Meths meths) rules) (inlineAll_Meths meths)).
 
 Definition inlineAll_All_module m :=
   inlineAll_All (getAllRegisters m) (getAllRules m) (getAllMethods m).
 
 Definition flatten_inline_everything m :=
-  createHideMod (inlineAll_All_module m) (getHidden m).
+  createHide (inlineAll_All_module m) (getHidden m).
 
 
 
