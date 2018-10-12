@@ -443,7 +443,7 @@ Section PPlusTraceInclusion.
       + apply WeakInclusion_flat_WeakInclusion; assumption.
   Qed.
   
-  Lemma StrongPPlusTraceInclusion_PPlusTraceInclusion m m' :
+  Theorem StrongPPlusTraceInclusion_PPlusTraceInclusion m m' :
     StrongPPlusTraceInclusion m m' ->
     PPlusTraceInclusion m m'.
   Proof.
@@ -474,7 +474,7 @@ Section PPlusTraceInclusion.
         apply H0; setoid_rewrite H10; assumption.
   Qed.
   
-  Lemma PPlusTraceInclusion_PTraceInclusion (m m' : BaseModule) :
+  Theorem PPlusTraceInclusion_PTraceInclusion (m m' : BaseModule) :
     PPlusTraceInclusion m m' ->
     PTraceInclusion (Base m) (Base m').
   Proof.
@@ -489,7 +489,7 @@ Section PPlusTraceInclusion.
       apply (WeakInclusions_flat_PermutationEquivLists_r _ _ H1 H2 H3 H4).
   Qed.
 
-  Corollary PPlusTraceInclusion_TraceInclusion (m m' : BaseModule) (Wfm : forall ty, WfMod ty (Base m)) (Wfm' : forall ty, WfMod ty (Base m')):
+  Theorem PPlusTraceInclusion_TraceInclusion (m m' : BaseModule) (Wfm : forall ty, WfMod ty (Base m)) (Wfm' : forall ty, WfMod ty (Base m')):
     PPlusTraceInclusion m m' ->
     TraceInclusion (Base m) (Base m').
   Proof.
@@ -2036,7 +2036,7 @@ Proof.
          unfold WeakInclusion_flat; split; intros; auto.
 Qed.
 
-Corollary TraceInclusion_inlining_Rules_r m f rn :
+Theorem TraceInclusion_inlining_Rules_r m f rn :
   In f (getMethods m) ->
   (forall ty, WfMod ty (Base m)) ->
   TraceInclusion (Base m) (Base (inlineSingle_Rule_BaseModule f rn m)).
@@ -2794,7 +2794,7 @@ Proof.
            unfold WeakInclusion_flat; split; intros; auto.
 Qed.
 
-Corollary TraceInclusion_inlining_Meth_r m f gn :
+Theorem TraceInclusion_inlining_Meth_r m f gn :
   In f (getMethods m) ->
   (forall ty, WfMod ty (Base m)) ->
   TraceInclusion (Base m) (Base (inlineSingle_Meth_BaseModule f gn m)).
@@ -3031,7 +3031,7 @@ Proof.
     rewrite inlineSingle_transform_gt; auto.
 Qed.
 
-Lemma inline_meth_transform f regs rules meths:
+Theorem inline_meth_transform f regs rules meths:
   (forall ty, WfMod ty (Base (BaseMod regs rules meths))) ->
   In f meths ->
   forall i,
@@ -3051,7 +3051,7 @@ Proof.
     apply TraceInclusion_refl.
 Qed.
 
-Lemma inline_rule_transform f regs rules meths:
+Theorem inline_rule_transform f regs rules meths:
   (forall ty, WfMod ty (Base (BaseMod regs rules meths))) ->
   In f meths ->
   forall i,
@@ -3076,7 +3076,7 @@ Section inlineSingle_nth.
   Variable (regs: list RegInitT) (rules: list RuleT) (meths: list DefMethT).
   Variable (Wf : forall ty, WfMod ty (Base (BaseMod regs rules meths))).
 
-  Lemma inline_meth_fold_right xs:
+  Theorem inline_meth_fold_right xs:
     In f meths ->
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs))).
   Proof.
@@ -3090,7 +3090,7 @@ Section inlineSingle_nth.
       apply (TraceInclusion_trans IHxs P3).
   Qed.
 
-  Lemma inline_rule_fold_right xs:
+  Theorem inline_rule_fold_right xs:
     In f meths ->
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (fold_right (transform_nth_right (inlineSingle_Rule f)) rules xs) meths)).
   Proof.
@@ -3104,7 +3104,7 @@ Section inlineSingle_nth.
   Qed.
 End inlineSingle_nth.
 
-Corollary TraceInclusion_inline_BaseModule_rules regs rules meths f:
+Theorem TraceInclusion_inline_BaseModule_rules regs rules meths f:
   (forall ty, WfMod ty (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (map (inlineSingle_Rule f) rules) meths)).
@@ -3117,7 +3117,7 @@ Proof.
   assumption.
 Qed.
 
-Corollary TraceInclusion_inline_BaseModule_meths regs rules meths f:
+Theorem TraceInclusion_inline_BaseModule_meths regs rules meths f:
   (forall ty, WfMod ty (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (map (inlineSingle_Meth f) meths))).
@@ -3131,7 +3131,7 @@ Qed.
 
 
 
-Corollary TraceInclusion_inline_BaseModule_all regs rules meths f:
+Theorem TraceInclusion_inline_BaseModule_all regs rules meths f:
   (forall ty, WfMod ty (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs rules meths)) (Base (inlineSingle_BaseModule f regs rules meths)).
@@ -3148,7 +3148,7 @@ Qed.
 
 
 Section inline_all_all.
-  Lemma TraceInclusion_inlineSingle_pos_Rules regs rules meths:
+  Theorem TraceInclusion_inlineSingle_pos_Rules regs rules meths:
     (forall ty, WfMod ty (Base (BaseMod regs rules meths))) ->
     forall n,
       (forall ty, WfMod ty (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths))) /\
@@ -3166,7 +3166,7 @@ Section inline_all_all.
       eapply nth_error_In; eauto.
   Qed.
 
-  Lemma TraceInclusion_inlineAll_pos_Rules regs rules meths:
+  Theorem TraceInclusion_inlineAll_pos_Rules regs rules meths:
     (forall ty, WfMod ty (Base (BaseMod regs rules meths))) ->
     (forall ty, WfMod ty (Base (BaseMod regs (inlineAll_Rules meths rules) meths))) /\
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (inlineAll_Rules meths rules) meths)).
@@ -3182,7 +3182,7 @@ Section inline_all_all.
     eapply TraceInclusion_trans; eauto.
   Qed.
   
-  Lemma TraceInclusion_inlineSingle_pos_Meths regs rules meths:
+  Theorem TraceInclusion_inlineSingle_pos_Meths regs rules meths:
     (forall ty, WfMod ty (Base (BaseMod regs rules meths))) ->
     forall n,
       (forall ty, WfMod ty (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n)))) /\
@@ -3200,7 +3200,7 @@ Section inline_all_all.
       eapply nth_error_In; eauto.
   Qed.
 
-  Lemma TraceInclusion_inlineAll_pos_Meths regs rules meths:
+  Theorem TraceInclusion_inlineAll_pos_Meths regs rules meths:
     (forall ty, WfMod ty (Base (BaseMod regs rules meths))) ->
     (forall ty, WfMod ty (Base (BaseMod regs rules (inlineAll_Meths meths)))) /\
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (inlineAll_Meths meths))).
@@ -3216,7 +3216,7 @@ Section inline_all_all.
     eapply TraceInclusion_trans; eauto.
   Qed.
 
-  Lemma TraceInclusion_inlineAll_pos regs rules meths:
+  Theorem TraceInclusion_inlineAll_pos regs rules meths:
     (forall ty, WfMod ty (Base (BaseMod regs rules meths))) ->
     (forall ty, WfMod ty (inlineAll_All regs rules meths)) /\
     TraceInclusion (Base (BaseMod regs rules meths)) (inlineAll_All regs rules meths).
@@ -3496,7 +3496,7 @@ Section flatten_and_inline_all.
              simpl in *; apply NoDupKey_Expand; auto)).
   Qed.
   
-  Lemma TraceInclusion_flatten_inline_r (m : WfModule) :
+  Theorem TraceInclusion_flatten_inline_r (m : WfModule) :
     TraceInclusion m (inlined_WfModule m).
   Proof.
     specialize (Wf_cond (inlined_WfModule m)) as Wf1.

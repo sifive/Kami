@@ -2728,6 +2728,22 @@ Proof.
         apply mergeSeparatedBaseFile_noHides.
 Qed.
 
+Lemma WfMod_getFlat m:
+  (forall ty, WfMod ty m) ->
+  (forall ty, WfMod ty (Base (getFlat m))).
+Proof.
+  intros.
+  pose proof (WfNoDups H).
+  pose proof (WfMod_WfBaseMod_flat H).
+  specialize (H ty).
+  unfold getFlat in *.
+  specialize (H1 ty).
+  constructor; tauto.
+Qed.
+
+Definition WfGetFlatMod (m: WfModule) : WfModule :=
+  (mkWfMod (fun ty => Wf_cond m ty)).
+
 Definition WfMergedMod (m : WfModule) :  WfModule :=
   (mkWfMod (fun ty => merged_WellFormed (Wf_cond m ty))).
 

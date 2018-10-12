@@ -1950,6 +1950,12 @@ Proof.
   induction l; simpl; auto; intros.
 Qed.
   
+Lemma createHideMod_Meths: forall m l, getAllMethods (createHideMod m l) = getAllMethods m.
+Proof.
+  intros.
+  induction l; simpl; auto; intros.
+Qed.
+  
 Lemma getFlat_Hide m s:
   getFlat (HideMeth m s) = getFlat m.
 Proof.
@@ -3525,6 +3531,19 @@ Proof.
       destruct (IHl HWf); assumption.
   - unfold SubList; induction l; simpl; intros; try tauto; dest; constructor.
     + rewrite createHide_Meths; apply (H a); left; reflexivity.
+    + apply IHl; intros; split;auto.
+Qed.
+
+Lemma WfMod_createHideMod l: forall ty m, WfMod ty (createHideMod m l) <-> (SubList l (map fst (getAllMethods m)) /\ WfMod ty m).
+Proof.
+  split.
+  - induction l; simpl; intros; split; unfold SubList; simpl; intros; try tauto.
+    + inv H.
+      destruct H0; subst; rewrite createHideMod_Meths in *; firstorder fail.
+    + inv H.
+      destruct (IHl HWf); assumption.
+  - unfold SubList; induction l; simpl; intros; try tauto; dest; constructor.
+    + rewrite createHideMod_Meths; apply (H a); left; reflexivity.
     + apply IHl; intros; split;auto.
 Qed.
 

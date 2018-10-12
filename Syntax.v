@@ -1573,6 +1573,11 @@ Definition getCallsWithSignPerMod (m: Mod) :=
 
 Definition getCallsPerMod (m: Mod) := map fst (getCallsWithSignPerMod m).
 
+
+(* Utility functions *)
+
+(* TODO: For each of these functions, get a well-formedness theorem and possibly trace inclusion theorem *)
+
 Fixpoint createHide (m: BaseModule) (hides: list string) :=
   match hides with
   | nil => Base m
@@ -1584,6 +1589,10 @@ Fixpoint createHideMod (m : Mod) (hides : list string) : Mod :=
   | nil => m
   | h::hides' => HideMeth (createHideMod m hides') h
   end.
+
+Definition getFlat m := BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m).
+
+Definition flatten m := createHide (getFlat m) (getHidden m).
 
 Definition autoHide (m: Mod) := createHideMod m (filter (fun i => getBool (in_dec string_dec i (getCallsPerMod m)))
                                                         (map fst (getAllMethods m))).
@@ -1620,13 +1629,11 @@ Fixpoint mergeSeparatedBaseFile (rfl : list RegFileBase) : Mod :=
 Definition mergeSeparatedMod (tup: list string * (list RegFileBase * list BaseModule)) :=
   createHideMod (ConcatMod (mergeSeparatedBaseFile (fst (snd tup))) (mergeSeparatedBaseMod (snd (snd tup)))) (fst tup).
  
-Definition getFlat m := BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m).
-
-Definition flatten m := createHide (getFlat m) (getHidden m).
-
 Definition concatFlat m1 m2 := BaseMod (getRegisters m1 ++ getRegisters m2)
                                        (getRules m1 ++ getRules m2)
                                        (getMethods m1 ++ getMethods m2).
+
+(* Inlining *)
 
 
 Section inlineSingle.
@@ -1754,8 +1761,11 @@ Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (0 upto (le
 Definition inlineAll_All regs rules meths :=
   (Base (BaseMod regs (inlineAll_Rules (inlineAll_Meths meths) rules) (inlineAll_Meths meths))).
 
+Definition inlineAll_All_module m :=
+  inlineAll_All (getAllRegisters m) (getAllRules m) (getAllMethods m).
 
-
+Definition flatten_inline_everything m :=
+  createHideMod (inlineAll_All_module m) (getHidden m).
 
 
 
