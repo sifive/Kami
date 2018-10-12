@@ -493,7 +493,7 @@ Section PPlusTraceInclusion.
     PPlusTraceInclusion m m' ->
     TraceInclusion (Base m) (Base m').
   Proof.
-    intros; apply PTraceInclusion_TraceInclusion', PPlusTraceInclusion_PTraceInclusion; auto.
+    intros; apply PTraceInclusion_TraceInclusion, PPlusTraceInclusion_PTraceInclusion; auto.
   Qed.
 End PPlusTraceInclusion.
 

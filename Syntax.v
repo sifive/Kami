@@ -1690,7 +1690,7 @@ Fixpoint inlineSingle_Rule_in_list (f : DefMethT) (rn : string) (lr : list RuleT
                  end
   | nil => nil
   end.
-                                
+
 Definition inlineSingle_Rule_BaseModule (f : DefMethT) (rn : string) (m : BaseModule) :=
   BaseMod (getRegisters m) (inlineSingle_Rule_in_list f rn (getRules m)) (getMethods m).
 
@@ -1735,14 +1735,6 @@ Section inlineSingle_nth.
     BaseMod regs (fold_right (transform_nth_right (inlineSingle_Rule f)) rules xs) meths.
 End inlineSingle_nth.
 
-Definition inlineSingle_Meths_pos newMeths n :=
-  match nth_error newMeths n with
-  | Some f => map (inlineSingle_Meth f) newMeths
-  | None => newMeths
-  end.
-
-Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (0 upto (length meths)) meths.
-
 Definition inlineSingle_Rules_pos meths n rules :=
   match nth_error meths n with
   | Some f => map (inlineSingle_Rule f) rules
@@ -1750,6 +1742,14 @@ Definition inlineSingle_Rules_pos meths n rules :=
   end.
 
 Definition inlineAll_Rules meths rules := fold_left (fun newRules n => inlineSingle_Rules_pos meths n newRules) (0 upto (length meths)) rules.
+
+Definition inlineSingle_Meths_pos newMeths n :=
+  match nth_error newMeths n with
+  | Some f => map (inlineSingle_Meth f) newMeths
+  | None => newMeths
+  end.
+
+Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (0 upto (length meths)) meths.
 
 Definition inlineAll_All regs rules meths :=
   (Base (BaseMod regs (inlineAll_Rules (inlineAll_Meths meths) rules) (inlineAll_Meths meths))).

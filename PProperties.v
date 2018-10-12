@@ -1090,7 +1090,7 @@ Proof.
       rewrite H0; reflexivity.
 Qed.
 
-Lemma PTraceInclusion_TraceInclusion' m1 m2 :
+Lemma PTraceInclusion_TraceInclusion m1 m2 :
   (forall ty, WfMod ty m1) ->
   (forall ty, WfMod ty m2) ->
   PTraceInclusion m1 m2 -> TraceInclusion m1 m2.
@@ -1108,13 +1108,6 @@ Proof.
     apply (WeakInclusionsTrans H3 trans).
 Qed.
 
-Lemma PTraceInclusion_TraceInclusion (m1 m2: WfModule) :
-  PTraceInclusion m1 m2 -> TraceInclusion m1 m2.
-Proof.
-  destruct m1, m2;
-    eapply PTraceInclusion_TraceInclusion'; auto.
-Qed.
-  
 Section PSubsteps_rewrite.
   
   Lemma PSubsteps_rewrite_regs m o1 o2 l:
@@ -2751,7 +2744,7 @@ Qed.
 Theorem TraceInclusion_Merge_l (m : WfModule) :
   TraceInclusion m (mergeSeparatedMod (separateMod m)).
 Proof.
-  apply PTraceInclusion_TraceInclusion'.
+  apply PTraceInclusion_TraceInclusion.
   - apply (Wf_cond m).
   - apply (Wf_cond (WfMergedMod m)).
   - repeat intro.
@@ -2765,7 +2758,7 @@ Qed.
 Theorem TraceInclusion_Merge_r (m : WfModule) :
   TraceInclusion (mergeSeparatedMod (separateMod m)) m.
 Proof.
-  apply PTraceInclusion_TraceInclusion'.
+  apply PTraceInclusion_TraceInclusion.
   - apply (Wf_cond (WfMergedMod m)).
   - apply (Wf_cond m).
   - repeat intro.
@@ -2775,3 +2768,64 @@ Proof.
     + unfold PTraceList; exists o; eauto.
     + apply WeakInclusionsRefl.
 Qed.
+
+Section Comm.
+  Variable m1 m2: Mod.
+  Variable wfMod: forall ty, WfMod ty (m1 ++ m2)%kami.
+
+  Theorem ConcatMod_comm:
+    TraceInclusion (m1 ++ m2)%kami (m2 ++ m1)%kami.
+  Proof.
+    apply PTraceInclusion_TraceInclusion; auto.
+    - intros; eapply WfConcatComm; eauto.
+    - unfold PTraceInclusion, TraceList.
+      intros.
+      assert (sth: forall ty, WfMod ty (m2 ++ m1)%kami) by (intros; specialize (wfMod ty); eapply WfConcatComm; eauto).
+      assert (sth2: WfModule_perm (mkWfMod wfMod) (mkWfMod sth)) by
+          (constructor; simpl; auto; apply Permutation_app_comm).
+      pose proof (@PTrace_WfModule_rewrite (mkWfMod wfMod) (mkWfMod sth) o ls sth2 H).
+      exists ls.
+      split.
+      + exists o; auto.
+      + apply WeakInclusionsRefl.
+  Qed.
+End Comm.
+
+Section Assoc.
+  Variable m1 m2 m3: Mod.
+  Variable wfMod: forall ty, WfMod ty ((m1 ++ m2) ++ m3)%kami.
+
+  Theorem ConcatModAssoc1:
+    TraceInclusion (m1 ++ (m2 ++ m3))%kami ((m1 ++ m2) ++ m3)%kami.
+  Proof.
+    apply PTraceInclusion_TraceInclusion; auto.
+    - intros; eapply WfConcatAssoc2; eauto.
+    - unfold PTraceInclusion, TraceList.
+      intros.
+      assert (sth: forall ty, WfMod ty (m1 ++ (m2 ++ m3))%kami) by (intros; specialize (wfMod ty); eapply WfConcatAssoc2; eauto).
+      assert (sth2: WfModule_perm (mkWfMod sth) (mkWfMod wfMod)) by
+        (constructor; simpl; rewrite app_assoc; auto).
+      pose proof (@PTrace_WfModule_rewrite (mkWfMod sth) (mkWfMod wfMod) o ls sth2 H).
+      exists ls.
+      split.
+      + exists o; auto.
+      + apply WeakInclusionsRefl.
+  Qed.
+
+  Theorem ConcatModAssoc2:
+    TraceInclusion ((m1 ++ m2) ++ m3)%kami (m1 ++ (m2 ++ m3))%kami.
+  Proof.
+    apply PTraceInclusion_TraceInclusion; auto.
+    - intros; eapply WfConcatAssoc2; eauto.
+    - unfold PTraceInclusion, TraceList.
+      intros.
+      assert (sth: forall ty, WfMod ty (m1 ++ (m2 ++ m3))%kami) by (intros; specialize (wfMod ty); eapply WfConcatAssoc2; eauto).
+      assert (sth2: WfModule_perm (mkWfMod wfMod) (mkWfMod sth)) by
+        (constructor; simpl; rewrite app_assoc; auto).
+      pose proof (@PTrace_WfModule_rewrite (mkWfMod wfMod) (mkWfMod sth) o ls sth2 H).
+      exists ls.
+      split.
+      + exists o; auto.
+      + apply WeakInclusionsRefl.
+  Qed.
+End Assoc.
