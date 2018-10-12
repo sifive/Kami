@@ -6,6 +6,153 @@ Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
 Require Import ZArith.
 
+
+Definition filterRegs f m (o: RegsT) :=
+  filter (fun x => f (getBool (in_dec string_dec (fst x) (map fst (getAllRegisters m))))) o.
+
+Definition filterExecs f m (l: list FullLabel) :=
+  filter (fun x => f match fst (snd x) with
+                     | Rle y =>
+                       getBool (in_dec string_dec y (map fst (getAllRules m)))
+                     | Meth (y, _) =>
+                       getBool (in_dec string_dec y (map fst (getAllMethods m)))
+                     end) l.
+
+Definition WeakEqualities ls ls' := WeakInclusions ls ls' /\ WeakInclusions ls' ls.
+
+Definition PStepSubstitute m o l :=
+  PSubsteps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
+  MatchingExecCalls_Base l (getFlat m) /\
+  (forall s v, In s (map fst (getAllMethods m)) ->
+               In s (getHidden m) ->
+               (getListFullLabel_diff (s, v) l = 0%Z)).
+
+Definition StepSubstitute m o l :=
+  Substeps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
+  MatchingExecCalls_Base l (getFlat m) /\
+  (forall s v, In s (map fst (getAllMethods m)) ->
+               In s (getHidden m) ->
+               (getListFullLabel_diff (s, v) l = 0%Z)).
+
+Definition InExec f (l: list (RegsT * (RuleOrMeth * MethsT))) :=
+  In (Meth f) (map getRleOrMeth l).
+
+Definition InCall f (l: list (RegsT * (RuleOrMeth * MethsT))) :=
+  exists x, In x l /\ In f (snd (snd x)).
+
+Lemma Kind_eq: forall k, Kind_dec k k = left eq_refl.
+Proof.
+  intros; destruct (Kind_dec k k).
+  - f_equal.
+    apply Eqdep_dec.UIP_dec.
+    apply Kind_dec.
+  - apply (match n eq_refl with end).
+Qed.
+
+Lemma Signature_eq: forall sig, Signature_dec sig sig = left eq_refl.
+Proof.
+  intros; destruct (Signature_dec sig sig).
+  - f_equal.
+    apply Eqdep_dec.UIP_dec.
+    apply Signature_dec.
+  - apply (match n eq_refl with end).
+Qed.
+
+Section InverseSemAction.
+  Variable o: RegsT.
+
+  Theorem inversionSemAction
+          k a reads news calls retC
+          (evalA: @SemAction o k a reads news calls retC):
+    match a with
+    | MCall m s e c =>
+      exists mret pcalls,
+      SemAction o (c mret) reads news pcalls retC /\
+      calls = (m, (existT _ _ (evalExpr e, mret))) :: pcalls
+    | LetExpr _ e cont =>
+      SemAction o (cont (evalExpr e)) reads news calls retC
+    | LetAction _ a cont =>
+      exists reads1 news1 calls1 reads2 news2 calls2 r1,
+      DisjKey news1 news2 /\
+      SemAction o a reads1 news1 calls1 r1 /\
+      SemAction o (cont r1) reads2 news2 calls2 retC /\
+      reads = reads1 ++ reads2 /\
+      news = news1 ++ news2 /\
+      calls = calls1 ++ calls2
+    | ReadNondet k c =>
+      exists rv,
+      SemAction o (c rv) reads news calls retC
+    | ReadReg r k c =>
+      exists rv reads2,
+      In (r, existT _ k rv) o /\
+      SemAction o (c rv) reads2 news calls retC /\
+      reads = (r, existT _ k rv) :: reads2
+    | WriteReg r k e a =>
+      exists pnews,
+      In (r, k) (getKindAttr o) /\
+      key_not_In r pnews /\
+      SemAction o a reads pnews calls retC /\
+      news = (r, (existT _ _ (evalExpr e))) :: pnews
+    | IfElse p _ aT aF c =>
+      exists reads1 news1 calls1 reads2 news2 calls2 r1,
+      DisjKey news1 news2 /\
+      match evalExpr p with
+      | true =>
+        SemAction o aT reads1  news1 calls1 r1 /\
+        SemAction o (c r1) reads2 news2 calls2 retC /\
+        reads = reads1 ++ reads2 /\
+        news = news1 ++ news2 /\
+        calls = calls1 ++ calls2
+      | false =>
+        SemAction o aF reads1 news1 calls1 r1 /\
+        SemAction o (c r1) reads2 news2 calls2 retC /\
+        reads = reads1 ++ reads2 /\
+        news = news1 ++ news2 /\
+        calls = calls1 ++ calls2
+      end
+    | Assertion e c =>
+      SemAction o c reads news calls retC /\
+      evalExpr e = true
+    | Sys _ c =>
+      SemAction o c reads news calls retC
+    | Return e =>
+      retC = evalExpr e /\
+      news = nil /\
+      calls = nil
+    end.
+  Proof.
+    destruct evalA; eauto; repeat eexists; try destruct (evalExpr p); eauto; try discriminate.
+  Qed.
+
+  Lemma convertLetExprSyntax_ActionT_same k (e: LetExprSyntax type k):
+    SemAction o (convertLetExprSyntax_ActionT e) nil nil nil (evalLetExpr e).
+  Proof.
+    induction e; simpl; try constructor; auto.
+    specialize (H (evalLetExpr e)).
+    pose proof (SemLetAction (fun v => convertLetExprSyntax_ActionT (cont v)) (@DisjKey_nil_l string _ nil) IHe H) as sth.
+    rewrite ?(app_nil_l nil) in sth.
+    auto.
+  Qed.
+
+  Lemma SemActionReadsSub k a reads upds calls ret:
+    @SemAction o k a reads upds calls ret ->
+    SubList reads o.
+  Proof.
+    induction 1; auto;
+      unfold SubList in *; intros;
+        rewrite ?in_app_iff in *.
+    - firstorder.
+    - repeat (subst; firstorder).
+    - subst.
+      rewrite in_app_iff in H1.
+      destruct H1; intuition.
+    - subst.
+      rewrite in_app_iff in H1.
+      destruct H1; intuition.
+    - subst; simpl in *; intuition.
+  Qed.
+End InverseSemAction.
+
 Section evalExpr.
 
   Lemma castBits_same ty ni no (pf: ni = no) (e: Expr ty (SyntaxKind (Bit ni))): castBits pf e = match pf in _ = Y return Expr ty (SyntaxKind (Bit Y)) with
@@ -80,10 +227,6 @@ Section evalExpr.
     rewrite evalExpr_castBits.
     repeat f_equal.
   Qed.
-
-
-
-
 End evalExpr.
 
 
@@ -318,6 +461,12 @@ Global Instance getNumExecs_perm_rewrite' :
 Proof.
   repeat red; intros; subst; eauto using getNumExecs_perm_rewrite.
 Qed.
+
+Definition UpdRegs' (u: list RegsT) (o o': RegsT)
+  := map fst o = map fst o' /\
+     (forall s v, In (s, v) o' -> ((exists x, In x u /\ In (s, v) x) \/
+                                   ((~ exists x, In x u /\ In s (map fst x)) /\ In (s, v) o))).
+
 
 Lemma UpdRegs_same: forall u o o', UpdRegs u o o' -> UpdRegs' u o o'.
 Proof.
@@ -1483,7 +1632,7 @@ Proof.
         firstorder fail.
 Qed.
 
-Lemma TraceInclusion_refl: forall m, TraceInclusion m m.
+Theorem TraceInclusion_refl: forall m, TraceInclusion m m.
 Proof.
   unfold TraceInclusion; intros.
   exists o1, ls1.
@@ -1493,9 +1642,9 @@ Proof.
   repeat split; intros; tauto.
 Qed.
 
-Lemma TraceInclusion_trans: forall m1 m2 m3, TraceInclusion m1 m2 ->
-                                             TraceInclusion m2 m3 ->
-                                             TraceInclusion m1 m3.
+Theorem TraceInclusion_trans: forall m1 m2 m3, TraceInclusion m1 m2 ->
+                                               TraceInclusion m2 m3 ->
+                                               TraceInclusion m1 m3.
 Proof.
   unfold TraceInclusion; intros.
   specialize (H _ _ H1); dest.
@@ -1685,7 +1834,7 @@ Section StepSimulation.
           rewrite nthProp2_cons; split; auto.
   Qed.
 
-  Lemma StepDecomposition:
+  Theorem StepDecomposition:
     TraceInclusion imp spec.
   Proof.
     unfold TraceInclusion; intros.
@@ -1736,7 +1885,7 @@ Section DecompositionZero.
              UpdRegs [uSpec] oSpec oSpec' /\
              simRel oImp' oSpec')).
 
-  Lemma decompositionZero:
+  Theorem decompositionZero:
     TraceInclusion (Base imp) (Base spec).
   Proof.
     apply StepDecomposition with (simRel := simRel); auto; intros.
@@ -1801,6 +1950,12 @@ Proof.
   induction l; simpl; auto; intros.
 Qed.
   
+Lemma createHideMod_Meths: forall m l, getAllMethods (createHideMod m l) = getAllMethods m.
+Proof.
+  intros.
+  induction l; simpl; auto; intros.
+Qed.
+  
 Lemma getFlat_Hide m s:
   getFlat (HideMeth m s) = getFlat m.
 Proof.
@@ -1814,8 +1969,8 @@ Proof.
   auto.
 Qed.
 
-Lemma WfMod_Hidden m:
-  WfMod m ->
+Lemma WfMod_Hidden ty m:
+  WfMod ty m ->
   forall s, In s (getHidden m) -> In s (map fst (getAllMethods m)).
 Proof.
   induction 1; simpl; auto; intros.
@@ -1905,7 +2060,7 @@ Proof.
       rewrite ?map_app; congruence.
     + econstructor 2; eauto; simpl; rewrite ?map_app; try congruence.
       * rewrite in_app_iff; right; eassumption.
-      * pose proof (SemActionReadsSub m2 HAction).
+      * pose proof (SemActionReadsSub HAction).
         pose proof (SemActionUpdSub HAction).
         eapply SemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; right.
         -- eapply H0; eauto.
@@ -1918,7 +2073,7 @@ Proof.
           unfold InCall in *; simpl in *; dest; tauto.
     + econstructor 3; eauto; simpl; rewrite ?map_app; try congruence.
       * rewrite in_app_iff; right; eassumption.
-      * pose proof (SemActionReadsSub m2 HAction).
+      * pose proof (SemActionReadsSub HAction).
         pose proof (SemActionUpdSub HAction).
         eapply SemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; right.
         -- eapply H0; eauto.
@@ -1937,7 +2092,7 @@ Proof.
     econstructor 2; eauto; simpl; rewrite ?map_app; try congruence.
     + inv H0; congruence.
     + rewrite in_app_iff; left; eassumption.
-    + pose proof (SemActionReadsSub m1 HAction).
+    + pose proof (SemActionReadsSub HAction).
       pose proof (SemActionUpdSub HAction).
       eapply SemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; left.
       * eapply H1; eauto.
@@ -1971,7 +2126,7 @@ Proof.
     econstructor 3; eauto; simpl; rewrite ?map_app; try congruence.
     + inv H0; congruence.
     + rewrite in_app_iff; left; eassumption.
-    + pose proof (SemActionReadsSub m1 HAction).
+    + pose proof (SemActionReadsSub HAction).
       pose proof (SemActionUpdSub HAction).
       eapply SemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; left.
       * eapply H1; eauto.
@@ -2012,8 +2167,8 @@ Lemma flatten_Substeps m o l:
   - econstructor 3; eauto.
 Qed.
 
-Lemma Step_substitute' m o l:
-  Step m o l -> forall (HWfMod: WfMod m), StepSubstitute m o l.
+Lemma Step_substitute' ty m o l:
+  Step m o l -> forall (HWfMod: WfMod ty m), StepSubstitute m o l.
 Proof.
   unfold StepSubstitute.
   induction 1; auto; simpl; intros; dest; unfold MatchingExecCalls_Base in *; simpl in *.
@@ -2084,7 +2239,7 @@ Proof.
         destruct (HMatching1 _ n H7); contradiction.
 Qed.
 
-Lemma StepSubstitute_flatten m o l (HWfMod: WfMod m):
+Lemma StepSubstitute_flatten ty m o l (HWfMod: WfMod ty m):
   Step (flatten m) o l <-> StepSubstitute m o l.
 Proof.
   unfold flatten, getFlat, StepSubstitute.
@@ -2108,17 +2263,13 @@ Proof.
       rewrite createHide_Meths; auto.
 Qed.
     
-Lemma Step_substitute m o l (HWfMod: WfMod m):
+Lemma Step_substitute ty m o l (HWfMod: WfMod ty m):
   Step m o l -> Step (flatten m) o l.
 Proof.
   intros Stp.
-  apply Step_substitute' in Stp; auto.
-  rewrite StepSubstitute_flatten in *; auto.
+  apply (@Step_substitute' ty) in Stp; auto.
+  rewrite (@StepSubstitute_flatten ty) in *; auto.
 Qed.
-
-Definition concatFlat m1 m2 := BaseMod (getRegisters m1 ++ getRegisters m2)
-                                       (getRules m1 ++ getRules m2)
-                                       (getMethods m1 ++ getMethods m2).
 
 Lemma splitRegs o m1 m2 (DisjRegisters: DisjKey (getRegisters m1) (getRegisters m2)):
   getKindAttr o = getKindAttr (getRegisters m1 ++ getRegisters m2) ->
@@ -2405,10 +2556,11 @@ Proof.
   rewrite map_app, in_app_iff in *; firstorder fail.
 Qed.
 
-Ltac EqDep_subst :=
-  repeat match goal with
-         |[H : existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _] => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
-         end.
+Lemma Kind_Kind_dec: forall k1 k2: Kind * Kind, {k1 = k2} + {k1 <> k2}.
+Proof.
+  decide equality; subst;
+    apply Kind_dec.
+Qed.
 
 Lemma WfActionT_ReadsWellDefined : forall (k : Kind)(a : ActionT type k)(retl : type k)
                                           (m1 : BaseModule)(o readRegs newRegs : RegsT)(calls : MethsT),
@@ -2570,8 +2722,8 @@ Section SplitSubsteps.
   Variable DisjRules: DisjKey (getRules m1) (getRules m2).
   Variable DisjMeths: DisjKey (getMethods m1) (getMethods m2).
 
-  Variable WfMod1: WfBaseMod m1.
-  Variable WfMod2: WfBaseMod m2.
+  Variable WfMod1: forall ty, WfBaseMod ty m1.
+  Variable WfMod2: forall ty, WfBaseMod ty m2.
   
   Lemma filter_perm o l :
     Substeps (concatFlat m1 m2) o l ->
@@ -2651,7 +2803,8 @@ Section SplitSubsteps.
       destruct HInRules as [HInRules|HInRules];generalize (in_map fst _ _ HInRules);destruct DisjRules;try contradiction.
       + subst; dest; exists x, x0;split;[|split;[|split;[|split]]];auto.
         rewrite (InRules_Filter _ _ _ _ _ _ HInRules).
-        destruct WfMod1 as [WfMod_Rle1 WfMod_Meth1];destruct WfMod2 as [WfMod_Rle2 WfMod_Meth2]; specialize (WfActionT_ReadsWellDefined (WfMod_Rle1 _ HInRules) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined (WfMod_Rle1 _ HInRules) HAction) as Writes_sublist.
+        destruct (WfMod1 type) as [WfMod_Rle1 WfMod_Meth1];destruct (WfMod2 type) as [WfMod_Rle2 WfMod_Meth2].
+        specialize (WfActionT_ReadsWellDefined (WfMod_Rle1 _ HInRules) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined (WfMod_Rle1 _ HInRules) HAction) as Writes_sublist.
         constructor 2 with (rn:= rn)(rb:=rb)(reads:=reads)(u:=u)(cs:=cs)(ls:=(ModuleFilterLabels m1 ls)); auto.
         * specialize (app_sublist_l _ _ H6) as SL_o_x.
           specialize (WfMod_Rle1 (rn, rb) HInRules); specialize (WfActionT_SemAction WfMod_Rle1 H2 HAction SL_o_x H4).
@@ -2666,7 +2819,7 @@ Section SplitSubsteps.
       + subst; dest; exists x, x0; split;[|split;[|split;[|split]]];auto.
         rewrite (NotInRules_Filter _ _ _ _ _ H3); assumption.
         rewrite (InRules_Filter _ _ _ _ _ _ HInRules).
-        destruct WfMod1 as [WfMod_Rle1 WfMod_Meth1];destruct WfMod2 as [WfMod_Rle2 WfMod_Meth2]; specialize (WfActionT_ReadsWellDefined (WfMod_Rle2 _ HInRules) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined (WfMod_Rle2 _ HInRules) HAction) as Writes_sublist.
+        destruct (WfMod1 type) as [WfMod_Rle1 WfMod_Meth1];destruct (WfMod2 type) as [WfMod_Rle2 WfMod_Meth2]; specialize (WfActionT_ReadsWellDefined (WfMod_Rle2 _ HInRules) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined (WfMod_Rle2 _ HInRules) HAction) as Writes_sublist.
         constructor 2 with (rn:= rn)(rb:=rb)(reads:=reads)(u:=u)(cs:=cs)(ls:=(ModuleFilterLabels m2 ls)); auto.
         * specialize (app_sublist_r _ _ H6) as SL_o_x.
           specialize (WfMod_Rle2 (rn, rb) HInRules); specialize (WfActionT_SemAction WfMod_Rle2 H2 HAction SL_o_x H5).
@@ -2682,7 +2835,7 @@ Section SplitSubsteps.
       destruct HInMeths as [HInMeths|HInMeths];generalize (in_map fst _ _ HInMeths);destruct DisjMeths;try contradiction;intros.
       + subst; dest; exists x, x0;split;[|split;[|split;[|split]]];auto.
         * rewrite (InMethods_Filter _ _ _ _ _ _ _ _ HInMeths).
-          destruct WfMod1 as [WfMod_Rle1 WfMod_Meth1];destruct WfMod2 as [WfMod_Rle2 WfMod_Meth2]; specialize (WfActionT_ReadsWellDefined (WfMod_Meth1 (fn, fb) HInMeths argV) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined (WfMod_Meth1 (fn, fb) HInMeths argV) HAction) as Writes_sublist.
+          destruct (WfMod1 type) as [WfMod_Rle1 WfMod_Meth1];destruct (WfMod2 type) as [WfMod_Rle2 WfMod_Meth2]; specialize (WfActionT_ReadsWellDefined (WfMod_Meth1 (fn, fb) HInMeths argV) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined (WfMod_Meth1 (fn, fb) HInMeths argV) HAction) as Writes_sublist.
           constructor 3 with (fn:=fn)(fb:=fb)(reads:=reads)(u:=u)(cs:=cs)(argV:=argV)(retV:=retV)(ls:=(ModuleFilterLabels m1 ls)); auto.
           -- specialize (app_sublist_l _ _ H7) as SL_o_x.
              specialize (WfMod_Meth1 (fn, fb) HInMeths argV); specialize (WfActionT_SemAction WfMod_Meth1 H2 HAction SL_o_x H5).
@@ -2694,7 +2847,7 @@ Section SplitSubsteps.
       + subst; dest; exists x, x0;split;[|split;[|split;[|split]]]; auto.
         * rewrite (NotInMethods_Filter _ _ _ _ _ _ _ _ H3); assumption.
         * rewrite (InMethods_Filter _ _ _ _ _ _ _ _ HInMeths).
-          destruct WfMod1 as [WfMod_Rle1 WfMod_Meth1];destruct WfMod2 as [WfMod_Rle2 WfMod_Meth2]; specialize (WfActionT_ReadsWellDefined (WfMod_Meth2 (fn, fb) HInMeths argV) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined (WfMod_Meth2 (fn, fb) HInMeths argV) HAction) as Writes_sublist.
+          destruct (WfMod1 type) as [WfMod_Rle1 WfMod_Meth1];destruct (WfMod2 type) as [WfMod_Rle2 WfMod_Meth2]; specialize (WfActionT_ReadsWellDefined (WfMod_Meth2 (fn, fb) HInMeths argV) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined (WfMod_Meth2 (fn, fb) HInMeths argV) HAction) as Writes_sublist.
           constructor 3 with (fn:=fn)(fb:=fb)(reads:=reads)(u:=u)(cs:=cs)(argV:=argV)(retV:=retV)(ls:=(ModuleFilterLabels m2 ls)); auto.
           -- specialize (app_sublist_r _ _ H7) as SL_o_x.
              specialize (WfMod_Meth2 (fn, fb) HInMeths argV); specialize (WfActionT_SemAction WfMod_Meth2 H2 HAction SL_o_x H6).
@@ -2835,11 +2988,12 @@ Lemma WeakEqualitySym : forall l1 l2, WeakEquality l1 l2 -> WeakEquality l2 l1.
   firstorder.
 Qed.
 
-Lemma WfNoDups m (HWfMod : WfMod m) :
+Lemma WfNoDups m (HWfMod : forall ty, WfMod ty m) :
     NoDup (map fst (getAllRegisters m)) /\
     NoDup (map fst (getAllMethods m))   /\
     NoDup (map fst (getAllRules m)).
 Proof.
+  specialize (HWfMod (fun _ => unit)).
   induction m.
   - split;[|split];inversion HWfMod; assumption.
   - inversion HWfMod; subst; apply IHm in HWf.
@@ -2886,9 +3040,11 @@ Proof.
         -- inversion_clear ND_Rles1; assumption.
 Qed.
 
-Lemma WfMod_WfBaseMod_flat m (HWfMod : WfMod m):
-  WfBaseMod (getFlat m).
+Lemma WfMod_WfBaseMod_flat m (HWfMod : forall ty, WfMod ty m):
+  forall ty, WfBaseMod ty (getFlat m).
 Proof.
+  intros ty.
+  specialize (HWfMod ty).
   unfold getFlat;induction m.
   - simpl; inversion HWfMod; subst; destruct WfBaseModule.
     unfold WfBaseMod in *; split; intros.
@@ -2947,36 +3103,40 @@ Proof.
 Qed.
 
 Lemma WfConcats : forall (m1 m2 : Mod) (o : RegsT)(l : list FullLabel),
-    WfConcat m2 m1 ->
+    (forall ty, WfConcat ty m2 m1) ->
     Substeps (getFlat m2) o l ->
     (forall (s: string)(v : {x : Kind*Kind & SignT x}), In s (getHidden m1) -> (getNumCalls (s, v) l = 0%Z)).
 Proof.
   intros.
   induction H0; subst.
   - reflexivity.
-  - inversion H; simpl in HInRules;specialize (H2 _ HInRules).
+  - specialize (H type).
+    inversion H; simpl in HInRules;specialize (H2 _ HInRules).
     rewrite getNumCalls_cons; rewrite IHSubsteps;simpl.
     assert (In (fst (s, v)) (getHidden m1)) as P1;auto.
     rewrite (getNumFromCalls_notIn _ _ (WfConcatNotInCalls _ H2 HAction P1)); ring.
-  - inversion H; simpl in HInMeths;specialize (H3 _ HInMeths argV).
+  - specialize (H type).
+    inversion H; simpl in HInMeths;specialize (H3 _ HInMeths argV).
     rewrite getNumCalls_cons; rewrite IHSubsteps;simpl.
     assert (In (fst (s, v)) (getHidden m1)) as P1;auto.
     rewrite (getNumFromCalls_notIn _ _ (WfConcatNotInCalls _ H3 HAction P1)); ring.
 Qed.
 
 Lemma WfConcats_Substeps : forall (m1 : Mod) m2 (o : RegsT)(l : list FullLabel),
-    WfConcat (Base m2) m1 ->
+    (forall ty, WfConcat ty (Base m2) m1) ->
     Substeps m2 o l ->
     forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z).
 Proof.
   intros.
   induction H0; subst.
   - reflexivity.
-  - inversion H; simpl in HInRules;specialize (H2 _ HInRules).
+  - specialize (H type).
+    inversion H; simpl in HInRules;specialize (H2 _ HInRules).
     rewrite getNumCalls_cons; rewrite IHSubsteps;simpl.
     assert (In (fst f) (getHidden m1)) as P1;auto.
     rewrite (getNumFromCalls_notIn _ _ (WfConcatNotInCalls _ H2 HAction P1)); ring.
-  - inversion H; simpl in HInMeths;specialize (H3 _ HInMeths argV).
+  - specialize (H type).
+    inversion H; simpl in HInMeths;specialize (H3 _ HInMeths argV).
     rewrite getNumCalls_cons; rewrite IHSubsteps;simpl.
     assert (In (fst f) (getHidden m1)) as P1;auto.
     rewrite (getNumFromCalls_notIn _ _ (WfConcatNotInCalls _ H3 HAction P1)); ring.
@@ -2985,7 +3145,7 @@ Qed.
 
 
 Lemma WfConcats_Step : forall (m1 m2 : Mod) (o : RegsT) (l : list FullLabel),
-    WfConcat m2 m1 ->
+    (forall ty, WfConcat ty m2 m1) ->
     Step m2 o l ->
     (forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z)).
 Proof.
@@ -2996,13 +3156,15 @@ Proof.
     specialize (IHStep H); auto.
   - unfold WfConcat in *; simpl in *.
     setoid_rewrite in_app_iff in H.
-    assert (sth1: (forall rule : RuleT, In rule (getAllRules m0) -> WfConcatActionT (snd rule type) m1) /\
-                  (forall meth : string * {x : Signature & MethodT x},
-                      In meth (getAllMethods m0) -> forall v : type (fst (projT1 (snd meth))), WfConcatActionT (projT2 (snd meth) type v) m1)) by
+    assert (sth1: forall ty,
+               (forall rule : RuleT, In rule (getAllRules m0) -> WfConcatActionT (snd rule ty) m1) /\
+               (forall meth : string * {x : Signature & MethodT x},
+                   In meth (getAllMethods m0) -> forall v : ty (fst (projT1 (snd meth))), WfConcatActionT (projT2 (snd meth) ty v) m1)) by
         (firstorder fail).
-    assert (sth2: (forall rule : RuleT, In rule (getAllRules m2) -> WfConcatActionT (snd rule type) m1) /\
-                  (forall meth : string * {x : Signature & MethodT x},
-                      In meth (getAllMethods m2) -> forall v : type (fst (projT1 (snd meth))), WfConcatActionT (projT2 (snd meth) type v) m1) ) by
+    assert (sth2: forall ty,
+               (forall rule : RuleT, In rule (getAllRules m2) -> WfConcatActionT (snd rule ty) m1) /\
+               (forall meth : string * {x : Signature & MethodT x},
+                   In meth (getAllMethods m2) -> forall v : ty (fst (projT1 (snd meth))), WfConcatActionT (projT2 (snd meth) ty v) m1) ) by
         (firstorder fail).
     specialize (IHStep1 sth1).
     specialize (IHStep2 sth2).
@@ -3011,7 +3173,7 @@ Qed.
 
 Lemma WfConcats_Trace : forall (m1 m2 : Mod) (o : RegsT) ls (l : list FullLabel),
     Trace m2 o ls ->
-    WfConcat m2 m1 ->
+    (forall ty, WfConcat ty m2 m1) ->
     forall i,
       nth_error ls i = Some l ->
       (forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z)).
@@ -3025,7 +3187,7 @@ Proof.
 Qed.
     
 
-Lemma substitute_Step' m (HWfMod: WfMod m):
+Lemma substitute_Step' m (HWfMod: forall ty, WfMod ty m):
   forall o l,
     StepSubstitute m o l ->
     exists l', Permutation l l' /\
@@ -3035,19 +3197,26 @@ Proof.
   induction m; simpl in *; intros; dest.
   - exists l; split;[apply Permutation_refl|constructor; auto].
     eapply Substeps_flatten; eauto.
-  - inv HWfMod.
-    assert (exists l' : list FullLabel, l [=] l' /\ Step m o l');[apply IHm;auto|dest;exists x;split;auto].
-    constructor 2; auto.
-    intros.
-    unfold getListFullLabel_diff in *;rewrite <-H2.
-    apply H1; auto.
-  - inv HWfMod.
+  - assert (exists l' : list FullLabel, l [=] l' /\ Step m o l');[apply IHm;auto|dest;exists x;split;auto].
+    + intros;
+        specialize (HWfMod ty);
+        inv HWfMod; auto.
+    + constructor 2; auto.
+      intros.
+      unfold getListFullLabel_diff in *;rewrite <-H2.
+      apply H1; auto.
+  - assert (HWf1: forall ty, WfMod ty m1) by (intros; specialize (HWfMod ty); inv HWfMod; auto).
+    assert (HWf2: forall ty, WfMod ty m2) by (intros; specialize (HWfMod ty); inv HWfMod; auto).
     specialize (IHm1 HWf1).
     specialize (IHm2 HWf2).
     destruct (WfNoDups HWf1) as [ND_Regs1 [ND_Meths1 ND_Rules1]].
     destruct (WfNoDups HWf2) as [ND_Regs2 [ND_Meths2 ND_Rules2]].
     specialize (WfMod_WfBaseMod_flat HWf1) as WfBaseMod1.
     specialize (WfMod_WfBaseMod_flat HWf2) as WfBaseMod2.
+    pose proof (HWfMod (fun _ => unit)) as hwfmod2.
+    assert (WfConcat1: forall ty, WfConcat ty m1 m2 ) by (intros; specialize (HWfMod ty); inv HWfMod; auto).
+    assert (WfConcat2: forall ty, WfConcat ty m2 m1 ) by (intros; specialize (HWfMod ty); inv HWfMod; auto).
+    inv hwfmod2.
     pose proof (@split_Substeps1 (getFlat m1) (getFlat m2) HDisjRegs HDisjRules HDisjMeths WfBaseMod1 WfBaseMod2 _ _  ND_Regs1 ND_Regs2 H);dest.
     assert (Substeps (BaseMod (getAllRegisters m1) (getAllRules m1) (getAllMethods m1)) x (ModuleFilterLabels (getFlat m1) l) /\
             MatchingExecCalls_Base (ModuleFilterLabels (getFlat m1) l) (getFlat m1) /\
@@ -3133,12 +3302,6 @@ Proof.
            ++  rewrite <- H15 in H18; rewrite <- H13 in H19.
                specialize (H17 _ _ H18 H19); assumption.
 Qed.
-
-Inductive WeakInclusions : list (list FullLabel) -> list (list (FullLabel)) -> Prop :=
-| WI_Nil : WeakInclusions nil nil
-| WI_Cons : forall (ls ls' : list (list FullLabel)) (l l' : list FullLabel), WeakInclusions ls ls' -> WeakInclusion l l' -> WeakInclusions (l::ls)(l'::ls').
-
-Definition WeakEqualities ls ls' := WeakInclusions ls ls' /\ WeakInclusions ls' ls.
 
 Lemma WeakInclusionsRefl l : WeakInclusions l l.
 Proof.
@@ -3256,13 +3419,13 @@ Proof.
   intros;unfold WeakEquality; split;[apply PermutationWI|apply PermutationWI;apply Permutation_sym];assumption.
 Qed.
 
-Lemma substitute_Step m o l (HWfMod: WfMod m):
+Lemma substitute_Step m o l (HWfMod: forall ty, WfMod ty m):
   Step (flatten m) o l ->
   exists l',
     Permutation l l' /\
     Step m o l'.
 Proof.
-  rewrite StepSubstitute_flatten in *; auto.
+  rewrite (@StepSubstitute_flatten (fun _ => unit)) in *; auto.
   apply substitute_Step'; auto.
 Qed.
 
@@ -3295,8 +3458,7 @@ Proof.
 Qed.
 
 Section TraceSubstitute.
-  Variable m: Mod.
-  Variable WfMod_m: WfMod m.
+  Variable m: WfModule.
 
   Lemma Trace_flatten_same1: forall o l,  Trace m o l -> Trace (flatten m) o l.
   Proof.
@@ -3305,8 +3467,9 @@ Section TraceSubstitute.
       unfold flatten.
       rewrite createHide_Regs.
       auto.
-    - apply Step_substitute in HStep; auto.
-      econstructor 2; eauto.
+    - apply (@Step_substitute type) in HStep; auto.
+      + econstructor 2; eauto.
+      + destruct m; auto.
   Qed.
 
   Lemma Trace_flatten_same2: forall o l, Trace (flatten m) o l -> (exists l', (PermutationEquivLists l l') /\ Trace m o l').
@@ -3320,9 +3483,10 @@ Section TraceSubstitute.
       + econstructor 2; eauto.
         apply (Permutation_map fst) in H2.
         eapply UpdRegs_perm; eauto.
+      + destruct m; auto.
   Qed.
 
-  Lemma TraceInclusion_flatten_r: TraceInclusion m (flatten m).
+  Theorem TraceInclusion_flatten_r: TraceInclusion m (flatten m).
   Proof.
     unfold TraceInclusion; intros.
     exists o1, ls1.
@@ -3330,7 +3494,7 @@ Section TraceSubstitute.
     apply Trace_flatten_same1; auto.
   Qed.
 
-  Lemma TraceInclusion_flatten_l: TraceInclusion (flatten m) m.
+  Theorem TraceInclusion_flatten_l: TraceInclusion (flatten m) m.
   Proof.
     apply TraceInclusion'_TraceInclusion.
     unfold TraceInclusion'; intros.
@@ -3342,7 +3506,6 @@ Section TraceSubstitute.
     - apply PermutationEquivLists_WeakInclusions.
       assumption.
   Qed.
-  
 End TraceSubstitute.
     
 Lemma SameTrace m1 m2:
@@ -3358,7 +3521,7 @@ Proof.
     repeat split; tauto.
 Qed.
 
-Lemma WfMod_createHide l: forall m, WfMod (createHide m l) <-> (SubList l (map fst (getMethods m)) /\ WfMod (Base m)).
+Lemma WfMod_createHide l: forall ty m, WfMod ty (createHide m l) <-> (SubList l (map fst (getMethods m)) /\ WfMod ty (Base m)).
 Proof.
   split.
   - induction l; simpl; intros; split; unfold SubList; simpl; intros; try tauto.
@@ -3371,14 +3534,27 @@ Proof.
     + apply IHl; intros; split;auto.
 Qed.
 
-Lemma WfActionT_flatten m k :
-  forall (a : ActionT type k),
+Lemma WfMod_createHideMod l: forall ty m, WfMod ty (createHideMod m l) <-> (SubList l (map fst (getAllMethods m)) /\ WfMod ty m).
+Proof.
+  split.
+  - induction l; simpl; intros; split; unfold SubList; simpl; intros; try tauto.
+    + inv H.
+      destruct H0; subst; rewrite createHideMod_Meths in *; firstorder fail.
+    + inv H.
+      destruct (IHl HWf); assumption.
+  - unfold SubList; induction l; simpl; intros; try tauto; dest; constructor.
+    + rewrite createHideMod_Meths; apply (H a); left; reflexivity.
+    + apply IHl; intros; split;auto.
+Qed.
+
+Lemma WfActionT_flatten ty m k :
+  forall (a : ActionT ty k),
     WfActionT m a <-> WfActionT (getFlat (Base m)) a.
 Proof.
   split; induction 1; econstructor; eauto.
 Qed.
 
-Lemma flatten_WfMod m: WfMod m -> WfMod (flatten m).
+Lemma flatten_WfMod ty m: WfMod ty m -> WfMod ty (flatten m).
 Proof.
   unfold flatten.
   induction 1; simpl; auto; intros.
@@ -3420,6 +3596,9 @@ Proof.
       * apply (NoDupKey_Expand NoDupRegs NoDupRegs0 HDisjRegs).
       * apply (NoDupKey_Expand NoDupRle NoDupRle0 HDisjRules).
 Qed.
+
+Definition flattened_WfModule m: WfModule :=
+  (mkWfMod (fun ty => flatten_WfMod (Wf_cond m ty))).
 
 Lemma word0_neq: forall w : word 1, w <> WO~0 -> w = WO~1.
 Proof.
@@ -3555,7 +3734,7 @@ Proof.
 Qed.
 
 Lemma separateBaseMod_flatten (m : Mod) :
-  getAllRegisters m [=] getAllRegisters (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+  getAllRegisters m [=] getAllRegisters (mergeSeparatedMod (separateMod m)).
 Proof.
   unfold mergeSeparatedMod.
   rewrite getAllRegisters_createHideMod.
@@ -3574,7 +3753,7 @@ Proof.
 Qed.
 
 Lemma separateBaseModule_flatten_Methods (m : Mod) :
-  getAllMethods m [=] getAllMethods (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+  getAllMethods m [=] getAllMethods (mergeSeparatedMod (separateMod m)).
 Proof.
   unfold mergeSeparatedMod.
   rewrite getAllMethods_createHideMod.
@@ -3593,7 +3772,7 @@ Proof.
 Qed.
 
 Lemma separateBaseModule_flatten_Rules (m : Mod) :
-  getAllRules m [=] getAllRules (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+  getAllRules m [=] getAllRules (mergeSeparatedMod (separateMod m)).
 Proof.
   unfold mergeSeparatedMod.
   rewrite getAllRules_createHideMod.
@@ -3610,7 +3789,8 @@ Proof.
 Qed.
 
 Lemma separateBaseModule_flatten_Hides (m : Mod) :
-  getHidden m [=] getHidden (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+  getHidden m [=] getHidden (mergeSeparatedMod (separateMod m)).
+Proof.
   unfold mergeSeparatedMod.
   rewrite getHidden_createHideMod;simpl.
   rewrite mergeSeparatedBaseFile_noHides.
@@ -3655,15 +3835,21 @@ Section ModularSubstition.
                                  (In x (map fst (getAllMethods b')) /\
                                   ~ In x (getHidden b')).
 
-  Variable wfAConcatB: WfMod (ConcatMod a b).
-  Variable wfA'ConcatB': WfMod (ConcatMod a' b').
+  Variable wfAConcatB: forall ty, WfMod ty (ConcatMod a b).
+  Variable wfA'ConcatB': forall ty, WfMod ty (ConcatMod a' b').
 
-  Lemma ModularSubstition: TraceInclusion a a' ->
-                           TraceInclusion b b' ->
-                           TraceInclusion (ConcatMod a b) (ConcatMod a' b').
+  Theorem ModularSubstition: TraceInclusion a a' ->
+                             TraceInclusion b b' ->
+                             TraceInclusion (ConcatMod a b) (ConcatMod a' b').
   Proof.
-    inv wfAConcatB.
-    inv wfA'ConcatB'.
+    assert (WfConcat1: forall ty, WfConcat ty a b) by (intros; specialize (wfAConcatB ty); inv wfAConcatB; auto).
+    assert (WfConcat2: forall ty, WfConcat ty b a) by (intros; specialize (wfAConcatB ty); inv wfAConcatB; auto).
+    assert (WfConcat0: forall ty, WfConcat ty a' b') by (intros; specialize (wfA'ConcatB' ty); inv wfA'ConcatB'; auto).
+    assert (WfConcat3: forall ty, WfConcat ty b' a') by (intros; specialize (wfA'ConcatB' ty); inv wfA'ConcatB'; auto).
+    pose proof (wfAConcatB (fun _ => unit)) as wfAConcatB_dup.
+    pose proof (wfA'ConcatB' (fun _ => unit)) as wfA'ConcatB'_dup.
+    inv wfAConcatB_dup.
+    inv wfA'ConcatB'_dup.
     unfold TraceInclusion, WeakInclusion,getListFullLabel_diff in *; intros.
     pose proof (SplitTrace HDisjRegs HDisjRules HDisjMeths H1); dest.
     specialize (@H _ _ H2).
@@ -3804,11 +3990,9 @@ Section ModularSubstition.
         rewrite H17. rewrite map_app, in_app_iff in *; setoid_rewrite in_app_iff.
         clear - H19 H18 H14.
         firstorder fail.
-Qed.
-
+  Qed.
 End ModularSubstition.
 
-Require Import Coq.Program.Equality.
 Section Fold.
   Variable k: Kind.
 
@@ -3816,7 +4000,7 @@ Section Fold.
   Variable fEval: type k -> type k -> type k.
   Variable fEval_f: forall x y, evalLetExpr (f x y) = fEval (evalLetExpr x) (evalLetExpr y).
 
-  Lemma evalFoldLeft_Let ls:
+  Theorem evalFoldLeft_Let ls:
     forall seed,
       evalLetExpr (fold_left f ls seed) =
       fold_left fEval (map (@evalLetExpr _) ls) (evalLetExpr seed).
@@ -3827,7 +4011,7 @@ Section Fold.
     reflexivity.
   Qed.
 
-  Lemma evalFoldRight_Let ls:
+  Theorem evalFoldRight_Let ls:
     forall seed,
       evalLetExpr (fold_right f seed ls) =
       fold_right fEval (evalLetExpr seed) (map (@evalLetExpr _) ls).
@@ -3844,7 +4028,7 @@ Section Fold.
     destruct H as [n H]. 
 
 
-  Lemma evalFoldTree_Let ls:
+  Theorem evalFoldTree_Let ls:
     forall seed,
       evalLetExpr (fold_tree f seed ls) =
       fold_tree fEval (evalLetExpr seed) (map (@evalLetExpr _) ls).
@@ -3898,7 +4082,7 @@ Section Fold.
   Variable unit: LetExprSyntax type k.
   Variable fUnit: forall x, fEval (evalLetExpr unit) x = x.
   
-  Lemma evalFoldTree_evalFoldLeft ls:
+  Theorem evalFoldTree_evalFoldLeft ls:
     evalLetExpr (fold_tree f unit ls) =
     evalLetExpr (fold_left f ls unit).
   Proof.
@@ -3908,7 +4092,7 @@ Section Fold.
   Qed.
 
   
-  Lemma evalFoldTree_evalFoldRight ls:
+  Theorem evalFoldTree_evalFoldRight ls:
     evalLetExpr (fold_tree f unit ls) =
     evalLetExpr (fold_right f unit ls).
   Proof.
