@@ -1090,7 +1090,7 @@ Proof.
       rewrite H0; reflexivity.
 Qed.
 
-Lemma PTraceInclusion_TraceInclusion m1 m2 :
+Theorem PTraceInclusion_TraceInclusion m1 m2 :
   (forall ty, WfMod ty m1) ->
   (forall ty, WfMod ty m2) ->
   PTraceInclusion m1 m2 -> TraceInclusion m1 m2.
