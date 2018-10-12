@@ -1711,8 +1711,8 @@ Section SplitSubsteps.
   Variable DisjRules: DisjKey (getRules m1) (getRules m2).
   Variable DisjMeths: DisjKey (getMethods m1) (getMethods m2).
 
-  Variable WfMod1: forall ty, WfBaseMod ty m1.
-  Variable WfMod2: forall ty, WfBaseMod ty m2.
+  Variable WfMod1: forall ty, WfBaseModule ty m1.
+  Variable WfMod2: forall ty, WfBaseModule ty m2.
   
   Lemma pfilter_perm o l :
     PSubsteps (concatFlat m1 m2) o l ->
@@ -2141,7 +2141,7 @@ End WfModule_rewrite.
 Lemma WfNilMod ty :
   WfMod ty (Base (BaseMod nil nil nil)).
 Proof.
-  constructor; simpl; constructor; intros; contradiction.
+  constructor; simpl; constructor; repeat split; intros; try contradiction; simpl; constructor.
 Qed.
 
 Lemma WfConcatActionTNil ty (k : Kind) (a : ActionT ty k):

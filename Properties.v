@@ -2722,8 +2722,8 @@ Section SplitSubsteps.
   Variable DisjRules: DisjKey (getRules m1) (getRules m2).
   Variable DisjMeths: DisjKey (getMethods m1) (getMethods m2).
 
-  Variable WfMod1: forall ty, WfBaseMod ty m1.
-  Variable WfMod2: forall ty, WfBaseMod ty m2.
+  Variable WfMod1: forall ty, WfBaseModule ty m1.
+  Variable WfMod2: forall ty, WfBaseModule ty m2.
   
   Lemma filter_perm o l :
     Substeps (concatFlat m1 m2) o l ->
@@ -2835,7 +2835,9 @@ Section SplitSubsteps.
       destruct HInMeths as [HInMeths|HInMeths];generalize (in_map fst _ _ HInMeths);destruct DisjMeths;try contradiction;intros.
       + subst; dest; exists x, x0;split;[|split;[|split;[|split]]];auto.
         * rewrite (InMethods_Filter _ _ _ _ _ _ _ _ HInMeths).
-          destruct (WfMod1 type) as [WfMod_Rle1 WfMod_Meth1];destruct (WfMod2 type) as [WfMod_Rle2 WfMod_Meth2]; specialize (WfActionT_ReadsWellDefined (WfMod_Meth1 (fn, fb) HInMeths argV) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined (WfMod_Meth1 (fn, fb) HInMeths argV) HAction) as Writes_sublist.
+          destruct (WfMod1 type) as [WfMod_Rle1 [WfMod_Meth1 _]];destruct (WfMod2 type) as [WfMod_Rle2 [WfMod_Meth2 _]].
+          specialize (WfActionT_ReadsWellDefined (WfMod_Meth1 (fn, fb) HInMeths argV) HAction) as Reads_sublist.
+          specialize (WfActionT_WritesWellDefined (WfMod_Meth1 (fn, fb) HInMeths argV) HAction) as Writes_sublist.
           constructor 3 with (fn:=fn)(fb:=fb)(reads:=reads)(u:=u)(cs:=cs)(argV:=argV)(retV:=retV)(ls:=(ModuleFilterLabels m1 ls)); auto.
           -- specialize (app_sublist_l _ _ H7) as SL_o_x.
              specialize (WfMod_Meth1 (fn, fb) HInMeths argV); specialize (WfActionT_SemAction WfMod_Meth1 H2 HAction SL_o_x H5).
@@ -2847,7 +2849,9 @@ Section SplitSubsteps.
       + subst; dest; exists x, x0;split;[|split;[|split;[|split]]]; auto.
         * rewrite (NotInMethods_Filter _ _ _ _ _ _ _ _ H3); assumption.
         * rewrite (InMethods_Filter _ _ _ _ _ _ _ _ HInMeths).
-          destruct (WfMod1 type) as [WfMod_Rle1 WfMod_Meth1];destruct (WfMod2 type) as [WfMod_Rle2 WfMod_Meth2]; specialize (WfActionT_ReadsWellDefined (WfMod_Meth2 (fn, fb) HInMeths argV) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined (WfMod_Meth2 (fn, fb) HInMeths argV) HAction) as Writes_sublist.
+          destruct (WfMod1 type) as [WfMod_Rle1 [WfMod_Meth1 _]];destruct (WfMod2 type) as [WfMod_Rle2 [WfMod_Meth2 _]].
+          specialize (WfActionT_ReadsWellDefined (WfMod_Meth2 (fn, fb) HInMeths argV) HAction) as Reads_sublist.
+          specialize (WfActionT_WritesWellDefined (WfMod_Meth2 (fn, fb) HInMeths argV) HAction) as Writes_sublist.
           constructor 3 with (fn:=fn)(fb:=fb)(reads:=reads)(u:=u)(cs:=cs)(argV:=argV)(retV:=retV)(ls:=(ModuleFilterLabels m2 ls)); auto.
           -- specialize (app_sublist_r _ _ H7) as SL_o_x.
              specialize (WfMod_Meth2 (fn, fb) HInMeths argV); specialize (WfActionT_SemAction WfMod_Meth2 H2 HAction SL_o_x H6).
@@ -2995,7 +2999,10 @@ Lemma WfNoDups m (HWfMod : forall ty, WfMod ty m) :
 Proof.
   specialize (HWfMod (fun _ => unit)).
   induction m.
-  - split;[|split];inversion HWfMod; assumption.
+  - inv HWfMod.
+    inv HWfBaseModule.
+    dest.
+    tauto.
   - inversion HWfMod; subst; apply IHm in HWf.
     assumption.
   - inversion HWfMod;subst;destruct (IHm1 HWf1) as [ND_Regs1 [ND_Meths1 ND_Rles1]];destruct (IHm2 HWf2) as [ND_Regs2 [ND_Meths2 ND_Rles2]];split;[|split].
@@ -3041,16 +3048,18 @@ Proof.
 Qed.
 
 Lemma WfMod_WfBaseMod_flat m (HWfMod : forall ty, WfMod ty m):
-  forall ty, WfBaseMod ty (getFlat m).
+  forall ty, WfBaseModule ty (getFlat m).
 Proof.
   intros ty.
   specialize (HWfMod ty).
   unfold getFlat;induction m.
-  - simpl; inversion HWfMod; subst; destruct WfBaseModule.
-    unfold WfBaseMod in *; split; intros.
+  - simpl; inversion HWfMod; subst; destruct HWfBaseModule.
+    unfold WfBaseModule in *; split; intros.
     + specialize (H rule H1).
       induction H; econstructor; eauto.
-    + specialize (H0 meth H1 v).
+    + dest; intros.
+      repeat split; auto; intros.
+      specialize (H0 meth H4 v).
       induction H0; econstructor; eauto.
   - inversion_clear HWfMod.
     specialize (IHm HWf).
@@ -3059,15 +3068,18 @@ Proof.
     specialize (IHm1 HWf1).
     specialize (IHm2 HWf2).
     simpl in *.
-    constructor;simpl; intros; destruct (in_app_or _ _ _ H) as [In1 | In1].
+    constructor;simpl; repeat split; auto; intros; try destruct (in_app_or _ _ _ H) as [In1 | In1].
     + destruct IHm1 as [Rle Meth]; clear Meth; specialize (Rle _ In1).
       induction Rle; econstructor; eauto; setoid_rewrite map_app; apply in_or_app;left; assumption.
     + destruct IHm2 as [Rle Meth]; clear Meth; specialize (Rle _ In1).
       induction Rle; econstructor; eauto; setoid_rewrite map_app; apply in_or_app;right; assumption.
-    + destruct IHm1 as [Rle Meth]; clear Rle; specialize (Meth _ In1 v).
+    + destruct IHm1 as [Rle [Meth _]]; clear Rle; specialize (Meth _ In1 v).
       induction Meth; econstructor; eauto; setoid_rewrite map_app; apply in_or_app;left; assumption.
-    + destruct IHm2 as [Rle Meth]; clear Rle; specialize (Meth _ In1 v).
+    + destruct IHm2 as [Rle [Meth _]]; clear Rle; specialize (Meth _ In1 v).
       induction Meth; econstructor; eauto; setoid_rewrite map_app; apply in_or_app;right;assumption.
+    + inv IHm1; inv IHm2; dest; apply NoDup_DisjKey; auto.
+    + inv IHm1; inv IHm2; dest; apply NoDup_DisjKey; auto.
+    + inv IHm1; inv IHm2; dest; apply NoDup_DisjKey; auto.
 Qed.
 
 Lemma WfConcatNotInCalls : forall (m : Mod)(o : RegsT)(k : Kind)(a : ActionT type k)
@@ -3560,12 +3572,14 @@ Proof.
   induction 1; simpl; auto; intros.
   - constructor; auto.
     unfold getFlat.
-    induction WfBaseModule.
+    induction HWfBaseModule.
     constructor; intros.
     + specialize (H rule H1).
       apply WfActionT_flatten in H.
       assumption.
-    + specialize (H0 meth H1 v).
+    + dest; intros.
+      repeat split; auto; intros.
+      specialize (H0 meth H4 v).
       apply WfActionT_flatten in H0.
       assumption.
   - constructor; auto.
@@ -3580,21 +3594,22 @@ Proof.
       specialize (H3 x).
       specialize (H1 x).
       tauto.
-    + constructor;inversion H4; inversion H2; inversion WfBaseModule; inversion WfBaseModule0; subst.
+    + constructor;inversion H4; inversion H2; inversion HWfBaseModule; inversion HWfBaseModule0; subst.
       * split; intros.
         -- destruct (in_app_or _ _ _ H6).
            ++ specialize (H5 _ H7).
               induction H5; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; left; assumption.
            ++ specialize (H9 _ H7).
               induction H9; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; right; assumption.
-        -- destruct (in_app_or _ _ _ H6).
-           ++ specialize (H8 _ H7 v).
-              induction H8; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; left; assumption.
-           ++ specialize (H10 _ H7 v).
-              induction H10; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; right; assumption.
-      * apply (NoDupKey_Expand NoDupMeths NoDupMeths0 HDisjMeths).
-      * apply (NoDupKey_Expand NoDupRegs NoDupRegs0 HDisjRegs).
-      * apply (NoDupKey_Expand NoDupRle NoDupRle0 HDisjRules).
+        -- repeat split; simpl; intros; dest.
+           ++ destruct (in_app_or _ _ _ H6).
+              ** specialize (H8 _ H16 v).
+                 induction H8; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; left; assumption.
+              ** specialize (H7 _ H16 v).
+                 induction H7; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; right; assumption.
+           ++ eapply NoDup_DisjKey; eauto.
+           ++ eapply NoDup_DisjKey; eauto.
+           ++ eapply NoDup_DisjKey; eauto.
 Qed.
 
 Definition flattened_WfModule m: WfModule :=

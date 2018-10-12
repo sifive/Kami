@@ -1986,15 +1986,16 @@ Lemma WfMod_Rule_inlined ty m f rn :
   WfMod ty (Base (inlineSingle_Rule_BaseModule f rn m)).
 Proof.
   intros; inv H; econstructor; eauto.
-  - split; intros; simpl in *; inv WfBaseModule; eauto; pose proof (H2 _ H0).
-    + destruct (inlineSingle_Rule_BaseModule_dec ty _ _ _ _ H).
-      * specialize (H1 _ H4); apply WfActionT_inline_Rule; auto.
+  - inv HWfBaseModule.
+    split; intros; simpl in *; dest; try inv HWfBaseModule; eauto; repeat split; intros; pose proof (H1 _ H0); auto.
+    + destruct (inlineSingle_Rule_BaseModule_dec ty _ _ _ _ H2).
+      * specialize (H _ H7); apply WfActionT_inline_Rule; auto.
       * dest.
-        specialize (H1 _ H4).
-        rewrite <- H6.
+        specialize (H _ H7).
+        rewrite <- H9.
         apply WfActionT_inline_Rule_inline_action; auto.
     + apply WfActionT_inline_Rule; auto.
-  - simpl; rewrite <-inlineSingle_Rule_preserves_names; auto.
+    + rewrite <- inlineSingle_Rule_preserves_names; auto.
 Qed.    
 
 Lemma PPlusStrongTraceInclusion_inlining_Rules_r m f rn :
@@ -2011,14 +2012,17 @@ Proof.
     specialize (H0 (fun _ => unit)).
       destruct (in_dec (RuleOrMeth_dec) (Rle rn) execs),(in_dec string_dec rn (map fst (getRules m))); inv H0.
     * rewrite in_map_iff in i0; dest; destruct x0; simpl in *; subst.
+      destruct HWfBaseModule as [? [? [NoDupMeths [NoDupRegisters NoDupRle]]]].
       specialize (PPlusStep_inline_Rule_In _ _ _ H4 H NoDupRle NoDupMeths i HPPlusStep) as TMP; dest.
       exists ((upds, (x1, x2))::x); split.
       -- econstructor 2; eauto.
       -- constructor; auto.
          unfold WeakInclusion_flat, getListFullLabel_diff_flat.
          split; intros.
-         ++ simpl;rewrite H0, H5, getNumFromExecs_app, getNumFromCalls_app, (call_execs_counts_eq); Omega.omega.
-         ++ simpl in *; destruct H7; exists x3; rewrite H0, in_app_iff; right; assumption.
+         ++ simpl;rewrite H6, H7, getNumFromExecs_app, getNumFromCalls_app, (call_execs_counts_eq); Omega.omega.
+         ++ simpl in *.
+            destruct H9; exists x3.
+            rewrite H6, in_app_iff; right; assumption.
     * exists ((upds, (execs, calls))::x); split.
       -- econstructor 2; eauto.
          apply PPlusStep_inlined_undef_Rule; auto.
@@ -2027,11 +2031,13 @@ Proof.
     * exists ((upds, (execs, calls))::x); split.
       -- econstructor 2; eauto.
          apply (PPlusStep_inline_Rule_NotIn); auto.
+         inv HWfBaseModule; dest; auto.
       -- econstructor; eauto.
          unfold WeakInclusion_flat; split; intros; auto.
     * exists ((upds, (execs, calls))::x); split.
       -- econstructor 2; eauto.
          apply (PPlusStep_inline_Rule_NotIn); auto.
+         inv HWfBaseModule; dest; auto.
       -- econstructor; eauto.
          unfold WeakInclusion_flat; split; intros; auto.
 Qed.
@@ -2748,18 +2754,19 @@ Proof.
   pose proof H as sth.
   specialize (H ty).
   inv H; econstructor; eauto.
-  - split; intros; simpl in *; inv WfBaseModule.
+  - split; intros; simpl in *; inv HWfBaseModule.
     + apply WfActionT_inline_Meth; auto.
-    + destruct (inlineSingle_Meth_BaseModule_dec _ _ _ _ H).
-      * specialize (H2 _ H3 v); apply WfActionT_inline_Meth; auto.
-      * dest.
-        destruct x, s0, meth, s1; inv H4; destruct string_dec.
-        -- inv H7; EqDep_subst; simpl in *.
-           specialize (H2 _ H3 v); simpl in *; apply WfActionT_inline_Meth; assumption.
-        -- inv H7; EqDep_subst.
-           apply WfActionT_inline_Meth_inline_action; auto.
-           specialize (H2 _ H3 v); simpl in *; assumption.
-  - simpl; rewrite SameKeys_inline_Meth; assumption.
+    + repeat split; dest; intros; try rewrite SameKeys_inline_Meth; auto.
+      * destruct (inlineSingle_Meth_BaseModule_dec _ _ _ _ H5).
+        -- specialize (H1 _ H6 v); apply WfActionT_inline_Meth; auto.
+        -- dest.
+           destruct x, s0, meth, s1; simpl in *.
+           inv H7; destruct string_dec.
+           ++ inv H10; EqDep_subst; simpl in *.
+              specialize (H1 _ H6 v); simpl in *; apply WfActionT_inline_Meth; assumption.
+           ++ inv H10; EqDep_subst.
+              apply WfActionT_inline_Meth_inline_action; auto.
+              specialize (H1 _ H6 v); simpl in *; assumption.
 Qed.
 
 Lemma PPlusStrongTraceInclusion_inlining_Meth_r m f gn :
@@ -2780,13 +2787,15 @@ Proof.
       * rewrite in_map_iff in i; dest.
         specialize (H0 (fun _ => unit)).
         inv H0; destruct x0; simpl in *.
+        destruct HWfBaseModule as [? [? [NoDupMeths [NoDupRegisters NoDupRle]]]].
         specialize (PPlusStep_inline_Meth_In _ _ H5 H NoDupRle NoDupMeths n HPPlusStep) as TMP; dest.
         exists ((upds, (x1, x2))::x); split.
         -- econstructor 2; eauto.
         -- constructor; auto.
            unfold WeakInclusion_flat, getListFullLabel_diff_flat; simpl; split; intros; auto.
-           ++ rewrite H0, H4, getNumFromExecs_app, getNumFromCalls_app, call_execs_counts_eq; Omega.omega.
-           ++ dest; exists x3; rewrite H0, in_app_iff; right; assumption.
+           ++ rewrite H6, H7, getNumFromExecs_app, getNumFromCalls_app, call_execs_counts_eq; Omega.omega.
+           ++ dest; exists x3.
+              rewrite ?H6, ?H7, in_app_iff; right; assumption.
       * exists ((upds, (execs, calls))::x); split.
         -- econstructor 2; eauto.
            apply PPlusStep_inline_Meth_NotInDef; auto.
@@ -2994,13 +3003,15 @@ Proof.
   - pose proof H0 as H0'.
     specialize (H0 (fun _ => unit)).
     inv H0; simpl in *.
+    destruct HWfBaseModule as [? [? [NoDupMeths [NoDupRegisters NoDupRle]]]].
+    simpl in *.
     rewrite (SameKeys_Meth_fold_right meths xs f) in NoDupMeths.
     rewrite <- (fold_right_len xs (inlineSingle_Meth f) meths) in l.
     specialize (inlineSingle_Meth_transform_nth f _ NoDupMeths l) as TMP; dest.
-    rewrite H1.
+    rewrite H3.
     assert (In f (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs));
       [apply inlined_Meth_not_transformed_fold_right; auto|].
-    specialize (WfMod_Meth_inlined _ (fst x) (IHxs H0') H2) as P1.
+    specialize (WfMod_Meth_inlined _ (fst x) (IHxs H0') H4) as P1.
     unfold inlineSingle_Meth_BaseModule in P1; simpl in *.
     eauto.
   - apply Nat.nlt_ge in n.
@@ -3020,10 +3031,12 @@ Proof.
   - pose proof H0 as H0'.
     specialize (H0 (fun _ => unit)).
     inv H0; simpl in *.
+    destruct HWfBaseModule as [? [? [NoDupMeths [NoDupRegisters NoDupRle]]]].
+    simpl in *.
     rewrite (SameKeys_Rule_fold_right rules xs f) in NoDupRle.
     rewrite <- (fold_right_len xs (inlineSingle_Rule f) rules) in l.
     specialize (inlineSingle_Rule_transform_nth f _ NoDupRle l) as TMP; dest.
-    rewrite H1.
+    rewrite H3.
     specialize (WfMod_Rule_inlined _ (fst x) (IHxs H0' ty) H) as P1.
     unfold inlineSingle_Rule_BaseModule in P1; simpl in *; assumption.
   - apply Nat.nlt_ge in n.
@@ -3041,10 +3054,12 @@ Proof.
   - pose proof H as H'.
     specialize (H (fun _ => unit)).
     inv H; simpl in *.
+    destruct HWfBaseModule as [? [? [NoDupMeths [NoDupRegisters NoDupRle]]]].
+    simpl in *.
     specialize (inlineSingle_Meth_transform_nth f _ NoDupMeths l) as TMP; dest.
-    rewrite H1.
+    rewrite H3.
     assert (In f (getMethods (BaseMod regs rules meths))); auto.
-    specialize (TraceInclusion_inlining_Meth_r _ (fst x) H2 H') as P1.
+    specialize (TraceInclusion_inlining_Meth_r _ (fst x) H4 H') as P1.
     unfold inlineSingle_Meth_BaseModule in P1; simpl in *; assumption.
   - apply Nat.nlt_ge in n.
     rewrite inlineSingle_transform_gt; auto.
@@ -3061,10 +3076,12 @@ Proof.
   - pose proof H as H'.
     specialize (H (fun _ => unit)).
     inv H; simpl in *.
+    destruct HWfBaseModule as [? [? [NoDupMeths [NoDupRegisters NoDupRle]]]].
+    simpl in *.
     specialize (inlineSingle_Rule_transform_nth f _ NoDupRle l) as TMP; dest.
-    rewrite H1.
+    rewrite H3.
     assert (In f (getMethods (BaseMod regs rules meths))); auto.
-    specialize (TraceInclusion_inlining_Rules_r _ (fst x) H2 H') as P1.
+    specialize (TraceInclusion_inlining_Rules_r _ (fst x) H4 H') as P1.
     unfold inlineSingle_Rule_BaseModule in P1; simpl in *; assumption.
   - apply Nat.nlt_ge in n.
     rewrite inlineSingle_transform_gt; auto.
@@ -3469,7 +3486,7 @@ Section flatten_and_inline_all.
     intro.
     induction m; simpl in *.
     - intros.
-      constructor 1; intros; [apply WfMod_WfBaseMod_flat| | | ]; auto; specialize (H ty); inv H; auto.
+      constructor 1; intros; apply WfMod_WfBaseMod_flat; auto; specialize (H ty); inv H; auto.
     - intros.
       unfold getFlat in *; simpl in *; apply IHm.
       intros.

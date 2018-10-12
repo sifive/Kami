@@ -1,9 +1,39 @@
-Require Import String Coq.Lists.List Omega Fin.
+Require Import String Coq.Lists.List Omega Fin Eqdep.
 
 Import ListNotations.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
+
+
+(* Useful Ltacs *)
+
+Ltac existT_destruct dec :=
+  match goal with
+  | H: existT _ _ _ = existT _ _ _ |- _ =>
+    apply EqdepFacts.eq_sigT_eq_dep in H;
+    apply (Eqdep_dec.eq_dep_eq_dec dec) in H;
+    subst
+  end.
+
+Ltac EqDep_subst :=
+  repeat match goal with
+         |[H : existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _] => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
+         end.
+
+
+Ltac constructor_simpl :=
+  econstructor; eauto; simpl; unfold not; intros.
+
+Ltac inv H :=
+  inversion H; subst; clear H.
+
+Ltac dest :=
+  repeat (match goal with
+            | H: _ /\ _ |- _ => destruct H
+            | H: exists _, _ |- _ => destruct H
+          end).
+
 
 
 Section fold_left_right.
@@ -628,6 +658,24 @@ Section DisjKey.
         intros; apply (in_dec Adec); auto.
     Qed.
   End l1_l2.
+  
+  Lemma NoDup_DisjKey l1:
+    forall l2,
+      NoDup (map fst l1) ->
+      NoDup (map fst l2) ->
+      DisjKey l1 l2 ->
+      NoDup (map fst (l1 ++ l2)).
+  Proof.
+    induction l1; simpl; auto; intros.
+    inv H.
+    unfold DisjKey in H1; simpl in H1.
+    assert (sth: forall k, ~ In k (map fst l1) \/ ~ In k (map fst l2)) by (clear - H1; firstorder fail).
+    specialize (IHl1 _ H5 H0 sth).
+    constructor; auto.
+    assert (~ In (fst a) (map fst l2)) by (clear - H1; firstorder fail).
+    rewrite map_app; rewrite in_app_iff.
+    tauto.
+  Qed.
 
   Lemma DisjKey_nil_r: forall l, DisjKey l nil.
   Proof.
@@ -640,6 +688,7 @@ Section DisjKey.
     unfold DisjKey; simpl; intros.
     tauto.
   Qed.
+
 End DisjKey.
 
 Section FilterMap.

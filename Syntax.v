@@ -594,9 +594,10 @@ Section Some_ty.
     | WfSys ls lretT c: WfActionT c -> @WfActionT lretT (Sys ls c)
     | WfReturn lretT e: @WfActionT lretT (Return e).
 
-    Definition WfBaseMod :=
+    Definition WfBaseModule :=
       (forall rule, In rule (getRules m) -> WfActionT (snd rule ty)) /\
-      (forall meth, In meth (getMethods m) -> forall v, WfActionT (projT2 (snd meth) ty v)).
+      (forall meth, In meth (getMethods m) -> forall v, WfActionT (projT2 (snd meth) ty v)) /\
+      NoDup (map fst (getMethods m)) /\ NoDup (map fst (getRegisters m)) /\ NoDup (map fst (getRules m)).
   End WfBaseMod.
 
   Inductive WfConcatActionT : forall lretT, ActionT ty lretT -> Mod -> Prop :=
@@ -616,8 +617,7 @@ Section Some_ty.
     (forall meth, In meth (getAllMethods m) -> forall v, WfConcatActionT (projT2 (snd meth) ty v) m').
 
   Inductive WfMod: Mod -> Prop :=
-  | BaseWf m (WfBaseModule: WfBaseMod m)(NoDupMeths: NoDup (map fst (getMethods m)))
-           (NoDupRegs : NoDup (map fst (getRegisters m)))(NoDupRle : NoDup (map fst (getRules m))): WfMod (Base m)
+  | BaseWf m (HWfBaseModule: WfBaseModule m): WfMod (Base m)
   | HideMethWf m s (HHideWf: In s (map fst (getAllMethods m))) (HWf: WfMod m): WfMod (HideMeth m s)
   | ConcatModWf m1 m2 (HDisjRegs: DisjKey (getAllRegisters m1) (getAllRegisters m2))
                 (HDisjRules: DisjKey (getAllRules m1) (getAllRules m2))
@@ -632,36 +632,10 @@ Record WfModule : Type := mkWfMod {
 
 Record BaseModWf :=
   { baseMod :> BaseModule ;
-    wfBaseMod : forall ty, WfBaseMod ty baseMod }.
+    wfBaseMod : forall ty, WfBaseModule ty baseMod }.
 
 
-(* Useful Ltacs *)
 
-Ltac existT_destruct dec :=
-  match goal with
-  | H: existT _ _ _ = existT _ _ _ |- _ =>
-    apply EqdepFacts.eq_sigT_eq_dep in H;
-    apply (Eqdep_dec.eq_dep_eq_dec dec) in H;
-    subst
-  end.
-
-Ltac EqDep_subst :=
-  repeat match goal with
-         |[H : existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _] => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
-         end.
-
-
-Ltac constructor_simpl :=
-  econstructor; eauto; simpl; unfold not; intros.
-
-Ltac inv H :=
-  inversion H; subst; clear H.
-
-Ltac dest :=
-  repeat (match goal with
-            | H: _ /\ _ |- _ => destruct H
-            | H: exists _, _ |- _ => destruct H
-          end).
 
 Ltac Struct_neq :=
   match goal with
@@ -679,13 +653,11 @@ Ltac discharge_wf :=
          | |- @WfConcat ty _ _ => constructor_simpl
          | |- _ /\ _ => constructor_simpl
          | |- @WfConcatActionT _ _ _ => constructor_simpl
-         | |- @WfBaseMod ty _ => constructor_simpl
+         | |- @WfBaseModule ty _ => constructor_simpl
          | |- @WfActionT ty _ _ _ => constructor_simpl
          | |- NoDup _ => constructor_simpl
          | H: _ \/ _ |- _ => destruct H; subst; simpl
          end; try tauto; discharge_appendage; try congruence.
-
-
 
 
 
