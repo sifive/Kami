@@ -1090,12 +1090,6 @@ Proof.
       rewrite H0; reflexivity.
 Qed.
 
-Definition PTraceList (m : Mod) (ls : list (list FullLabel)) :=
-  (exists (o : RegsT), PTrace m o ls).
-
-Definition PTraceInclusion (m m' : Mod) :=
-  forall (o : RegsT)(ls : list (list FullLabel)), PTrace m o ls -> exists (ls' : list (list FullLabel)), PTraceList m' ls' /\ WeakInclusions ls ls'.
-
 Lemma PTraceInclusion_TraceInclusion' m1 m2 :
   (forall ty, WfMod ty m1) ->
   (forall ty, WfMod ty m2) ->
@@ -2675,7 +2669,7 @@ Qed.
 
 Lemma merged_WellFormed ty m:
   WfMod ty m ->
-  WfMod ty (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+  WfMod ty (mergeSeparatedMod (separateMod m)).
 Proof.
   induction 1.
   - destruct m; simpl in *.
@@ -2754,8 +2748,8 @@ Proof.
   - apply separateBaseModule_flatten_Hides.
 Qed.
 
-Lemma TraceInclusion_Merge_l (m : WfModule) :
-  TraceInclusion m (WfMergedMod m).
+Theorem TraceInclusion_Merge_l (m : WfModule) :
+  TraceInclusion m (mergeSeparatedMod (separateMod m)).
 Proof.
   apply PTraceInclusion_TraceInclusion'.
   - apply (Wf_cond m).
@@ -2768,8 +2762,8 @@ Proof.
     + apply WeakInclusionsRefl.
 Qed.
 
-Lemma TraceInclusion_Merge_r (m : WfModule) :
-  TraceInclusion (WfMergedMod m) m.
+Theorem TraceInclusion_Merge_r (m : WfModule) :
+  TraceInclusion (mergeSeparatedMod (separateMod m)) m.
 Proof.
   apply PTraceInclusion_TraceInclusion'.
   - apply (Wf_cond (WfMergedMod m)).

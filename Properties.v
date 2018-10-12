@@ -6,6 +6,153 @@ Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
 Require Import ZArith.
 
+
+Definition filterRegs f m (o: RegsT) :=
+  filter (fun x => f (getBool (in_dec string_dec (fst x) (map fst (getAllRegisters m))))) o.
+
+Definition filterExecs f m (l: list FullLabel) :=
+  filter (fun x => f match fst (snd x) with
+                     | Rle y =>
+                       getBool (in_dec string_dec y (map fst (getAllRules m)))
+                     | Meth (y, _) =>
+                       getBool (in_dec string_dec y (map fst (getAllMethods m)))
+                     end) l.
+
+Definition WeakEqualities ls ls' := WeakInclusions ls ls' /\ WeakInclusions ls' ls.
+
+Definition PStepSubstitute m o l :=
+  PSubsteps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
+  MatchingExecCalls_Base l (getFlat m) /\
+  (forall s v, In s (map fst (getAllMethods m)) ->
+               In s (getHidden m) ->
+               (getListFullLabel_diff (s, v) l = 0%Z)).
+
+Definition StepSubstitute m o l :=
+  Substeps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
+  MatchingExecCalls_Base l (getFlat m) /\
+  (forall s v, In s (map fst (getAllMethods m)) ->
+               In s (getHidden m) ->
+               (getListFullLabel_diff (s, v) l = 0%Z)).
+
+Definition InExec f (l: list (RegsT * (RuleOrMeth * MethsT))) :=
+  In (Meth f) (map getRleOrMeth l).
+
+Definition InCall f (l: list (RegsT * (RuleOrMeth * MethsT))) :=
+  exists x, In x l /\ In f (snd (snd x)).
+
+Lemma Kind_eq: forall k, Kind_dec k k = left eq_refl.
+Proof.
+  intros; destruct (Kind_dec k k).
+  - f_equal.
+    apply Eqdep_dec.UIP_dec.
+    apply Kind_dec.
+  - apply (match n eq_refl with end).
+Qed.
+
+Lemma Signature_eq: forall sig, Signature_dec sig sig = left eq_refl.
+Proof.
+  intros; destruct (Signature_dec sig sig).
+  - f_equal.
+    apply Eqdep_dec.UIP_dec.
+    apply Signature_dec.
+  - apply (match n eq_refl with end).
+Qed.
+
+Section InverseSemAction.
+  Variable o: RegsT.
+
+  Theorem inversionSemAction
+          k a reads news calls retC
+          (evalA: @SemAction o k a reads news calls retC):
+    match a with
+    | MCall m s e c =>
+      exists mret pcalls,
+      SemAction o (c mret) reads news pcalls retC /\
+      calls = (m, (existT _ _ (evalExpr e, mret))) :: pcalls
+    | LetExpr _ e cont =>
+      SemAction o (cont (evalExpr e)) reads news calls retC
+    | LetAction _ a cont =>
+      exists reads1 news1 calls1 reads2 news2 calls2 r1,
+      DisjKey news1 news2 /\
+      SemAction o a reads1 news1 calls1 r1 /\
+      SemAction o (cont r1) reads2 news2 calls2 retC /\
+      reads = reads1 ++ reads2 /\
+      news = news1 ++ news2 /\
+      calls = calls1 ++ calls2
+    | ReadNondet k c =>
+      exists rv,
+      SemAction o (c rv) reads news calls retC
+    | ReadReg r k c =>
+      exists rv reads2,
+      In (r, existT _ k rv) o /\
+      SemAction o (c rv) reads2 news calls retC /\
+      reads = (r, existT _ k rv) :: reads2
+    | WriteReg r k e a =>
+      exists pnews,
+      In (r, k) (getKindAttr o) /\
+      key_not_In r pnews /\
+      SemAction o a reads pnews calls retC /\
+      news = (r, (existT _ _ (evalExpr e))) :: pnews
+    | IfElse p _ aT aF c =>
+      exists reads1 news1 calls1 reads2 news2 calls2 r1,
+      DisjKey news1 news2 /\
+      match evalExpr p with
+      | true =>
+        SemAction o aT reads1  news1 calls1 r1 /\
+        SemAction o (c r1) reads2 news2 calls2 retC /\
+        reads = reads1 ++ reads2 /\
+        news = news1 ++ news2 /\
+        calls = calls1 ++ calls2
+      | false =>
+        SemAction o aF reads1 news1 calls1 r1 /\
+        SemAction o (c r1) reads2 news2 calls2 retC /\
+        reads = reads1 ++ reads2 /\
+        news = news1 ++ news2 /\
+        calls = calls1 ++ calls2
+      end
+    | Assertion e c =>
+      SemAction o c reads news calls retC /\
+      evalExpr e = true
+    | Sys _ c =>
+      SemAction o c reads news calls retC
+    | Return e =>
+      retC = evalExpr e /\
+      news = nil /\
+      calls = nil
+    end.
+  Proof.
+    destruct evalA; eauto; repeat eexists; try destruct (evalExpr p); eauto; try discriminate.
+  Qed.
+
+  Lemma convertLetExprSyntax_ActionT_same k (e: LetExprSyntax type k):
+    SemAction o (convertLetExprSyntax_ActionT e) nil nil nil (evalLetExpr e).
+  Proof.
+    induction e; simpl; try constructor; auto.
+    specialize (H (evalLetExpr e)).
+    pose proof (SemLetAction (fun v => convertLetExprSyntax_ActionT (cont v)) (@DisjKey_nil_l string _ nil) IHe H) as sth.
+    rewrite ?(app_nil_l nil) in sth.
+    auto.
+  Qed.
+
+  Lemma SemActionReadsSub k a reads upds calls ret:
+    @SemAction o k a reads upds calls ret ->
+    SubList reads o.
+  Proof.
+    induction 1; auto;
+      unfold SubList in *; intros;
+        rewrite ?in_app_iff in *.
+    - firstorder.
+    - repeat (subst; firstorder).
+    - subst.
+      rewrite in_app_iff in H1.
+      destruct H1; intuition.
+    - subst.
+      rewrite in_app_iff in H1.
+      destruct H1; intuition.
+    - subst; simpl in *; intuition.
+  Qed.
+End InverseSemAction.
+
 Section evalExpr.
 
   Lemma castBits_same ty ni no (pf: ni = no) (e: Expr ty (SyntaxKind (Bit ni))): castBits pf e = match pf in _ = Y return Expr ty (SyntaxKind (Bit Y)) with
@@ -80,10 +227,6 @@ Section evalExpr.
     rewrite evalExpr_castBits.
     repeat f_equal.
   Qed.
-
-
-
-
 End evalExpr.
 
 
@@ -318,6 +461,12 @@ Global Instance getNumExecs_perm_rewrite' :
 Proof.
   repeat red; intros; subst; eauto using getNumExecs_perm_rewrite.
 Qed.
+
+Definition UpdRegs' (u: list RegsT) (o o': RegsT)
+  := map fst o = map fst o' /\
+     (forall s v, In (s, v) o' -> ((exists x, In x u /\ In (s, v) x) \/
+                                   ((~ exists x, In x u /\ In s (map fst x)) /\ In (s, v) o))).
+
 
 Lemma UpdRegs_same: forall u o o', UpdRegs u o o' -> UpdRegs' u o o'.
 Proof.
@@ -1483,7 +1632,7 @@ Proof.
         firstorder fail.
 Qed.
 
-Lemma TraceInclusion_refl: forall m, TraceInclusion m m.
+Theorem TraceInclusion_refl: forall m, TraceInclusion m m.
 Proof.
   unfold TraceInclusion; intros.
   exists o1, ls1.
@@ -1493,9 +1642,9 @@ Proof.
   repeat split; intros; tauto.
 Qed.
 
-Lemma TraceInclusion_trans: forall m1 m2 m3, TraceInclusion m1 m2 ->
-                                             TraceInclusion m2 m3 ->
-                                             TraceInclusion m1 m3.
+Theorem TraceInclusion_trans: forall m1 m2 m3, TraceInclusion m1 m2 ->
+                                               TraceInclusion m2 m3 ->
+                                               TraceInclusion m1 m3.
 Proof.
   unfold TraceInclusion; intros.
   specialize (H _ _ H1); dest.
@@ -1685,7 +1834,7 @@ Section StepSimulation.
           rewrite nthProp2_cons; split; auto.
   Qed.
 
-  Lemma StepDecomposition:
+  Theorem StepDecomposition:
     TraceInclusion imp spec.
   Proof.
     unfold TraceInclusion; intros.
@@ -1736,7 +1885,7 @@ Section DecompositionZero.
              UpdRegs [uSpec] oSpec oSpec' /\
              simRel oImp' oSpec')).
 
-  Lemma decompositionZero:
+  Theorem decompositionZero:
     TraceInclusion (Base imp) (Base spec).
   Proof.
     apply StepDecomposition with (simRel := simRel); auto; intros.
@@ -1905,7 +2054,7 @@ Proof.
       rewrite ?map_app; congruence.
     + econstructor 2; eauto; simpl; rewrite ?map_app; try congruence.
       * rewrite in_app_iff; right; eassumption.
-      * pose proof (SemActionReadsSub m2 HAction).
+      * pose proof (SemActionReadsSub HAction).
         pose proof (SemActionUpdSub HAction).
         eapply SemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; right.
         -- eapply H0; eauto.
@@ -1918,7 +2067,7 @@ Proof.
           unfold InCall in *; simpl in *; dest; tauto.
     + econstructor 3; eauto; simpl; rewrite ?map_app; try congruence.
       * rewrite in_app_iff; right; eassumption.
-      * pose proof (SemActionReadsSub m2 HAction).
+      * pose proof (SemActionReadsSub HAction).
         pose proof (SemActionUpdSub HAction).
         eapply SemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; right.
         -- eapply H0; eauto.
@@ -1937,7 +2086,7 @@ Proof.
     econstructor 2; eauto; simpl; rewrite ?map_app; try congruence.
     + inv H0; congruence.
     + rewrite in_app_iff; left; eassumption.
-    + pose proof (SemActionReadsSub m1 HAction).
+    + pose proof (SemActionReadsSub HAction).
       pose proof (SemActionUpdSub HAction).
       eapply SemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; left.
       * eapply H1; eauto.
@@ -1971,7 +2120,7 @@ Proof.
     econstructor 3; eauto; simpl; rewrite ?map_app; try congruence.
     + inv H0; congruence.
     + rewrite in_app_iff; left; eassumption.
-    + pose proof (SemActionReadsSub m1 HAction).
+    + pose proof (SemActionReadsSub HAction).
       pose proof (SemActionUpdSub HAction).
       eapply SemActionExpandRegs; eauto; unfold SubList in *; intros; rewrite ?map_app, ?in_app_iff; left.
       * eapply H1; eauto.
@@ -2115,10 +2264,6 @@ Proof.
   apply (@Step_substitute' ty) in Stp; auto.
   rewrite (@StepSubstitute_flatten ty) in *; auto.
 Qed.
-
-Definition concatFlat m1 m2 := BaseMod (getRegisters m1 ++ getRegisters m2)
-                                       (getRules m1 ++ getRules m2)
-                                       (getMethods m1 ++ getMethods m2).
 
 Lemma splitRegs o m1 m2 (DisjRegisters: DisjKey (getRegisters m1) (getRegisters m2)):
   getKindAttr o = getKindAttr (getRegisters m1 ++ getRegisters m2) ->
@@ -2405,10 +2550,11 @@ Proof.
   rewrite map_app, in_app_iff in *; firstorder fail.
 Qed.
 
-Ltac EqDep_subst :=
-  repeat match goal with
-         |[H : existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _] => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
-         end.
+Lemma Kind_Kind_dec: forall k1 k2: Kind * Kind, {k1 = k2} + {k1 <> k2}.
+Proof.
+  decide equality; subst;
+    apply Kind_dec.
+Qed.
 
 Lemma WfActionT_ReadsWellDefined : forall (k : Kind)(a : ActionT type k)(retl : type k)
                                           (m1 : BaseModule)(o readRegs newRegs : RegsT)(calls : MethsT),
@@ -3151,12 +3297,6 @@ Proof.
                specialize (H17 _ _ H18 H19); assumption.
 Qed.
 
-Inductive WeakInclusions : list (list FullLabel) -> list (list (FullLabel)) -> Prop :=
-| WI_Nil : WeakInclusions nil nil
-| WI_Cons : forall (ls ls' : list (list FullLabel)) (l l' : list FullLabel), WeakInclusions ls ls' -> WeakInclusion l l' -> WeakInclusions (l::ls)(l'::ls').
-
-Definition WeakEqualities ls ls' := WeakInclusions ls ls' /\ WeakInclusions ls' ls.
-
 Lemma WeakInclusionsRefl l : WeakInclusions l l.
 Proof.
   induction l; constructor.
@@ -3312,8 +3452,7 @@ Proof.
 Qed.
 
 Section TraceSubstitute.
-  Variable m: Mod.
-  Variable WfMod_m: forall ty, WfMod ty m.
+  Variable m: WfModule.
 
   Lemma Trace_flatten_same1: forall o l,  Trace m o l -> Trace (flatten m) o l.
   Proof.
@@ -3323,7 +3462,8 @@ Section TraceSubstitute.
       rewrite createHide_Regs.
       auto.
     - apply (@Step_substitute type) in HStep; auto.
-      econstructor 2; eauto.
+      + econstructor 2; eauto.
+      + destruct m; auto.
   Qed.
 
   Lemma Trace_flatten_same2: forall o l, Trace (flatten m) o l -> (exists l', (PermutationEquivLists l l') /\ Trace m o l').
@@ -3337,9 +3477,10 @@ Section TraceSubstitute.
       + econstructor 2; eauto.
         apply (Permutation_map fst) in H2.
         eapply UpdRegs_perm; eauto.
+      + destruct m; auto.
   Qed.
 
-  Lemma TraceInclusion_flatten_r: TraceInclusion m (flatten m).
+  Theorem TraceInclusion_flatten_r: TraceInclusion m (flatten m).
   Proof.
     unfold TraceInclusion; intros.
     exists o1, ls1.
@@ -3347,7 +3488,7 @@ Section TraceSubstitute.
     apply Trace_flatten_same1; auto.
   Qed.
 
-  Lemma TraceInclusion_flatten_l: TraceInclusion (flatten m) m.
+  Theorem TraceInclusion_flatten_l: TraceInclusion (flatten m) m.
   Proof.
     apply TraceInclusion'_TraceInclusion.
     unfold TraceInclusion'; intros.
@@ -3359,7 +3500,6 @@ Section TraceSubstitute.
     - apply PermutationEquivLists_WeakInclusions.
       assumption.
   Qed.
-  
 End TraceSubstitute.
     
 Lemma SameTrace m1 m2:
@@ -3437,6 +3577,9 @@ Proof.
       * apply (NoDupKey_Expand NoDupRegs NoDupRegs0 HDisjRegs).
       * apply (NoDupKey_Expand NoDupRle NoDupRle0 HDisjRules).
 Qed.
+
+Definition flattened_WfModule m: WfModule :=
+  (mkWfMod (fun ty => flatten_WfMod (Wf_cond m ty))).
 
 Lemma word0_neq: forall w : word 1, w <> WO~0 -> w = WO~1.
 Proof.
@@ -3572,7 +3715,7 @@ Proof.
 Qed.
 
 Lemma separateBaseMod_flatten (m : Mod) :
-  getAllRegisters m [=] getAllRegisters (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+  getAllRegisters m [=] getAllRegisters (mergeSeparatedMod (separateMod m)).
 Proof.
   unfold mergeSeparatedMod.
   rewrite getAllRegisters_createHideMod.
@@ -3591,7 +3734,7 @@ Proof.
 Qed.
 
 Lemma separateBaseModule_flatten_Methods (m : Mod) :
-  getAllMethods m [=] getAllMethods (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+  getAllMethods m [=] getAllMethods (mergeSeparatedMod (separateMod m)).
 Proof.
   unfold mergeSeparatedMod.
   rewrite getAllMethods_createHideMod.
@@ -3610,7 +3753,7 @@ Proof.
 Qed.
 
 Lemma separateBaseModule_flatten_Rules (m : Mod) :
-  getAllRules m [=] getAllRules (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+  getAllRules m [=] getAllRules (mergeSeparatedMod (separateMod m)).
 Proof.
   unfold mergeSeparatedMod.
   rewrite getAllRules_createHideMod.
@@ -3627,7 +3770,8 @@ Proof.
 Qed.
 
 Lemma separateBaseModule_flatten_Hides (m : Mod) :
-  getHidden m [=] getHidden (mergeSeparatedMod (fst (separateMod m)) (fst (snd (separateMod m))) (snd (snd (separateMod m)))).
+  getHidden m [=] getHidden (mergeSeparatedMod (separateMod m)).
+Proof.
   unfold mergeSeparatedMod.
   rewrite getHidden_createHideMod;simpl.
   rewrite mergeSeparatedBaseFile_noHides.
@@ -3675,9 +3819,9 @@ Section ModularSubstition.
   Variable wfAConcatB: forall ty, WfMod ty (ConcatMod a b).
   Variable wfA'ConcatB': forall ty, WfMod ty (ConcatMod a' b').
 
-  Lemma ModularSubstition: TraceInclusion a a' ->
-                           TraceInclusion b b' ->
-                           TraceInclusion (ConcatMod a b) (ConcatMod a' b').
+  Theorem ModularSubstition: TraceInclusion a a' ->
+                             TraceInclusion b b' ->
+                             TraceInclusion (ConcatMod a b) (ConcatMod a' b').
   Proof.
     assert (WfConcat1: forall ty, WfConcat ty a b) by (intros; specialize (wfAConcatB ty); inv wfAConcatB; auto).
     assert (WfConcat2: forall ty, WfConcat ty b a) by (intros; specialize (wfAConcatB ty); inv wfAConcatB; auto).
@@ -3828,7 +3972,6 @@ Section ModularSubstition.
         clear - H19 H18 H14.
         firstorder fail.
   Qed.
-
 End ModularSubstition.
 
 Section Fold.
@@ -3838,7 +3981,7 @@ Section Fold.
   Variable fEval: type k -> type k -> type k.
   Variable fEval_f: forall x y, evalLetExpr (f x y) = fEval (evalLetExpr x) (evalLetExpr y).
 
-  Lemma evalFoldLeft_Let ls:
+  Theorem evalFoldLeft_Let ls:
     forall seed,
       evalLetExpr (fold_left f ls seed) =
       fold_left fEval (map (@evalLetExpr _) ls) (evalLetExpr seed).
@@ -3849,7 +3992,7 @@ Section Fold.
     reflexivity.
   Qed.
 
-  Lemma evalFoldRight_Let ls:
+  Theorem evalFoldRight_Let ls:
     forall seed,
       evalLetExpr (fold_right f seed ls) =
       fold_right fEval (evalLetExpr seed) (map (@evalLetExpr _) ls).
@@ -3866,7 +4009,7 @@ Section Fold.
     destruct H as [n H]. 
 
 
-  Lemma evalFoldTree_Let ls:
+  Theorem evalFoldTree_Let ls:
     forall seed,
       evalLetExpr (fold_tree f seed ls) =
       fold_tree fEval (evalLetExpr seed) (map (@evalLetExpr _) ls).
@@ -3920,7 +4063,7 @@ Section Fold.
   Variable unit: LetExprSyntax type k.
   Variable fUnit: forall x, fEval (evalLetExpr unit) x = x.
   
-  Lemma evalFoldTree_evalFoldLeft ls:
+  Theorem evalFoldTree_evalFoldLeft ls:
     evalLetExpr (fold_tree f unit ls) =
     evalLetExpr (fold_left f ls unit).
   Proof.
@@ -3930,7 +4073,7 @@ Section Fold.
   Qed.
 
   
-  Lemma evalFoldTree_evalFoldRight ls:
+  Theorem evalFoldTree_evalFoldRight ls:
     evalLetExpr (fold_tree f unit ls) =
     evalLetExpr (fold_right f unit ls).
   Proof.

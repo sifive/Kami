@@ -5,6 +5,7 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+
 Section fold_left_right.
   Variable A B: Type.
   Variable f: A -> B -> A.
@@ -601,29 +602,43 @@ Definition key_not_In A B key (ls: list (A * B)) := forall v, ~ In (key, v) ls.
 
 Section DisjKey.
   Variable A B: Type.
-  Variable l1 l2: list (A * B).
+  Section l1_l2.
+    Variable l1 l2: list (A * B).
 
-  Definition DisjKey :=
-    forall k, ~ In k (map fst l1) \/ ~ In k (map fst l2).
-  
-  Variable Adec: forall a1 a2: A, {a1 = a2} + {a1 <> a2}.
-  
-  Definition DisjKeyWeak :=
-    forall k, In k (map fst l1) -> In k (map fst l2) -> False.
+    Definition DisjKey :=
+      forall k, ~ In k (map fst l1) \/ ~ In k (map fst l2).
+    
+    Variable Adec: forall a1 a2: A, {a1 = a2} + {a1 <> a2}.
+    
+    Definition DisjKeyWeak :=
+      forall k, In k (map fst l1) -> In k (map fst l2) -> False.
 
-  Lemma Demorgans (P Q: A -> Prop) (Pdec: forall a, {P a} + {~ P a})
-        (Qdec: forall a, {Q a} + {~ Q a}):
-    (forall a, ~ P a \/ ~ Q a) <-> (forall a, P a -> Q a -> False).
+    Lemma Demorgans (P Q: A -> Prop) (Pdec: forall a, {P a} + {~ P a})
+          (Qdec: forall a, {Q a} + {~ Q a}):
+      (forall a, ~ P a \/ ~ Q a) <-> (forall a, P a -> Q a -> False).
+    Proof.
+      split; intros; firstorder fail.
+    Qed.
+
+    Lemma DisjKeyWeak_same:
+      DisjKey <-> DisjKeyWeak.
+    Proof.
+      unfold DisjKeyWeak.
+      apply Demorgans;
+        intros; apply (in_dec Adec); auto.
+    Qed.
+  End l1_l2.
+
+  Lemma DisjKey_nil_r: forall l, DisjKey l nil.
   Proof.
-    split; intros; firstorder fail.
+    unfold DisjKey; simpl; intros.
+    tauto.
   Qed.
 
-  Lemma DisjKeyWeak_same:
-    DisjKey <-> DisjKeyWeak.
+  Lemma DisjKey_nil_l: forall l, DisjKey nil l.
   Proof.
-    unfold DisjKeyWeak.
-    apply Demorgans;
-      intros; apply (in_dec Adec); auto.
+    unfold DisjKey; simpl; intros.
+    tauto.
   Qed.
 End DisjKey.
 

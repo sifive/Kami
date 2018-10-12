@@ -391,57 +391,6 @@ Inductive Mod: Type :=
 | ConcatMod (m1 m2: Mod): Mod.
 
 
-Fixpoint separateBaseMod (m: Mod): (list RegFileBase * list BaseModule) :=
-  match m with
-  | Base m' =>
-    match m' with
-    | BaseMod regs rules meths => (nil, BaseMod regs rules meths :: nil)
-    | BaseRegFile rf => (rf :: nil, nil)
-    end
-  | HideMeth m' meth => separateBaseMod m'
-  | ConcatMod m1 m2 =>
-    let '(rfs1, ms1) := separateBaseMod m1 in
-    let '(rfs2, ms2) := separateBaseMod m2 in
-    (rfs1 ++ rfs2, ms1 ++ ms2)
-  end.
-
-Fixpoint getHidden m :=
-  match m with
-  | Base _ => []
-  | ConcatMod m1 m2 => getHidden m1 ++ getHidden m2
-  | HideMeth m' s => s :: getHidden m'
-  end.
-
-Definition separateMod (m: Mod) :=
-  (getHidden m, separateBaseMod m).
-    
-Fixpoint mergeSeparatedBaseMod (bl : list BaseModule) : Mod :=
-  match bl with
-  | b::bl' => ConcatMod (Base b) (mergeSeparatedBaseMod bl')
-  | nil => Base (BaseMod nil nil nil)
-  end.
-
-Fixpoint mergeSeparatedBaseFile (rfl : list RegFileBase) : Mod :=
-  match rfl with
-  | rf::rfl' => ConcatMod (Base (BaseRegFile rf))(mergeSeparatedBaseFile rfl')
-  | nil => Base (BaseMod nil nil nil)
-  end.
-
-Fixpoint createHide (m: BaseModule) (hides: list string) :=
-  match hides with
-  | nil => Base m
-  | x :: xs => HideMeth (createHide m xs) x
-  end.
-
-Fixpoint createHideMod (m : Mod) (hides : list string) : Mod :=
-  match hides with
-  | nil => m
-  | h::hides' => HideMeth (createHideMod m hides') h
-  end.
-
-Definition mergeSeparatedMod (hl : list string)(rfl : list RegFileBase) (bl : list BaseModule) :=
-  createHideMod (ConcatMod (mergeSeparatedBaseFile rfl) (mergeSeparatedBaseMod bl)) hl.
- 
 Notation getKindAttr ls := (map (fun x => (fst x, projT1 (snd x))) ls).
 
 Notation "l '[=]' r" :=
@@ -621,6 +570,13 @@ Fixpoint getAllMethods m :=
   | ConcatMod m1 m2 => getAllMethods m1 ++ getAllMethods m2
   end.
 
+Fixpoint getHidden m :=
+  match m with
+  | Base _ => []
+  | ConcatMod m1 m2 => getHidden m1 ++ getHidden m2
+  | HideMeth m' s => s :: getHidden m'
+  end.
+
 Section Some_ty.
   Variable ty: Kind -> Type.
   Section WfBaseMod.
@@ -670,8 +626,51 @@ Section Some_ty.
                 (WfConcat2 : WfConcat m2 m1): WfMod (ConcatMod m1 m2).
 End Some_ty.
 
+Record WfModule : Type := mkWfMod {
+                              module :> Mod;
+                              Wf_cond : forall ty, WfMod ty module }.
+
+Record BaseModWf :=
+  { baseMod :> BaseModule ;
+    wfBaseMod : forall ty, WfBaseMod ty baseMod }.
+
+
+(* Useful Ltacs *)
+
+Ltac existT_destruct dec :=
+  match goal with
+  | H: existT _ _ _ = existT _ _ _ |- _ =>
+    apply EqdepFacts.eq_sigT_eq_dep in H;
+    apply (Eqdep_dec.eq_dep_eq_dec dec) in H;
+    subst
+  end.
+
+Ltac EqDep_subst :=
+  repeat match goal with
+         |[H : existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _] => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
+         end.
+
+
 Ltac constructor_simpl :=
   econstructor; eauto; simpl; unfold not; intros.
+
+Ltac inv H :=
+  inversion H; subst; clear H.
+
+Ltac dest :=
+  repeat (match goal with
+            | H: _ /\ _ |- _ => destruct H
+            | H: exists _, _ |- _ => destruct H
+          end).
+
+Ltac Struct_neq :=
+  match goal with
+  | |- Struct _ _ <> Struct _ _ =>
+    let H := fresh in intro H;
+                      injection H;
+                      intros;
+                      repeat (existT_destruct Nat.eq_dec)
+  end.
 
 Ltac discharge_wf :=
   intros ty;
@@ -686,40 +685,12 @@ Ltac discharge_wf :=
          | H: _ \/ _ |- _ => destruct H; subst; simpl
          end; try tauto; discharge_appendage; try congruence.
 
-Record WfModule : Type := mkWfMod {
-                              module :> Mod;
-                              Wf_cond : forall ty, WfMod ty module }.
-
-Record BaseModWf :=
-  { baseMod :> BaseModule ;
-    wfBaseMod : forall ty, WfBaseMod ty baseMod }.
 
 
 
 
 
 (* Semantics *)
-
-Ltac existT_destruct :=
-  match goal with
-  | H: existT _ _ _ = existT _ _ _ |- _ =>
-    apply EqdepFacts.eq_sigT_eq_dep in H;
-    apply (Eqdep_dec.eq_dep_eq_dec Nat.eq_dec) in H;
-    subst
-  end.
-
-Ltac Struct_neq :=
-  match goal with
-  | |- Struct _ _ <> Struct _ _ =>
-    let H := fresh in intro H;
-                      injection H;
-                      intros;
-                      repeat existT_destruct
-  end.
-
-Ltac inv H :=
-  inversion H; subst; clear H.
-
 
 Definition Kind_dec (k1: Kind): forall k2, {k1 = k2} + {k1 <> k2}.
 Proof.
@@ -737,7 +708,7 @@ Proof.
         destruct IHn0.
         -- injection e.
            intros.
-           repeat existT_destruct.
+           repeat (existT_destruct Nat.eq_dec).
            destruct (string_dec (s Fin.F1) (s0 Fin.F1)).
            ++ destruct (H Fin.F1 (k0 Fin.F1)).
               ** left; f_equal; extensionality x; apply (Fin.caseS' x); try assumption;
@@ -772,24 +743,6 @@ Lemma Signature_dec: forall (s1 s2: Signature), {s1 = s2} + {s1 <> s2}.
 Proof.
   decide equality; apply Kind_dec.
 Defined.
-
-Lemma Kind_eq: forall k, Kind_dec k k = left eq_refl.
-Proof.
-  intros; destruct (Kind_dec k k).
-  - f_equal.
-    apply Eqdep_dec.UIP_dec.
-    apply Kind_dec.
-  - apply (match n eq_refl with end).
-Qed.
-
-Lemma Signature_eq: forall sig, Signature_dec sig sig = left eq_refl.
-Proof.
-  intros; destruct (Signature_dec sig sig).
-  - f_equal.
-    apply Eqdep_dec.UIP_dec.
-    apply Signature_dec.
-  - apply (match n eq_refl with end).
-Qed.
 
 Fixpoint type (k: Kind): Type :=
   match k with
@@ -928,8 +881,6 @@ Definition MethsT := (list MethT).
 
 
 Section Semantics.
-  Variable m: BaseModule.
-  
   Fixpoint natToFin n (i: nat): Fin.t (S n) :=
     match i with
     | 0 => Fin.F1
@@ -1180,130 +1131,14 @@ Section Semantics.
       (HReadRegs: readRegs = nil)
       (HNewRegs: newRegs = nil)
       (HCalls: calls = nil) :
-      PSemAction (Return e) readRegs newRegs calls evale.
-  
-  Theorem inversionSemAction
-          k a reads news calls retC
-          (evalA: @SemAction k a reads news calls retC):
-    match a with
-    | MCall m s e c =>
-      exists mret pcalls,
-      SemAction (c mret) reads news pcalls retC /\
-      calls = (m, (existT _ _ (evalExpr e, mret))) :: pcalls
-    | LetExpr _ e cont =>
-      SemAction (cont (evalExpr e)) reads news calls retC
-    | LetAction _ a cont =>
-      exists reads1 news1 calls1 reads2 news2 calls2 r1,
-      DisjKey news1 news2 /\
-      SemAction a reads1 news1 calls1 r1 /\
-      SemAction (cont r1) reads2 news2 calls2 retC /\
-      reads = reads1 ++ reads2 /\
-      news = news1 ++ news2 /\
-      calls = calls1 ++ calls2
-    | ReadNondet k c =>
-      exists rv,
-      SemAction (c rv) reads news calls retC
-    | ReadReg r k c =>
-      exists rv reads2,
-      In (r, existT _ k rv) o /\
-      SemAction (c rv) reads2 news calls retC /\
-      reads = (r, existT _ k rv) :: reads2
-    | WriteReg r k e a =>
-      exists pnews,
-      In (r, k) (getKindAttr o) /\
-      key_not_In r pnews /\
-      SemAction a reads pnews calls retC /\
-      news = (r, (existT _ _ (evalExpr e))) :: pnews
-    | IfElse p _ aT aF c =>
-      exists reads1 news1 calls1 reads2 news2 calls2 r1,
-      DisjKey news1 news2 /\
-      match evalExpr p with
-      | true =>
-        SemAction aT reads1  news1 calls1 r1 /\
-        SemAction (c r1) reads2 news2 calls2 retC /\
-        reads = reads1 ++ reads2 /\
-        news = news1 ++ news2 /\
-        calls = calls1 ++ calls2
-      | false =>
-        SemAction aF reads1 news1 calls1 r1 /\
-        SemAction (c r1) reads2 news2 calls2 retC /\
-        reads = reads1 ++ reads2 /\
-        news = news1 ++ news2 /\
-        calls = calls1 ++ calls2
-      end
-    | Assertion e c =>
-      SemAction c reads news calls retC /\
-      evalExpr e = true
-    | Sys _ c =>
-      SemAction c reads news calls retC
-    | Return e =>
-      retC = evalExpr e /\
-      news = nil /\
-      calls = nil
-    end.
-  Proof.
-    destruct evalA; eauto; repeat eexists; try destruct (evalExpr p); eauto; try discriminate.
-  Qed.
-
-  Lemma DisjKey_nils A B: @DisjKey A B nil nil.
-  Proof.
-    unfold DisjKey; intro.
-    left; simpl; auto.
-  Qed.
-  
-  Lemma convertLetExprSyntax_ActionT_same k (e: LetExprSyntax type k):
-    SemAction (convertLetExprSyntax_ActionT e) nil nil nil (evalLetExpr e).
-  Proof.
-    induction e; simpl; try constructor; auto.
-    specialize (H (evalLetExpr e)).
-    pose proof (SemLetAction (fun v => convertLetExprSyntax_ActionT (cont v)) (@DisjKey_nils string _) IHe H) as sth.
-    rewrite ?(app_nil_l nil) in sth.
-    auto.
-  Qed.
-  
-  Lemma SemActionReadsSub k a reads upds calls ret:
-    @SemAction k a reads upds calls ret ->
-    SubList reads o.
-  Proof.
-    induction 1; auto;
-      unfold SubList in *; intros;
-        rewrite ?in_app_iff in *.
-    - firstorder.
-    - repeat (subst; firstorder).
-    - subst.
-      rewrite in_app_iff in H1.
-      destruct H1; intuition.
-    - subst.
-      rewrite in_app_iff in H1.
-      destruct H1; intuition.
-    - subst; simpl in *; intuition.
-  Qed.
+      PSemAction (Return e) readRegs newRegs calls evale.  
 End Semantics.
-
-Ltac dest :=
-  repeat (match goal with
-            | H: _ /\ _ |- _ => destruct H
-            | H: exists _, _ |- _ => destruct H
-          end).
-
-
-Definition getFlat m := BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m).
-
-Definition flatten m := createHide (getFlat m) (getHidden m).
-
-
 
 Inductive RuleOrMeth :=
 | Rle (rn: string)
 | Meth (f: MethT).
 
 Notation getRleOrMeth := (fun x => fst (snd x)).
-
-Definition InExec f (l: list (RegsT * (RuleOrMeth * MethsT))) :=
-  In (Meth f) (map getRleOrMeth l).
-
-Definition InCall f (l: list (RegsT * (RuleOrMeth * MethsT))) :=
-  exists x, In x l /\ In f (snd (snd x)).
 
 Notation FullLabel := (RegsT * (RuleOrMeth * MethsT))%type.
 
@@ -1385,6 +1220,7 @@ Definition MatchingExecCalls_Concat (lcall lexec : list FullLabel) mexec :=
 
 Section BaseModule.
   Variable m: BaseModule.
+
   Variable o: RegsT.
 
   Inductive Substeps: list FullLabel -> Prop :=
@@ -1423,6 +1259,39 @@ Section BaseModule.
   Inductive PSubsteps: list FullLabel -> Prop :=
   | NilPSubstep (HRegs: getKindAttr o [=] getKindAttr (getRegisters m)) : PSubsteps nil
   | PAddRule (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
+             rn rb
+             (HInRules: In (rn, rb) (getRules m))
+             reads u cs
+             (HPAction: PSemAction o (rb type) reads u cs WO)
+             (HReadsGood: SubList (getKindAttr reads)
+                                  (getKindAttr (getRegisters m)))
+             (HUpdGood: SubList (getKindAttr u)
+                                (getKindAttr (getRegisters m)))
+             l ls (HLabel: l [=] (u, (Rle rn, cs)) :: ls)
+             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
+             (HNoRle: forall x, In x ls -> match fst (snd x) with
+                                           | Rle _ => False
+                                           | _ => True
+                                           end)
+             (HPSubstep: PSubsteps ls):
+      PSubsteps l
+  | PAddMeth (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
+             fn fb
+             (HInMeths: In (fn, fb) (getMethods m))
+             reads u cs argV retV
+             (HPAction: PSemAction o ((projT2 fb) type argV) reads u cs retV)
+             (HReadsGood: SubList (getKindAttr reads)
+                                  (getKindAttr (getRegisters m)))
+             (HUpdGood: SubList (getKindAttr u)
+                                (getKindAttr (getRegisters m)))
+             l ls (HLabel: l [=] (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
+             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
+             (HPSubsteps: PSubsteps ls):
+      PSubsteps l.
+
+  Inductive PPlusSubsteps: RegsT -> list RuleOrMeth -> MethsT -> Prop :=
+  | NilPPlusSubstep (HRegs: getKindAttr o [=] getKindAttr (getRegisters m)) : PPlusSubsteps nil nil nil
+  | PPlusAddRule (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
             rn rb
             (HInRules: In (rn, rb) (getRules m))
             reads u cs
@@ -1431,15 +1300,18 @@ Section BaseModule.
                                  (getKindAttr (getRegisters m)))
             (HUpdGood: SubList (getKindAttr u)
                                (getKindAttr (getRegisters m)))
-            l ls (HLabel: l [=] (u, (Rle rn, cs)) :: ls)
-            (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
-            (HNoRle: forall x, In x ls -> match fst (snd x) with
-                                          | Rle _ => False
-                                          | _ => True
-                                          end)
-            (HPSubstep: PSubsteps ls):
-      PSubsteps l
-  | PAddMeth (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
+            upds execs calls oldUpds oldExecs oldCalls
+            (HUpds: upds [=] u ++ oldUpds)
+            (HExecs: execs [=] Rle rn :: oldExecs)
+            (HCalls: calls [=] cs ++ oldCalls)
+            (HDisjRegs: DisjKey oldUpds u)
+            (HNoRle: forall x, In x oldExecs -> match x with
+                                                | Rle _ => False
+                                                | _ => True
+                                                end)
+            (HPSubstep: PPlusSubsteps oldUpds oldExecs oldCalls):
+      PPlusSubsteps upds execs calls
+  | PPlusAddMeth (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
             fn fb
             (HInMeths: In (fn, fb) (getMethods m))
             reads u cs argV retV
@@ -1448,10 +1320,13 @@ Section BaseModule.
                                  (getKindAttr (getRegisters m)))
             (HUpdGood: SubList (getKindAttr u)
                                (getKindAttr (getRegisters m)))
-            l ls (HLabel: l [=] (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
-            (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
-            (HPSubsteps: PSubsteps ls):
-      PSubsteps l.
+            upds execs calls oldUpds oldExecs oldCalls
+            (HUpds: upds [=] u ++ oldUpds)
+            (HExecs: execs [=] Meth (fn, existT _ _ (argV, retV)) :: oldExecs)
+            (HCalls: calls [=] cs ++ oldCalls)
+            (HDisjRegs: DisjKey oldUpds u)
+            (HPSubstep: PPlusSubsteps oldUpds oldExecs oldCalls):
+      PPlusSubsteps upds execs calls.
 End BaseModule.
 
 Inductive Step: Mod -> RegsT -> list FullLabel -> Prop :=
@@ -1493,6 +1368,22 @@ Inductive PStep: Mod -> RegsT -> list FullLabel -> Prop :=
                  (HRegs: o [=] o1 ++ o2)
                  (HLabels: l [=] l1 ++ l2):
     PStep (ConcatMod m1 m2) o l.
+
+Section PPlusStep.
+  Variable m: BaseModule.
+  Variable o: RegsT.
+  
+  Definition MatchingExecCalls_flat (calls : MethsT) (execs : list RuleOrMeth) (m : BaseModule) :=
+    forall (f : MethT),
+      In (fst f) (map fst (getMethods m)) ->
+      (getNumFromCalls f calls <= getNumFromExecs f execs)%Z.
+  
+  Inductive PPlusStep :  RegsT -> list RuleOrMeth -> MethsT -> Prop :=
+  | BasePPlusStep upds execs calls:
+      PPlusSubsteps m o upds execs calls ->
+      MatchingExecCalls_flat calls execs m -> PPlusStep upds execs calls.
+End PPlusStep.
+
 
 Definition UpdRegs (u: list RegsT) (o o': RegsT)
   := getKindAttr o = getKindAttr o' /\
@@ -1542,31 +1433,29 @@ Section Trace.
       PTrace o' ls'.
 End Trace.
 
-
-
-
-
-
-
-
-
-
-
-Definition UpdRegs' (u: list RegsT) (o o': RegsT)
-  := map fst o = map fst o' /\
-     (forall s v, In (s, v) o' -> ((exists x, In x u /\ In (s, v) x) \/
-                                   ((~ exists x, In x u /\ In s (map fst x)) /\ In (s, v) o))).
-
-Definition filterRegs f m (o: RegsT) :=
-  filter (fun x => f (getBool (in_dec string_dec (fst x) (map fst (getAllRegisters m))))) o.
-
-Definition filterExecs f m (l: list FullLabel) :=
-  filter (fun x => f match fst (snd x) with
-                     | Rle y =>
-                       getBool (in_dec string_dec y (map fst (getAllRules m)))
-                     | Meth (y, _) =>
-                       getBool (in_dec string_dec y (map fst (getAllMethods m)))
-                     end) l.
+Definition PPlusUpdRegs (u o o' : RegsT) :=
+  getKindAttr o [=] getKindAttr o' /\
+  (forall s v, In (s, v) o' -> In (s, v) u \/ (~ In s (map fst u) /\ In (s, v) o)).
+  
+Section PPlusTrace.
+  Variable m: BaseModule.
+  Inductive PPlusTrace : RegsT -> list (RegsT * ((list RuleOrMeth) * MethsT)) -> Prop :=
+  | PPlusInitTrace (o' o'' : RegsT) ls'
+                   (HPerm : o' [=] o'')
+                   (HUpdRegs : Forall2 regInit o'' (getRegisters m))
+                   (HTrace : ls' = nil):
+      PPlusTrace o' ls'
+  | PPlusContinueTrace (o o' : RegsT)
+                       (upds : RegsT)
+                       (execs : list RuleOrMeth)
+                       (calls : MethsT)
+                       (ls ls' : list (RegsT * ((list RuleOrMeth) * MethsT)))
+                       (PPlusOldTrace : PPlusTrace o ls)
+                       (HPPlusStep : PPlusStep m o upds execs calls)
+                       (HUpdRegs : PPlusUpdRegs upds o o')
+                       (HPPlusTrace : ls' = ((upds, (execs, calls))::ls)):
+      PPlusTrace o' ls'.
+End PPlusTrace.
 
 Definition WeakInclusion (l1 : list FullLabel) (l2 : list FullLabel) : Prop :=
   (forall f, getListFullLabel_diff f l1 = getListFullLabel_diff f l2) /\
@@ -1581,26 +1470,168 @@ Definition TraceInclusion m1 m2 :=
      length ls1 = length ls2 /\
      (nthProp2 WeakInclusion ls1 ls2).
 
+Definition PTraceList (m : Mod) (ls : list (list FullLabel)) :=
+  (exists (o : RegsT), PTrace m o ls).
 
-Definition PStepSubstitute m o l :=
-  PSubsteps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
-  MatchingExecCalls_Base l (getFlat m) /\
-  (forall s v, In s (map fst (getAllMethods m)) ->
-               In s (getHidden m) ->
-               (getListFullLabel_diff (s, v) l = 0%Z)).
+Inductive WeakInclusions : list (list FullLabel) -> list (list (FullLabel)) -> Prop :=
+| WI_Nil : WeakInclusions nil nil
+| WI_Cons : forall (ls ls' : list (list FullLabel)) (l l' : list FullLabel), WeakInclusions ls ls' -> WeakInclusion l l' -> WeakInclusions (l::ls)(l'::ls').
 
-Definition StepSubstitute m o l :=
-  Substeps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
-  MatchingExecCalls_Base l (getFlat m) /\
-  (forall s v, In s (map fst (getAllMethods m)) ->
-               In s (getHidden m) ->
-               (getListFullLabel_diff (s, v) l = 0%Z)).
+Definition PTraceInclusion (m m' : Mod) :=
+  forall (o : RegsT) (ls : list (list FullLabel)),
+    PTrace m o ls -> exists (ls' : list (list FullLabel)), PTraceList m' ls' /\ WeakInclusions ls ls'.
+
+Notation PPT_upds := (fun x => fst x).
+Notation PPT_execs := (fun x => fst (snd x)).
+Notation PPT_calls := (fun x => snd (snd x)).
+
+Section PPlusTraceInclusion.
+
+  Definition getListFullLabel_diff_flat f (t : (RegsT *((list RuleOrMeth)*MethsT))) : Z:=
+    (getNumFromExecs f (PPT_execs t) - getNumFromCalls f (PPT_calls t))%Z. 
+  
+  Definition WeakInclusion_flat (t1 t2 : (RegsT *((list RuleOrMeth) * MethsT))) :=
+    (forall (f : MethT), (getListFullLabel_diff_flat f t1 = getListFullLabel_diff_flat f t2)%Z) /\
+    ((exists rle, In (Rle rle) (PPT_execs t2)) ->
+     (exists rle, In (Rle rle) (PPT_execs t1))).
+
+
+  Inductive WeakInclusions_flat : list (RegsT * ((list RuleOrMeth) * MethsT)) -> list (RegsT *((list RuleOrMeth) * MethsT)) -> Prop :=
+  |WIf_Nil : WeakInclusions_flat nil nil
+  |WIf_Cons : forall (lt1 lt2 : list (RegsT *((list RuleOrMeth) * MethsT))) (t1 t2 : RegsT *((list RuleOrMeth) * MethsT)),
+      WeakInclusions_flat lt1 lt2 -> WeakInclusion_flat t1 t2 -> WeakInclusions_flat (t1::lt1) (t2::lt2).
+
+  Definition PPlusTraceList (m : BaseModule)(lt : list (RegsT * ((list RuleOrMeth) * MethsT))) :=
+    (exists (o : RegsT), PPlusTrace m o lt).
+
+  Definition PPlusTraceInclusion (m m' : BaseModule) :=
+    forall (o : RegsT)(tl : list (RegsT *((list RuleOrMeth) * MethsT))),
+      PPlusTrace m o tl -> exists (tl' : list (RegsT * ((list RuleOrMeth) * MethsT))),  PPlusTraceList m' tl' /\ WeakInclusions_flat tl tl'.
+
+  Definition StrongPPlusTraceInclusion (m m' : BaseModule) :=
+    forall (o : RegsT)(tl : list (RegsT *((list RuleOrMeth) * MethsT))),
+      PPlusTrace m o tl -> exists (tl' : list (RegsT * ((list RuleOrMeth) * MethsT))), PPlusTrace m' o tl' /\ WeakInclusions_flat tl tl'.
+End PPlusTraceInclusion.
+
+
+
+
+
+
+
+
+
+
+
+
+
+(* Useful functions *)
+
+Fixpoint getCallsWithSign k (a: ActionT (fun _ => unit) k) :=
+  match a in ActionT _ _ with
+  | MCall meth k argExpr cont =>
+    (meth, k) :: getCallsWithSign (cont tt)
+  | Return x => nil
+  | LetExpr k' expr cont =>
+    match k' return (fullType (fun _ => unit) k' -> ActionT (fun _ => unit) k) ->
+                    list (string * (Kind * Kind)) with
+    | SyntaxKind k => fun cont => getCallsWithSign (cont tt)
+    | _ => fun _ => nil
+    end cont
+  | LetAction k' a' cont =>
+    getCallsWithSign a' ++ getCallsWithSign (cont tt)
+  | ReadNondet k' cont =>
+    match k' return (fullType (fun _ => unit) k' -> ActionT (fun _ => unit) k) ->
+                    list (string * (Kind * Kind)) with
+    | SyntaxKind k => fun cont =>
+                        getCallsWithSign (cont tt)
+    | _ => fun _ => nil
+    end cont
+  | ReadReg r k' cont =>
+    match k' return (fullType (fun _ => unit) k' -> ActionT (fun _ => unit) k) ->
+                    list (string * (Kind * Kind)) with
+    | SyntaxKind k => fun cont =>
+                        getCallsWithSign (cont tt)
+    | _ => fun _ => nil
+    end cont
+  | WriteReg r k' expr cont =>
+    getCallsWithSign cont
+  | Assertion pred cont => getCallsWithSign cont
+  | Sys ls cont => getCallsWithSign cont
+  | IfElse pred ktf t f cont =>
+    getCallsWithSign t ++ getCallsWithSign f ++ getCallsWithSign (cont tt)
+  end.
+
+Definition getCallsWithSignPerRule (rule: Attribute (Action Void)) :=
+  getCallsWithSign (snd rule _).
+
+Definition getCallsWithSignPerMeth (meth: DefMethT) :=
+  getCallsWithSign (projT2 (snd meth) _ tt).
+
+Definition getCallsWithSignPerMod (m: Mod) :=
+  concat (map getCallsWithSignPerRule (getAllRules m)) ++ concat (map getCallsWithSignPerMeth (getAllMethods m)).
+
+Definition getCallsPerMod (m: Mod) := map fst (getCallsWithSignPerMod m).
+
+Fixpoint createHide (m: BaseModule) (hides: list string) :=
+  match hides with
+  | nil => Base m
+  | x :: xs => HideMeth (createHide m xs) x
+  end.
+
+Fixpoint createHideMod (m : Mod) (hides : list string) : Mod :=
+  match hides with
+  | nil => m
+  | h::hides' => HideMeth (createHideMod m hides') h
+  end.
+
+Definition autoHide (m: Mod) := createHideMod m (filter (fun i => getBool (in_dec string_dec i (getCallsPerMod m)))
+                                                        (map fst (getAllMethods m))).
+
+Fixpoint separateBaseMod (m: Mod): (list RegFileBase * list BaseModule) :=
+  match m with
+  | Base m' =>
+    match m' with
+    | BaseMod regs rules meths => (nil, BaseMod regs rules meths :: nil)
+    | BaseRegFile rf => (rf :: nil, nil)
+    end
+  | HideMeth m' meth => separateBaseMod m'
+  | ConcatMod m1 m2 =>
+    let '(rfs1, ms1) := separateBaseMod m1 in
+    let '(rfs2, ms2) := separateBaseMod m2 in
+    (rfs1 ++ rfs2, ms1 ++ ms2)
+  end.
+
+Definition separateMod (m: Mod) :=
+  (getHidden m, separateBaseMod m).
+    
+Fixpoint mergeSeparatedBaseMod (bl : list BaseModule) : Mod :=
+  match bl with
+  | b::bl' => ConcatMod (Base b) (mergeSeparatedBaseMod bl')
+  | nil => Base (BaseMod nil nil nil)
+  end.
+
+Fixpoint mergeSeparatedBaseFile (rfl : list RegFileBase) : Mod :=
+  match rfl with
+  | rf::rfl' => ConcatMod (Base (BaseRegFile rf))(mergeSeparatedBaseFile rfl')
+  | nil => Base (BaseMod nil nil nil)
+  end.
+
+Definition mergeSeparatedMod (tup: list string * (list RegFileBase * list BaseModule)) :=
+  createHideMod (ConcatMod (mergeSeparatedBaseFile (fst (snd tup))) (mergeSeparatedBaseMod (snd (snd tup)))) (fst tup).
+ 
+Definition getFlat m := BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m).
+
+Definition flatten m := createHide (getFlat m) (getHidden m).
+
+Definition concatFlat m1 m2 := BaseMod (getRegisters m1 ++ getRegisters m2)
+                                       (getRules m1 ++ getRules m2)
+                                       (getMethods m1 ++ getMethods m2).
 
 
 Section inlineSingle.
   Variable ty: Kind -> Type.
   Variable f: DefMethT.
-  Variable cheat: forall t, t.
   
   Fixpoint inlineSingle k (a: ActionT ty k): ActionT ty k :=
     match a with
@@ -1639,6 +1670,91 @@ Section inlineSingle.
       Return e
     end.
 End inlineSingle.
+
+Definition inlineSingle_Rule  (f : DefMethT) (rle : RuleT): RuleT.
+Proof.
+  unfold RuleT in *.
+  destruct rle.
+  constructor.
+  - apply s.
+  - unfold Action in *.
+    intro.
+    apply (inlineSingle f (a ty)).
+Defined.
+
+Fixpoint inlineSingle_Rule_in_list (f : DefMethT) (rn : string) (lr : list RuleT) : list RuleT :=
+  match lr with
+  | rle'::lr' => match string_dec rn (fst rle') with
+                 | right _ => rle'::(inlineSingle_Rule_in_list f rn lr')
+                 | left _ => (inlineSingle_Rule f rle')::(inlineSingle_Rule_in_list f rn lr')
+                 end
+  | nil => nil
+  end.
+                                
+Definition inlineSingle_Rule_BaseModule (f : DefMethT) (rn : string) (m : BaseModule) :=
+  BaseMod (getRegisters m) (inlineSingle_Rule_in_list f rn (getRules m)) (getMethods m).
+
+Definition inlineSingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT.
+Proof.
+  unfold DefMethT in *.
+  destruct meth.
+  constructor.
+  - apply s.
+  - destruct (string_dec (fst f) s).
+    + apply s0.
+    + destruct s0.
+      unfold MethodT; unfold MethodT in m.
+      exists x.
+      intros.
+      apply (inlineSingle f (m ty X)).
+Defined.
+
+Fixpoint inlineSingle_Meth_in_list (f : DefMethT) (gn : string) (lm : list DefMethT) : list DefMethT :=
+  match lm with
+  | meth'::lm' => match string_dec gn (fst meth') with
+                  | right _ => meth'::(inlineSingle_Meth_in_list f gn lm')
+                  | left _ => (inlineSingle_Meth f meth')::(inlineSingle_Meth_in_list f gn lm')
+                  end
+  | nil => nil
+  end.
+                                
+Definition inlineSingle_Meth_BaseModule (f : DefMethT) (fn : string) (m : BaseModule) :=
+  BaseMod (getRegisters m) (getRules m) (inlineSingle_Meth_in_list f fn (getMethods m)).
+
+Section inlineSingle_nth.
+  Variable (f : DefMethT).
+  Variable (regs: list RegInitT) (rules: list RuleT) (meths: list DefMethT).
+
+  Definition inlineSingle_BaseModule : BaseModule :=
+    BaseMod regs (map (inlineSingle_Rule f) rules) (map (inlineSingle_Meth f) meths).
+  
+  Definition inlineSingle_BaseModule_nth_Meth xs : BaseModule :=
+    BaseMod regs rules (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs).
+  
+  Definition inlineSingle_BaseModule_nth_Rule xs : BaseModule :=
+    BaseMod regs (fold_right (transform_nth_right (inlineSingle_Rule f)) rules xs) meths.
+End inlineSingle_nth.
+
+Definition inlineSingle_Meths_pos newMeths n :=
+  match nth_error newMeths n with
+  | Some f => map (inlineSingle_Meth f) newMeths
+  | None => newMeths
+  end.
+
+Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (0 upto (length meths)) meths.
+
+Definition inlineSingle_Rules_pos meths n rules :=
+  match nth_error meths n with
+  | Some f => map (inlineSingle_Rule f) rules
+  | None => rules
+  end.
+
+Definition inlineAll_Rules meths rules := fold_left (fun newRules n => inlineSingle_Rules_pos meths n newRules) (0 upto (length meths)) rules.
+
+Definition inlineAll_All regs rules meths :=
+  (Base (BaseMod regs (inlineAll_Rules (inlineAll_Meths meths) rules) (inlineAll_Meths meths))).
+
+
 
 
 

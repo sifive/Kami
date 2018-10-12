@@ -11,45 +11,6 @@ Section BaseModule.
   Variable m: BaseModule.
   Variable o: RegsT.
 
-  Inductive PPlusSubsteps: RegsT -> list RuleOrMeth -> MethsT -> Prop :=
-  | NilPPlusSubstep (HRegs: getKindAttr o [=] getKindAttr (getRegisters m)) : PPlusSubsteps nil nil nil
-  | PPlusAddRule (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
-            rn rb
-            (HInRules: In (rn, rb) (getRules m))
-            reads u cs
-            (HPAction: PSemAction o (rb type) reads u cs WO)
-            (HReadsGood: SubList (getKindAttr reads)
-                                 (getKindAttr (getRegisters m)))
-            (HUpdGood: SubList (getKindAttr u)
-                               (getKindAttr (getRegisters m)))
-            upds execs calls oldUpds oldExecs oldCalls
-            (HUpds: upds [=] u ++ oldUpds)
-            (HExecs: execs [=] Rle rn :: oldExecs)
-            (HCalls: calls [=] cs ++ oldCalls)
-            (HDisjRegs: DisjKey oldUpds u)
-            (HNoRle: forall x, In x oldExecs -> match x with
-                                                | Rle _ => False
-                                                | _ => True
-                                                end)
-            (HPSubstep: PPlusSubsteps oldUpds oldExecs oldCalls):
-      PPlusSubsteps upds execs calls
-  | PPlusAddMeth (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
-            fn fb
-            (HInMeths: In (fn, fb) (getMethods m))
-            reads u cs argV retV
-            (HPAction: PSemAction o ((projT2 fb) type argV) reads u cs retV)
-            (HReadsGood: SubList (getKindAttr reads)
-                                 (getKindAttr (getRegisters m)))
-            (HUpdGood: SubList (getKindAttr u)
-                               (getKindAttr (getRegisters m)))
-            upds execs calls oldUpds oldExecs oldCalls
-            (HUpds: upds [=] u ++ oldUpds)
-            (HExecs: execs [=] Meth (fn, existT _ _ (argV, retV)) :: oldExecs)
-            (HCalls: calls [=] cs ++ oldCalls)
-            (HDisjRegs: DisjKey oldUpds u)
-            (HPSubstep: PPlusSubsteps oldUpds oldExecs oldCalls):
-      PPlusSubsteps upds execs calls.
-  
   Definition getLabelUpds (ls: list FullLabel) :=
     concat (map (fun x => fst x) ls).
   
@@ -142,7 +103,7 @@ Section BaseModule.
   
   Lemma PPlusSubsteps_PSubsteps:
     forall upds execs calls,
-      PPlusSubsteps upds execs calls ->
+      PPlusSubsteps m o upds execs calls ->
       exists l,
         PSubsteps m o l /\
         upds [=] getLabelUpds l /\
@@ -341,19 +302,9 @@ Section PPlusStep.
   Variable m: BaseModule.
   Variable o: RegsT.
   
-  Definition MatchingExecCalls_flat (calls : MethsT) (execs : list RuleOrMeth) (m : BaseModule) :=
-    forall (f : MethT),
-      In (fst f) (map fst (getMethods m)) ->
-      (getNumFromCalls f calls <= getNumFromExecs f execs)%Z.
-  
-  Inductive PPlusStep :  RegsT -> list RuleOrMeth -> MethsT -> Prop :=
-  | BasePPlusStep upds execs calls:
-      PPlusSubsteps m o upds execs calls ->
-      MatchingExecCalls_flat calls execs m -> PPlusStep upds execs calls.
-  
   Lemma PPlusStep_PStep:
     forall upds execs calls,
-      PPlusStep upds execs calls ->
+      PPlusStep m o upds execs calls ->
       exists l,
         PStep (Base m) o l /\
         upds [=] getLabelUpds l /\
@@ -372,7 +323,7 @@ Section PPlusStep.
   Lemma PStep_PPlusStep :
   forall l,
     PStep (Base m) o l ->
-    PPlusStep (getLabelUpds l) (getLabelExecs l) (getLabelCalls l).
+    PPlusStep m o (getLabelUpds l) (getLabelExecs l) (getLabelCalls l).
   Proof.
     intros; inv H; econstructor.
     - apply PSubsteps_PPlusSubsteps in HPSubsteps; assumption.
@@ -384,33 +335,12 @@ End PPlusStep.
 Section PPlusTrace.
   Variable m: BaseModule.
   
-  Definition PPlusUpdRegs (u o o' : RegsT) :=
-    getKindAttr o [=] getKindAttr o' /\
-    (forall s v, In (s, v) o' -> In (s, v) u \/ (~ In s (map fst u) /\ In (s, v) o)).
-  
-  Inductive PPlusTrace : RegsT -> list (RegsT * ((list RuleOrMeth) * MethsT)) -> Prop :=
-  | PPlusInitTrace (o' o'' : RegsT) ls'
-                   (HPerm : o' [=] o'')
-                   (HUpdRegs : Forall2 regInit o'' (getRegisters m))
-                   (HTrace : ls' = nil):
-      PPlusTrace o' ls'
-  | PPlusContinueTrace (o o' : RegsT)
-                       (upds : RegsT)
-                       (execs : list RuleOrMeth)
-                       (calls : MethsT)
-                       (ls ls' : list (RegsT * ((list RuleOrMeth) * MethsT)))
-                       (PPlusOldTrace : PPlusTrace o ls)
-                       (HPPlusStep : PPlusStep m o upds execs calls)
-                       (HUpdRegs : PPlusUpdRegs upds o o')
-                       (HPPlusTrace : ls' = ((upds, (execs, calls))::ls)):
-      PPlusTrace o' ls'.
-
   Notation PPT_upds := (fun x => fst x).
   Notation PPT_execs := (fun x => fst (snd x)).
   Notation PPT_calls := (fun x => snd (snd x)).
   
   Lemma PPlusTrace_PTrace o ls :
-    PPlusTrace o ls ->
+    PPlusTrace m o ls ->
     exists ls',
       PTrace (Base m) o ls' /\
       PermutationEquivLists (map PPT_upds ls) (map getLabelUpds ls') /\
@@ -456,7 +386,7 @@ Section PPlusTrace.
   
   Lemma PTrace_PPlusTrace o ls:
     PTrace (Base m) o ls ->
-      PPlusTrace o (extractTriples ls).
+      PPlusTrace m o (extractTriples ls).
   Proof.
     induction 1; subst; intros.
     - econstructor; eauto.
@@ -478,18 +408,6 @@ Section PPlusTrace.
 End PPlusTrace.
 
 Section PPlusTraceInclusion.
-  Notation PPT_upds := (fun x => fst x).
-  Notation PPT_execs := (fun x => fst (snd x)).
-  Notation PPT_calls := (fun x => snd (snd x)).
-
-  Definition getListFullLabel_diff_flat f (t : (RegsT *((list RuleOrMeth)*MethsT))) : Z:=
-    (getNumFromExecs f (PPT_execs t) - getNumFromCalls f (PPT_calls t))%Z. 
-  
-  Definition WeakInclusion_flat (t1 t2 : (RegsT *((list RuleOrMeth) * MethsT))) :=
-    (forall (f : MethT), (getListFullLabel_diff_flat f t1 = getListFullLabel_diff_flat f t2)%Z) /\
-    ((exists rle, In (Rle rle) (PPT_execs t2)) ->
-     (exists rle, In (Rle rle) (PPT_execs t1))).
-
   Lemma  InExec_rewrite f l:
     In (Meth f) (getLabelExecs l) <-> InExec f l.
   Proof.
@@ -513,12 +431,6 @@ Section PPlusTraceInclusion.
     split; auto.
   Qed.
   
-  Inductive WeakInclusions_flat : list (RegsT * ((list RuleOrMeth) * MethsT)) -> list (RegsT *((list RuleOrMeth) * MethsT)) -> Prop :=
-  |WIf_Nil : WeakInclusions_flat nil nil
-  |WIf_Cons : forall (lt1 lt2 : list (RegsT *((list RuleOrMeth) * MethsT))) (t1 t2 : RegsT *((list RuleOrMeth) * MethsT)),
-      WeakInclusions_flat lt1 lt2 -> WeakInclusion_flat t1 t2 -> WeakInclusions_flat (t1::lt1) (t2::lt2).
-
-  
   Lemma WeakInclusions_flat_WeakInclusions (ls1 ls2 : list (list FullLabel)) :
     WeakInclusions_flat (extractTriples ls1) (extractTriples ls2) ->
     WeakInclusions ls1 ls2.
@@ -531,17 +443,6 @@ Section PPlusTraceInclusion.
       + apply WeakInclusion_flat_WeakInclusion; assumption.
   Qed.
   
-  Definition PPlusTraceList (m : BaseModule)(lt : list (RegsT * ((list RuleOrMeth) * MethsT))) :=
-    (exists (o : RegsT), PPlusTrace m o lt).
-
-  Definition PPlusTraceInclusion (m m' : BaseModule) :=
-    forall (o : RegsT)(tl : list (RegsT *((list RuleOrMeth) * MethsT))),
-      PPlusTrace m o tl -> exists (tl' : list (RegsT * ((list RuleOrMeth) * MethsT))),  PPlusTraceList m' tl' /\ WeakInclusions_flat tl tl'.
-
-  Definition StrongPPlusTraceInclusion (m m' : BaseModule) :=
-    forall (o : RegsT)(tl : list (RegsT *((list RuleOrMeth) * MethsT))),
-      PPlusTrace m o tl -> exists (tl' : list (RegsT * ((list RuleOrMeth) * MethsT))), PPlusTrace m' o tl' /\ WeakInclusions_flat tl tl'.
-
   Lemma StrongPPlusTraceInclusion_PPlusTraceInclusion m m' :
     StrongPPlusTraceInclusion m m' ->
     PPlusTraceInclusion m m'.
@@ -1573,29 +1474,6 @@ Proof.
       rewrite filter_In in H1; dest; assumption.
 Qed.
 
-Definition inlineSingle_Rule  (f : DefMethT) (rle : RuleT): RuleT.
-Proof.
-  unfold RuleT in *.
-  destruct rle.
-  constructor.
-  - apply s.
-  - unfold Action in *.
-    intro.
-    apply (inlineSingle f (a ty)).
-Defined.
-
-Fixpoint inlineSingle_Rule_in_list (f : DefMethT) (rn : string) (lr : list RuleT) : list RuleT :=
-  match lr with
-  | rle'::lr' => match string_dec rn (fst rle') with
-                 | right _ => rle'::(inlineSingle_Rule_in_list f rn lr')
-                 | left _ => (inlineSingle_Rule f rle')::(inlineSingle_Rule_in_list f rn lr')
-                 end
-  | nil => nil
-  end.
-                                
-Definition inlineSingle_Rule_BaseModule (f : DefMethT) (rn : string) (m : BaseModule) :=
-  BaseMod (getRegisters m) (inlineSingle_Rule_in_list f rn (getRules m)) (getMethods m).
-
 Lemma InRule_In_inlined f rn rb m:
   In (rn, rb) (getRules m) ->
   In (rn, (fun ty => (inlineSingle f (rb ty)))) (getRules (inlineSingle_Rule_BaseModule f rn m)).
@@ -2170,33 +2048,6 @@ Proof.
   apply (WfMod_Rule_inlined); auto.
   eauto using StrongPPlusTraceInclusion_PPlusTraceInclusion, PPlusStrongTraceInclusion_inlining_Rules_r.
 Qed.
-
-Definition inlineSingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT.
-Proof.
-  unfold DefMethT in *.
-  destruct meth.
-  constructor.
-  - apply s.
-  - destruct (string_dec (fst f) s).
-    + apply s0.
-    + destruct s0.
-      unfold MethodT; unfold MethodT in m.
-      exists x.
-      intros.
-      apply (inlineSingle f (m ty X)).
-Defined.
-
-Fixpoint inlineSingle_Meth_in_list (f : DefMethT) (gn : string) (lm : list DefMethT) : list DefMethT :=
-  match lm with
-  | meth'::lm' => match string_dec gn (fst meth') with
-                  | right _ => meth'::(inlineSingle_Meth_in_list f gn lm')
-                  | left _ => (inlineSingle_Meth f meth')::(inlineSingle_Meth_in_list f gn lm')
-                  end
-  | nil => nil
-  end.
-                                
-Definition inlineSingle_Meth_BaseModule (f : DefMethT) (fn : string) (m : BaseModule) :=
-  BaseMod (getRegisters m) (getRules m) (inlineSingle_Meth_in_list f fn (getMethods m)).
 
 Lemma ProjT1_inline_eq (f g : DefMethT):
   (projT1 (snd g)) = (projT1 (snd (inlineSingle_Meth f g))).
@@ -3225,15 +3076,6 @@ Section inlineSingle_nth.
   Variable (regs: list RegInitT) (rules: list RuleT) (meths: list DefMethT).
   Variable (Wf : forall ty, WfMod ty (Base (BaseMod regs rules meths))).
 
-  Definition inlineSingle_BaseModule : BaseModule :=
-    BaseMod regs (map (inlineSingle_Rule f) rules) (map (inlineSingle_Meth f) meths).
-  
-  Definition inlineSingle_BaseModule_nth_Meth xs : BaseModule :=
-    BaseMod regs rules (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs).
-  
-  Definition inlineSingle_BaseModule_nth_Rule xs : BaseModule :=
-    BaseMod regs (fold_right (transform_nth_right (inlineSingle_Rule f)) rules xs) meths.
-  
   Lemma inline_meth_fold_right xs:
     In f meths ->
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs))).
@@ -3306,25 +3148,6 @@ Qed.
 
 
 Section inline_all_all.
-  Definition inlineSingle_Meths_pos newMeths n :=
-    match nth_error newMeths n with
-    | Some f => map (inlineSingle_Meth f) newMeths
-    | None => newMeths
-    end.
-
-  Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (0 upto (length meths)) meths.
-
-  Definition inlineSingle_Rules_pos meths n rules :=
-    match nth_error meths n with
-    | Some f => map (inlineSingle_Rule f) rules
-    | None => rules
-    end.
-
-  Definition inlineAll_Rules meths rules := fold_left (fun newRules n => inlineSingle_Rules_pos meths n newRules) (0 upto (length meths)) rules.
-
-  Definition inlineAll_All regs rules meths :=
-    (Base (BaseMod regs (inlineAll_Rules (inlineAll_Meths meths) rules) (inlineAll_Meths meths))).
-  
   Lemma TraceInclusion_inlineSingle_pos_Rules regs rules meths:
     (forall ty, WfMod ty (Base (BaseMod regs rules meths))) ->
     forall n,
@@ -3409,9 +3232,6 @@ End inline_all_all.
 
 
 Section flatten_and_inline_all.
-  Definition flattened_WfModule (m : WfModule): WfModule :=
-    (mkWfMod (fun ty => flatten_WfMod (Wf_cond m ty))).
-  
   Lemma inline_preserves_key_Meth (f : DefMethT) (meth : DefMethT):
     fst (inlineSingle_Meth f meth) = fst meth.
   Proof.
@@ -3681,7 +3501,7 @@ Section flatten_and_inline_all.
   Proof.
     specialize (Wf_cond (inlined_WfModule m)) as Wf1.
     simpl.
-    specialize (TraceInclusion_flatten_r (Wf_cond m)) as P1.
+    specialize (TraceInclusion_flatten_r m) as P1.
     unfold flatten, getFlat in *.
     assert (forall ty, WfMod ty (Base (getFlat m))). {
       intros.
