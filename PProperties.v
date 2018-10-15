@@ -2787,16 +2787,16 @@ Qed.
 
 Section Comm.
   Variable m1 m2: Mod.
-  Variable wfMod: forall ty, WfMod ty (m1 ++ m2)%kami.
+  Variable wfMod: forall ty, WfMod ty (ConcatMod m1 m2)%kami.
 
   Theorem ConcatMod_comm:
-    TraceInclusion (m1 ++ m2)%kami (m2 ++ m1)%kami.
+    TraceInclusion (ConcatMod m1 m2)%kami (ConcatMod m2 m1)%kami.
   Proof.
     apply PTraceInclusion_TraceInclusion; auto.
     - intros; eapply WfConcatComm; eauto.
     - unfold PTraceInclusion, TraceList.
       intros.
-      assert (sth: forall ty, WfMod ty (m2 ++ m1)%kami) by (intros; specialize (wfMod ty); eapply WfConcatComm; eauto).
+      assert (sth: forall ty, WfMod ty (ConcatMod m2 m1)%kami) by (intros; specialize (wfMod ty); eapply WfConcatComm; eauto).
       assert (sth2: WfModule_perm (mkWfMod wfMod) (mkWfMod sth)) by
           (constructor; simpl; auto; apply Permutation_app_comm).
       pose proof (@PTrace_WfModule_rewrite (mkWfMod wfMod) (mkWfMod sth) o ls sth2 H).
@@ -2809,16 +2809,16 @@ End Comm.
 
 Section Assoc.
   Variable m1 m2 m3: Mod.
-  Variable wfMod: forall ty, WfMod ty ((m1 ++ m2) ++ m3)%kami.
+  Variable wfMod: forall ty, WfMod ty (ConcatMod (ConcatMod m1 m2) m3)%kami.
 
   Theorem ConcatModAssoc1:
-    TraceInclusion (m1 ++ (m2 ++ m3))%kami ((m1 ++ m2) ++ m3)%kami.
+    TraceInclusion (ConcatMod m1 (ConcatMod m2 m3))%kami (ConcatMod (ConcatMod m1 m2) m3)%kami.
   Proof.
     apply PTraceInclusion_TraceInclusion; auto.
     - intros; eapply WfConcatAssoc2; eauto.
     - unfold PTraceInclusion, TraceList.
       intros.
-      assert (sth: forall ty, WfMod ty (m1 ++ (m2 ++ m3))%kami) by (intros; specialize (wfMod ty); eapply WfConcatAssoc2; eauto).
+      assert (sth: forall ty, WfMod ty (ConcatMod m1 (ConcatMod m2 m3))%kami) by (intros; specialize (wfMod ty); eapply WfConcatAssoc2; eauto).
       assert (sth2: WfModule_perm (mkWfMod sth) (mkWfMod wfMod)) by
         (constructor; simpl; rewrite app_assoc; auto).
       pose proof (@PTrace_WfModule_rewrite (mkWfMod sth) (mkWfMod wfMod) o ls sth2 H).
@@ -2829,13 +2829,13 @@ Section Assoc.
   Qed.
 
   Theorem ConcatModAssoc2:
-    TraceInclusion ((m1 ++ m2) ++ m3)%kami (m1 ++ (m2 ++ m3))%kami.
+    TraceInclusion (ConcatMod (ConcatMod m1 m2) m3)%kami (ConcatMod m1 (ConcatMod m2 m3))%kami.
   Proof.
     apply PTraceInclusion_TraceInclusion; auto.
     - intros; eapply WfConcatAssoc2; eauto.
     - unfold PTraceInclusion, TraceList.
       intros.
-      assert (sth: forall ty, WfMod ty (m1 ++ (m2 ++ m3))%kami) by (intros; specialize (wfMod ty); eapply WfConcatAssoc2; eauto).
+      assert (sth: forall ty, WfMod ty (ConcatMod m1 (ConcatMod m2 m3))%kami) by (intros; specialize (wfMod ty); eapply WfConcatAssoc2; eauto).
       assert (sth2: WfModule_perm (mkWfMod wfMod) (mkWfMod sth)) by
         (constructor; simpl; rewrite app_assoc; auto).
       pose proof (@PTrace_WfModule_rewrite (mkWfMod wfMod) (mkWfMod sth) o ls sth2 H).

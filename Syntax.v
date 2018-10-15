@@ -2179,7 +2179,7 @@ Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
      Wf_cond := ltac:(discharge_wf) |}
     (only parsing).
 
-Infix "++" := ConcatMod: kami_scope.
+(* Infix "++" := ConcatMod: kami_scope. *)
 
 Section tets.
   Variable a : string.
@@ -2192,7 +2192,7 @@ Section tets.
                     }.
 End tets.
 
-Local Example test2 a b := (test a ++ test b)%kami.
+Local Example test2 a b := (ConcatMod (test a) (test b))%kami.
 
 
 
