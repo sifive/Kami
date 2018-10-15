@@ -577,62 +577,67 @@ Fixpoint getHidden m :=
   | HideMeth m' s => s :: getHidden m'
   end.
 
-Section Some_ty.
-  Variable ty: Kind -> Type.
-  Section WfBaseMod.
-    Variable m: BaseModule.
-    
-    Inductive WfActionT: forall lretT, ActionT ty lretT -> Prop :=
-    | WfMCall meth s e lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (MCall meth s e c)
-    | WfLetExpr k (e: Expr ty k) lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (LetExpr e c)
-    | WfLetAction k (a: ActionT ty k) lretT c: WfActionT a -> (forall v, WfActionT (c v)) -> @WfActionT lretT (LetAction a c)
-    | WfReadNondet k lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (ReadNondet k c)
-    | WfReadReg r k lretT c: (forall v, WfActionT (c v)) -> In (r, k) (getKindAttr (getRegisters m)) -> @WfActionT lretT (ReadReg r k c)
-    | WfWriteReg r k (e: Expr ty k) lretT c: WfActionT c  -> In (r, k) (getKindAttr (getRegisters m)) -> @WfActionT lretT (WriteReg r e c)
-    | WfIfElse p k (atrue: ActionT ty k) afalse lretT c: (forall v, WfActionT (c v)) -> WfActionT atrue -> WfActionT afalse -> @WfActionT lretT (IfElse p atrue afalse c)
-    | WfAssertion (e: Expr ty (SyntaxKind Bool)) lretT c: WfActionT c -> @WfActionT lretT (Assertion e c)
-    | WfSys ls lretT c: WfActionT c -> @WfActionT lretT (Sys ls c)
-    | WfReturn lretT e: @WfActionT lretT (Return e).
+Fixpoint type (k: Kind): Type :=
+  match k with
+    | Bool => bool
+    | Bit n => word n
+    | Struct n fk fs => forall i, type (fk i)
+    | Array n k' => Fin.t n -> type k'
+  end.
 
-    Definition WfBaseModule :=
-      (forall rule, In rule (getRules m) -> WfActionT (snd rule ty)) /\
-      (forall meth, In meth (getMethods m) -> forall v, WfActionT (projT2 (snd meth) ty v)) /\
-      NoDup (map fst (getMethods m)) /\ NoDup (map fst (getRegisters m)) /\ NoDup (map fst (getRules m)).
-  End WfBaseMod.
+Section WfBaseMod.
+  Variable m: BaseModule.
+  
+  Inductive WfActionT: forall lretT, ActionT type lretT -> Prop :=
+  | WfMCall meth s e lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (MCall meth s e c)
+  | WfLetExpr k (e: Expr type k) lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (LetExpr e c)
+  | WfLetAction k (a: ActionT type k) lretT c: WfActionT a -> (forall v, WfActionT (c v)) -> @WfActionT lretT (LetAction a c)
+  | WfReadNondet k lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (ReadNondet k c)
+  | WfReadReg r k lretT c: (forall v, WfActionT (c v)) -> In (r, k) (getKindAttr (getRegisters m)) -> @WfActionT lretT (ReadReg r k c)
+  | WfWriteReg r k (e: Expr type k) lretT c: WfActionT c  -> In (r, k) (getKindAttr (getRegisters m)) -> @WfActionT lretT (WriteReg r e c)
+  | WfIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, WfActionT (c v)) -> WfActionT atrue -> WfActionT afalse -> @WfActionT lretT (IfElse p atrue afalse c)
+  | WfAssertion (e: Expr type (SyntaxKind Bool)) lretT c: WfActionT c -> @WfActionT lretT (Assertion e c)
+  | WfSys ls lretT c: WfActionT c -> @WfActionT lretT (Sys ls c)
+  | WfReturn lretT e: @WfActionT lretT (Return e).
 
-  Inductive WfConcatActionT : forall lretT, ActionT ty lretT -> Mod -> Prop :=
-  | WfConcatMCall meth s e lretT c m' :(forall v, WfConcatActionT (c v) m') -> ~In meth (getHidden m') -> @WfConcatActionT lretT (MCall meth s e c) m'
-  | WfConcatLetExpr k (e : Expr ty k) lretT c m' : (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetExpr e c) m'
-  | WfConcatLetAction k (a : ActionT ty k) lretT c m' : WfConcatActionT a m' -> (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetAction a c) m'
-  | WfConcatReadNondet k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadNondet k c) m'
-  | WfConcatReadReg r k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadReg r k c) m'
-  | WfConcatWriteReg r k (e: Expr ty k) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (WriteReg r e c) m'
-  | WfConcatIfElse p k (atrue: ActionT ty k) afalse lretT c m': (forall v, WfConcatActionT (c v) m') -> WfConcatActionT atrue m' -> WfConcatActionT afalse m' -> @WfConcatActionT lretT (IfElse p atrue afalse c) m'
-  | WfConcatAssertion (e: Expr ty (SyntaxKind Bool)) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Assertion e c) m'
-  | WfConcatSys ls lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Sys ls c) m'
-  | WfConcatReturn lretT e m': @WfConcatActionT lretT (Return e) m'.
+  Definition WfBaseModule :=
+    (forall rule, In rule (getRules m) -> WfActionT (snd rule type)) /\
+    (forall meth, In meth (getMethods m) -> forall v, WfActionT (projT2 (snd meth) type v)) /\
+    NoDup (map fst (getMethods m)) /\ NoDup (map fst (getRegisters m)) /\ NoDup (map fst (getRules m)).
+End WfBaseMod.
 
-  Definition WfConcat m m' :=
-    (forall rule, In rule (getAllRules m) -> WfConcatActionT (snd rule ty) m') /\
-    (forall meth, In meth (getAllMethods m) -> forall v, WfConcatActionT (projT2 (snd meth) ty v) m').
+Inductive WfConcatActionT : forall lretT, ActionT type lretT -> Mod -> Prop :=
+| WfConcatMCall meth s e lretT c m' :(forall v, WfConcatActionT (c v) m') -> ~In meth (getHidden m') -> @WfConcatActionT lretT (MCall meth s e c) m'
+| WfConcatLetExpr k (e : Expr type k) lretT c m' : (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetExpr e c) m'
+| WfConcatLetAction k (a : ActionT type k) lretT c m' : WfConcatActionT a m' -> (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetAction a c) m'
+| WfConcatReadNondet k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadNondet k c) m'
+| WfConcatReadReg r k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadReg r k c) m'
+| WfConcatWriteReg r k (e: Expr type k) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (WriteReg r e c) m'
+| WfConcatIfElse p k (atrue: ActionT type k) afalse lretT c m': (forall v, WfConcatActionT (c v) m') -> WfConcatActionT atrue m' -> WfConcatActionT afalse m' -> @WfConcatActionT lretT (IfElse p atrue afalse c) m'
+| WfConcatAssertion (e: Expr type (SyntaxKind Bool)) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Assertion e c) m'
+| WfConcatSys ls lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Sys ls c) m'
+| WfConcatReturn lretT e m': @WfConcatActionT lretT (Return e) m'.
 
-  Inductive WfMod: Mod -> Prop :=
-  | BaseWf m (HWfBaseModule: WfBaseModule m): WfMod (Base m)
-  | HideMethWf m s (HHideWf: In s (map fst (getAllMethods m))) (HWf: WfMod m): WfMod (HideMeth m s)
-  | ConcatModWf m1 m2 (HDisjRegs: DisjKey (getAllRegisters m1) (getAllRegisters m2))
-                (HDisjRules: DisjKey (getAllRules m1) (getAllRules m2))
-                (HDisjMeths: DisjKey (getAllMethods m1) (getAllMethods m2))
-                (HWf1: WfMod m1) (HWf2: WfMod m2)(WfConcat1: WfConcat m1 m2)
-                (WfConcat2 : WfConcat m2 m1): WfMod (ConcatMod m1 m2).
-End Some_ty.
+Definition WfConcat m m' :=
+  (forall rule, In rule (getAllRules m) -> WfConcatActionT (snd rule type) m') /\
+  (forall meth, In meth (getAllMethods m) -> forall v, WfConcatActionT (projT2 (snd meth) type v) m').
 
-Record WfModule : Type := mkWfMod {
-                              module :> Mod;
-                              Wf_cond : forall ty, WfMod ty module }.
+Inductive WfMod: Mod -> Prop :=
+| BaseWf m (HWfBaseModule: WfBaseModule m): WfMod (Base m)
+| HideMethWf m s (HHideWf: In s (map fst (getAllMethods m))) (HWf: WfMod m): WfMod (HideMeth m s)
+| ConcatModWf m1 m2 (HDisjRegs: DisjKey (getAllRegisters m1) (getAllRegisters m2))
+              (HDisjRules: DisjKey (getAllRules m1) (getAllRules m2))
+              (HDisjMeths: DisjKey (getAllMethods m1) (getAllMethods m2))
+              (HWf1: WfMod m1) (HWf2: WfMod m2)(WfConcat1: WfConcat m1 m2)
+              (WfConcat2 : WfConcat m2 m1): WfMod (ConcatMod m1 m2).
+
+Record ModWf : Type := mkWfMod {
+                           module :> Mod;
+                           Wf_cond : WfMod module }.
 
 Record BaseModWf :=
   { baseMod :> BaseModule ;
-    wfBaseMod : forall ty, WfBaseModule ty baseMod }.
+    wfBaseMod : WfBaseModule baseMod }.
 
 
 
@@ -647,14 +652,13 @@ Ltac Struct_neq :=
   end.
 
 Ltac discharge_wf :=
-  intros ty;
   repeat match goal with
-         | |- @WfMod ty _ => constructor_simpl
-         | |- @WfConcat ty _ _ => constructor_simpl
+         | |- @WfMod _ => constructor_simpl
+         | |- @WfConcat _ _ => constructor_simpl
          | |- _ /\ _ => constructor_simpl
          | |- @WfConcatActionT _ _ _ => constructor_simpl
-         | |- @WfBaseModule ty _ => constructor_simpl
-         | |- @WfActionT ty _ _ _ => constructor_simpl
+         | |- @WfBaseModule _ => constructor_simpl
+         | |- @WfActionT _ _ _ => constructor_simpl
          | |- NoDup _ => constructor_simpl
          | H: _ \/ _ |- _ => destruct H; subst; simpl
          end; try tauto; discharge_appendage; try congruence.
@@ -715,14 +719,6 @@ Lemma Signature_dec: forall (s1 s2: Signature), {s1 = s2} + {s1 <> s2}.
 Proof.
   decide equality; apply Kind_dec.
 Defined.
-
-Fixpoint type (k: Kind): Type :=
-  match k with
-    | Bool => bool
-    | Bit n => word n
-    | Struct n fk fs => forall i, type (fk i)
-    | Array n k' => Fin.t n -> type k'
-  end.
 
 Lemma isEq k: forall (e1: type k) (e2: type k),
     {e1 = e2} + {e1 <> e2}.
