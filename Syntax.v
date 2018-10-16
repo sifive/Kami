@@ -604,6 +604,11 @@ Section WfBaseMod.
     (forall rule, In rule (getRules m) -> WfActionT (snd rule type)) /\
     (forall meth, In meth (getMethods m) -> forall v, WfActionT (projT2 (snd meth) type v)) /\
     NoDup (map fst (getMethods m)) /\ NoDup (map fst (getRegisters m)) /\ NoDup (map fst (getRules m)).
+  
+  Lemma WfLetExprSyntax k (e: LetExprSyntax type k): WfActionT (convertLetExprSyntax_ActionT e).
+  Proof.
+    induction e; constructor; auto.
+  Qed.
 End WfBaseMod.
 
 Inductive WfConcatActionT : forall lretT, ActionT type lretT -> Mod -> Prop :=
@@ -658,6 +663,7 @@ Ltac discharge_wf :=
          | |- _ /\ _ => constructor_simpl
          | |- @WfConcatActionT _ _ _ => constructor_simpl
          | |- @WfBaseModule _ => constructor_simpl
+         | |- @WfActionT _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
          | |- @WfActionT _ _ _ => constructor_simpl
          | |- NoDup _ => constructor_simpl
          | H: _ \/ _ |- _ => destruct H; subst; simpl
@@ -1987,9 +1993,8 @@ Local Definition testFieldAccess (ty: Kind -> Type): ActionT ty (Bit 10) :=
 Local Close Scope kami_expr.
 Local Close Scope kami_action.
 
-
-Local Definition testFieldUpd ty := 
-  ((testStructVal ty) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
+Local Definition testFieldUpd (ty: Kind -> Type) := 
+  ((testStructVal (ty := ty)) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
 
 
 Fixpoint gatherActions (ty: Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_out (cont: list (k_in @# ty) -> ActionT ty k_out): ActionT ty k_out :=
