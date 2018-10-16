@@ -662,7 +662,7 @@ Ltac discharge_wf :=
          | |- NoDup _ => constructor_simpl
          | H: _ \/ _ |- _ => destruct H; subst; simpl
          end; repeat (discharge_DisjKey || tauto || congruence);
-  (discharge_DisjKey || tauto || congruence).
+  try (discharge_DisjKey || tauto || congruence).
 
 
 
@@ -1769,7 +1769,7 @@ Local Definition testStruct :=
        "b" :: Bit 5 ;
        "test" :: Bool }).
 
-Local Definition testStructVal ty: testStruct @# ty :=
+Local Definition testStructVal {ty}: testStruct @# ty :=
   (STRUCT {
        "hello" ::= $ 4 ;
        "a" ::= $ 23 ;
@@ -1878,16 +1878,10 @@ Notation "name ::= value" :=
   (name, value) (only parsing): kami_switch_init_scope.
 Delimit Scope kami_switch_init_scope with switch_init.
 
-Local Definition testFieldAccess ty := 
-  ((testStructVal ty) @% "hello")%kami_expr.
-
 Notation "s '@%[' f <- v ]" := (UpdateStruct s%kami_expr (ltac:(let typeS := type of s in
                                                                getStructFull typeS f))
                                              v%kami_expr)
                                  (at level 100, only parsing) : kami_expr_scope.
-
-Local Definition testFieldUpd ty := 
-  ((testStructVal ty) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
 
 Local Definition testExtract ty n n1 n2 (pf1: n > n1) (pf2: n1 > n2) (a: Bit n @# ty) := (a $#[n1 : n2])%kami_expr.
 
@@ -1984,6 +1978,19 @@ Notation "'RetE' expr" :=
   (NormExpr expr%kami_expr) (at level 12) : kami_expr_scope.
 
 Delimit Scope kami_action_scope with kami_action.
+
+Local Open Scope kami_action.
+Local Open Scope kami_expr.
+Local Definition testFieldAccess (ty: Kind -> Type): ActionT ty (Bit 10) :=
+  (LET val: testStruct <- testStructVal;
+     Ret (#val @% "hello")).
+Local Close Scope kami_expr.
+Local Close Scope kami_action.
+
+
+Local Definition testFieldUpd ty := 
+  ((testStructVal ty) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
+
 
 Fixpoint gatherActions (ty: Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_out (cont: list (k_in @# ty) -> ActionT ty k_out): ActionT ty k_out :=
   match acts with
@@ -2205,6 +2212,12 @@ Definition Maybe k :=
       "valid" :: Bool;
       "data"  :: k
     }.
+
+Definition Pair (A B: Kind) := (STRUCT {
+                                    "fst" :: A;
+                                    "snd" :: B
+                               }).
+
 
 Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_expr
     (at level 100, only parsing) : kami_expr_scope.
