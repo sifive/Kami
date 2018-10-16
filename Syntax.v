@@ -661,7 +661,8 @@ Ltac discharge_wf :=
          | |- @WfActionT _ _ _ => constructor_simpl
          | |- NoDup _ => constructor_simpl
          | H: _ \/ _ |- _ => destruct H; subst; simpl
-         end; try tauto; discharge_appendage; try congruence.
+         end; repeat (discharge_DisjKey || tauto || congruence);
+  (discharge_DisjKey || tauto || congruence).
 
 
 

@@ -1435,13 +1435,10 @@ Ltac discharge_appendage :=
          end.
 
 Ltac discharge_DisjKey :=
-  match goal with
-  | |- DisjKey ?P ?Q => rewrite DisjKeyWeak_same by apply string_dec;
-                        let k := fresh in
-                        let H1 := fresh in
-                        let H2 := fresh in
-                        unfold DisjKeyWeak; simpl; intros k H1 H2
-  end;
+  try match goal with
+      | |- DisjKey ?P ?Q => rewrite DisjKeyWeak_same by apply string_dec;
+                            unfold DisjKeyWeak; simpl; intros
+      end;
   discharge_appendage;
   subst;
   auto;
