@@ -4113,3 +4113,55 @@ Section Fold.
     rewrite fold_right_fold_tree; auto.
   Qed.
 End Fold.
+
+Section DecompositionZeroAction.
+  Variable imp spec: BaseModWf.
+  Variable simRel: RegsT -> RegsT -> Prop.
+  Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
+                                 exists rspec, Forall2 regInit rspec (getRegisters spec) /\ simRel rimp rspec.
+
+  Variable NoMeths: getMethods imp = [].
+  Variable NoMethsSpec: getMethods spec = [].
+
+  Variable simulation:
+    forall oImp rImp uImp rleImp csImp oImp' aImp,
+      In (rleImp, aImp) (getRules imp) ->
+      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      UpdRegs [uImp] oImp oImp' ->
+      forall oSpec,
+        simRel oImp oSpec ->
+        ((simRel oImp' oSpec /\ csImp = []) \/
+         (exists rleSpec aSpec,
+             In (rleSpec, aSpec) (getRules spec) /\
+             exists rSpec uSpec,
+               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               exists oSpec',
+                 UpdRegs [uSpec] oSpec oSpec' /\
+                 simRel oImp' oSpec')).
+
+  Theorem decompositionZeroAction:
+    TraceInclusion (Base imp) (Base spec).
+  Proof.
+    pose proof (wfBaseMod imp) as wfImp.
+    pose proof (wfBaseMod spec) as wfSpec.
+    inv wfImp.
+    inv wfSpec.
+    dest.
+    apply decompositionZero with (simRel := simRel); auto; simpl; intros.
+    inv H9; [|discriminate].
+    inv HLabel.
+    specialize (@simulation oImp reads u rn cs oImp' rb HInRules HAction H10 _ H11).
+    pose proof (simRelGood H11).
+    destruct simulation.
+    - left; auto.
+    - right.
+      dest.
+      exists x2, x, x3.
+      split.
+      + pose proof (WfActionT_ReadsWellDefined (H1 _ H12) H13) as sth1.
+        pose proof (WfActionT_WritesWellDefined (H1 _ H12) H13) as sth2.
+        repeat econstructor; eauto.
+      + split; assumption.
+  Qed.
+End DecompositionZeroAction.
