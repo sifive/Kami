@@ -255,8 +255,8 @@ Lemma getNumFromCalls_neq_cons f g l :
 Proof.
   intro; unfold getNumFromCalls; destruct MethT_dec; auto; contradiction.
 Qed.
-Opaque getNumFromCalls.
 
+Opaque getNumFromCalls.
 Lemma getNumFromCalls_app f l1:
   forall l2,
   getNumFromCalls f (l1++l2) = (getNumFromCalls f l1 + getNumFromCalls f l2)%Z.
@@ -269,6 +269,7 @@ Proof.
       rewrite IHl1; ring.
     + simpl; repeat rewrite getNumFromCalls_neq_cons; auto.
 Qed.
+Transparent getNumFromCalls.
 
 Corollary getNumCalls_app f l1 :
   forall l2,
@@ -1045,6 +1046,7 @@ Section SplitJoin.
     rewrite DisjMeths_1_id with (m2 := m2) (o1 := o1) (o2 := o2), DisjMeths_2_id with (m1 := m1) (o1 := o1) (o2 := o2); auto.
     Opaque MatchingExecCalls_Concat.
     repeat split; auto.
+    Transparent MatchingExecCalls_Concat.
   Qed.
 
   Lemma Step_upd_1 o l:
@@ -1211,6 +1213,7 @@ Section SplitJoin.
         rewrite H12 in H4.
         simpl in H4.
         auto.
+    Transparent MatchingExecCalls_Concat.
   Qed.
 
   Lemma JoinStep o1 o2 l1 l2:
@@ -1471,6 +1474,7 @@ Proof.
     + destruct f; inv e.
       apply (in_map fst) in HInMeths; simpl in *; contradiction.
     + rewrite getNumFromExecs_neq_cons; auto.
+    Transparent getNumFromExecs.
 Qed.
 
 Lemma NotInDef_ZeroExecs_Step m o ls f:
@@ -2453,6 +2457,7 @@ Lemma InExec_ModuleFilterLabels : forall (f : MethT)(m : BaseModule)(l : list Fu
     In (fst f) (map fst (getMethods m)) ->
     (getNumExecs f l = getNumExecs f (ModuleFilterLabels m l)).
 Proof.
+  Opaque getNumFromExecs.
   intros.
   assert (existsb (strcmp (fst f)) (map fst (getMethods m)) = true);[apply (existsb_exists (strcmp (fst f))(map fst (getMethods m)));exists (fst f);split;
                                                                      [assumption|unfold strcmp; destruct (string_dec(fst f)(fst f));[reflexivity|contradiction]]|].
@@ -2465,17 +2470,20 @@ Proof.
       destruct (MethT_dec f f0); subst;
         [rewrite H0; simpl; repeat rewrite getNumFromExecs_eq_cons; auto; rewrite IHl; reflexivity|].
       destruct (existsb (strcmp (fst f0)) (map fst (getMethods m)));
-      simpl; repeat rewrite getNumFromExecs_neq_cons; auto.
+        simpl; repeat rewrite getNumFromExecs_neq_cons; auto.
+  Transparent getNumFromExecs.
 Qed.
 
 Lemma getNumExecs_le_length (f : MethT) (l : list FullLabel) :
   (getNumExecs f l <= Zlength l)%Z.
 Proof.
+  Opaque getNumFromExecs.
   induction l.
   - reflexivity.
   - destruct a, p, r0; unfold getNumExecs in *;simpl.
     + rewrite getNumFromExecs_Rle_cons, Zlength_cons; Omega.omega.
     + destruct (MethT_dec f f0); simpl in *;[rewrite getNumFromExecs_eq_cons|rewrite getNumFromExecs_neq_cons];auto; rewrite Zlength_cons; Omega.omega.
+  Transparent getNumFromExecs.
 Qed.
 
 Lemma getNumFromCalls_le_length (f : MethT) (l : MethsT):
@@ -2498,6 +2506,7 @@ Qed.
 Lemma filter_reduces_execs (f : MethT) (g : FullLabel -> bool) (l : list FullLabel) :
   (getNumExecs f (filter g l) <= getNumExecs f l)%Z.
 Proof.
+  Opaque getNumFromExecs.
   induction l; simpl.
   - reflexivity.
   - destruct (g a), a, p, r0; unfold getNumExecs in *; simpl in *.
@@ -2505,6 +2514,7 @@ Proof.
     + destruct (MethT_dec f f0);[repeat rewrite getNumFromExecs_eq_cons|repeat rewrite getNumFromExecs_neq_cons];auto;Omega.omega.
     + rewrite getNumFromExecs_Rle_cons; assumption.
     + destruct (MethT_dec f f0);[rewrite getNumFromExecs_eq_cons|rewrite getNumFromExecs_neq_cons];auto;Omega.omega.
+  Transparent getNumFromExecs.
 Qed.
 
 Lemma MatchingExecCalls_Split (l : list FullLabel) (m1 m2 : BaseModule) :
@@ -4165,3 +4175,263 @@ Section DecompositionZeroAction.
       + split; assumption.
   Qed.
 End DecompositionZeroAction.
+
+Section LemmaNoSelfCall.
+  Variable m: BaseModule.
+  Lemma NoSelfCallAction ls k (a: ActionT type k):
+    NoCallActionT ls a ->
+    forall o reads u cs ret,
+      SemAction o a reads u cs ret ->
+      forall f, In (fst f) ls ->
+                getNumFromCalls f cs = 0%Z.
+  Proof.
+    intro.
+    induction H; simpl; auto; intros; simpl in *.
+    - inv H2.
+      EqDep_subst; simpl.
+      specialize (H1 _ _ _ _ _ _ HSemAction _ H3).
+      rewrite H1 in *.
+      match goal with
+      | |- (if ?P then _ else _) = _ => destruct P
+      end; auto; subst; simpl in *.
+      tauto.
+    - inv H1; EqDep_subst; simpl in *.
+      eapply H0; eauto.
+    - inv H2; EqDep_subst; simpl in *.
+      rewrite getNumFromCalls_app.
+      specialize (H1 _ _ _ _ _ _ HSemActionCont _ H3).
+      specialize (IHNoCallActionT _ _ _ _ _ HSemAction _ H3).
+      rewrite H1, IHNoCallActionT.
+      auto.
+    - inv H1; EqDep_subst; simpl in *.
+      eapply H0; eauto.
+    - inv H1; EqDep_subst; simpl in *.
+      eapply H0; eauto.
+    - inv H0; EqDep_subst; simpl in *.
+      eapply IHNoCallActionT; eauto.
+    - inv H3; EqDep_subst; simpl in *; rewrite getNumFromCalls_app.
+      + specialize (IHNoCallActionT1 _ _ _ _ _ HAction _ H4).
+        specialize (H0 _ _ _ _ _ _ HSemAction _ H4).
+        rewrite H0, IHNoCallActionT1.
+        auto.
+      + specialize (IHNoCallActionT2 _ _ _ _ _ HAction _ H4).
+        specialize (H0 _ _ _ _ _ _ HSemAction _ H4).
+        rewrite H0, IHNoCallActionT2.
+        auto.
+    - inv H0; EqDep_subst; simpl in *.
+      eapply IHNoCallActionT; eauto.
+    - inv H0; EqDep_subst; simpl in *.
+      eapply IHNoCallActionT; eauto.
+    - inv H; EqDep_subst; simpl in *.
+      auto.
+  Qed.
+  
+  Lemma NoSelfCallRule_Impl r:
+    NoSelfCallBaseModule m ->
+    In r (getRules m) ->
+    forall o reads u cs ret,
+      SemAction o (snd r type) reads u cs ret ->
+      forall f, In (fst f) (map fst (getMethods m)) ->
+                getNumFromCalls  f cs = 0%Z.
+  Proof.
+    intros.
+    destruct H.
+    unfold NoSelfCallRulesBaseModule, NoSelfCallMethsBaseModule in *.
+    specialize (H _ H0); simpl in *.
+    eapply NoSelfCallAction; eauto.
+  Qed.
+
+  Lemma NoSelfCallMeth_Impl f:
+    NoSelfCallBaseModule m ->
+    In f (getMethods m) ->
+    forall o reads u cs arg ret,
+      SemAction o (projT2 (snd f) type arg) reads u cs ret ->
+      forall g, In (fst g) (map fst (getMethods m)) ->
+                getNumFromCalls  g cs = 0%Z.
+  Proof.
+    intros.
+    destruct H.
+    unfold NoSelfCallRulesBaseModule, NoSelfCallMethsBaseModule in *.
+    specialize (H3 _ H0 arg); simpl in *.
+    eapply NoSelfCallAction; eauto.
+  Qed.
+End LemmaNoSelfCall.
+
+Section DecompositionGen.
+  Variable imp spec: BaseModWf.
+  Variable NoSelfCalls: NoSelfCallBaseModule spec.
+  
+  Variable simRel: RegsT -> RegsT -> Prop.
+  Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
+                                 exists rspec, Forall2 regInit rspec (getRegisters spec) /\ simRel rimp rspec.
+
+  Variable simulationRule:
+    forall oImp rImp uImp rleImp csImp oImp' aImp,
+      In (rleImp, aImp) (getRules imp) ->
+      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      UpdRegs [uImp] oImp oImp' ->
+      forall oSpec,
+        simRel oImp oSpec ->
+        ((simRel oImp' oSpec /\ csImp = []) \/
+         (exists rleSpec aSpec,
+             In (rleSpec, aSpec) (getRules spec) /\
+             exists rSpec uSpec,
+               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               exists oSpec',
+                 UpdRegs [uSpec] oSpec oSpec' /\
+                 simRel oImp' oSpec')).
+
+  Variable simulationMeth:
+    forall oImp rImp uImp meth csImp oImp' sign aImp arg ret,
+      In (meth, existT _ sign aImp) (getMethods imp) ->
+      SemAction oImp (aImp type arg) rImp uImp csImp ret ->
+      UpdRegs [uImp] oImp oImp' ->
+      forall oSpec,
+        simRel oImp oSpec ->
+          exists aSpec rSpec uSpec,
+            In (meth, existT _ sign aSpec) (getMethods spec) /\
+            SemAction oSpec (aSpec type arg) rSpec uSpec csImp ret /\
+              exists oSpec',
+                UpdRegs [uSpec] oSpec oSpec' /\
+                simRel oImp' oSpec'.
+
+  Variable notMethMeth:
+    forall oImp rImpl1 uImpl1 meth1 sign1 aImp1 arg1 ret1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (meth1, existT _ sign1 aImp1) (getMethods imp) ->
+      SemAction oImp (aImp1 type arg1) rImpl1 uImpl1 csImp1 ret1 ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+          
+  Variable notRuleMeth:
+    forall oImp rImpl1 uImpl1 rleImpl1 aImp1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (rleImpl1, aImp1) (getRules imp) ->
+      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 WO ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+
+  Lemma SubstepsSingle o l:
+    Substeps imp o l ->
+    length l <= 1.
+  Proof.
+    induction 1; simpl; auto; intros; subst.
+    - destruct ls; simpl in *; auto; simpl in *.
+      assert (sth1: length ls = 0) by (simpl in *; Omega.omega).
+      rewrite length_zero_iff_nil in sth1; subst; simpl in *.
+      specialize (HNoRle p (or_introl eq_refl)).
+      specialize (HDisjRegs p (or_introl eq_refl)).
+      repeat destruct p; simpl in *.
+      destruct r0; simpl in *; [tauto|].
+      inv H; [discriminate|].
+      destruct fb; simpl in *.
+      destruct (@notRuleMeth _ _ _ _ _ _ _ _ _ _ _ _ _ _ HInRules HAction HInMeths HAction0) as [k [in1 in2]].
+      specialize (HDisjRegs k).
+      inv HLabel.
+      tauto.
+    - destruct ls; simpl in *; auto; simpl in *.
+      assert (sth1: length ls = 0) by (simpl in *; Omega.omega).
+      rewrite length_zero_iff_nil in sth1; subst; simpl in *.
+      specialize (HDisjRegs p (or_introl eq_refl)).
+      repeat destruct p; simpl in *.
+      inv H.
+      + inv HLabel; simpl in *.
+        inv HSubstep; try congruence.
+        destruct fb.
+        destruct (@notRuleMeth _ _ _ _ _ _ _ _ _ _ _ _ _ _ HInRules HAction0 HInMeths HAction) as [k [in1 in2]].
+        specialize (HDisjRegs k).
+        tauto.
+      + destruct ls; [| discriminate].
+        inv HLabel.
+        destruct fb.
+        destruct fb0.
+        destruct (@notMethMeth _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ HInMeths HAction HInMeths0 HAction0) as [k [in1 in2]].
+        specialize (HDisjRegs k).
+        tauto.
+  Qed.
+        
+  Theorem decompositionGen:
+    TraceInclusion (Base imp) (Base spec).
+  Proof.
+    pose proof (wfBaseMod imp) as wfImp.
+    pose proof (wfBaseMod spec) as wfSpec.
+    inv wfImp.
+    inv wfSpec.
+    dest.
+    apply StepDecomposition with (simRel := simRel); auto; simpl; intros.
+    inv H9.
+    pose proof (SubstepsSingle HSubsteps) as sth.
+    destruct lImp; [tauto| simpl in *].
+    destruct lImp; simpl in *; [| Omega.omega].
+    repeat destruct p; simpl in *.
+    inv HSubsteps; inv HLabel; simpl in *.
+    - destruct (@simulationRule _ _ _ _ _ _ _ HInRules HAction H11 _ H12); dest; subst.
+      exists nil, oSpec.
+      split.
+      + constructor; auto; simpl in *.
+        * constructor 1; auto.
+          eapply simRelGood; eauto.
+        * unfold MatchingExecCalls_Base, getNumCalls, getNumExecs; intros; simpl.
+          Omega.omega.
+      + simpl.
+        split.
+        * unfold UpdRegs; repeat split; auto; intros.
+          right; split; try intro; simpl in *; auto.
+          dest; auto.
+        * split; auto.
+          unfold WeakInclusion; simpl; intros.
+          unfold getListFullLabel_diff; simpl.
+          split; intros; dest; auto.
+          tauto.
+      + exists [(x2, (Rle x, cs))], x3; simpl.
+        split.
+        * constructor; auto.
+          -- econstructor 2; eauto.
+             ++ eapply WfActionT_ReadsWellDefined; eauto.
+             ++ eapply WfActionT_WritesWellDefined; eauto.
+             ++ simpl; intros; tauto.
+             ++ constructor 1; auto.
+                eapply simRelGood; eauto.
+          -- unfold MatchingExecCalls_Base; unfold getNumCalls, getNumExecs; simpl; intros.
+             rewrite app_nil_r.
+             assert (th1: forall x, (x = 0)%Z -> (x <= 0)%Z) by (intros; Omega.omega).
+             apply th1; clear th1.
+             eapply NoSelfCallRule_Impl; eauto.
+        * split; auto.
+          split; auto.
+          unfold WeakInclusion; simpl; intros.
+          split; intros; auto.
+          exists rn.
+          left; auto.
+    - destruct fb.
+      destruct (@simulationMeth _ _ _ _ _ _ _ _ _ _ HInMeths HAction H11 _ H12); dest; subst.
+      exists [(x2, (Meth (fn, existT _ x (argV, retV)), cs))], x3; simpl.
+      split.
+      * constructor; auto.
+        -- econstructor 3; eauto.
+           ++ eapply WfActionT_ReadsWellDefined; eauto.
+           ++ eapply WfActionT_WritesWellDefined; eauto.
+           ++ simpl; intros; tauto.
+           ++ constructor 1; auto.
+              eapply simRelGood; eauto.
+        -- unfold MatchingExecCalls_Base; unfold getNumCalls, getNumExecs; simpl; intros.
+           rewrite app_nil_r.
+           assert (th1: forall x, (x = 0)%Z -> (x <= 0)%Z) by (intros; Omega.omega).
+           match goal with
+           | |- (_ <= if ?P then _ else _)%Z => destruct P; subst; simpl in *
+           end.
+           ++ assert (th2: forall x, (x = 0)%Z -> (x <= 1)%Z) by (intros; Omega.omega).
+              apply th2; clear th2.
+              eapply NoSelfCallMeth_Impl; eauto.
+           ++ apply th1; clear th1.
+              eapply NoSelfCallMeth_Impl; eauto.
+      * split; auto.
+        split; auto.
+        unfold WeakInclusion; simpl; intros.
+        split; intros; auto.
+  Qed.
+End DecompositionGen.    
+

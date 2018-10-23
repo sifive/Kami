@@ -671,6 +671,44 @@ Ltac discharge_wf :=
   try (discharge_DisjKey || tauto || congruence).
 
 
+Section NoCallActionT.
+  Variable ls: list string.
+  
+  Inductive NoCallActionT: forall k, ActionT type k -> Prop :=
+  | NoCallMCall meth s e lretT c: ~ In meth ls -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (MCall meth s e c)
+  | NoCallLetExpr k (e: Expr type k) lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetExpr e c)
+  | NoCallLetAction k (a: ActionT type k) lretT c: NoCallActionT a -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetAction a c)
+  | NoCallReadNondet k lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (ReadNondet k c)
+  | NoCallReadReg r k lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (ReadReg r k c)
+  | NoCallWriteReg r k (e: Expr type k) lretT c: NoCallActionT c  -> @NoCallActionT lretT (WriteReg r e c)
+  | NoCallIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, NoCallActionT (c v)) -> NoCallActionT atrue -> NoCallActionT afalse -> @NoCallActionT lretT (IfElse p atrue afalse c)
+  | NoCallAssertion (e: Expr type (SyntaxKind Bool)) lretT c: NoCallActionT c -> @NoCallActionT lretT (Assertion e c)
+  | NoCallSys ls lretT c: NoCallActionT c -> @NoCallActionT lretT (Sys ls c)
+  | NoCallReturn lretT e: @NoCallActionT lretT (Return e).
+End NoCallActionT.
+
+Section NoSelfCallBaseModule.
+  Variable m: BaseModule.
+  
+  Definition NoSelfCallRuleBaseModule (rule : Attribute (Action Void)) :=
+    NoCallActionT (map fst (getMethods m)) (snd rule type).
+  
+  Definition NoSelfCallRulesBaseModule :=
+    forall rule, In rule (getRules m) ->
+                 NoCallActionT (map fst (getMethods m)) (snd rule type).
+  
+  Definition NoSelfCallMethsBaseModule :=
+    forall meth, In meth (getMethods m) ->
+                 forall (arg: type (fst (projT1 (snd meth)))), NoCallActionT (map fst (getMethods m)) (projT2 (snd meth) type arg).
+
+  Definition NoSelfCallBaseModule :=
+    NoSelfCallRulesBaseModule /\ NoSelfCallMethsBaseModule.
+End NoSelfCallBaseModule.
+
+
+
+
+
 
 
 (* Semantics *)
