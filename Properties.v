@@ -4225,6 +4225,11 @@ Section LemmaNoSelfCall.
     - inv H; EqDep_subst; simpl in *.
       auto.
   Qed.
+
+  Lemma LetExprNoCallActionT k (e: LetExprSyntax type k): forall ls, NoCallActionT ls (convertLetExprSyntax_ActionT e).
+  Proof.
+    induction e; simpl; auto; intros; constructor; auto.
+  Qed.
   
   Lemma NoSelfCallRule_Impl r:
     NoSelfCallBaseModule m ->
@@ -4256,6 +4261,16 @@ Section LemmaNoSelfCall.
     eapply NoSelfCallAction; eauto.
   Qed.
 End LemmaNoSelfCall.
+
+Ltac discharge_NoSelfCall :=
+  unfold NoSelfCallBaseModule, NoSelfCallRulesBaseModule, NoSelfCallMethsBaseModule; split; auto; simpl; intros;
+  repeat match goal with
+         | H: _ \/ _ |- _ => destruct H; subst; simpl in *
+         | H: False |- _ => exfalso; apply H
+         | |- NoCallActionT _ (convertLetExprSyntax_ActionT _) => apply LetExprNoCallActionT
+         | _ => constructor; auto; simpl; try intro; discharge_DisjKey
+         end.
+
 
 Section DecompositionGen.
   Variable imp spec: BaseModWf.
@@ -4435,3 +4450,135 @@ Section DecompositionGen.
   Qed.
 End DecompositionGen.    
 
+Ltac discharge_decompositionGen mySimRel disjReg :=
+  apply decompositionGen with (simRel := mySimRel); auto; simpl; intros;
+  (repeat match goal with
+          | H: _ \/ _ |- _ => destruct H
+          | H: False |- _ => exfalso; apply H
+          | H: (?a, ?b) = (?c, ?d) |- _ =>
+            let H2 := fresh in
+            inversion H;
+            pose proof (f_equal snd H) as H2;
+            simpl in H2; subst; clear H; EqDep_subst
+          | H: SemAction _ _ _ _ _ _ |- _ =>
+            apply inversionSemAction in H; dest; subst
+          | H: if ?P then _ else _ |- _ => case_eq P; let i := fresh in intros i; rewrite ?i in *; dest
+          | H: Forall2 _ _ _ |- _ => inv H
+          | |- exists k, In k _ /\ In k _ =>
+            exists disjReg; rewrite ?map_app, ?in_app_iff; simpl; tauto
+          | H: ?a = ?a |- _ => clear H
+          | H: match convertLetExprSyntax_ActionT ?P with
+               | _ => _
+               end |- _ => 
+            case_eq P; intros;
+            match goal with
+            | H': P = _ |- _ => rewrite ?H' in *; simpl in *; try discriminate
+            end
+          end); dest; simpl in *; repeat subst; simpl in *.
+
+Fixpoint findReg (s: string) (u: RegsT) :=
+  match u with
+  | x :: xs => if string_dec s (fst x)
+               then Some (snd x)
+               else findReg s xs
+  | nil => None
+  end.
+
+Fixpoint doUpdRegs (u: RegsT) (o: RegsT) :=
+  match o with
+  | x :: o' => match findReg (fst x) u with
+               | Some y => (fst x, y)
+               | None => x
+               end :: doUpdRegs u o'
+  | nil => nil
+  end.
+
+Lemma findRegs_exists u:
+  NoDup (map fst u) ->
+  forall s v,
+    (exists x : RegsT, (u = x) /\ In (s, v) x) ->
+    findReg s u = Some v.
+Proof.
+  induction u; simpl; auto; intros; dest; subst; simpl in *; [tauto|].
+  destruct H1; subst; simpl in *.
+  - destruct (string_dec s s); tauto.
+  - inv H.
+    specialize (IHu H4 s v (ex_intro _ u (conj eq_refl H0))).
+    destruct a; simpl in *.
+    destruct (string_dec s s0); subst; auto.
+    apply (in_map fst) in H0.
+    simpl in *.
+    tauto.
+Qed.
+
+Lemma findRegs_not_exists u:
+  NoDup (map fst u) ->
+  forall s,
+    ~ (exists x : RegsT, (u = x) /\ In s (map fst x)) ->
+    findReg s u = None.
+Proof.
+  induction u; simpl; auto; intros; dest; subst; simpl in *.
+  destruct a; simpl in *.
+  inv H.
+  specialize (IHu H4).
+  destruct (string_dec s s0); subst.
+  - assert (exists x, (s0, s1) :: u = x /\ In s0 (map fst x)) by
+        (exists ((s0, s1) :: u); split; auto; simpl; auto).
+    tauto.
+  - eapply IHu.
+    intro; dest; subst.
+    assert (exists x0, (s0, s1) :: x = x0 /\ In s (map fst x0)) by
+        (exists ((s0, s1) :: x); split; auto; simpl; auto).
+    tauto.
+Qed.
+
+Lemma NoDup_UpdRegs o:
+  NoDup (map fst o) ->
+  forall u o',
+    NoDup (map fst u) ->
+    UpdRegs [u] o o' ->
+    o' = doUpdRegs u o.
+Proof.
+  induction o; simpl; auto; intros.
+  - inv H1; simpl in *.
+    apply eq_sym in H2.
+    apply map_eq_nil in H2.
+    auto.
+  - inv H1; simpl in *.
+    destruct o'; simpl in *; [discriminate|].
+    inv H2.
+    f_equal.
+    + specialize (H3 (fst p) (snd p)).
+      destruct p; simpl in *.
+      specialize (H3 (or_introl eq_refl)).
+      rewrite H4 in *.
+      destruct H3.
+      * assert (sth2: exists x, (u = x) /\ In (s, s0) x) by (clear - H1; firstorder fail).
+        apply findRegs_exists in sth2; auto; subst.
+        rewrite sth2; auto.
+      * dest.
+        assert (sth2: ~ (exists x, (u = x) /\ In s (map fst x))) by (clear - H1; firstorder fail).
+        apply findRegs_not_exists in sth2; auto; subst.
+        rewrite sth2; auto.
+        destruct a; simpl in *.
+        destruct H2.
+        -- inv H2; auto.
+        -- inv H.
+           apply (in_map fst) in H2; simpl in *.
+           tauto.
+    + inv H.
+      eapply IHo; eauto.
+      constructor; auto; intros; simpl.
+      specialize (H3 s v (or_intror H)).
+      destruct H3; [tauto|].
+      dest.
+      destruct H2; subst; simpl in *.
+      * apply (in_map fst) in H; simpl in *.
+        apply (f_equal (map fst)) in H6.
+        rewrite ?map_map in *; simpl in *.
+        assert (sth: forall A B, (fun (x: (A * B)) => fst x) = fst) by (intros; extensionality x; intros; reflexivity).
+        rewrite ?sth in H6.
+        rewrite <- H6 in H.
+        tauto.
+      * right; auto.
+Qed.

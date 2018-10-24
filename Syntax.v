@@ -1494,7 +1494,6 @@ Definition PTraceInclusion (m m' : Mod) :=
   forall (o : RegsT) (ls : list (list FullLabel)),
     PTrace m o ls -> exists (ls' : list (list FullLabel)), PTraceList m' ls' /\ WeakInclusions ls ls'.
 
-Notation PPT_upds := (fun x => fst x).
 Notation PPT_execs := (fun x => fst (snd x)).
 Notation PPT_calls := (fun x => snd (snd x)).
 

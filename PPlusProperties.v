@@ -335,15 +335,11 @@ End PPlusStep.
 Section PPlusTrace.
   Variable m: BaseModule.
   
-  Notation PPT_upds := (fun x => fst x).
-  Notation PPT_execs := (fun x => fst (snd x)).
-  Notation PPT_calls := (fun x => snd (snd x)).
-  
   Lemma PPlusTrace_PTrace o ls :
     PPlusTrace m o ls ->
     exists ls',
       PTrace (Base m) o ls' /\
-      PermutationEquivLists (map PPT_upds ls) (map getLabelUpds ls') /\
+      PermutationEquivLists (map fst ls) (map getLabelUpds ls') /\
       PermutationEquivLists (map PPT_execs ls) (map getLabelExecs ls') /\
       PermutationEquivLists (map PPT_calls ls) (map getLabelCalls ls').
   Proof.
@@ -456,7 +452,7 @@ Section PPlusTraceInclusion.
   Lemma WeakInclusions_flat_PermutationEquivLists_r ls1:
     forall l ls2,
       WeakInclusions_flat (extractTriples ls1) l ->
-      PermutationEquivLists (map PPT_upds l) (map getLabelUpds ls2) ->
+      PermutationEquivLists (map fst l) (map getLabelUpds ls2) ->
       PermutationEquivLists (map PPT_execs l) (map getLabelExecs ls2) ->
       PermutationEquivLists (map PPT_calls l) (map getLabelCalls ls2) ->
       WeakInclusions_flat (extractTriples ls1) (extractTriples ls2).
