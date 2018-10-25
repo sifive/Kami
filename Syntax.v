@@ -1413,6 +1413,24 @@ Notation regInit := (fun o' r => fst o' = fst r /\
                                      end = evalConstFullT x
                                    end).
 
+
+Fixpoint findReg (s: string) (u: RegsT) :=
+  match u with
+  | x :: xs => if string_dec s (fst x)
+               then Some (snd x)
+               else findReg s xs
+  | nil => None
+  end.
+
+Fixpoint doUpdRegs (u: RegsT) (o: RegsT) :=
+  match o with
+  | x :: o' => match findReg (fst x) u with
+               | Some y => (fst x, y)
+               | None => x
+               end :: doUpdRegs u o'
+  | nil => nil
+  end.
+
 Section Trace.
   Variable m: Mod.
   Inductive Trace: RegsT -> list (list FullLabel) -> Prop :=
