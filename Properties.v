@@ -4450,32 +4450,6 @@ Section DecompositionGen.
   Qed.
 End DecompositionGen.    
 
-Ltac discharge_decompositionGen mySimRel disjReg :=
-  apply decompositionGen with (simRel := mySimRel); auto; simpl; intros;
-  (repeat match goal with
-          | H: _ \/ _ |- _ => destruct H
-          | H: False |- _ => exfalso; apply H
-          | H: (?a, ?b) = (?c, ?d) |- _ =>
-            let H2 := fresh in
-            inversion H;
-            pose proof (f_equal snd H) as H2;
-            simpl in H2; subst; clear H; EqDep_subst
-          | H: SemAction _ _ _ _ _ _ |- _ =>
-            apply inversionSemAction in H; dest; subst
-          | H: if ?P then _ else _ |- _ => case_eq P; let i := fresh in intros i; rewrite ?i in *; dest
-          | H: Forall2 _ _ _ |- _ => inv H
-          | |- exists k, In k _ /\ In k _ =>
-            exists disjReg; rewrite ?map_app, ?in_app_iff; simpl; tauto
-          | H: ?a = ?a |- _ => clear H
-          | H: match convertLetExprSyntax_ActionT ?P with
-               | _ => _
-               end |- _ => 
-            case_eq P; intros;
-            match goal with
-            | H': P = _ |- _ => rewrite ?H' in *; simpl in *; try discriminate
-            end
-          end); dest; simpl in *; repeat subst; simpl in *.
-
 Lemma findRegs_Some u:
   NoDup (map fst u) ->
   forall s v,
@@ -4612,7 +4586,177 @@ Proof.
       * right; auto.
 Qed.
 
-Section DecompositionGeneral.
+Lemma doUpdRegs_enuf o u (noDup: NoDup (map fst u)):
+  getKindAttr o = getKindAttr (doUpdRegs u o) ->
+  UpdRegs [u] o (doUpdRegs u o).
+Proof.
+  induction o; simpl; auto; unfold UpdRegs; intros.
+  - repeat split; simpl; auto.
+  - inv H.
+    specialize (IHo H3).
+    simpl in *; intros.
+    repeat split; auto; intros.
+    + rewrite H1 at 1.
+      rewrite H2 at 1.
+      rewrite H3.
+      auto.
+    + unfold UpdRegs in *.
+      dest.
+      destruct H.
+      * case_eq (findReg (fst a) u); intros; rewrite H5 in *; simpl in *.
+        -- rewrite <- findRegs_Some in H5 by auto.
+           inv H; simpl in *.
+           left; eexists; eauto.
+        -- rewrite <- findRegs_None in H5 by auto; subst; simpl in *.
+           right.
+           split; try intro; auto; dest.
+           destruct H; subst; auto.
+      * specialize (H4 _ _ H).
+        clear - H4; firstorder fail.
+Qed.
+
+Lemma UpdRegs_nil_nil_upd: forall o, NoDup (map fst o) -> forall o', UpdRegs [[]] o o' -> o = o'.
+Proof.
+  unfold UpdRegs.
+  intros.
+  dest.
+  simpl in *.
+  assert (sth: forall s v, In (s, v) o' -> In (s, v) o).
+  { intros.
+    specialize (H1 s v H2).
+    destruct H1; dest; try auto.
+    destruct H1; subst; simpl in *; try tauto.
+  }
+  clear H1.
+  generalize o' H H0 sth.
+  clear o' H H0 sth.
+  induction o; destruct o'; simpl; auto; intros.
+  - discriminate.
+  - discriminate.
+  - inv H0.
+    inv H.
+    specialize (IHo _ H6 H4).
+    destruct p, a; simpl in *; subst; auto; repeat f_equal; auto.
+    + specialize (sth s s0 (or_introl eq_refl)).
+      destruct sth.
+      * inv H; subst; auto.
+      * apply (in_map fst) in H; simpl in *; tauto.
+    + eapply IHo; intros.
+      specialize (sth _ _ (or_intror H)).
+      destruct sth; [|auto].
+      inv H0; subst.
+      apply (f_equal (map fst)) in H4.
+      rewrite ?map_map in *; simpl in *.
+      setoid_rewrite (functional_extensionality (fun x => fst x) fst) in H4; try tauto.
+      apply (in_map fst) in H; simpl in *; congruence.
+Qed.
+
+Lemma findRegs_Some' u:
+  forall s v,
+    findReg s u = Some v ->
+    In (s, v) u.
+Proof.
+  induction u; simpl; auto; intros; auto; try (tauto || discriminate).
+  destruct (string_dec s (fst a)); subst; simpl in *.
+  - inv H; auto.
+    destruct a; auto.
+  - specialize (IHu _ _ H).
+    right; auto.
+Qed.
+                           
+Lemma getKindAttr_findReg_Some u:
+  forall o: RegsT,
+    (forall s v, In (s, v) u -> In (s, projT1 v) (getKindAttr o)) ->
+    forall s v,
+      findReg s u = Some v ->
+      In (s, projT1 v) (getKindAttr o).
+Proof.
+  intros.
+  apply findRegs_Some' in H0.
+  specialize (H _ _ H0); simpl in *.
+  auto.
+Qed.
+
+Lemma getKindAttr_doUpdRegs' o:
+  forall u,
+    getKindAttr (doUpdRegs u o) = map (fun x => match findReg (fst x) u with
+                                                | Some y => (fst x, projT1 y)
+                                                | None => (fst x, projT1 (snd x))
+                                                end) o.
+Proof.
+  induction o; simpl; auto; intros.
+  case_eq (findReg (fst a) u); simpl; intros; f_equal; auto.
+Qed.
+
+Lemma forall_map A B (f g: A -> B) ls:
+  (map f ls = map g ls) <->
+  forall x, In x ls -> f x = g x.
+Proof.
+  induction ls; simpl; split; auto; intros; try tauto.
+  - destruct H0; subst.
+    + inv H.
+      auto.
+    + inv H.
+      rewrite IHls in H3.
+      eapply H3; eauto.
+  - assert (sth1: f a = g a) by firstorder fail.
+    assert (sth2: forall x, In x ls -> f x = g x) by firstorder fail.
+    f_equal; auto.
+    firstorder.
+Qed.
+
+
+Lemma KeyMatching_gen A B : forall (l : list (A * B)) (a b : A * B),
+    NoDup (map fst l) -> In a l -> In b l -> fst a = fst b -> a = b.
+Proof.
+  induction l; intros.
+  - inversion H0.
+  - destruct H0; destruct H1.
+    + symmetry; rewrite <- H1; assumption.
+    + rewrite (map_cons fst) in H.
+      inversion H; subst.
+      apply (in_map fst l b) in H1.
+      apply False_ind. apply H5.
+      destruct a0; destruct b; simpl in *.
+      rewrite H2; assumption.
+    + rewrite (map_cons fst) in H.
+      inversion H; subst.
+      apply (in_map fst l a0) in H0.
+      apply False_ind; apply H5.
+      destruct a0, b; simpl in *.
+      rewrite <- H2; assumption.
+    + inversion H; subst.
+      apply IHl; auto.
+Qed.
+
+
+Lemma getKindAttr_doUpdRegs o:
+  NoDup (map fst o) ->
+  forall u,
+    NoDup (map fst u) ->
+    (forall s v, In (s, v) u -> In (s, projT1 v) (getKindAttr o)) ->
+    getKindAttr o = getKindAttr (doUpdRegs u o).
+Proof.
+  intros.
+  setoid_rewrite getKindAttr_doUpdRegs'.
+  rewrite forall_map; intros.
+  case_eq (findReg (fst x) u); intros; auto.
+  rewrite <- findRegs_Some in H3; auto.
+  specialize (H1 _ _ H3).
+  f_equal.
+  destruct x; simpl in *.
+  apply (in_map (fun x => (fst x, projT1 (snd x)))) in H2; simpl in *.
+  assert (sth: map fst o = map fst (getKindAttr o)). {
+    rewrite map_map; simpl.
+    assert (sth2: fst = fun x : RegT => fst x) by (extensionality x; intros; auto).
+    rewrite sth2; auto.
+  }
+  rewrite sth in H.
+  pose proof (@KeyMatching_gen _ _ (getKindAttr o) _ _ H H1 H2 eq_refl); simpl in *.
+  inv H4; congruence.
+Qed.
+
+Section DecompositionGeneralEx.
   Variable imp spec: BaseModWf.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
@@ -4668,7 +4812,7 @@ Section DecompositionGeneral.
       SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
       exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
 
-  Theorem decompositionGeneral:
+  Theorem decompositionGeneralEx:
     TraceInclusion (Base imp) (Base spec).
   Proof.
     eapply decompositionGen; eauto; intros.
@@ -4697,9 +4841,9 @@ Section DecompositionGeneral.
       apply NoDup_UpdRegs in H1; subst; auto.
       eapply simulationMeth; eauto.
   Qed.
-End DecompositionGeneral.
+End DecompositionGeneralEx.
 
-Section DecompositionZeroAction.
+Section DecompositionZeroA.
   Variable imp spec: BaseModWf.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec ->
@@ -4728,7 +4872,7 @@ Section DecompositionZeroAction.
                  UpdRegs [uSpec] oSpec oSpec' /\
                  simRel (doUpdRegs uImp oImp) oSpec')).
 
-  Theorem decompositionZeroAction:
+  Theorem decompositionZeroA:
     TraceInclusion (Base imp) (Base spec).
   Proof.
     eapply decompositionZeroAct; eauto; intros.
@@ -4745,4 +4889,120 @@ Section DecompositionZeroAction.
     apply NoDup_UpdRegs in H1; subst; auto.
     eapply simulation; eauto.
   Qed.
+End DecompositionZeroA.
+
+Section DecompositionGeneral.
+  Variable imp spec: BaseModWf.
+  Variable NoSelfCalls: NoSelfCallBaseModule spec.
+  
+  Variable simRel: RegsT -> RegsT -> Prop.
+  Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
+  Variable simRelImpGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oImp = getKindAttr (getRegisters imp).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
+                                 exists rspec, Forall2 regInit rspec (getRegisters spec) /\ simRel rimp rspec.
+
+  Variable simulationRule:
+    forall oImp rImp uImp rleImp csImp aImp,
+      In (rleImp, aImp) (getRules imp) ->
+      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      forall oSpec,
+        simRel oImp oSpec ->
+        ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = []) \/
+         (exists rleSpec aSpec,
+             In (rleSpec, aSpec) (getRules spec) /\
+             exists rSpec uSpec,
+               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+                 simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec))).
+
+  Variable simulationMeth:
+    forall oImp rImp uImp meth csImp sign aImp arg ret,
+      In (meth, existT _ sign aImp) (getMethods imp) ->
+      SemAction oImp (aImp type arg) rImp uImp csImp ret ->
+      forall oSpec,
+        simRel oImp oSpec ->
+          exists aSpec rSpec uSpec,
+            In (meth, existT _ sign aSpec) (getMethods spec) /\
+            SemAction oSpec (aSpec type arg) rSpec uSpec csImp ret /\
+                simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec).
+
+  Variable notMethMeth:
+    forall oImp rImpl1 uImpl1 meth1 sign1 aImp1 arg1 ret1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (meth1, existT _ sign1 aImp1) (getMethods imp) ->
+      SemAction oImp (aImp1 type arg1) rImpl1 uImpl1 csImp1 ret1 ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+          
+  Variable notRuleMeth:
+    forall oImp rImpl1 uImpl1 rleImpl1 aImp1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (rleImpl1, aImp1) (getRules imp) ->
+      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 WO ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+
+  Theorem decompositionGeneral:
+    TraceInclusion (Base imp) (Base spec).
+  Proof.
+    eapply decompositionGeneralEx; eauto; intros.
+    - specialize (@simulationRule _ _ _ _ _ _ H H0 oSpec H1).
+      destruct simulationRule; auto.
+      dest.
+      right.
+      exists x, x0; repeat split; auto.
+      exists x1, x2; repeat split; auto.
+      exists (doUpdRegs x2 oSpec); split; auto.
+      admit.
+    - specialize (@simulationMeth _ _ _ _ _ _ _ _ _ H H0 oSpec H1).
+      pose proof simulationMeth as sth; clear simulationMeth.
+      dest.
+      exists x, x0, x1; repeat split; auto.
+      exists (doUpdRegs x1 oSpec); split; auto.
+      admit.
+  Admitted.
+End DecompositionGeneral.
+
+Section DecompositionZeroAction.
+  Variable imp spec: BaseModWf.
+  Variable simRel: RegsT -> RegsT -> Prop.
+  Variable simRelGood: forall oImp oSpec, simRel oImp oSpec ->
+                                          getKindAttr oSpec = getKindAttr (getRegisters spec).
+  Variable simRelImpGood: forall oImp oSpec, simRel oImp oSpec ->
+                                             getKindAttr oImp = getKindAttr (getRegisters imp).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
+                                 exists rspec, Forall2 regInit rspec (getRegisters spec) /\
+                                               simRel rimp rspec.
+
+  Variable NoMeths: getMethods imp = [].
+  Variable NoMethsSpec: getMethods spec = [].
+
+  Variable simulation:
+    forall oImp rImp uImp rleImp csImp aImp,
+      In (rleImp, aImp) (getRules imp) ->
+      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      forall oSpec,
+        simRel oImp oSpec ->
+        ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = []) \/
+         (exists rleSpec aSpec,
+             In (rleSpec, aSpec) (getRules spec) /\
+             exists rSpec uSpec,
+               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+                 simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec))).
+
+  Theorem decompositionZeroAction:
+    TraceInclusion (Base imp) (Base spec).
+  Proof.
+    eapply decompositionZeroA; eauto; intros.
+    specialize (@simulation _ _ _ _ _ _ H H0 _ H1).
+    destruct simulation; auto.
+    right.
+    dest.
+    exists x, x0; split; auto.
+    exists x1, x2; split; auto.
+    exists (doUpdRegs x2 oSpec); split; auto.
+    admit.
+  Admitted.
 End DecompositionZeroAction.
+
