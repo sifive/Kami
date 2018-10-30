@@ -4756,6 +4756,32 @@ Proof.
   inv H4; congruence.
 Qed.
 
+Lemma doUpdRegs_UpdRegs' o:
+  NoDup (map fst o) ->
+  forall u,
+    NoDup (map fst u) ->
+    (forall s v, In (s, v) u -> In (s, projT1 v) (getKindAttr o)) ->
+    UpdRegs [u] o (doUpdRegs u o).
+Proof.
+  intros.
+  eapply doUpdRegs_enuf; eauto.
+  eapply getKindAttr_doUpdRegs; eauto.
+Qed.
+
+Lemma doUpdRegs_UpdRegs o:
+  NoDup (map fst o) ->
+  forall u,
+    NoDup (map fst u) ->
+    SubList (getKindAttr u) (getKindAttr o) ->
+    UpdRegs [u] o (doUpdRegs u o).
+Proof.
+  intros.
+  eapply doUpdRegs_enuf; eauto.
+  eapply getKindAttr_doUpdRegs; eauto; intros.
+  apply (in_map (fun x => (fst x, projT1 (snd x)))) in H2; simpl in *.
+  eapply H1; eauto.
+Qed.
+
 Section DecompositionGeneralEx.
   Variable imp spec: BaseModWf.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
@@ -4954,14 +4980,37 @@ Section DecompositionGeneral.
       exists x, x0; repeat split; auto.
       exists x1, x2; repeat split; auto.
       exists (doUpdRegs x2 oSpec); split; auto.
-      admit.
+      
+      pose proof (SemAction_NoDup_u H3) as sth.
+      destruct (wfBaseMod spec); dest.
+      pose proof (simRelGood H1) as sth2.
+      apply (f_equal (map fst)) in sth2.
+      rewrite ?map_map in *; simpl in *.
+      assert (sth3: forall A B, (fun x: (A * B) => fst x) = fst) by
+          (intros; extensionality y; intros; auto).
+      rewrite <- sth3 in H8.
+      rewrite <- sth2 in H8.
+      rewrite sth3 in H8.
+      pose proof (SemActionUpdSub H3).
+      eapply doUpdRegs_UpdRegs; eauto.
     - specialize (@simulationMeth _ _ _ _ _ _ _ _ _ H H0 oSpec H1).
       pose proof simulationMeth as sth; clear simulationMeth.
       dest.
       exists x, x0, x1; repeat split; auto.
       exists (doUpdRegs x1 oSpec); split; auto.
-      admit.
-  Admitted.
+      pose proof (SemAction_NoDup_u H3) as sth.
+      destruct (wfBaseMod spec); dest.
+      pose proof (simRelGood H1) as sth2.
+      apply (f_equal (map fst)) in sth2.
+      rewrite ?map_map in *; simpl in *.
+      assert (sth3: forall A B, (fun x: (A * B) => fst x) = fst) by
+          (intros; extensionality y; intros; auto).
+      rewrite <- sth3 in H8.
+      rewrite <- sth2 in H8.
+      rewrite sth3 in H8.
+      pose proof (SemActionUpdSub H3).
+      eapply doUpdRegs_UpdRegs; eauto.
+  Qed.
 End DecompositionGeneral.
 
 Section DecompositionZeroAction.
@@ -5002,7 +5051,18 @@ Section DecompositionZeroAction.
     exists x, x0; split; auto.
     exists x1, x2; split; auto.
     exists (doUpdRegs x2 oSpec); split; auto.
-    admit.
-  Admitted.
+    pose proof (SemAction_NoDup_u H3) as sth.
+    destruct (wfBaseMod spec); dest.
+    pose proof (simRelGood H1) as sth2.
+    apply (f_equal (map fst)) in sth2.
+    rewrite ?map_map in *; simpl in *.
+    assert (sth3: forall A B, (fun x: (A * B) => fst x) = fst) by
+        (intros; extensionality y; intros; auto).
+    rewrite <- sth3 in H8.
+    rewrite <- sth2 in H8.
+    rewrite sth3 in H8.
+    pose proof (SemActionUpdSub H3).
+    eapply doUpdRegs_UpdRegs; eauto.
+  Qed.
 End DecompositionZeroAction.
 
