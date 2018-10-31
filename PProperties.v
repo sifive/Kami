@@ -26,7 +26,7 @@ Proof.
   - exists (x2++x), (x3++x0), (x4++x1).
     rewrite H1, H5 in HUReadRegs; rewrite H2, H6 in HUNewRegs; rewrite H3, H7 in HUCalls.
     repeat split; auto.
-    + econstructor 3; eauto.
+    + constructor 3 with (readRegs := x2) (newRegs := x3) (readRegsCont := x) (newRegsCont := x0) (calls := x4) (callsCont := x1) (v := v); eauto.
       * intro; specialize (HDisjRegs k0); rewrite <- H6, <- H2; assumption.
   - exists x, x0, x1.
     repeat split; auto.

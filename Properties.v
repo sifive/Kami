@@ -138,16 +138,16 @@ Section InverseSemAction.
     @SemAction o k a reads upds calls ret ->
     SubList reads o.
   Proof.
-    induction 1; auto;
+    induction 1; auto; subst;
       unfold SubList in *; intros;
         rewrite ?in_app_iff in *.
-    - firstorder.
+    - subst; firstorder.
     - repeat (subst; firstorder).
     - subst.
-      rewrite in_app_iff in H1.
+      rewrite ?in_app_iff in H1.
       destruct H1; intuition.
     - subst.
-      rewrite in_app_iff in H1.
+      rewrite ?in_app_iff in H1.
       destruct H1; intuition.
     - subst; simpl in *; intuition.
   Qed.
@@ -1988,7 +1988,7 @@ Lemma SemActionUpdSub o k a reads upds calls ret:
   @SemAction o k a reads upds calls ret ->
   SubList (getKindAttr upds) (getKindAttr o).
 Proof.
-  induction 1; auto;
+  induction 1; auto; subst;
     unfold SubList in *; intros;
       rewrite ?in_app_iff in *.
   - rewrite map_app, in_app_iff in *.

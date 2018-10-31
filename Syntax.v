@@ -961,9 +961,12 @@ Section Semantics.
       readRegs newRegs readRegsCont newRegsCont calls callsCont
       (HDisjRegs: DisjKey newRegs newRegsCont)
       (HSemAction: SemAction a readRegs newRegs calls v)
-      (HSemActionCont: SemAction (cont v) readRegsCont newRegsCont callsCont fret):
-      SemAction (LetAction a cont) (readRegs ++ readRegsCont) (newRegs ++ newRegsCont)
-                (calls ++ callsCont) fret
+      (HSemActionCont: SemAction (cont v) readRegsCont newRegsCont callsCont fret)
+      uReadRegs uNewRegs uCalls
+      (HReadRegs: uReadRegs = readRegs ++ readRegsCont)
+      (HNewRegs: uNewRegs = newRegs ++ newRegsCont)
+      (HCalls: uCalls = calls ++ callsCont):
+      SemAction (LetAction a cont) uReadRegs uNewRegs uCalls fret
   | SemReadNondet
       valueT (valueV: fullType type valueT)
       retK (fret: type retK) (cont: fullType type valueT -> ActionT type retK)
