@@ -1802,7 +1802,7 @@ Section StepSimulation.
           UpdRegs (map fst lSpec) oSpec oSpec' /\
           simRel oImp' oSpec' /\ WeakInclusion lImp lSpec.
 
-  Lemma StepDecomposition':
+  Lemma StepSimulation':
     forall (oImp : RegsT) (lsImp : list (list FullLabel)),
       Trace imp oImp lsImp ->
       exists (oSpec : RegsT) (lsSpec : list (list FullLabel)),
@@ -1838,11 +1838,11 @@ Section StepSimulation.
           rewrite nthProp2_cons; split; auto.
   Qed.
 
-  Theorem StepDecomposition:
+  Theorem StepSimulation:
     TraceInclusion imp spec.
   Proof.
     unfold TraceInclusion; intros.
-    eapply StepDecomposition' in H.
+    eapply StepSimulation' in H.
     dest.
     exists x, x0.
     repeat split; auto.
@@ -1868,7 +1868,7 @@ Proof.
 Qed.
 
 
-Section DecompositionZero.
+Section SimulationZero.
   Variable imp spec: BaseModule.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) -> exists rspec, Forall2 regInit rspec (getRegisters spec) /\ simRel rimp rspec.
@@ -1889,10 +1889,10 @@ Section DecompositionZero.
              UpdRegs [uSpec] oSpec oSpec' /\
              simRel oImp' oSpec')).
 
-  Theorem decompositionZero:
+  Theorem simulationZero:
     TraceInclusion (Base imp) (Base spec).
   Proof.
-    apply StepDecomposition with (simRel := simRel); auto; intros.
+    apply StepSimulation with (simRel := simRel); auto; intros.
     inv H.
     pose proof HSubsteps as sth.
     inv HSubsteps; simpl in *.
@@ -1929,7 +1929,7 @@ Section DecompositionZero.
     - rewrite NoMeths in *.
       simpl in *; tauto.
   Qed.
-End DecompositionZero.
+End SimulationZero.
 
 Lemma createHide_hides: forall hides m, getHidden (createHide m hides) = hides.
 Proof.
@@ -4124,7 +4124,7 @@ Section Fold.
   Qed.
 End Fold.
 
-Section DecompositionZeroAct.
+Section SimulationZeroAct.
   Variable imp spec: BaseModWf.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
@@ -4150,7 +4150,7 @@ Section DecompositionZeroAct.
                  UpdRegs [uSpec] oSpec oSpec' /\
                  simRel oImp' oSpec')).
 
-  Theorem decompositionZeroAct:
+  Theorem simulationZeroAct:
     TraceInclusion (Base imp) (Base spec).
   Proof.
     pose proof (wfBaseMod imp) as wfImp.
@@ -4158,7 +4158,7 @@ Section DecompositionZeroAct.
     inv wfImp.
     inv wfSpec.
     dest.
-    apply decompositionZero with (simRel := simRel); auto; simpl; intros.
+    apply simulationZero with (simRel := simRel); auto; simpl; intros.
     inv H9; [|discriminate].
     inv HLabel.
     specialize (@simulation oImp reads u rn cs oImp' rb HInRules HAction H10 _ H11).
@@ -4174,7 +4174,7 @@ Section DecompositionZeroAct.
         repeat econstructor; eauto.
       + split; assumption.
   Qed.
-End DecompositionZeroAct.
+End SimulationZeroAct.
 
 Section LemmaNoSelfCall.
   Variable m: BaseModule.
@@ -4272,7 +4272,7 @@ Ltac discharge_NoSelfCall :=
          end.
 
 
-Section DecompositionGen.
+Section SimulationGen.
   Variable imp spec: BaseModWf.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
@@ -4368,7 +4368,7 @@ Section DecompositionGen.
         tauto.
   Qed.
         
-  Theorem decompositionGen:
+  Theorem simulationGen:
     TraceInclusion (Base imp) (Base spec).
   Proof.
     pose proof (wfBaseMod imp) as wfImp.
@@ -4376,7 +4376,7 @@ Section DecompositionGen.
     inv wfImp.
     inv wfSpec.
     dest.
-    apply StepDecomposition with (simRel := simRel); auto; simpl; intros.
+    apply StepSimulation with (simRel := simRel); auto; simpl; intros.
     inv H9.
     pose proof (SubstepsSingle HSubsteps) as sth.
     destruct lImp; [tauto| simpl in *].
@@ -4448,7 +4448,7 @@ Section DecompositionGen.
         unfold WeakInclusion; simpl; intros.
         split; intros; auto.
   Qed.
-End DecompositionGen.    
+End SimulationGen.    
 
 Lemma findRegs_Some u:
   NoDup (map fst u) ->
@@ -4782,7 +4782,7 @@ Proof.
   eapply H1; eauto.
 Qed.
 
-Section DecompositionGeneralEx.
+Section SimulationGeneralEx.
   Variable imp spec: BaseModWf.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
@@ -4838,10 +4838,10 @@ Section DecompositionGeneralEx.
       SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
       exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
 
-  Theorem decompositionGeneralEx:
+  Theorem simulationGeneralEx:
     TraceInclusion (Base imp) (Base spec).
   Proof.
-    eapply decompositionGen; eauto; intros.
+    eapply simulationGen; eauto; intros.
     - pose proof (SemAction_NoDup_u H0) as sth.
       pose proof (simRelImpGood H2) as sth2.
       apply (f_equal (map fst)) in sth2.
@@ -4867,9 +4867,9 @@ Section DecompositionGeneralEx.
       apply NoDup_UpdRegs in H1; subst; auto.
       eapply simulationMeth; eauto.
   Qed.
-End DecompositionGeneralEx.
+End SimulationGeneralEx.
 
-Section DecompositionZeroA.
+Section SimulationZeroA.
   Variable imp spec: BaseModWf.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec ->
@@ -4898,10 +4898,10 @@ Section DecompositionZeroA.
                  UpdRegs [uSpec] oSpec oSpec' /\
                  simRel (doUpdRegs uImp oImp) oSpec')).
 
-  Theorem decompositionZeroA:
+  Theorem simulationZeroA:
     TraceInclusion (Base imp) (Base spec).
   Proof.
-    eapply decompositionZeroAct; eauto; intros.
+    eapply simulationZeroAct; eauto; intros.
     pose proof (SemAction_NoDup_u H0) as sth.
     pose proof (simRelImpGood H2) as sth2.
     apply (f_equal (map fst)) in sth2.
@@ -4915,9 +4915,9 @@ Section DecompositionZeroA.
     apply NoDup_UpdRegs in H1; subst; auto.
     eapply simulation; eauto.
   Qed.
-End DecompositionZeroA.
+End SimulationZeroA.
 
-Section DecompositionGeneral.
+Section SimulationGeneral.
   Variable imp spec: BaseModWf.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
@@ -4969,10 +4969,10 @@ Section DecompositionGeneral.
       SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
       exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
 
-  Theorem decompositionGeneral:
+  Theorem simulationGeneral:
     TraceInclusion (Base imp) (Base spec).
   Proof.
-    eapply decompositionGeneralEx; eauto; intros.
+    eapply simulationGeneralEx; eauto; intros.
     - specialize (@simulationRule _ _ _ _ _ _ H H0 oSpec H1).
       destruct simulationRule; auto.
       dest.
@@ -5011,9 +5011,9 @@ Section DecompositionGeneral.
       pose proof (SemActionUpdSub H3).
       eapply doUpdRegs_UpdRegs; eauto.
   Qed.
-End DecompositionGeneral.
+End SimulationGeneral.
 
-Section DecompositionZeroAction.
+Section SimulationZeroAction.
   Variable imp spec: BaseModWf.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec ->
@@ -5040,10 +5040,10 @@ Section DecompositionZeroAction.
                SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
                  simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec))).
 
-  Theorem decompositionZeroAction:
+  Theorem simulationZeroAction:
     TraceInclusion (Base imp) (Base spec).
   Proof.
-    eapply decompositionZeroA; eauto; intros.
+    eapply simulationZeroA; eauto; intros.
     specialize (@simulation _ _ _ _ _ _ H H0 _ H1).
     destruct simulation; auto.
     right.
@@ -5064,5 +5064,5 @@ Section DecompositionZeroAction.
     pose proof (SemActionUpdSub H3).
     eapply doUpdRegs_UpdRegs; eauto.
   Qed.
-End DecompositionZeroAction.
+End SimulationZeroAction.
 
