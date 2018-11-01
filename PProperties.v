@@ -2049,8 +2049,8 @@ Qed.
     PStep m2 o l.
   Proof.
     intros.
-    apply (substitute_PStep); eauto using (Wf_cond m2).
-    apply (PStep_substitute) in H0; eauto using (Wf_cond m1).
+    apply (substitute_PStep); eauto using (wfMod m2).
+    apply (PStep_substitute) in H0; eauto using (wfMod m1).
     unfold flatten in *.
     assert (BaseModule_perm (getFlat m1) (getFlat m2));[inv H;unfold getFlat;constructor;auto|].
     apply (PStep_rewrite_base (getHidden m1) H1) in H0.
@@ -2742,10 +2742,10 @@ Proof.
 Qed.
 
 Definition WfGetFlatMod (m: ModWf) : ModWf :=
-  (mkWfMod (Wf_cond m)).
+  (Build_ModWf (wfMod m)).
 
 Definition WfMergedMod (m : ModWf) :  ModWf :=
-  (mkWfMod (merged_WellFormed (Wf_cond m))).
+  (Build_ModWf (merged_WellFormed (wfMod m))).
 
 Lemma merged_perm_equality m :
   ModWf_perm m (WfMergedMod m).
@@ -2761,8 +2761,8 @@ Theorem TraceInclusion_Merge_l (m : ModWf) :
   TraceInclusion m (mergeSeparatedMod (separateMod m)).
 Proof.
   apply PTraceInclusion_TraceInclusion.
-  - apply (Wf_cond m).
-  - apply (Wf_cond (WfMergedMod m)).
+  - apply (wfMod m).
+  - apply (wfMod (WfMergedMod m)).
   - repeat intro.
     apply (PTrace_ModWf_rewrite (merged_perm_equality m)) in H.
     exists ls.
@@ -2775,8 +2775,8 @@ Theorem TraceInclusion_Merge_r (m : ModWf) :
   TraceInclusion (mergeSeparatedMod (separateMod m)) m.
 Proof.
   apply PTraceInclusion_TraceInclusion.
-  - apply (Wf_cond (WfMergedMod m)).
-  - apply (Wf_cond m).
+  - apply (wfMod (WfMergedMod m)).
+  - apply (wfMod m).
   - repeat intro.
     apply (PTrace_ModWf_rewrite (ModWf_perm_sym (merged_perm_equality m))) in H.
     exists ls.
@@ -2797,9 +2797,9 @@ Section Comm.
     - unfold PTraceInclusion, TraceList.
       intros.
       assert (sth: WfMod (ConcatMod m2 m1)%kami) by (intros; specialize (wfMod); eapply WfConcatComm; eauto).
-      assert (sth2: ModWf_perm (mkWfMod wfMod) (mkWfMod sth)) by
+      assert (sth2: ModWf_perm (Build_ModWf wfMod) (Build_ModWf sth)) by
           (constructor; simpl; auto; apply Permutation_app_comm).
-      pose proof (@PTrace_ModWf_rewrite (mkWfMod wfMod) (mkWfMod sth) o ls sth2 H).
+      pose proof (@PTrace_ModWf_rewrite (Build_ModWf wfMod) (Build_ModWf sth) o ls sth2 H).
       exists ls.
       split.
       + exists o; auto.
@@ -2819,9 +2819,9 @@ Section Assoc.
     - unfold PTraceInclusion, TraceList.
       intros.
       assert (sth: WfMod (ConcatMod m1 (ConcatMod m2 m3))%kami) by (intros; specialize (wfMod); eapply WfConcatAssoc2; eauto).
-      assert (sth2: ModWf_perm (mkWfMod sth) (mkWfMod wfMod)) by
+      assert (sth2: ModWf_perm (Build_ModWf sth) (Build_ModWf wfMod)) by
         (constructor; simpl; rewrite app_assoc; auto).
-      pose proof (@PTrace_ModWf_rewrite (mkWfMod sth) (mkWfMod wfMod) o ls sth2 H).
+      pose proof (@PTrace_ModWf_rewrite (Build_ModWf sth) (Build_ModWf wfMod) o ls sth2 H).
       exists ls.
       split.
       + exists o; auto.
@@ -2836,9 +2836,9 @@ Section Assoc.
     - unfold PTraceInclusion, TraceList.
       intros.
       assert (sth: WfMod (ConcatMod m1 (ConcatMod m2 m3))%kami) by (intros; specialize (wfMod); eapply WfConcatAssoc2; eauto).
-      assert (sth2: ModWf_perm (mkWfMod wfMod) (mkWfMod sth)) by
+      assert (sth2: ModWf_perm (Build_ModWf wfMod) (Build_ModWf sth)) by
         (constructor; simpl; rewrite app_assoc; auto).
-      pose proof (@PTrace_ModWf_rewrite (mkWfMod wfMod) (mkWfMod sth) o ls sth2 H).
+      pose proof (@PTrace_ModWf_rewrite (Build_ModWf wfMod) (Build_ModWf sth) o ls sth2 H).
       exists ls.
       split.
       + exists o; auto.

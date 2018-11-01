@@ -636,13 +636,12 @@ Inductive WfMod: Mod -> Prop :=
               (HWf1: WfMod m1) (HWf2: WfMod m2)(WfConcat1: WfConcat m1 m2)
               (WfConcat2 : WfConcat m2 m1): WfMod (ConcatMod m1 m2).
 
-Record ModWf : Type := mkWfMod {
-                           module :> Mod;
-                           Wf_cond : WfMod module }.
+Record ModWf : Type := { module :> Mod;
+                         wfMod : WfMod module }.
 
-Record BaseModWf :=
-  { baseMod :> BaseModule ;
-    wfBaseMod : WfBaseModule baseMod }.
+Record BaseModuleWf :=
+  { baseModule :> BaseModule ;
+    wfBaseModule : WfBaseModule baseModule }.
 
 
 
@@ -1794,11 +1793,11 @@ Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (0 upto (le
 Definition inlineAll_All regs rules meths :=
   (BaseMod regs (inlineAll_Rules (inlineAll_Meths meths) rules) (inlineAll_Meths meths)).
 
-Definition inlineAll_All_module m :=
+Definition inlineAll_All_mod m :=
   inlineAll_All (getAllRegisters m) (getAllRules m) (getAllMethods m).
 
 Definition flatten_inline_everything m :=
-  createHide (inlineAll_All_module m) (getHidden m).
+  createHide (inlineAll_All_mod m) (getHidden m).
 
 
 
@@ -2085,7 +2084,7 @@ Notation "'WriteToList' names 'of' k 'using' vals ; cont" :=
   (gatherActions (@writeNames _ k (List.combine names vals)) (fun _ => cont) (* nil *))
     (at level 12, right associativity, vals at level 99) : kami_action_scope.
 
-(** * Notation for normal modules *)
+(** * Notation for normal mods *)
 
 Inductive ModuleElt :=
 | MERegister (_ : RegInitT)
@@ -2237,13 +2236,13 @@ Definition testSwitch2 ty (val: Bit 5 @# ty) (a b: Bool @# ty) : Bool @# ty :=
 
 
 Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
-  {| baseMod := makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) ;
-     wfBaseMod := ltac:(discharge_wf) |}
+  {| baseModule := makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) ;
+     wfBaseModule := ltac:(discharge_wf) |}
     (only parsing).
 
 Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
   {| module := Base (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..)) ;
-     Wf_cond := ltac:(discharge_wf) |}
+     wfMod := ltac:(discharge_wf) |}
     (only parsing).
 
 (* Infix "++" := ConcatMod: kami_scope. *)

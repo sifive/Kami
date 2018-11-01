@@ -3299,8 +3299,8 @@ Section flatten_and_inline_all.
   Lemma WfCreateHide_Mod (m : ModWf) :
     WfMod (flatten_inline_everything m).
   Proof.
-    unfold flatten_inline_everything, inlineAll_All_module.
-    pose proof (flatten_WfMod (Wf_cond m)) as HWfm'.
+    unfold flatten_inline_everything, inlineAll_All_mod.
+    pose proof (flatten_WfMod (wfMod m)) as HWfm'.
     pose proof (HWfm') as HWfm.
     unfold flatten, getFlat in *.
     setoid_rewrite WfMod_createHide in HWfm'; dest.
@@ -3312,7 +3312,7 @@ Section flatten_and_inline_all.
   Qed.
 
   Definition inlined_ModWf (m : ModWf) : ModWf :=
-    (mkWfMod (WfCreateHide_Mod m)).
+    (Build_ModWf (WfCreateHide_Mod m)).
   
   Lemma TraceHide_Trace m o s ls:
     Trace (HideMeth m s) o ls -> Trace m o ls.
@@ -3508,13 +3508,13 @@ Section flatten_and_inline_all.
   Theorem TraceInclusion_flatten_inline_everything_r (m : ModWf) :
     TraceInclusion m (inlined_ModWf m).
   Proof.
-    specialize (Wf_cond (inlined_ModWf m)) as Wf1.
+    specialize (wfMod (inlined_ModWf m)) as Wf1.
     simpl.
     specialize (TraceInclusion_flatten_r m) as P1.
     unfold flatten, getFlat in *.
     assert (WfMod (Base (getFlat m))). {
       intros.
-      apply (WfMod_WfBase_getFlat (Wf_cond m)).
+      apply (WfMod_WfBase_getFlat (wfMod m)).
     }
     unfold getFlat in *.
     specialize (TraceInclusion_inlineAll_pos H) as TMP; dest.

@@ -431,119 +431,63 @@ Section Compile.
                 getRtlSys f (RtlCABool And (convertExprToRtl (UniBool Neg pred) :: enable :: nil)) (0 :: inc startList) ++
                 getRtlSys (cont (inc (inc startList))) enable (inc (inc (inc startList)))
     end.
-
-  Fixpoint getCallsSign k (a: ActionT (fun _ => list nat) k) startList :=
-    match a in ActionT _ _ with
-    | MCall meth k argExpr cont =>
-      (meth, k) :: getCallsSign (cont startList) (inc startList) 
-    | Return x => nil
-    | LetExpr k' expr cont =>
-      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
-                      list (string * (Kind * Kind)) with
-      | SyntaxKind k => fun cont =>
-                          getCallsSign (cont startList) (inc startList)
-      | _ => fun _ => nil
-      end cont
-    | LetAction k' a' cont =>
-      getCallsSign a' (0 :: startList) ++
-                   getCallsSign (cont startList) (inc startList)
-    | ReadNondet k' cont =>
-      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
-                      list (string * (Kind * Kind)) with
-      | SyntaxKind k => fun cont =>
-                          getCallsSign (cont startList) (inc startList)
-      | _ => fun _ => nil
-      end cont
-    | ReadReg r k' cont =>
-      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
-                      list (string * (Kind * Kind)) with
-      | SyntaxKind k => fun cont =>
-                          getCallsSign (cont startList) (inc startList)
-      | _ => fun _ => nil
-      end cont
-    | WriteReg r k' expr cont =>
-      getCallsSign cont startList
-    | Assertion pred cont => getCallsSign cont startList
-    | Sys ls cont => getCallsSign cont startList
-    | IfElse pred ktf t f cont =>
-      getCallsSign t (0 :: startList) ++ getCallsSign f (0 :: inc startList) ++ getCallsSign (cont (inc (inc startList))) (inc (inc (inc startList)))
-    end.
-
-  Fixpoint getWrites k (a: ActionT (fun _ => list nat) k) startList :=
-    match a in ActionT _ _ with
-    | MCall meth k argExpr cont =>
-      getWrites (cont startList) (inc startList) 
-    | Return x => nil
-    | LetExpr k' expr cont =>
-      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
-                      list string with
-      | SyntaxKind k => fun cont =>
-                          getWrites (cont startList) (inc startList)
-      | _ => fun _ => nil
-      end cont
-    | LetAction k' a' cont =>
-      getWrites a' (0 :: startList) ++
-                   getWrites (cont startList) (inc startList)
-    | ReadNondet k' cont =>
-      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
-                      list string with
-      | SyntaxKind k => fun cont =>
-                          getWrites (cont startList) (inc startList)
-      | _ => fun _ => nil
-      end cont
-    | ReadReg r k' cont =>
-      match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) ->
-                      list string with
-      | SyntaxKind k => fun cont =>
-                          getWrites (cont startList) (inc startList)
-      | _ => fun _ => nil
-      end cont
-    | WriteReg r k' expr cont =>
-      r :: getWrites cont startList
-    | Assertion pred cont => getWrites cont startList
-    | Sys ls cont => getWrites cont startList
-    | IfElse pred ktf t f cont =>
-      getWrites t (0 :: startList) ++ getWrites f (0 :: inc startList) ++ getWrites (cont (inc (inc startList))) (inc (inc (inc startList)))
-    end.
 End Compile.
 
-Definition getCallsSignPerRule (rule: Attribute (Action Void)) :=
-  getCallsSign (snd rule (fun _ => list nat)) (1 :: nil).
+Definition getRule m r :=
+  find (fun x => getBool (string_dec r (fst x))) (getRules m).
 
-Definition getCallsPerBaseMod rules := concat (map getCallsSignPerRule rules).
+Definition getMeth m r :=
+  find (fun x => getBool (string_dec r (fst x))) (getMethods m).
 
 Section ForMeth.
+  Variable m: BaseModule.
   Variable meth: Attribute Signature.
   Open Scope string.
-  Fixpoint getMethEnsRules (rules: list (Attribute (Action Void))) : option (RtlExpr Bool * RtlExpr (fst (snd meth))) :=
-    match rules with
-    | r :: rules' => let wc' := getMethEnsRules rules' in
-                     let wm' := getMethEns (fst r) meth (snd r _) (1 :: nil) in
-                     match wc', wm' with
-                     | None, None => None
-                     | Some wc'', None => Some wc''
-                     | None, Some wm'' => Some wm''
-                     | Some wc'', Some wm'' =>
-                       Some (conditionPair (fst wc'') wc'' wm'')%rtl_expr
-                     end
+
+  Fixpoint getMethEnsOrder (order: list string) : option (RtlExpr Bool * RtlExpr (fst (snd meth))) :=
+    match order with
+    | o :: order' => let wc' := getMethEnsOrder order' in
+                     match getRule m o with
+                     | Some r =>
+                       let wm' := getMethEns (fst r) meth (snd r _) (1 :: nil) in
+                       match wc', wm' with
+                       | None, None => None
+                       | Some wc'', None => Some wc''
+                       | None, Some wm'' => Some wm''
+                       | Some wc'', Some wm'' =>
+                         Some (conditionPair (fst wc'') wc'' wm'')%rtl_expr
+                       end
                      (* (RtlITE (wc' @% "valid") wc' *)
                      (*         match getMethEns (fst r) meth (snd r _) (1 :: nil) with *)
                      (*         | Some methEns => methEns *)
                      (*         | None => invalidRtl _ *)
                      (*         end *)
                      (* )%rtl_expr *)
+                     | None => match getMeth m o with
+                               | Some r =>
+                                 let wm' := getMethEns (fst r) meth (projT2 (snd r) _ (1 :: nil)) (2 :: nil) in
+                                 match wc', wm' with
+                                 | None, None => None
+                                 | Some wc'', None => Some wc''
+                                 | None, Some wm'' => Some wm''
+                                 | Some wc'', Some wm'' =>
+                                   Some (conditionPair (fst wc'') wc'' wm'')%rtl_expr
+                                 end
+                               | None => None
+                               end
+                     end
     | nil => (* invalidRtl _ *) None
     end.
 
-  Definition getMethEnsRulesEn rules :=
-    match getMethEnsRules rules with
+  Definition getMethEnsOrderEn order :=
+    match getMethEnsOrder order with
     | None => (getMethEn (fst meth), existT _ Bool (RtlConst false))%rtl_expr
     | Some vals => (getMethEn (fst meth), existT _ Bool (fst vals))%rtl_expr
     end.
     (* (getMethEn (fst meth), existT _ Bool (getMethEnsRules rules @% "valid"))%rtl_expr. *)
 
-  Definition getMethEnsRulesArg rules :=
-    match getMethEnsRules rules with
+  Definition getMethEnsOrderArg order :=
+    match getMethEnsOrder order with
     | None => (getMethArg (fst meth), existT _ _ (RtlConst (getDefaultConst (fst (snd meth)))))%rtl_expr
     | Some vals => (getMethArg (fst meth), existT _ _ (snd vals))%rtl_expr
     end.
@@ -552,8 +496,8 @@ Section ForMeth.
 End ForMeth.
 
 
-Definition getMethEnsRulesEnBaseMod rules := map (fun meth => getMethEnsRulesEn meth rules) (getCallsPerBaseMod rules).
-Definition getMethEnsRulesArgBaseMod rules := map (fun meth => getMethEnsRulesArg meth rules) (getCallsPerBaseMod rules).
+Definition getMethEnsRulesEnBaseMod m order := map (fun meth => getMethEnsOrderEn m meth order) (getCallsWithSignPerMod (Base m)).
+Definition getMethEnsRulesArgBaseMod m order := map (fun meth => getMethEnsOrderArg m meth order) (getCallsWithSignPerMod (Base m)).
 
 Definition getSysPerRule (rule: Attribute (Action Void)) :=
   getRtlSys (fst rule) (snd rule (fun _ => list nat)) (RtlReadWire Bool (getActionGuard (fst rule))) (1 :: nil).
@@ -624,9 +568,9 @@ Definition getAllWriteReadConnections (regs: list RegInitT) (order: list string)
   | nil => nil
   end.
 
-Definition getWires regs (rules: list (Attribute (Action Void))) (order: list string) :=
-  concat (map computeRuleAssigns rules) ++ getAllWriteReadConnections regs order ++ concat (map (computeRuleAssignsRegs regs) rules) ++
-         getMethEnsRulesEnBaseMod rules ++ getMethEnsRulesArgBaseMod rules.
+Definition getWires m (order: list string) :=
+  concat (map computeRuleAssigns (getRules m)) ++ getAllWriteReadConnections (getRegisters m) order ++ concat (map (computeRuleAssignsRegs (getRegisters m)) (getRules m)) ++
+         getMethEnsRulesEnBaseMod m order ++ getMethEnsRulesArgBaseMod m order.
       
 Definition getWriteRegs (regs: list RegInitT) :=
   map (fun r => (fst r, existT _ (projT1 (getRegInit (snd r))) (RtlReadWire _ (getRegWrite (fst r))))) regs.
@@ -643,23 +587,23 @@ Definition getAllMethodsRegFileList ls :=
 Definition SubtractList A B (f: A -> string) (g: B -> string) l1 l2 :=
   filter (filterNotInList f (map g l2)) l1.
 
-Definition setMethodGuards (ignoreMeths: list string) (rules: list (Attribute (Action Void))) :=
-  map (fun m => (getMethGuard (fst m), existT _ Bool (RtlConst (ConstBool true)))) (SubtractList fst id (getCallsPerBaseMod rules) ignoreMeths).
+Definition setMethodGuards (ignoreMeths: list string) m :=
+  map (fun m => (getMethGuard (fst m), existT _ Bool (RtlConst (ConstBool true)))) (SubtractList fst id (getCallsWithSignPerMod (Base m)) ignoreMeths).
 
 (* Inputs and outputs must be all method calls in base module - register file methods being called *)
 (* Reg File methods definitions must serve as wires *)
-Definition getRtl_full (bm: (list string * (list RegFileBase * BaseModule))) (preserveGuards: list string) :=
+Definition getRtl_full (bm: (list string * (list RegFileBase * BaseModule))) (order: list string) (preserveGuards: list string) :=
   {| hiddenWires := map (fun x => getMethRet x) (fst bm) ++ map (fun x => getMethArg x) (fst bm) ++ map (fun x => getMethEn x) (fst bm);
      regFiles := map (fun x => (false, x)) (fst (snd bm));
-     inputs := getInputs (SubtractList fst fst (getCallsPerBaseMod (getRules (snd (snd bm))))
+     inputs := getInputs (SubtractList fst fst (getCallsWithSignPerMod (Base (snd (snd bm))))
                                        (getAllMethodsRegFileList (fst (snd bm)))
-                         ) ++ getInputGuards (filter (fun x => getBool (in_dec string_dec (fst x) preserveGuards)) (getCallsPerBaseMod (getRules (snd (snd bm)))));
-     outputs := getOutputs (SubtractList fst fst (getCallsPerBaseMod (getRules (snd (snd bm))))
+                         ) ++ getInputGuards (filter (fun x => getBool (in_dec string_dec (fst x) preserveGuards)) (getCallsWithSignPerMod (Base (snd (snd bm)))));
+     outputs := getOutputs (SubtractList fst fst (getCallsWithSignPerMod (Base (snd (snd bm))))
                                          (getAllMethodsRegFileList (fst (snd bm))));
      regInits := map (fun x => (fst x, getRegInit (snd x))) (getRegisters (snd (snd bm)));
      regWrites := getWriteRegs (getRegisters (snd (snd bm)));
-     wires := getReadRegs (getRegisters (snd (snd bm))) ++ getWires (getRegisters (snd (snd bm))) (getRules (snd (snd bm))) (map fst (getRules (snd (snd bm)))) ++
-                          setMethodGuards (map fst (getAllMethodsRegFileList (fst (snd bm))) ++ preserveGuards) (getRules (snd (snd bm)));
+     wires := getReadRegs (getRegisters (snd (snd bm))) ++ getWires (snd (snd bm)) order ++
+                          setMethodGuards (map fst (getAllMethodsRegFileList (fst (snd bm))) ++ preserveGuards) (snd (snd bm));
      sys := getSysPerBaseMod (getRules (snd (snd bm))) |}.
 
 Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) := getRtl_full bm nil.

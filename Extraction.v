@@ -50,8 +50,8 @@ Extract Inlined Constant concat => "Prelude.concat".
 
 (*
 Open Scope string.
-Eval vm_compute in (getCallGraph mod).
-Eval vm_compute in (methPos mod (map (@attrName _) (getRules mod)) "enq.f2d").
+Eval vm_compute in (getCallGraph module).
+Eval vm_compute in (methPos module (map (@attrName _) (getRules module)) "enq.f2d").
 Close Scope string.
 *)
 (* Extraction "Target.hs" target. *)

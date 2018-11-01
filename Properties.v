@@ -3620,7 +3620,7 @@ Proof.
 Qed.
 
 Definition flattened_ModWf m: ModWf :=
-  (mkWfMod (flatten_WfMod (Wf_cond m))).
+  (Build_ModWf (flatten_WfMod (wfMod m))).
 
 Lemma word0_neq: forall w : word 1, w <> WO~0 -> w = WO~1.
 Proof.
@@ -4125,7 +4125,7 @@ Section Fold.
 End Fold.
 
 Section SimulationZeroAct.
-  Variable imp spec: BaseModWf.
+  Variable imp spec: BaseModuleWf.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
   Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
@@ -4153,8 +4153,8 @@ Section SimulationZeroAct.
   Theorem simulationZeroAct:
     TraceInclusion (Base imp) (Base spec).
   Proof.
-    pose proof (wfBaseMod imp) as wfImp.
-    pose proof (wfBaseMod spec) as wfSpec.
+    pose proof (wfBaseModule imp) as wfImp.
+    pose proof (wfBaseModule spec) as wfSpec.
     inv wfImp.
     inv wfSpec.
     dest.
@@ -4273,7 +4273,7 @@ Ltac discharge_NoSelfCall :=
 
 
 Section SimulationGen.
-  Variable imp spec: BaseModWf.
+  Variable imp spec: BaseModuleWf.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
   Variable simRel: RegsT -> RegsT -> Prop.
@@ -4371,8 +4371,8 @@ Section SimulationGen.
   Theorem simulationGen:
     TraceInclusion (Base imp) (Base spec).
   Proof.
-    pose proof (wfBaseMod imp) as wfImp.
-    pose proof (wfBaseMod spec) as wfSpec.
+    pose proof (wfBaseModule imp) as wfImp.
+    pose proof (wfBaseModule spec) as wfSpec.
     inv wfImp.
     inv wfSpec.
     dest.
@@ -4783,7 +4783,7 @@ Proof.
 Qed.
 
 Section SimulationGeneralEx.
-  Variable imp spec: BaseModWf.
+  Variable imp spec: BaseModuleWf.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
   Variable simRel: RegsT -> RegsT -> Prop.
@@ -4848,7 +4848,7 @@ Section SimulationGeneralEx.
       rewrite ?map_map in *; simpl in *.
       assert (sth3: forall A B, (fun x: (A * B) => fst x) = fst) by
           (intros; extensionality x; intros; auto).
-      destruct (wfBaseMod imp); dest.
+      destruct (wfBaseModule imp); dest.
       rewrite <- sth3 in H6.
       rewrite <- sth2 in H6.
       rewrite sth3 in H6.
@@ -4860,7 +4860,7 @@ Section SimulationGeneralEx.
       rewrite ?map_map in *; simpl in *.
       assert (sth3: forall A B, (fun x: (A * B) => fst x) = fst) by
           (intros; extensionality x; intros; auto).
-      destruct (wfBaseMod imp); dest.
+      destruct (wfBaseModule imp); dest.
       rewrite <- sth3 in H6.
       rewrite <- sth2 in H6.
       rewrite sth3 in H6.
@@ -4870,7 +4870,7 @@ Section SimulationGeneralEx.
 End SimulationGeneralEx.
 
 Section SimulationZeroA.
-  Variable imp spec: BaseModWf.
+  Variable imp spec: BaseModuleWf.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec ->
                                           getKindAttr oSpec = getKindAttr (getRegisters spec).
@@ -4908,7 +4908,7 @@ Section SimulationZeroA.
     rewrite ?map_map in *; simpl in *.
     assert (sth3: forall A B, (fun x: (A * B) => fst x) = fst) by
         (intros; extensionality x; intros; auto).
-    destruct (wfBaseMod imp); dest.
+    destruct (wfBaseModule imp); dest.
     rewrite <- sth3 in H6.
     rewrite <- sth2 in H6.
     rewrite sth3 in H6.
@@ -4918,7 +4918,7 @@ Section SimulationZeroA.
 End SimulationZeroA.
 
 Section SimulationGeneral.
-  Variable imp spec: BaseModWf.
+  Variable imp spec: BaseModuleWf.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
   Variable simRel: RegsT -> RegsT -> Prop.
@@ -4982,7 +4982,7 @@ Section SimulationGeneral.
       exists (doUpdRegs x2 oSpec); split; auto.
       
       pose proof (SemAction_NoDup_u H3) as sth.
-      destruct (wfBaseMod spec); dest.
+      destruct (wfBaseModule spec); dest.
       pose proof (simRelGood H1) as sth2.
       apply (f_equal (map fst)) in sth2.
       rewrite ?map_map in *; simpl in *.
@@ -4999,7 +4999,7 @@ Section SimulationGeneral.
       exists x, x0, x1; repeat split; auto.
       exists (doUpdRegs x1 oSpec); split; auto.
       pose proof (SemAction_NoDup_u H3) as sth.
-      destruct (wfBaseMod spec); dest.
+      destruct (wfBaseModule spec); dest.
       pose proof (simRelGood H1) as sth2.
       apply (f_equal (map fst)) in sth2.
       rewrite ?map_map in *; simpl in *.
@@ -5014,7 +5014,7 @@ Section SimulationGeneral.
 End SimulationGeneral.
 
 Section SimulationZeroAction.
-  Variable imp spec: BaseModWf.
+  Variable imp spec: BaseModuleWf.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec ->
                                           getKindAttr oSpec = getKindAttr (getRegisters spec).
@@ -5052,7 +5052,7 @@ Section SimulationZeroAction.
     exists x1, x2; split; auto.
     exists (doUpdRegs x2 oSpec); split; auto.
     pose proof (SemAction_NoDup_u H3) as sth.
-    destruct (wfBaseMod spec); dest.
+    destruct (wfBaseModule spec); dest.
     pose proof (simRelGood H1) as sth2.
     apply (f_equal (map fst)) in sth2.
     rewrite ?map_map in *; simpl in *.
