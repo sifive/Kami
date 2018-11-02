@@ -592,7 +592,7 @@ Definition setMethodGuards (ignoreMeths: list string) m :=
 
 (* Inputs and outputs must be all method calls in base module - register file methods being called *)
 (* Reg File methods definitions must serve as wires *)
-Definition getRtl_full (bm: (list string * (list RegFileBase * BaseModule))) (order: list string) (preserveGuards: list string) :=
+Definition getRtl_full (bm: (list string * (list RegFileBase * BaseModule))) (preserveGuards: list string) (order: list string) :=
   {| hiddenWires := map (fun x => getMethRet x) (fst bm) ++ map (fun x => getMethArg x) (fst bm) ++ map (fun x => getMethEn x) (fst bm);
      regFiles := map (fun x => (false, x)) (fst (snd bm));
      inputs := getInputs (SubtractList fst fst (getCallsWithSignPerMod (Base (snd (snd bm))))
@@ -606,13 +606,10 @@ Definition getRtl_full (bm: (list string * (list RegFileBase * BaseModule))) (or
                           setMethodGuards (map fst (getAllMethodsRegFileList (fst (snd bm))) ++ preserveGuards) (snd (snd bm));
      sys := getSysPerBaseMod (getRules (snd (snd bm))) |}.
 
-Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) := getRtl_full bm nil.
-
-Definition flatten_inline m :=
-  let m' := flatten m in
-  (BaseMod (getAllRegisters m') (inlineAll_Rules (inlineAll_Meths (getAllMethods m')) (getAllRules m')) (inlineAll_Meths (getAllMethods m'))).
-
+Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) := getRtl_full bm nil (map fst (getRules (snd (snd bm)))).
 
 Definition rtlGet m pgs :=
-  getRtl_full (getHidden m, (fst (separateBaseMod m), flatten_inline (mergeSeparatedBaseMod (snd (separateBaseMod m))))) pgs.
+  getRtl_full (getHidden m, (fst (separateBaseMod m), inlineAll_All_mod (mergeSeparatedBaseMod (snd (separateBaseMod m))))) pgs (map fst (getAllRules m)).
 
+Definition makeRtl (m: ModWfOrd) pgs :=
+  getRtl_full (getHidden m, (fst (separateBaseMod m), inlineAll_All_mod (mergeSeparatedBaseMod (snd (separateBaseMod m))))) pgs (modOrd m).

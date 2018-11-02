@@ -639,10 +639,16 @@ Inductive WfMod: Mod -> Prop :=
 Record ModWf : Type := { module :> Mod;
                          wfMod : WfMod module }.
 
+Record ModWfOrd := { modWf :> ModWf ;
+                     modOrd : list string }.
+
 Record BaseModuleWf :=
   { baseModule :> BaseModule ;
     wfBaseModule : WfBaseModule baseModule }.
 
+Record BaseModuleWfOrd :=
+  { baseModuleWf :> BaseModuleWf ;
+    baseModuleOrd : list string }.
 
 
 
@@ -2109,6 +2115,19 @@ Fixpoint makeModule' (im : InModule) :=
     end
   end.
 
+Fixpoint getOrder (im : InModule) :=
+  match im with
+  | NilInModule => nil
+  | ConsInModule e i =>
+    let rest := getOrder i in
+    match e with
+    | MERule mrule => fst mrule :: rest
+    | MEMeth mmeth => fst mmeth :: rest
+    | _ => rest
+    end
+  end.
+
+
 Definition makeModule (im : InModule) :=
   let '(regs, rules, meths) := makeModule' im in
   BaseMod regs rules meths.
@@ -2236,13 +2255,15 @@ Definition testSwitch2 ty (val: Bit 5 @# ty) (a b: Bool @# ty) : Bool @# ty :=
 
 
 Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
-  {| baseModule := makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) ;
-     wfBaseModule := ltac:(discharge_wf) |}
+  {| baseModuleWf := {| baseModule := makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) ;
+                        wfBaseModule := ltac:(discharge_wf) |} ;
+     baseModuleOrd := getOrder (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) |}
     (only parsing).
 
 Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
-  {| module := Base (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..)) ;
-     wfMod := ltac:(discharge_wf) |}
+  {| modWf := {| module := Base (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..)) ;
+                 wfMod := ltac:(discharge_wf) |} ;
+     modOrd := getOrder (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) |}
     (only parsing).
 
 (* Infix "++" := ConcatMod: kami_scope. *)
