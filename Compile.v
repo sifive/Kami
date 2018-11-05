@@ -457,12 +457,12 @@ Section ForMeth.
                        | Some wc'', Some wm'' =>
                          Some (conditionPair (fst wc'') wc'' wm'')%rtl_expr
                        end
-                     (* (RtlITE (wc' @% "valid") wc' *)
-                     (*         match getMethEns (fst r) meth (snd r _) (1 :: nil) with *)
-                     (*         | Some methEns => methEns *)
-                     (*         | None => invalidRtl _ *)
-                     (*         end *)
-                     (* )%rtl_expr *)
+                       (* (RtlITE (wc' @% "valid") wc' *)
+                       (*         match getMethEns (fst r) meth (snd r _) (1 :: nil) with *)
+                       (*         | Some methEns => methEns *)
+                       (*         | None => invalidRtl _ *)
+                       (*         end *)
+                       (* )%rtl_expr *)
                      | None => match getMeth m o with
                                | Some r =>
                                  let wm' := getMethEns (fst r) meth (projT2 (snd r) _ (1 :: nil)) (2 :: nil) in
@@ -502,6 +502,9 @@ Definition getMethEnsRulesArgBaseMod m order := map (fun meth => getMethEnsOrder
 Definition getSysPerRule (rule: Attribute (Action Void)) :=
   getRtlSys (fst rule) (snd rule (fun _ => list nat)) (RtlReadWire Bool (getActionGuard (fst rule))) (1 :: nil).
 
+Definition getSysPerMeth (meth: DefMethT) :=
+  getRtlSys (fst meth) (projT2 (snd meth) (fun _ => list nat) (1 :: nil)) (RtlReadWire Bool (getActionGuard (fst meth))) (2 :: nil).
+
 Definition getSysPerBaseMod rules := concat (map getSysPerRule rules).
 
 (* Set the enables correctly in the following two functions *)
@@ -534,18 +537,6 @@ Definition getRegInit (y: {x : FullKind & option (ConstFullT x)}): {x: Kind & op
                            | _ => WO
                            end
          end.
-
-(* Fixpoint finalWrites (regs: list RegInitT) (a: Attribute (Action Void)): list (string * list nat * {x : Kind & RtlExpr x}) := *)
-(*   match regs with *)
-(*   | nil => nil *)
-(*   | s :: ss => (getRegActionFinalWrite (fst a) (fst s), *)
-(*                 existT _ _ (if in_dec string_dec (fst s) (getWrites (snd a (fun _ => list nat)) (1 :: nil)) *)
-(*                             then RtlITE (RtlReadWire _ (getRegActionEn (fst a) (fst s))) *)
-(*                                         (RtlReadWire _ (getRegActionWrite (fst a) (fst s))) *)
-(*                                         (RtlReadWire _ (getRegActionRead (fst a) (fst s))) *)
-(*                             else RtlReadWire (projT1 (getRegInit (snd s))) (getRegActionRead (fst a) (fst s)))) *)
-(*                  :: finalWrites ss a *)
-(*   end. *)
 
 Fixpoint getAllWriteReadConnections' (regs: list RegInitT) (order: list string) {struct order} :=
   match order with

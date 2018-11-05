@@ -15,16 +15,6 @@ models for these circuits. The Compile.v file defines code that can be
 extracted to a Haskell script. The Haskell script can be executed to
 generate the Verilog the code.
 
-Related Repositories
---------------------
-
--   <https://github.com/sifive/Kami> - defines the core Kami library
--   <https://github.com/sifive/ProcKami> - models a processor using Kami
--   <https://github.com/sifive/ModulesKami> - defines a set of reusable
-    Kami modules
--   <https://github.com/sifive/FpuKami> - defines a model for a floating
-    point processor unit
-
 Loading the Kami Library
 ------------------------
 
