@@ -32,20 +32,23 @@ following steps:
         `git clone `[`https://github.com/sifive/Kami.git`](https://github.com/sifive/Kami.git)
         to clone the Kami repo.
     2.  cd into kami and run `make` to compile the files.
-3.  Open Coqtop and load all of the libraries.
-    1.  Run `rlwrap coqtop`
-    2.  Execute `Add Rec LoadPath `“`../bbv/theories`”` as bbv.` to make
-        the bbv library visible.
-    3.  Execute `Add Rec LoadPath `“`.`”` as Kami.` to make the Kami
-        library visible.
-    4.  Execute `Require All.` to load all of the Kami library.
-    5.  Execute `Import Syntax.` to import the key definitions.
-    6.  Execute `Open Scope expr_action.` to import notations such as
-        `Retv`.
+3.  Open proofgeneral or your favorite IDE for Coq.
+    1.  In the Vernacular, execute `Require Import Kami.All.` to load all of the Kami library.
+    2.  Write a Kami module and its specification based on what is described below and prove it!
+#3.  Open Coqtop and load all of the libraries.
+#    1.  Run `rlwrap coqtop`
+#    2.  Execute `Add Rec LoadPath `“`../bbv/theories`”` as bbv.` to make
+#        the bbv library visible.
+#    3.  Execute `Add Rec LoadPath `“`.`”` as Kami.` to make the Kami
+#        library visible.
+#    4.  Execute `Require All.` to load all of the Kami library.
+#    5.  Execute `Import Syntax.` to import the key definitions.
+#    6.  Execute `Open Scope expr_action.` to import notations such as
+#        `Retv`.
 
-You can also use the `-R` flag when compiling modules with `coqc`. For
-example:
-`coqc -R '../sifive-kami' 'Kami' -R '../bbv/theories' 'bbv' modules.v`.
+#You can also use the `-R` flag when compiling modules with `coqc`. For
+#example:
+#`coqc -R '../sifive-kami' 'Kami' -R '../bbv/theories' 'bbv' modules.v`.
 
 Library Organization
 --------------------
