@@ -18,9 +18,10 @@ generate the Verilog the code.
 Loading the Kami Library
 ------------------------
 
-Before you can use the Kami library from `coqtop`, you must perform the
+Before you can use the Kami library, you must perform the
 following steps:
 
+0.  Create a "Projects" directory where all the repositories are going to reside
 1.  Download and Compile the MIT Bedrock Bit Vectors library from
     <https://github.com/mit-plv/bbv>.
     1.  In the “Projects” directory use
