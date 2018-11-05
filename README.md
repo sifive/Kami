@@ -47,10 +47,12 @@ their properties.
 The Syntax.v module contains a number of definitions, functions, and
 predicates prefixed with the letter “P” (for example, the file defines a
 constructor named “SemLetExpr” and another named “PSemLetExpr”). The
-file is roughly divided into two models. One represents the registers,
+file is roughly divided into three models. One represents the registers,
 rules, and methods in a module using lists. The other equates modules
-that differ only by permutations on these lists. The definitions that
-begin with the “P” are those that work with permutations.
+that differ only by permutations on these lists, and the third creates
+more permutations on the objects in the semantics. The definitions that
+begin with the “P” are those that work with permutations, and those with
+"PPlus" work with more permutations.
 
 Kami Semantics Overview
 -----------------------
@@ -61,7 +63,7 @@ Kami consists of 7 things:
     digital circuits (i.e. kinds, expressions, actions, registers,
     methods, rules, modules, and traces)
 2.  a denotational semantics that maps expressions, kinds, and actions,
-    etc onto Gallina terms)
+    etc onto Gallina terms
 3.  an operational semantics that models the behavior of digital
     circuits represented by Kami modules.
 4.  a collection of axioms and theorems asserting relations between
@@ -73,7 +75,7 @@ In Kami, we represent digital circuits as modules. A Kami module
 consists of a set of registers, rules, and methods. These elements
 correspond to physical circuit elements. When compiled into Verilog,
 registers become physical registers while rules and methods become
-combinatorial circuits.
+combinational circuits.
 
 Kami's operational semantics model the behavior of digital circuits. The
 behavior of a digital circuit is represented by the sequential execution
@@ -93,54 +95,40 @@ translated into Gallina terms.
 
 The datastructures used to represent Kami kinds, expressions, actions,
 registers, methods, rules, modules, and traces are all defined in
-Syntax.v. The definitions for these constructors are abstracted with
+Syntax.v. The definitions for these constructors are parameterized with
 respect to a function (represented by the variable `ty`) that maps Kami
-kinds onto Gallina and Verilog terms - i.e. the definitions for Kami
-expressions and actions accepts a parameter function that maps Kami
-kinds onto Gallina types[^1].
+kinds onto either Gallina terms[^1].
 
-Syntax.v defines a mapping function named `type` that effectively maps
-the Kami types according to the denotational semantics outlined in Kami:
-A Platform for High-Level Parametric Hardware Specification and Its
-Modular Verification[^2]. Compile.v defines an alternative mapping
-function that leads to a mapping of Kami kinds into Verilog terms.
+The denotational semantics of Syntax.v defines the non-deterministic
+behavior of the circuit in Galline. Compile.v, on the other hand,
+generates an AST for a circuit.
 
-The denotational semantics defined by Syntax.v effectively duplicates
-combinatorial circuit elements[^3]. The semantics defined by Compile.v
-ensures that shared combinatorial circuit elements are generated once
-and then linked by wires represented by Verilog variable references.
-It's easier to prove theorems using the denotational semantics defined
-by Syntax.v, but the circuits modeled by Compile.v are more
-efficient/less redundant.
-
-The `ty` parameter represents a function that maps Kami types onto
-Gallina types. In effect, it gives the denotation for Kami Kinds - i.e.
-the interpretation of various Kinds as Gallina terms. For theorem
-proving we use the function `type` defined in Syntax.v. This function
-essentially represents the duplication of combinatorial circuits
-whenever they are referenced. This approach simplifies theorem proving,
-but it would be inefficient to generate Verilog code that contained
-component duplications. The compiler defined in Compile.v uses a
-different function that generates combinatorial circuits, defines a
-temporary identifier for these circuits represented as a list of nats,
-and then generates verilog code that creates the combinatorial circuits
-once and then connects code that uses them over wires - i.e. the
-identifiers become Verilog component IDs and mapping generates Verilog
+Syntax.v defines a mapping function named `type` that effectively maps the Kami
+types according to the denotational semantics outlined in Kami: A Platform for
+High-Level Parametric Hardware Specification and Its Modular Verification[^2].
+In effect, it gives the denotation for Kami Kinds - i.e.  the interpretation of
+various Kinds as Gallina terms. For theorem proving we use the function `type`
+defined in Syntax.v.  The compiler defined in Compile.v uses a different
+function that generates combinational circuits, defines a temporary identifier
+for these circuits represented as a list of nats -- a reference to the
+expression that a particular `let` represents, similar to de-Bruin indices.
+These identifiers become Verilog component IDs and mapping generates Verilog
 variable references.
 
-The fundamental relationship within Kami is trace inclusion. Given two
-modules, m and n, we say that m refines n iff every trace produced by m
-can also be produced by n. A trace is a sequence of labels where a label
-denotes either a rule execution, a method call, or a method execution.
-Trace's summarize the externally visible behavior of a circuit.
+The fundamental relationship within Kami is trace inclusion. Given two modules,
+m and n, we say that m refines n iff every trace produced by m can also be
+produced by n. A trace is a sequence of labels where a label denotes either a
+rule execution, a method call, or a method execution.  Traces summarize the
+externally visible behavior of a circuit -- which is the called methods with
+its argument and return value, and the executed methods with its argument and
+return value (rule names are omitted when comparing traces).
 
-Theorem proving in Kami is based on three fundamental theorems: the
-modular substitution theorem, the inlining theorem, and the simulation
-theorem (previously referred to as the decomposition theorem). These
+Theorem proving in Kami is based on three fundamental theorems: the modular
+substitution theorem, the inlining theorem, and the simulation theorem. These
 theorems allow us to decompose complex circuits into smaller subcircuits
-represented by small modules, to prove properties about these modules,
-to combine these modules into larger composite modules, and to project
-these properties onto composite modules.
+represented by small modules, to prove properties about these modules, to
+combine these modules into larger composite modules, and to project these
+properties onto composite modules.
 
 Representing Circuits
 ---------------------
@@ -1088,17 +1076,12 @@ Footnotes
 <references/>
 <Category:Note>
 
-[^1]: “In brief, this encoding style \[Parametric Higher-Order Abstract
-    Syntax\] represents terms as polymorphic functions, parameterized
-    over representation types for **variables**, one per object-language
-    type.” Choi et. al. 2017
+[^1]: [Parametric Higher-Order Abstract Syntax for Mechanized Semantics]
+    (http://adam.chlipala.net/papers/PhoasICFP08/PhoasICFP08.pdf)
 
 [^2]: [Kami: A Platform for High-Level Parametric Hardware Specification
     and Its Modular
     Verification](http://plv.csail.mit.edu/kami/papers/icfp17.pdf)
-
-[^3]: “the definitions of the interacting methods are semantically
-    inlined at the places of their calls.” Choi et. al. 2017
 
 [^4]: “we found it convenient to define one Kami language with embedding
     of normal Coq programs as an optional feature, by convention to be

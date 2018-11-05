@@ -1,4 +1,4 @@
-Require Import Syntax Rtl PPlusProperties Properties.
+Require Import Syntax Rtl.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
@@ -496,8 +496,8 @@ Section ForMeth.
 End ForMeth.
 
 
-Definition getMethEnsRulesEnBaseMod m order := map (fun meth => getMethEnsOrderEn m meth order) (getCallsWithSignPerMod (Base m)).
-Definition getMethEnsRulesArgBaseMod m order := map (fun meth => getMethEnsOrderArg m meth order) (getCallsWithSignPerMod (Base m)).
+Definition getMethEnsOrderFull m order := map (fun meth => getMethEnsOrderEn m meth order) (getCallsWithSignPerMod (Base m)) ++
+                                              map (fun meth => getMethEnsOrderArg m meth order) (getCallsWithSignPerMod (Base m)).
 
 Definition getSysPerRule (rule: Attribute (Action Void)) :=
   getRtlSys (fst rule) (snd rule (fun _ => list nat)) (RtlReadWire Bool (getActionGuard (fst rule))) (1 :: nil).
@@ -505,7 +505,7 @@ Definition getSysPerRule (rule: Attribute (Action Void)) :=
 Definition getSysPerMeth (meth: DefMethT) :=
   getRtlSys (fst meth) (projT2 (snd meth) (fun _ => list nat) (1 :: nil)) (RtlReadWire Bool (getActionGuard (fst meth))) (2 :: nil).
 
-Definition getSysPerBaseMod rules := concat (map getSysPerRule rules).
+Definition getSysPerBaseMod m := concat (map getSysPerRule (getRules m) ++ map getSysPerMeth (getMethods m)).
 
 (* Set the enables correctly in the following two functions *)
 
@@ -518,12 +518,29 @@ Definition computeRuleAssigns (r: Attribute (Action Void)) :=
 Definition computeRuleAssignsRegs regs (r: Attribute (Action Void)) :=
   convertRegsWrites (fst r) regs (snd r (fun _ => list nat)) (1 :: nil).
 
-Definition getInputs (calls: list (Attribute (Kind * Kind))) := map (fun x => (getMethRet (fst x), snd (snd x))) calls.
+Definition computeMethAssigns (f: DefMethT) :=
+  (getMethGuard (fst f),
+   existT _ Bool (convertActionToRtl_guardF (fst f) (projT2 (snd f) (fun _ => list nat) (1 :: nil)) (2 :: nil)))
+    :: (fst f, (1 :: nil),
+        existT _ (fst (projT1 (snd f))) (RtlReadWire _ (getMethArg (fst f))))
+    :: (getMethRet (fst f),
+        existT _ (snd (projT1 (snd f))) (RtlReadWire _ (fst f, (0 :: nil))))
+    ::
+    convertActionToRtl_noGuard (fst f) (projT2 (snd f) (fun _ => list nat) (1 :: nil)) (2 :: nil) (0 :: nil).
+
+Definition computeMethAssignsRegs regs (f: DefMethT) :=
+  convertRegsWrites (fst f) regs (projT2 (snd f) (fun _ => list nat) (1 :: nil)) (2 :: nil).
+
+Definition getInputs (calls defs: list (Attribute (Kind * Kind))) := map (fun x => (getMethRet (fst x), snd (snd x))) calls ++
+                                                                         map (fun x => (getMethArg (fst x), fst (snd x))) defs ++
+                                                                         map (fun x => (getMethEn (fst x), Bool)) defs.
 
 Definition getInputGuards (calls: list (Attribute (Kind * Kind))) := map (fun x => (getMethGuard (fst x), Bool)) calls.
 
-Definition getOutputs (calls: list (Attribute (Kind * Kind))) := map (fun x => (getMethArg (fst x), fst (snd x))) calls ++
-                                                                     map (fun x => (getMethEn (fst x), Bool)) calls.
+Definition getOutputs (calls defs: list (Attribute (Kind * Kind))) := map (fun x => (getMethArg (fst x), fst (snd x))) calls ++
+                                                                          map (fun x => (getMethEn (fst x), Bool)) calls ++
+                                                                          map (fun x => (getMethRet (fst x), snd (snd x))) defs ++
+                                                                          map (fun x => (getMethGuard (fst x), Bool)) defs.
 
 Definition getRegInit (y: {x : FullKind & option (ConstFullT x)}): {x: Kind & option (ConstT x)} :=
   existT _ _
@@ -538,7 +555,7 @@ Definition getRegInit (y: {x : FullKind & option (ConstFullT x)}): {x: Kind & op
                            end
          end.
 
-Fixpoint getAllWriteReadConnections' (regs: list RegInitT) (order: list string) {struct order} :=
+Fixpoint getAllWriteReadConnections' (regs: list RegInitT) (order: list string) :=
   match order with
   | penult :: xs =>
     match xs with
@@ -560,8 +577,10 @@ Definition getAllWriteReadConnections (regs: list RegInitT) (order: list string)
   end.
 
 Definition getWires m (order: list string) :=
-  concat (map computeRuleAssigns (getRules m)) ++ getAllWriteReadConnections (getRegisters m) order ++ concat (map (computeRuleAssignsRegs (getRegisters m)) (getRules m)) ++
-         getMethEnsRulesEnBaseMod m order ++ getMethEnsRulesArgBaseMod m order.
+  concat (map computeRuleAssigns (getRules m)) ++ concat (map (computeRuleAssignsRegs (getRegisters m)) (getRules m)) ++
+         concat (map computeMethAssigns (getMethods m)) ++ concat (map (computeMethAssignsRegs (getRegisters m)) (getMethods m)) ++
+         getAllWriteReadConnections (getRegisters m) order ++
+         getMethEnsOrderFull m order.
       
 Definition getWriteRegs (regs: list RegInitT) :=
   map (fun r => (fst r, existT _ (projT1 (getRegInit (snd r))) (RtlReadWire _ (getRegWrite (fst r))))) regs.
@@ -587,15 +606,21 @@ Definition getRtl_full (bm: (list string * (list RegFileBase * BaseModule))) (pr
   {| hiddenWires := map (fun x => getMethRet x) (fst bm) ++ map (fun x => getMethArg x) (fst bm) ++ map (fun x => getMethEn x) (fst bm);
      regFiles := map (fun x => (false, x)) (fst (snd bm));
      inputs := getInputs (SubtractList fst fst (getCallsWithSignPerMod (Base (snd (snd bm))))
-                                       (getAllMethodsRegFileList (fst (snd bm)))
-                         ) ++ getInputGuards (filter (fun x => getBool (in_dec string_dec (fst x) preserveGuards)) (getCallsWithSignPerMod (Base (snd (snd bm)))));
+                                       (getAllMethodsRegFileList (fst (snd bm))))
+                         (SubtractList fst fst (map (fun x => (fst x, projT1 (snd x))) (getMethods (snd (snd bm))))
+                                       (getAllMethodsRegFileList (fst (snd bm))))
+                         ++
+                         getInputGuards (filter (fun x => getBool (in_dec string_dec (fst x) preserveGuards))
+                                                (getCallsWithSignPerMod (Base (snd (snd bm)))));
      outputs := getOutputs (SubtractList fst fst (getCallsWithSignPerMod (Base (snd (snd bm))))
+                                         (getAllMethodsRegFileList (fst (snd bm))))
+                           (SubtractList fst fst (map (fun x => (fst x, projT1 (snd x))) (getMethods (snd (snd bm))))
                                          (getAllMethodsRegFileList (fst (snd bm))));
      regInits := map (fun x => (fst x, getRegInit (snd x))) (getRegisters (snd (snd bm)));
      regWrites := getWriteRegs (getRegisters (snd (snd bm)));
      wires := getReadRegs (getRegisters (snd (snd bm))) ++ getWires (snd (snd bm)) order ++
                           setMethodGuards (map fst (getAllMethodsRegFileList (fst (snd bm))) ++ preserveGuards) (snd (snd bm));
-     sys := getSysPerBaseMod (getRules (snd (snd bm))) |}.
+     sys := getSysPerBaseMod (snd (snd bm)) |}.
 
 Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) := getRtl_full bm nil (map fst (getRules (snd (snd bm)))).
 
