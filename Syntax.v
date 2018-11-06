@@ -390,6 +390,7 @@ Inductive Mod: Type :=
 | HideMeth (m: Mod) (meth: string): Mod
 | ConcatMod (m1 m2: Mod): Mod.
 
+Coercion Base: BaseModule >-> Mod.
 
 Notation getKindAttr ls := (map (fun x => (fst x, projT1 (snd x))) ls).
 
@@ -650,6 +651,16 @@ Record BaseModuleWfOrd :=
   { baseModuleWf :> BaseModuleWf ;
     baseModuleOrd : list string }.
 
+Definition getModWf (m: BaseModuleWf) :=
+  {| module := m;
+     wfMod := BaseWf (wfBaseModule m) |}.
+
+Definition getModWfOrd (m: BaseModuleWfOrd) :=
+  {| modWf := getModWf m;
+     modOrd := baseModuleOrd m |}.
+
+Coercion getModWf: BaseModuleWf >-> ModWf.
+Coercion getModWfOrd: BaseModuleWfOrd >-> ModWfOrd.
 
 
 Ltac Struct_neq :=

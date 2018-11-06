@@ -1470,3 +1470,27 @@ Proof.
 Qed.
 
 
+Lemma key_not_In_fst A B (ls: list (A*B)):
+  forall k,
+    key_not_In k ls <->
+    ~ In k (map fst ls).
+Proof.
+  induction ls; simpl; auto; split; intros; try tauto.
+  - unfold key_not_In in *; simpl; intros; auto.
+  - intro.
+    unfold key_not_In in H; simpl in *.
+    assert (sth: key_not_In k ls) by (firstorder fail).
+    pose proof (proj1 (IHls _) sth) as sth2.
+    destruct H0; [subst|tauto].
+    specialize (H (snd a)).
+    destruct a; simpl in *.
+    firstorder fail.
+  - unfold key_not_In in *; simpl; intros; auto.
+    intro.
+    destruct a; simpl in *.
+    destruct H0.
+    + inv H0.
+      firstorder fail.
+    + apply (in_map fst) in H0; simpl in *.
+      firstorder fail.
+Qed.
