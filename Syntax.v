@@ -1170,23 +1170,77 @@ Proof.
   destruct s1, s2.
   simpl in *.
   apply prod_dec; simpl; auto; apply isEq.
-Qed.
+Defined.
 
-Lemma sigT_SignT_dec: forall s1 s2: (sigT SignT), {s1 = s2} + {s1 <> s2}.
-Proof.
-  intros.
-  destruct s1, s2.
-  destruct (Signature_dec x x0); subst.
-  - destruct (SignT_dec s s0); subst.
-    + left; reflexivity.
-    + right; intro.
-      apply EqdepFacts.eq_sigT_eq_dep in H.
-      apply (Eqdep_dec.eq_dep_eq_dec (Signature_dec)) in H.
-      tauto.
-  - right; intro.
-    inversion H.
-    tauto.
-Qed.
+(*
+  Asserts that, if the values passed to, and
+  returned by, a method are equal, the Gallina
+  values passed to, and returned by, a method
+  are also equal.
+*)
+Lemma method_values_eq
+  :  forall (s : Signature) (x y : SignT s), existT SignT s x = existT SignT s y -> x = y.
+Proof (Eqdep_dec.inj_pair2_eq_dec Signature Signature_dec SignT).
+            
+(*
+  Asserts that the values passed two and returned
+  by two method calls differ if their signatures
+  differ.
+*)
+Lemma method_values_neq 
+  :  forall (s r : Signature) (x : SignT s) (y : SignT r), s <> r -> existT SignT s x <> existT SignT r y.
+Proof (fun s r x y H H0 => H (projT1_eq H0)).
+
+(*
+  Determines whether or not the Gallina terms
+  passed to, and returned by, two method calls
+  are equal.
+*)
+Definition method_denotation_values_dec
+  :  forall (s : Signature) (x y : SignT s), {x = y} + {x <> y}
+  := fun s => prod_dec (isEq (fst s)) (isEq (snd s)).
+
+(*
+  Determines whether or not the values passed to,
+  and returned by, two method calls that have
+  the same Kami signature are equal.
+*)
+Definition method_values_dec
+  :  forall (s : Signature) (x y : SignT s), {existT SignT s x = existT SignT s y} + {existT SignT s x <> existT SignT s y}
+  := fun s x y
+       => sumbool_rec
+            (fun _ => {existT SignT s x = existT SignT s y} + {existT SignT s x <> existT SignT s y})
+            (fun H : x = y
+              => left
+                   (eq_ind x
+                     (fun z => existT SignT s x = existT SignT s z)
+                     (eq_refl (existT SignT s x))
+                     y H))
+            (fun H : x <> y
+              => right
+                   (fun H0 : existT SignT s x = existT SignT s y
+                     => H (method_values_eq H0)))
+            (method_denotation_values_dec x y).
+
+(*
+  Determines whether or not the values passed to,
+  and returned by, two method calls are equal.
+*)
+Definition sigT_SignT_dec
+  :  forall x y: (sigT SignT), {x = y} + {x <> y}
+  := sigT_rect _
+       (fun (s : Signature) (x : SignT s)
+          => sigT_rect _
+               (fun (r : Signature)
+                 => sumbool_rect _
+                      (fun H : s = r
+                        => eq_rect s
+                             (fun t => forall y : SignT t, {existT SignT s x = existT SignT t y} + {existT SignT s x <> existT SignT t y})
+                             (fun y : SignT s => method_values_dec x y)
+                             r H)
+                      (fun (H : s <> r) (_ : SignT r)
+                        => right (method_values_neq H))
+                      (Signature_dec s r))).
 
 Lemma MethT_dec: forall s1 s2: MethT, {s1 = s2} + {s1 <> s2}.
 Proof.
@@ -1195,7 +1249,7 @@ Proof.
   apply prod_dec.
   - apply string_dec.
   - apply sigT_SignT_dec.
-Qed.
+Defined.
 
 Fixpoint getNumFromCalls (f : MethT) (l : MethsT) : Z :=
   match l with
