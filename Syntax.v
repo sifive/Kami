@@ -1289,6 +1289,74 @@ Fixpoint getNumFromExecs (f : MethT) (l : list RuleOrMeth) : Z :=
 Definition getNumExecs (f : MethT) (l : list FullLabel) :=
   getNumFromExecs f (map (fun x => fst (snd x)) l).
 
+Open Scope Z_scope.
+
+Notation PPT_execs := (fun x => fst (snd x)).
+Notation PPT_calls := (fun x => snd (snd x)).
+
+(*
+  Proves that the number of method calls returned
+  by [getNumCalls] is always greater than or
+  equal to 0.
+*)
+Lemma num_method_calls_positive
+  : forall (method : MethT) (labels : list FullLabel),
+      0 <= getNumCalls method labels.
+Proof 
+fun method
+  => list_ind _
+       (ltac:(discriminate) : 0 <= getNumCalls method [])
+       (fun (label : FullLabel) (labels : list FullLabel)
+         (H : 0 <= getNumFromCalls method (concat (map PPT_calls labels)))
+         => list_ind _ H
+              (fun (method0 : MethT) (methods : MethsT)
+                (H0 : 0 <= getNumFromCalls method (methods ++ concat (map PPT_calls labels)))
+                => sumbool_ind
+                     (fun methods_eq
+                       => 0 <=
+                            if methods_eq
+                              then 1 + getNumFromCalls method (methods ++ concat (map PPT_calls labels))
+                              else getNumFromCalls method (methods ++ concat (map PPT_calls labels)))
+                     (fun _ => Z.add_nonneg_nonneg 1 _ (Zle_0_pos 1) H0)
+                     (fun _ => H0)
+                     (MethT_dec method method0))
+              (snd (snd label))).
+
+(*
+  Proves that the number of method executions
+  counted by [getNumExecs] is always greater
+  than or equal to 0.
+*)
+Lemma num_method_execs_positive
+  : forall (method : MethT) (labels : list FullLabel),
+      0 <= getNumExecs method labels.
+Proof
+fun method
+  => list_ind _
+       (ltac:(discriminate) : 0 <= getNumExecs method [])
+       (fun (label : FullLabel) (labels : list FullLabel)
+         (H : 0 <= getNumFromExecs method (map PPT_execs labels))
+         => RuleOrMeth_ind
+              (fun rule_method : RuleOrMeth
+                => 0 <= match rule_method with
+                        | Rle _ => _
+                        | Meth _ => _
+                        end)
+              (fun _ => H)
+              (fun method0 : MethT
+                => sumbool_ind
+                     (fun methods_eq
+                       => 0 <=
+                            if methods_eq
+                              then 1 + getNumFromExecs method (map PPT_execs labels)
+                              else getNumFromExecs method (map PPT_execs labels))
+                     (fun _ => Z.add_nonneg_nonneg 1 _ (Zle_0_pos 1) H)
+                     (fun _ => H)
+                     (MethT_dec method method0))
+              (fst (snd label))).
+
+Close Scope Z_scope.
+
 Definition getListFullLabel_diff (f : MethT) (l : list FullLabel) :=
   ((getNumExecs f l) - (getNumCalls f l))%Z.
 
@@ -1584,9 +1652,6 @@ Inductive WeakInclusions : list (list FullLabel) -> list (list (FullLabel)) -> P
 Definition PTraceInclusion (m m' : Mod) :=
   forall (o : RegsT) (ls : list (list FullLabel)),
     PTrace m o ls -> exists (ls' : list (list FullLabel)), PTraceList m' ls' /\ WeakInclusions ls ls'.
-
-Notation PPT_execs := (fun x => fst (snd x)).
-Notation PPT_calls := (fun x => snd (snd x)).
 
 Section PPlusTraceInclusion.
 
