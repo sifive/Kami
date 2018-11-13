@@ -61,7 +61,7 @@ Qed.
 Section InverseSemAction.
   Variable o: RegsT.
 
-  Theorem inversionSemAction
+  Lemma inversionSemAction
           k a reads news calls retC
           (evalA: @SemAction o k a reads news calls retC):
     match a with
@@ -1636,7 +1636,7 @@ Proof.
         firstorder fail.
 Qed.
 
-Theorem TraceInclusion_refl: forall m, TraceInclusion m m.
+Lemma TraceInclusion_refl: forall m, TraceInclusion m m.
 Proof.
   unfold TraceInclusion; intros.
   exists o1, ls1.
@@ -1646,7 +1646,7 @@ Proof.
   repeat split; intros; tauto.
 Qed.
 
-Theorem TraceInclusion_trans: forall m1 m2 m3, TraceInclusion m1 m2 ->
+Lemma TraceInclusion_trans: forall m1 m2 m3, TraceInclusion m1 m2 ->
                                                TraceInclusion m2 m3 ->
                                                TraceInclusion m1 m3.
 Proof.
@@ -3475,57 +3475,6 @@ Proof.
     apply Permutation_sym in H0.
     eapply Permutation_in; eauto.
 Qed.
-
-Section TraceSubstitute.
-  Variable m: ModWf.
-
-  Lemma Trace_flatten_same1: forall o l,  Trace m o l -> Trace (flatten m) o l.
-  Proof.
-    induction 1; subst.
-    - constructor 1; auto.
-      unfold flatten.
-      rewrite createHide_Regs.
-      auto.
-    - apply (@Step_substitute) in HStep; auto.
-      + econstructor 2; eauto.
-      + destruct m; auto.
-  Qed.
-
-  Lemma Trace_flatten_same2: forall o l, Trace (flatten m) o l -> (exists l', (PermutationEquivLists l l') /\ Trace m o l').
-  Proof.
-    induction 1; subst.
-    - rewrite getAllRegisters_flatten in *.
-      exists nil;split;constructor 1; auto.
-    - apply substitute_Step in HStep;auto; dest.
-      exists (x0::x);split.
-      + constructor; auto.
-      + econstructor 2; eauto.
-        apply (Permutation_map fst) in H2.
-        eapply UpdRegs_perm; eauto.
-      + destruct m; auto.
-  Qed.
-
-  Theorem TraceInclusion_flatten_r: TraceInclusion m (flatten m).
-  Proof.
-    unfold TraceInclusion; intros.
-    exists o1, ls1.
-    repeat split; auto; intros; unfold nthProp2; intros; try destruct (nth_error ls1 i); auto; repeat split; intros; try firstorder.
-    apply Trace_flatten_same1; auto.
-  Qed.
-
-  Theorem TraceInclusion_flatten_l: TraceInclusion (flatten m) m.
-  Proof.
-    apply TraceInclusion'_TraceInclusion.
-    unfold TraceInclusion'; intros.
-    apply Trace_flatten_same2 in H.
-    dest.
-    exists x.
-    split.
-    - unfold TraceList; exists o; auto.
-    - apply PermutationEquivLists_WeakInclusions.
-      assumption.
-  Qed.
-End TraceSubstitute.
     
 Lemma SameTrace m1 m2:
   (forall o1 l, Trace m1 o1 l -> exists o2, Trace m2 o2 l) ->
@@ -3573,7 +3522,7 @@ Proof.
   split; induction 1; econstructor; eauto.
 Qed.
 
-Lemma flatten_WfMod m: WfMod m -> WfMod (flatten m).
+Theorem flatten_WfMod m: WfMod m -> WfMod (flatten m).
 Proof.
   unfold flatten.
   induction 1; simpl; auto; intros.
@@ -3621,6 +3570,57 @@ Qed.
 
 Definition flattened_ModWf m: ModWf :=
   (Build_ModWf (flatten_WfMod (wfMod m))).
+
+Section TraceSubstitute.
+  Variable m: ModWf.
+
+  Lemma Trace_flatten_same1: forall o l,  Trace m o l -> Trace (flatten m) o l.
+  Proof.
+    induction 1; subst.
+    - constructor 1; auto.
+      unfold flatten.
+      rewrite createHide_Regs.
+      auto.
+    - apply (@Step_substitute) in HStep; auto.
+      + econstructor 2; eauto.
+      + destruct m; auto.
+  Qed.
+
+  Lemma Trace_flatten_same2: forall o l, Trace (flatten m) o l -> (exists l', (PermutationEquivLists l l') /\ Trace m o l').
+  Proof.
+    induction 1; subst.
+    - rewrite getAllRegisters_flatten in *.
+      exists nil;split;constructor 1; auto.
+    - apply substitute_Step in HStep;auto; dest.
+      exists (x0::x);split.
+      + constructor; auto.
+      + econstructor 2; eauto.
+        apply (Permutation_map fst) in H2.
+        eapply UpdRegs_perm; eauto.
+      + destruct m; auto.
+  Qed.
+
+  Theorem TraceInclusion_flatten_r: TraceInclusion m (flattened_ModWf m).
+  Proof.
+    unfold TraceInclusion; intros.
+    exists o1, ls1.
+    repeat split; auto; intros; unfold nthProp2; intros; try destruct (nth_error ls1 i); auto; repeat split; intros; try firstorder.
+    apply Trace_flatten_same1; auto.
+  Qed.
+
+  Theorem TraceInclusion_flatten_l: TraceInclusion (flattened_ModWf m) m.
+  Proof.
+    apply TraceInclusion'_TraceInclusion.
+    unfold TraceInclusion'; intros.
+    apply Trace_flatten_same2 in H.
+    dest.
+    exists x.
+    split.
+    - unfold TraceList; exists o; auto.
+    - apply PermutationEquivLists_WeakInclusions.
+      assumption.
+  Qed.
+End TraceSubstitute.
 
 Lemma word0_neq: forall w : word 1, w <> WO~0 -> w = WO~1.
 Proof.
@@ -4022,7 +4022,7 @@ Section Fold.
   Variable fEval: type k -> type k -> type k.
   Variable fEval_f: forall x y, evalLetExpr (f x y) = fEval (evalLetExpr x) (evalLetExpr y).
 
-  Theorem evalFoldLeft_Let ls:
+  Lemma evalFoldLeft_Let ls:
     forall seed,
       evalLetExpr (fold_left f ls seed) =
       fold_left fEval (map (@evalLetExpr _) ls) (evalLetExpr seed).
@@ -4033,7 +4033,7 @@ Section Fold.
     reflexivity.
   Qed.
 
-  Theorem evalFoldRight_Let ls:
+  Lemma evalFoldRight_Let ls:
     forall seed,
       evalLetExpr (fold_right f seed ls) =
       fold_right fEval (evalLetExpr seed) (map (@evalLetExpr _) ls).
@@ -4050,7 +4050,7 @@ Section Fold.
     destruct H as [n H]. 
 
 
-  Theorem evalFoldTree_Let ls:
+  Lemma evalFoldTree_Let ls:
     forall seed,
       evalLetExpr (fold_tree f seed ls) =
       fold_tree fEval (evalLetExpr seed) (map (@evalLetExpr _) ls).
@@ -4104,7 +4104,7 @@ Section Fold.
   Variable unit: LetExprSyntax type k.
   Variable fUnit: forall x, fEval (evalLetExpr unit) x = x.
   
-  Theorem evalFoldTree_evalFoldLeft ls:
+  Lemma evalFoldTree_evalFoldLeft ls:
     evalLetExpr (fold_tree f unit ls) =
     evalLetExpr (fold_left f ls unit).
   Proof.
@@ -4114,7 +4114,7 @@ Section Fold.
   Qed.
 
   
-  Theorem evalFoldTree_evalFoldRight ls:
+  Lemma evalFoldTree_evalFoldRight ls:
     evalLetExpr (fold_tree f unit ls) =
     evalLetExpr (fold_right f unit ls).
   Proof.

@@ -1090,7 +1090,7 @@ Proof.
       rewrite H0; reflexivity.
 Qed.
 
-Theorem PTraceInclusion_TraceInclusion m1 m2 :
+Lemma PTraceInclusion_TraceInclusion m1 m2 :
   (WfMod m1) ->
   (WfMod m2) ->
   PTraceInclusion m1 m2 -> TraceInclusion m1 m2.
@@ -2173,7 +2173,7 @@ Lemma WfConcatComm m1 m2 :
 Proof.
   intros; inv H.
   econstructor; eauto using DisjKey_Commutative.
-Qed.
+Qed. 
 
 Lemma DeM1 (A : Type):
   forall (l1 l2 : list A) (a : A),
@@ -2226,7 +2226,7 @@ Proof.
 Qed.
     
 
-Lemma WfConcatAssoc1 m1 m2 m3 :
+Theorem WfConcatAssoc1 m1 m2 m3 :
   WfMod (ConcatMod m1 (ConcatMod m2 m3)) ->
   WfMod (ConcatMod (ConcatMod m1 m2) m3).
 Proof.
@@ -2272,7 +2272,7 @@ Proof.
 Qed.
 
 
-Lemma WfConcatAssoc2 m1 m2 m3 :
+Theorem WfConcatAssoc2 m1 m2 m3 :
   WfMod (ConcatMod (ConcatMod m1 m2) m3) ->
   WfMod (ConcatMod m1 (ConcatMod m2 m3)).
 Proof.
@@ -2556,7 +2556,7 @@ Proof.
   - rewrite mergeSeparatedBaseMod_noHides; intro; contradiction.
 Qed.
 
-Lemma WfModBreakDownFile m :
+Theorem WfModBreakDownFile m :
   WfMod m ->
   WfMod (mergeSeparatedBaseFile (fst (snd (separateMod m)))).
 Proof.
@@ -2602,7 +2602,7 @@ Proof.
         unfold separateMod in H2; simpl in *; rewrite <- Heqsbm1 in H2; simpl in *; assumption.
 Qed.
 
-Lemma WfModBreakDownMod m :
+Theorem WfModBreakDownMod m :
   WfMod m ->
   WfMod (mergeSeparatedBaseMod (snd (snd (separateMod m)))).
 Proof.
@@ -2660,7 +2660,7 @@ Proof.
     rewrite H; intro; contradiction.
 Qed.
 
-Lemma merged_WellFormed m:
+Theorem merged_WellFormed m:
   WfMod m ->
   WfMod (mergeSeparatedMod (separateMod m)).
 Proof.
@@ -2728,7 +2728,7 @@ Proof.
         apply mergeSeparatedBaseFile_noHides.
 Qed.
 
-Lemma WfMod_getFlat m:
+Theorem WfMod_getFlat m:
   (WfMod m) ->
   (WfMod (Base (getFlat m))).
 Proof.
@@ -2742,7 +2742,7 @@ Proof.
 Qed.
 
 Definition WfGetFlatMod (m: ModWf) : ModWf :=
-  (Build_ModWf (wfMod m)).
+  (Build_ModWf (WfMod_getFlat (wfMod m))).
 
 Definition WfMergedMod (m : ModWf) :  ModWf :=
   (Build_ModWf (merged_WellFormed (wfMod m))).
@@ -2758,31 +2758,27 @@ Proof.
 Qed.
 
 Theorem TraceInclusion_Merge_l (m : ModWf) :
-  TraceInclusion m (mergeSeparatedMod (separateMod m)).
+  TraceInclusion m (WfMergedMod m).
 Proof.
-  apply PTraceInclusion_TraceInclusion.
-  - apply (wfMod m).
-  - apply (wfMod (WfMergedMod m)).
-  - repeat intro.
-    apply (PTrace_ModWf_rewrite (merged_perm_equality m)) in H.
-    exists ls.
-    split.
-    + unfold PTraceList; exists o; eauto.
-    + apply WeakInclusionsRefl.
+  apply PTraceInclusion_TraceInclusion; try apply wfMod.
+  repeat intro.
+  apply (PTrace_ModWf_rewrite (merged_perm_equality m)) in H.
+  exists ls.
+  split.
+  - unfold PTraceList; exists o; eauto.
+  - apply WeakInclusionsRefl.
 Qed.
 
 Theorem TraceInclusion_Merge_r (m : ModWf) :
-  TraceInclusion (mergeSeparatedMod (separateMod m)) m.
+  TraceInclusion (WfMergedMod m) m.
 Proof.
-  apply PTraceInclusion_TraceInclusion.
-  - apply (wfMod (WfMergedMod m)).
-  - apply (wfMod m).
-  - repeat intro.
-    apply (PTrace_ModWf_rewrite (ModWf_perm_sym (merged_perm_equality m))) in H.
-    exists ls.
-    split.
-    + unfold PTraceList; exists o; eauto.
-    + apply WeakInclusionsRefl.
+  apply PTraceInclusion_TraceInclusion; try apply wfMod.
+  repeat intro.
+  apply (PTrace_ModWf_rewrite (ModWf_perm_sym (merged_perm_equality m))) in H.
+  exists ls.
+  split.
+  - unfold PTraceList; exists o; eauto.
+  - apply WeakInclusionsRefl.
 Qed.
 
 Section Comm.

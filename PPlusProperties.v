@@ -3296,7 +3296,7 @@ Section flatten_and_inline_all.
     unfold inlineAll_Meths; rewrite <-SameKeys_inlineSome_Meths; reflexivity.
   Qed.
   
-  Lemma WfCreateHide_Mod (m : ModWf) :
+  Theorem WfCreateHide_Mod (m : ModWf) :
     WfMod (flatten_inline_everything m).
   Proof.
     unfold flatten_inline_everything, inlineAll_All_mod.
