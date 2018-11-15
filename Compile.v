@@ -185,16 +185,16 @@ Section Compile.
   Definition convertActionToRtl_guardF k (a: ActionT (fun _ => list nat) k) startList :=
     RtlCABool And (convertActionToRtl_guard a startList).
 
-  Definition invalidRtl (k: Kind) :=
+  Definition invalidRtl k v :=
     ((STRUCT {
           "valid" ::= RtlConst false ;
-          "data" ::= RtlConst (getDefaultConst k)
+          "data" ::= v
      })%rtl_expr : RtlExpr (Maybe k)).
 
 
   Definition conditionPair k (p: RtlExpr Bool) (e1 e2: (RtlExpr Bool * RtlExpr k)) :=
     (RtlITE p (fst e1) (fst e2), RtlITE p (snd e1) (snd e2)).
-  Definition invalidPair k := (RtlConst false, RtlConst (getDefaultConst k)).
+  Definition invalidPair k (v: RtlExpr k) := (RtlConst false, v).
              
   Section MethReg.
     Open Scope string.
@@ -205,35 +205,36 @@ Section Compile.
                             | SyntaxKind k => k
                             | _ => Void
                             end.
-      Fixpoint getRegisterWrites k (a: ActionT (fun _ => list nat) k) (startList: list nat) : option (RtlExpr Bool * RtlExpr regKind) :=
+      
+      Fixpoint getRegisterWrites k (a: ActionT (fun _ => list nat) k) (startList: list nat) : sum (RtlExpr Bool * RtlExpr regKind) (RtlExpr regKind) :=
         match a in ActionT _ _ with
         | MCall meth k argExpr cont =>
           @getRegisterWrites _ (cont startList) (inc startList)
-        | Return x => None
+        | Return x => inr (RtlConst (getDefaultConst _))
         | LetExpr k' expr cont =>
           match k' return Expr (fun _ => list nat) k' ->
                           (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) -> _ with
           | SyntaxKind k => fun expr cont => @getRegisterWrites _ (cont startList) (inc startList)
-          | _ => fun _ _ => None
+          | _ => fun _ _ => inr (RtlConst (getDefaultConst _))
           end expr cont
         | LetAction k' a' cont =>
           let w1 := @getRegisterWrites _ a' (0 :: startList) in
           let w2 := @getRegisterWrites _ (cont startList) (inc startList) in
           match w1, w2 with
-          | None, None => None
-          | None, Some w2' => Some w2'
-          | Some w1', None => Some w1'
-          | Some w1', Some w2' => Some (conditionPair (fst w2') w2' w1')%rtl_expr
+          | inr x, inr y => inr x
+          | inr _, inl w2' => inl w2'
+          | inl w1', inr _ => inl w1'
+          | inl w1', inl w2' => inl (conditionPair (fst w2') w2' w1')%rtl_expr
           end
         | ReadNondet k' cont =>
           match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) -> _ with
           | SyntaxKind k => fun cont => @getRegisterWrites _ (cont startList) (inc startList)
-          | _ => fun _ => None
+          | _ => fun _ => inr (RtlConst (getDefaultConst _))
           end cont
         | ReadReg r k' cont =>
           match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) -> _ with
           | SyntaxKind k => fun cont => @getRegisterWrites _ (cont startList) (inc startList)
-          | _ => fun _ => None
+          | _ => fun _ => inr (RtlConst (getDefaultConst _))
           end cont
         | Assertion pred cont => @getRegisterWrites _ cont startList
         | Sys ls cont => @getRegisterWrites _ cont startList
@@ -243,42 +244,42 @@ Section Compile.
           let wf := @getRegisterWrites _ f (0 :: inc startList) in
           let wc := @getRegisterWrites _ (cont (inc (inc startList))) (inc (inc (inc startList))) in
           match wt, wf, wc with
-          | None, None, None => None
-          | None, None, Some wc' => Some wc'
-          | None, Some wf', None => Some (conditionPair p (invalidPair _) wf')
-          | Some wt', None, None => Some (conditionPair p wt' (invalidPair _))
-          | Some wt', Some wf', None => Some (conditionPair p wt' wf')
-          | Some wt', None, Some wc' => Some (conditionPair (fst wc') wc' (conditionPair p wt' (invalidPair _)))%rtl_expr
-          | None, Some wf', Some wc' => Some (conditionPair (fst wc') wc' (conditionPair p (invalidPair _) wf'))%rtl_expr
-          | Some wt', Some wf', Some wc' => Some (conditionPair (fst wc') wc'
-                                                         (conditionPair p wt' wf'))%rtl_expr
+          | inr x, inr y, inr z => inr x
+          | inr x, inr y, inl wc' => inl wc'
+          | inr x, inl wf', inr z => inl (conditionPair p (invalidPair (snd wf')) wf')
+          | inl wt', inr y, inr z => inl (conditionPair p wt' (invalidPair (snd wt')))
+          | inl wt', inl wf', inr z => inl (conditionPair p wt' wf')
+          | inl wt', inr y, inl wc' => inl (conditionPair (fst wc') wc' (conditionPair p wt' (invalidPair (snd wt'))))%rtl_expr
+          | inr x, inl wf', inl wc' => inl (conditionPair (fst wc') wc' (conditionPair p (invalidPair (snd wf')) wf'))%rtl_expr
+          | inl wt', inl wf', inl wc' => inl (conditionPair (fst wc') wc'
+                                                            (conditionPair p wt' wf'))%rtl_expr
           end
         | WriteReg r k' expr cont =>
           let wc := @getRegisterWrites _ cont startList in
           if string_dec r (fst reg)
           then
-            match k' return Expr (fun _ => list nat) k' -> option (RtlExpr Bool * RtlExpr regKind) with
+            match k' return Expr (fun _ => list nat) k' -> sum (RtlExpr Bool * RtlExpr regKind) (RtlExpr regKind) with
             | SyntaxKind k => fun expr =>
                                 match Kind_dec regKind k with
-                                | left pf => match pf in _ = Y return Expr _ (SyntaxKind Y) -> option (RtlExpr Bool * RtlExpr regKind) with
+                                | left pf => match pf in _ = Y return Expr _ (SyntaxKind Y) -> sum (RtlExpr Bool * RtlExpr regKind) (RtlExpr regKind) with
                                              | eq_refl => fun expr =>
                                                             match wc with
-                                                            | Some wc' =>
-                                                              Some (conditionPair (fst wc') wc'
-                                                                                  (RtlReadWire Bool (getActionGuard name),
-                                                                                   convertExprToRtl expr)
-                                                                   )%rtl_expr
-                                                            | None => 
-                                                              Some (RtlReadWire Bool (getActionGuard name),
-                                                                    convertExprToRtl expr
-                                                                   )%rtl_expr
+                                                            | inl wc' =>
+                                                              inl (conditionPair (fst wc') wc'
+                                                                                 (RtlCABool And (RtlReadWire Bool (getActionGuard name) :: RtlReadWire Bool (getActionEn name) :: nil),
+                                                                                  convertExprToRtl expr)
+                                                                  )%rtl_expr
+                                                            | inr x => 
+                                                              inl (RtlCABool And (RtlReadWire Bool (getActionGuard name) :: RtlReadWire Bool (getActionEn name) :: nil),
+                                                                   convertExprToRtl expr
+                                                                  )%rtl_expr
                                                             end
                                              end expr
-                                | right _ => Some (RtlReadWire Bool
-                                                               (("TYPES DONT MATCH FOR REGISTER " ++ r ++ " EXPECTED " ++ natToHexStr (size regKind) ++ " GOT " ++
-                                                                                                  natToHexStr (size k)), nil),
-                                                   RtlReadWire _ ("TYPES DONT MATCH FOR REGISTERS " ++ r ++ " EXPECTED " ++ natToHexStr (size regKind) ++ " GOT " ++
-                                                                                                    natToHexStr (size k), nil))
+                                | right _ => inl (RtlReadWire Bool
+                                                              (("TYPES DONT MATCH FOR REGISTER " ++ r ++ " EXPECTED " ++ natToHexStr (size regKind) ++ " GOT " ++
+                                                                                                 natToHexStr (size k)), nil),
+                                                  RtlReadWire _ ("TYPES DONT MATCH FOR REGISTERS " ++ r ++ " EXPECTED " ++ natToHexStr (size regKind) ++ " GOT " ++
+                                                                                                   natToHexStr (size k), nil))
                                 end
             | _ => fun _ => wc
             end expr
@@ -291,33 +292,33 @@ Section Compile.
       
       Definition argKind := fst (snd meth).
 
-      Fixpoint getMethEns k (a: ActionT (fun _ => list nat) k) (startList: list nat) : option (RtlExpr Bool * RtlExpr argKind) :=
+      Fixpoint getMethEns k (a: ActionT (fun _ => list nat) k) (startList: list nat) : sum (RtlExpr Bool * RtlExpr argKind) (RtlExpr argKind) :=
         match a in ActionT _ _ with
-        | Return x => None
+        | Return x => inr (RtlConst (getDefaultConst _))
         | LetExpr k' expr cont =>
           match k' return Expr (fun _ => list nat) k' ->
                           (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) -> _ with
           | SyntaxKind k => fun expr cont => @getMethEns _ (cont startList) (inc startList)
-          | _ => fun _ _ => None
+          | _ => fun _ _ => inr (RtlConst (getDefaultConst _))
           end expr cont
         | LetAction k' a' cont =>
           let w1 := @getMethEns _ a' (0 :: startList) in
           let w2 := @getMethEns _ (cont startList) (inc startList) in
           match w1, w2 with
-          | None, None => None
-          | None, Some w2' => Some w2'
-          | Some w1', None => Some w1'
-          | Some w1', Some w2' => Some (conditionPair (fst w2') w2' w1')%rtl_expr
+          | inr x, inr y => inr x
+          | inr x, inl w2' => inl w2'
+          | inl w1', inr y => inl w1'
+          | inl w1', inl w2' => inl (conditionPair (fst w2') w2' w1')%rtl_expr
           end
         | ReadNondet k' cont =>
           match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) -> _ with
           | SyntaxKind k => fun cont => @getMethEns _ (cont startList) (inc startList)
-          | _ => fun _ => None
+          | _ => fun _ => inr (RtlConst (getDefaultConst _))
           end cont
         | ReadReg r k' cont =>
           match k' return (fullType (fun _ => list nat) k' -> ActionT (fun _ => list nat) k) -> _ with
           | SyntaxKind k => fun cont => @getMethEns _ (cont startList) (inc startList)
-          | _ => fun _ => None
+          | _ => fun _ => inr (RtlConst (getDefaultConst _))
           end cont
         | Assertion pred cont => @getMethEns _ cont startList
         | Sys ls cont => @getMethEns _ cont startList
@@ -327,15 +328,15 @@ Section Compile.
           let wf := @getMethEns _ f (0 :: inc startList) in
           let wc := @getMethEns _ (cont (inc (inc startList))) (inc (inc (inc startList))) in
           match wt, wf, wc with
-          | None, None, None => None
-          | None, None, Some wc' => Some wc'
-          | None, Some wf', None => Some (conditionPair p (invalidPair _) wf')
-          | Some wt', None, None => Some (conditionPair p wt' (invalidPair _))
-          | Some wt', Some wf', None => Some (conditionPair p wt' wf')
-          | Some wt', None, Some wc' => Some (conditionPair (fst wc') wc' (conditionPair p wt' (invalidPair _)))%rtl_expr
-          | None, Some wf', Some wc' => Some (conditionPair (fst wc') wc' (conditionPair p (invalidPair _) wf'))%rtl_expr
-          | Some wt', Some wf', Some wc' => Some (conditionPair (fst wc') wc'
-                                                         (conditionPair p wt' wf'))%rtl_expr
+          | inr x, inr y, inr z => inr x
+          | inr x, inr y, inl wc' => inl wc'
+          | inr x, inl wf', inr z => inl (conditionPair p (invalidPair (snd wf')) wf')
+          | inl wt', inr y, inr z => inl (conditionPair p wt' (invalidPair (snd wt')))
+          | inl wt', inl wf', inr z => inl (conditionPair p wt' wf')
+          | inl wt', inr y, inl wc' => inl (conditionPair (fst wc') wc' (conditionPair p wt' (invalidPair (snd wt'))))%rtl_expr
+          | inr x, inl wf', inl wc' => inl (conditionPair (fst wc') wc' (conditionPair p (invalidPair (snd wf')) wf'))%rtl_expr
+          | inl wt', inl wf', inl wc' => inl (conditionPair (fst wc') wc'
+                                                            (conditionPair p wt' wf'))%rtl_expr
           end
         | WriteReg r k' expr cont =>
           @getMethEns _ cont startList
@@ -344,22 +345,22 @@ Section Compile.
           if string_dec f (fst meth)
           then
             match Kind_dec argKind (fst k) with
-            | left pf => match pf in _ = Y return Expr _ (SyntaxKind Y) -> option (RtlExpr Bool * RtlExpr argKind) with
+            | left pf => match pf in _ = Y return Expr _ (SyntaxKind Y) -> sum (RtlExpr Bool * RtlExpr argKind) (RtlExpr argKind) with
                          | eq_refl => fun expr =>
                                         match wc with
-                                        | Some wc' =>
-                                          Some (conditionPair (fst wc') wc'
-                                                              (RtlReadWire Bool (getActionGuard name),
-                                                               convertExprToRtl expr)
-                                               )%rtl_expr
-                                        | None =>
-                                          Some (RtlReadWire Bool (getActionGuard name),
-                                                convertExprToRtl expr
-                                               )%rtl_expr
+                                        | inl wc' =>
+                                          inl (conditionPair (fst wc') wc'
+                                                             (RtlCABool And (RtlReadWire Bool (getActionGuard name) :: RtlReadWire Bool (getActionEn name) :: nil),
+                                                              convertExprToRtl expr)
+                                              )%rtl_expr
+                                        | inr _ =>
+                                          inl (RtlCABool And (RtlReadWire Bool (getActionGuard name) :: RtlReadWire Bool (getActionEn name) :: nil),
+                                               convertExprToRtl expr
+                                              )%rtl_expr
                                         end
                          end expr
-            | right _ => Some (RtlReadWire Bool ("TYPES DONT MATCH FOR METHOD " ++ f, nil),
-                               RtlReadWire _ ("", nil))
+            | right _ => inl (RtlReadWire Bool ("TYPES DONT MATCH FOR METHOD " ++ f, nil),
+                              RtlReadWire _ ("", nil))
             end
           else wc
         end.
@@ -372,11 +373,11 @@ Section Compile.
     map (fun reg =>
            let wc := getRegisterWrites reg a startList in
            match wc with
-           | Some wc' =>
+           | inl wc' =>
              (getRegActionFinalWrite name (fst reg), existT _ (regKind reg)
                                                             (RtlITE (fst wc')%rtl_expr (snd wc')%rtl_expr
                                                                     (RtlReadWire _ (getRegActionRead name (fst reg)))))
-           | None => (getRegActionFinalWrite name (fst reg), existT _ (regKind reg) (RtlReadWire _ (getRegActionRead name (fst reg))))
+           | inr x => (getRegActionFinalWrite name (fst reg), existT _ (regKind reg) (RtlReadWire _ (getRegActionRead name (fst reg))))
            end
         ) regs.
 
@@ -444,18 +445,18 @@ Section ForMeth.
   Variable meth: Attribute Signature.
   Open Scope string.
 
-  Fixpoint getMethEnsOrder (order: list string) : option (RtlExpr Bool * RtlExpr (fst (snd meth))) :=
+  Fixpoint getMethEnsOrder (order: list string) : sum (RtlExpr Bool * RtlExpr (fst (snd meth))) (RtlExpr (fst (snd meth))) :=
     match order with
     | o :: order' => let wc' := getMethEnsOrder order' in
                      match getRule m o with
                      | Some r =>
                        let wm' := getMethEns (fst r) meth (snd r _) (1 :: nil) in
                        match wc', wm' with
-                       | None, None => None
-                       | Some wc'', None => Some wc''
-                       | None, Some wm'' => Some wm''
-                       | Some wc'', Some wm'' =>
-                         Some (conditionPair (fst wc'') wc'' wm'')%rtl_expr
+                       | inr x, inr y => inr x
+                       | inl wc'', inr y => inl wc''
+                       | inr x, inl wm'' => inl wm''
+                       | inl wc'', inl wm'' =>
+                         inl (conditionPair (fst wc'') wc'' wm'')%rtl_expr
                        end
                        (* (RtlITE (wc' @% "valid") wc' *)
                        (*         match getMethEns (fst r) meth (snd r _) (1 :: nil) with *)
@@ -467,29 +468,29 @@ Section ForMeth.
                                | Some r =>
                                  let wm' := getMethEns (fst r) meth (projT2 (snd r) _ (1 :: nil)) (2 :: nil) in
                                  match wc', wm' with
-                                 | None, None => None
-                                 | Some wc'', None => Some wc''
-                                 | None, Some wm'' => Some wm''
-                                 | Some wc'', Some wm'' =>
-                                   Some (conditionPair (fst wc'') wc'' wm'')%rtl_expr
+                                 | inr y, inr z => inr y
+                                 | inl wc'', inr z => inl wc''
+                                 | inr y, inl wm'' => inl wm''
+                                 | inl wc'', inl wm'' =>
+                                   inl (conditionPair (fst wc'') wc'' wm'')%rtl_expr
                                  end
-                               | None => None
+                               | None => inr (RtlConst (getDefaultConst _))
                                end
                      end
-    | nil => (* invalidRtl _ *) None
+    | nil => (* invalidRtl _ *) inr (RtlConst (getDefaultConst _))
     end.
 
   Definition getMethEnsOrderEn order :=
     match getMethEnsOrder order with
-    | None => (getMethEn (fst meth), existT _ Bool (RtlConst false))%rtl_expr
-    | Some vals => (getMethEn (fst meth), existT _ Bool (fst vals))%rtl_expr
+    | inr x => (getMethEn (fst meth), existT _ Bool (RtlConst false))%rtl_expr
+    | inl vals => (getMethEn (fst meth), existT _ Bool (fst vals))%rtl_expr
     end.
     (* (getMethEn (fst meth), existT _ Bool (getMethEnsRules rules @% "valid"))%rtl_expr. *)
 
   Definition getMethEnsOrderArg order :=
     match getMethEnsOrder order with
-    | None => (getMethArg (fst meth), existT _ _ (RtlConst (getDefaultConst (fst (snd meth)))))%rtl_expr
-    | Some vals => (getMethArg (fst meth), existT _ _ (snd vals))%rtl_expr
+    | inr x => (getMethArg (fst meth), existT _ _ x)%rtl_expr
+    | inl vals => (getMethArg (fst meth), existT _ _ (snd vals))%rtl_expr
     end.
     (* (getMethArg (fst meth), existT _ _ (getMethEnsRules rules @% "data"))%rtl_expr. *)
   Close Scope string.
@@ -512,6 +513,8 @@ Definition getSysPerBaseMod m := concat (map getSysPerRule (getRules m) ++ map g
 Definition computeRuleAssigns (r: Attribute (Action Void)) :=
   (getActionGuard (fst r),
    existT _ Bool (convertActionToRtl_guardF (fst r) (snd r (fun _ => list nat)) (1 :: nil)))
+    ::
+    (getActionEn (fst r), existT _ Bool (RtlReadWire Bool (getActionGuard (fst r))))
     ::
     convertActionToRtl_noGuard (fst r) (snd r (fun _ => list nat)) (1 :: nil) (0 :: nil).
 
