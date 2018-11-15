@@ -967,7 +967,7 @@ Lemma prod_dec A B
   forall x y: (A * B), {x = y} + {x <> y}.
 Proof.
   decide equality.
-Qed.
+Defined.
 
 Lemma DisjKey_Commutative A B (l1 l2: list (A * B)): DisjKey l1 l2 -> DisjKey l2 l1.
 Proof.

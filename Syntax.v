@@ -1181,23 +1181,77 @@ Proof.
   destruct s1, s2.
   simpl in *.
   apply prod_dec; simpl; auto; apply isEq.
-Qed.
+Defined.
 
-Lemma sigT_SignT_dec: forall s1 s2: (sigT SignT), {s1 = s2} + {s1 <> s2}.
-Proof.
-  intros.
-  destruct s1, s2.
-  destruct (Signature_dec x x0); subst.
-  - destruct (SignT_dec s s0); subst.
-    + left; reflexivity.
-    + right; intro.
-      apply EqdepFacts.eq_sigT_eq_dep in H.
-      apply (Eqdep_dec.eq_dep_eq_dec (Signature_dec)) in H.
-      tauto.
-  - right; intro.
-    inversion H.
-    tauto.
-Qed.
+(*
+  Asserts that, if the values passed to, and
+  returned by, a method are equal, the Gallina
+  values passed to, and returned by, a method
+  are also equal.
+*)
+Lemma method_values_eq
+  :  forall (s : Signature) (x y : SignT s), existT SignT s x = existT SignT s y -> x = y.
+Proof (Eqdep_dec.inj_pair2_eq_dec Signature Signature_dec SignT).
+            
+(*
+  Asserts that the values passed two and returned
+  by two method calls differ if their signatures
+  differ.
+*)
+Lemma method_values_neq 
+  :  forall (s r : Signature) (x : SignT s) (y : SignT r), s <> r -> existT SignT s x <> existT SignT r y.
+Proof (fun s r x y H H0 => H (projT1_eq H0)).
+
+(*
+  Determines whether or not the Gallina terms
+  passed to, and returned by, two method calls
+  are equal.
+*)
+Definition method_denotation_values_dec
+  :  forall (s : Signature) (x y : SignT s), {x = y} + {x <> y}
+  := fun s => prod_dec (isEq (fst s)) (isEq (snd s)).
+
+(*
+  Determines whether or not the values passed to,
+  and returned by, two method calls that have
+  the same Kami signature are equal.
+*)
+Definition method_values_dec
+  :  forall (s : Signature) (x y : SignT s), {existT SignT s x = existT SignT s y} + {existT SignT s x <> existT SignT s y}
+  := fun s x y
+       => sumbool_rec
+            (fun _ => {existT SignT s x = existT SignT s y} + {existT SignT s x <> existT SignT s y})
+            (fun H : x = y
+              => left
+                   (eq_ind x
+                     (fun z => existT SignT s x = existT SignT s z)
+                     (eq_refl (existT SignT s x))
+                     y H))
+            (fun H : x <> y
+              => right
+                   (fun H0 : existT SignT s x = existT SignT s y
+                     => H (method_values_eq H0)))
+            (method_denotation_values_dec x y).
+
+(*
+  Determines whether or not the values passed to,
+  and returned by, two method calls are equal.
+*)
+Definition sigT_SignT_dec
+  :  forall x y: (sigT SignT), {x = y} + {x <> y}
+  := sigT_rect _
+       (fun (s : Signature) (x : SignT s)
+          => sigT_rect _
+               (fun (r : Signature)
+                 => sumbool_rect _
+                      (fun H : s = r
+                        => eq_rect s
+                             (fun t => forall y : SignT t, {existT SignT s x = existT SignT t y} + {existT SignT s x <> existT SignT t y})
+                             (fun y : SignT s => method_values_dec x y)
+                             r H)
+                      (fun (H : s <> r) (_ : SignT r)
+                        => right (method_values_neq H))
+                      (Signature_dec s r))).
 
 Lemma MethT_dec: forall s1 s2: MethT, {s1 = s2} + {s1 <> s2}.
 Proof.
@@ -1206,7 +1260,7 @@ Proof.
   apply prod_dec.
   - apply string_dec.
   - apply sigT_SignT_dec.
-Qed.
+Defined.
 
 Fixpoint getNumFromCalls (f : MethT) (l : MethsT) : Z :=
   match l with
@@ -1234,6 +1288,74 @@ Fixpoint getNumFromExecs (f : MethT) (l : list RuleOrMeth) : Z :=
 
 Definition getNumExecs (f : MethT) (l : list FullLabel) :=
   getNumFromExecs f (map (fun x => fst (snd x)) l).
+
+Open Scope Z_scope.
+
+Notation PPT_execs := (fun x => fst (snd x)).
+Notation PPT_calls := (fun x => snd (snd x)).
+
+(*
+  Proves that the number of method calls returned
+  by [getNumCalls] is always greater than or
+  equal to 0.
+*)
+Lemma num_method_calls_positive
+  : forall (method : MethT) (labels : list FullLabel),
+      0 <= getNumCalls method labels.
+Proof 
+fun method
+  => list_ind _
+       (ltac:(discriminate) : 0 <= getNumCalls method [])
+       (fun (label : FullLabel) (labels : list FullLabel)
+         (H : 0 <= getNumFromCalls method (concat (map PPT_calls labels)))
+         => list_ind _ H
+              (fun (method0 : MethT) (methods : MethsT)
+                (H0 : 0 <= getNumFromCalls method (methods ++ concat (map PPT_calls labels)))
+                => sumbool_ind
+                     (fun methods_eq
+                       => 0 <=
+                            if methods_eq
+                              then 1 + getNumFromCalls method (methods ++ concat (map PPT_calls labels))
+                              else getNumFromCalls method (methods ++ concat (map PPT_calls labels)))
+                     (fun _ => Z.add_nonneg_nonneg 1 _ (Zle_0_pos 1) H0)
+                     (fun _ => H0)
+                     (MethT_dec method method0))
+              (snd (snd label))).
+
+(*
+  Proves that the number of method executions
+  counted by [getNumExecs] is always greater
+  than or equal to 0.
+*)
+Lemma num_method_execs_positive
+  : forall (method : MethT) (labels : list FullLabel),
+      0 <= getNumExecs method labels.
+Proof
+fun method
+  => list_ind _
+       (ltac:(discriminate) : 0 <= getNumExecs method [])
+       (fun (label : FullLabel) (labels : list FullLabel)
+         (H : 0 <= getNumFromExecs method (map PPT_execs labels))
+         => RuleOrMeth_ind
+              (fun rule_method : RuleOrMeth
+                => 0 <= match rule_method with
+                        | Rle _ => _
+                        | Meth _ => _
+                        end)
+              (fun _ => H)
+              (fun method0 : MethT
+                => sumbool_ind
+                     (fun methods_eq
+                       => 0 <=
+                            if methods_eq
+                              then 1 + getNumFromExecs method (map PPT_execs labels)
+                              else getNumFromExecs method (map PPT_execs labels))
+                     (fun _ => Z.add_nonneg_nonneg 1 _ (Zle_0_pos 1) H)
+                     (fun _ => H)
+                     (MethT_dec method method0))
+              (fst (snd label))).
+
+Close Scope Z_scope.
 
 Definition getListFullLabel_diff (f : MethT) (l : list FullLabel) :=
   ((getNumExecs f l) - (getNumCalls f l))%Z.
@@ -1530,9 +1652,6 @@ Inductive WeakInclusions : list (list FullLabel) -> list (list (FullLabel)) -> P
 Definition PTraceInclusion (m m' : Mod) :=
   forall (o : RegsT) (ls : list (list FullLabel)),
     PTrace m o ls -> exists (ls' : list (list FullLabel)), PTraceList m' ls' /\ WeakInclusions ls ls'.
-
-Notation PPT_execs := (fun x => fst (snd x)).
-Notation PPT_calls := (fun x => snd (snd x)).
 
 Section PPlusTraceInclusion.
 
