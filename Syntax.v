@@ -1937,7 +1937,7 @@ Definition flatten_inline_everything m :=
 
 Definition removeHides (m: BaseModule) s :=
   BaseMod (getRegisters m) (getRules m)
-          (filter (fun df => getBool (in_dec string_dec (fst df) s)) (getMethods m)).
+          (filter (fun df => negb (getBool (in_dec string_dec (fst df) s))) (getMethods m)).
 
 Definition flatten_inline_remove m :=
   removeHides (inlineAll_All_mod m) (getHidden m).
