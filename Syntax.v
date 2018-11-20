@@ -1807,7 +1807,8 @@ Definition concatFlat m1 m2 := BaseMod (getRegisters m1 ++ getRegisters m2)
 Section inlineSingle.
   Variable ty: Kind -> Type.
   Variable f: DefMethT.
-  
+
+  (* not expressible as a module *)
   Fixpoint inlineSingle k (a: ActionT ty k): ActionT ty k :=
     match a with
     | MCall g sign arg cont =>
@@ -1857,6 +1858,9 @@ Proof.
     apply (inlineSingle f (a ty)).
 Defined.
 
+Definition inlineSingle_Rule_map_BaseModule (f : DefMethT) (m : BaseModule) :=
+  BaseMod (getRegisters m) (map (inlineSingle_Rule f) (getRules m)) (getMethods m).
+
 Fixpoint inlineSingle_Rule_in_list (f : DefMethT) (rn : string) (lr : list RuleT) : list RuleT :=
   match lr with
   | rle'::lr' => match string_dec rn (fst rle') with
@@ -1866,6 +1870,7 @@ Fixpoint inlineSingle_Rule_in_list (f : DefMethT) (rn : string) (lr : list RuleT
   | nil => nil
   end.
 
+(* module version of inlineSingle_Rule_in_list *)
 Definition inlineSingle_Rule_BaseModule (f : DefMethT) (rn : string) (m : BaseModule) :=
   BaseMod (getRegisters m) (inlineSingle_Rule_in_list f rn (getRules m)) (getMethods m).
 
@@ -1884,6 +1889,9 @@ Proof.
       apply (inlineSingle f (m ty X)).
 Defined.
 
+Definition inlineSingle_Meth_map_BaseModule (f : DefMethT) (m : BaseModule) :=
+  BaseMod (getRegisters m) (getRules m) (map (inlineSingle_Meth f) (getMethods m)).
+
 Fixpoint inlineSingle_Meth_in_list (f : DefMethT) (gn : string) (lm : list DefMethT) : list DefMethT :=
   match lm with
   | meth'::lm' => match string_dec gn (fst meth') with
@@ -1892,7 +1900,8 @@ Fixpoint inlineSingle_Meth_in_list (f : DefMethT) (gn : string) (lm : list DefMe
                   end
   | nil => nil
   end.
-                                
+
+(* module version of inlineSingle_Meth_in_list *)
 Definition inlineSingle_Meth_BaseModule (f : DefMethT) (fn : string) (m : BaseModule) :=
   BaseMod (getRegisters m) (getRules m) (inlineSingle_Meth_in_list f fn (getMethods m)).
 
@@ -1900,12 +1909,15 @@ Section inlineSingle_nth.
   Variable (f : DefMethT).
   Variable (regs: list RegInitT) (rules: list RuleT) (meths: list DefMethT).
 
+  (* Module version of both inlineSingle_Rule and inlineSingle_Meth *)
   Definition inlineSingle_BaseModule : BaseModule :=
     BaseMod regs (map (inlineSingle_Rule f) rules) (map (inlineSingle_Meth f) meths).
-  
+
+  (* Iterated module version of inlineSingle_Meth *)
   Definition inlineSingle_BaseModule_nth_Meth xs : BaseModule :=
     BaseMod regs rules (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs).
-  
+
+  (* Iterated module version of inlineSingle_Rule *)
   Definition inlineSingle_BaseModule_nth_Rule xs : BaseModule :=
     BaseMod regs (fold_right (transform_nth_right (inlineSingle_Rule f)) rules xs) meths.
 End inlineSingle_nth.
@@ -1918,6 +1930,9 @@ Definition inlineSingle_Rules_pos meths n rules :=
 
 Definition inlineAll_Rules meths rules := fold_left (fun newRules n => inlineSingle_Rules_pos meths n newRules) (0 upto (length meths)) rules.
 
+Definition inlineAll_Rules_mod m :=
+  (BaseMod (getRegisters m) (inlineAll_Rules (getMethods m) (getRules m)) (getMethods m)).
+
 Definition inlineSingle_Meths_pos newMeths n :=
   match nth_error newMeths n with
   | Some f => map (inlineSingle_Meth f) newMeths
@@ -1925,6 +1940,9 @@ Definition inlineSingle_Meths_pos newMeths n :=
   end.
 
 Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (0 upto (length meths)) meths.
+
+Definition inlineAll_Meths_mod m :=
+  (BaseMod (getRegisters m) (getRules m) (inlineAll_Meths (getMethods m))).
 
 Definition inlineAll_All regs rules meths :=
   (BaseMod regs (inlineAll_Rules (inlineAll_Meths meths) rules) (inlineAll_Meths meths)).
