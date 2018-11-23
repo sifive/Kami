@@ -3715,14 +3715,27 @@ Qed.
 Theorem flatten_inline_remove_Wf (m : ModWf) :
   WfMod (flatten_inline_remove m).
 Proof.
-  specialize (wfMod m) as P1.
-  unfold flatten_inline_remove, removeHides; simpl.
-  econstructor; econstructor; simpl in *; intros.
-  - specialize (WfCreateHide_Mod m); unfold flatten_inline_everything, inlineAll_All_mod, inlineAll_All; simpl; intro P2.
-    induction (getHidden m).
-    + inv P2; unfold WfBaseModule in *; dest; simpl in *.
-      specialize (H0 _ H).
-      induction H0; econstructor; eauto.
-    + admit.
-  - admit.
-Admitted.
+  unfold flatten_inline_remove.
+  specialize (TraceInclusion_inlineAll_pos (WfMod_WfBase_getFlat (wfMod m))) as P1; dest.
+  inv H; unfold WfBaseModule in *; dest.
+  econstructor; repeat split; unfold removeHides; simpl in *; intros; eauto.
+  - specialize (H _ H5).
+    unfold inlineAll_All in *.
+    induction H; econstructor; eauto.
+  - rewrite filter_In in H5; dest.
+    specialize (H1 _ H5 v).
+    induction H1; econstructor; eauto.
+  - clear - H2.
+    induction (inlineAll_Meths (getAllMethods m)); simpl; auto.
+    destruct negb.
+    + simpl in *; econstructor; inv H2; auto.
+      intro P1; apply H1.
+      rewrite in_map_iff in P1; dest.
+      rewrite <- H.
+      rewrite filter_In in H0; dest.
+      rewrite in_map_iff; exists x; auto.
+    + inv H2; auto.
+Qed.
+
+Definition flatten_inline_remove_ModWf (m : ModWf) :=
+  (Build_ModWf (flatten_inline_remove_Wf m)).
