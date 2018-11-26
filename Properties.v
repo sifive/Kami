@@ -3846,7 +3846,7 @@ Proof.
 Qed.
 
 
-Section ModularSubstition.
+Section ModularSubstitution.
   Variable a b a' b': Mod.
   Variable SameList_a: forall x, (In x (map fst (getAllMethods a)) /\
                                   ~ In x (getHidden a)) <->
@@ -3860,7 +3860,7 @@ Section ModularSubstition.
   Variable wfAConcatB: WfMod (ConcatMod a b).
   Variable wfA'ConcatB': WfMod (ConcatMod a' b').
 
-  Theorem ModularSubstition: TraceInclusion a a' ->
+  Theorem ModularSubstitution: TraceInclusion a a' ->
                              TraceInclusion b b' ->
                              TraceInclusion (ConcatMod a b) (ConcatMod a' b').
   Proof.
@@ -4013,7 +4013,7 @@ Section ModularSubstition.
         clear - H19 H18 H14.
         firstorder fail.
   Qed.
-End ModularSubstition.
+End ModularSubstitution.
 
 Section Fold.
   Variable k: Kind.

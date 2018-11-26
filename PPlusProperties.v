@@ -3739,3 +3739,134 @@ Qed.
 
 Definition flatten_inline_remove_ModWf (m : ModWf) :=
   (Build_ModWf (flatten_inline_remove_Wf m)).
+
+
+Definition removeMeth (m : BaseModule) (s : string) :=
+  (BaseMod (getRegisters m) (getRules m) ((filter (fun df => (negb (getBool (string_dec (fst df) s))))) (getMethods m))).
+
+Lemma Substeps_removeMeth (f : string) (m : BaseModule) (o : RegsT) (l : list FullLabel):
+  Substeps m o l ->
+  (forall v, getNumCalls (f, v) l = 0%Z) ->
+  (forall v, getNumExecs (f, v) l = 0%Z) ->
+  Substeps (removeMeth m f) o l.
+Proof.
+  induction 1; intros.
+  - econstructor 1; eauto.
+  - rewrite HLabel in *; simpl in *.
+    econstructor; eauto.
+    assert (((u, (Rle rn, cs)) :: ls) = [(u, (Rle rn, cs))]++ls) as TMP; auto.
+    apply IHSubsteps; intros.
+    + specialize (H0 v).
+      rewrite TMP in H0; rewrite getNumCalls_app in H0.
+      specialize (getNumCalls_nonneg (f, v) [(u, (Rle rn, cs))]) as TMP2.
+      specialize (getNumCalls_nonneg (f, v) ls) as TMP3.
+      omega.
+    + specialize (H1 v).
+      rewrite TMP in H1; rewrite getNumExecs_app in H1.
+      specialize (getNumExecs_nonneg (f, v) [(u, (Rle rn, cs))]) as TMP2.
+      specialize (getNumExecs_nonneg (f, v) ls) as TMP3.
+      omega.
+  - rewrite HLabel in *; simpl in *.
+    econstructor 3; eauto.
+    + destruct (string_dec f fn); subst.
+      * exfalso.
+        specialize (H1 (existT SignT (projT1 fb) (argV, retV))).
+        unfold getNumExecs in H1.
+        rewrite map_cons in H1.
+        assert ((fst (snd (u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs)))) = Meth (fn, existT SignT (projT1 fb) (argV, retV))) as TMP; auto; rewrite TMP in H1; clear TMP.
+        rewrite getNumFromExecs_eq_cons in H1; auto.
+        specialize (getNumFromExecs_nonneg (fn, existT SignT (projT1 fb) (argV, retV)) (map PPT_execs ls)) as TMP2.
+        omega.
+      * unfold removeMeth.
+        simpl.
+        rewrite filter_In.
+        split; auto.
+        simpl.
+        destruct (string_dec fn f); auto.
+    + apply IHSubsteps; intros.
+      * specialize (H0 v).
+        rewrite getNumCalls_cons in H0; simpl in H0.
+        specialize (getNumFromCalls_nonneg (f, v) cs) as TMP1.
+        specialize (getNumCalls_nonneg (f, v) ls) as TMP2.
+        omega.
+      * specialize (H1 v).
+        assert (((u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs)) :: ls) = [(u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))] ++ ls) as TMP1; auto.
+        rewrite TMP1 in H1.
+        rewrite getNumExecs_app in H1.
+        specialize (getNumExecs_nonneg (f, v) [(u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))]) as TMP2.
+        specialize (getNumExecs_nonneg (f, v) ls) as TMP3.
+        omega.
+Qed.
+
+Lemma Step_removeMeth (f : string) (m : BaseModule) (o : RegsT) (l : list FullLabel) :
+  Step m o l ->
+  (forall v, getNumCalls (f, v) l = 0%Z) ->
+  (forall v, getNumExecs (f, v) l = 0%Z) ->
+  Step (removeMeth m f) o l.
+Proof.
+  intros.
+  inv H.
+  econstructor; eauto using Substeps_removeMeth.
+  unfold MatchingExecCalls_Base in *; simpl.
+  intros.
+  specialize (HMatching f0).
+  rewrite in_map_iff in H; dest.
+  rewrite filter_In in H2; dest.
+  rewrite <- H in HMatching.
+  apply (in_map fst) in H2.
+  auto.
+Qed.
+
+Lemma Step_HideMeth_removeMeth_noCalls (f : string) (m : BaseModule) (o : RegsT) (l : list FullLabel) (wfMod : WfMod m):
+  Step (HideMeth m f) o l ->
+  (forall v, getNumCalls (f, v) l = 0%Z) ->
+  Step (removeMeth m f) o l.
+Proof.
+  intros.
+  destruct (in_dec string_dec f (map fst (getMethods m))).
+  - inv H.
+    specialize (HHidden i).
+    apply Step_removeMeth; auto.
+    intro; specialize (HHidden v); specialize (H0 v).
+    unfold getListFullLabel_diff in HHidden.
+    rewrite H0 in HHidden.
+    omega.
+  - inv H.
+    unfold removeMeth.
+    rewrite filter_true_list.
+    + apply Step_substitute in HStep; auto.
+    + intros.
+      destruct (string_dec (fst a) f).
+      * exfalso.
+        apply (in_map fst) in H; rewrite e in H.
+        tauto.
+      * simpl; reflexivity.
+Qed.
+
+Lemma Trace_HideMeth_removeMeth_noCalls (f : string) (m : BaseModule) (o : RegsT) (ls : list (list FullLabel)) (wfMod : WfMod m) :
+  Trace (HideMeth m f) o ls ->
+  (forall l, In l ls -> forall v, getNumCalls (f, v) l = 0%Z) ->
+  Trace (removeMeth m f) o ls.
+Proof.
+  induction 1; subst; intros.
+  - econstructor 1; eauto.
+  - econstructor 2; eauto.
+    eapply IHTrace.
+    intros.
+    eapply H0.
+    right; assumption.
+    apply Step_HideMeth_removeMeth_noCalls; auto.
+    intros.
+    eapply H0; left; reflexivity.
+Qed.
+
+Lemma flatten_inline_remove_TraceInclusion (m : ModWf) :
+  TraceInclusion (flatten_inline_everything m) (flatten_inline_remove_ModWf m).
+Proof.
+  simpl; unfold flatten_inline_everything, flatten_inline_remove.
+  induction (getHidden m); simpl.
+  - unfold removeHides; simpl.
+    rewrite filter_true_list; auto; unfold inlineAll_All_mod, inlineAll_All.
+    apply TraceInclusion_refl.
+  - admit.
+Admitted.
