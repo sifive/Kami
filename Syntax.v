@@ -2207,6 +2207,17 @@ Notation "'LETE' name : t <- expr ; cont " :=
 Notation "'RetE' expr" :=
   (NormExpr expr%kami_expr) (at level 12) : kami_expr_scope.
 
+Notation "k ## ty" := (LetExprSyntax ty k) (no associativity, at level 98, only parsing).
+
+Notation "'LETC' name <- v ; c " :=
+  (LETE name <- RetE v ; c)%kami_expr
+                           (at level 12, right associativity, name at level 99) : kami_expr_scope.
+
+Notation "'LETC' name : t <- v ; c " :=
+  (LETE name : t <- RetE v ; c)%kami_expr
+                               (at level 12, right associativity, name at level 99) : kami_expr_scope.
+
+
 Delimit Scope kami_action_scope with kami_action.
 
 Local Open Scope kami_action.
