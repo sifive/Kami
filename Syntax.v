@@ -2477,7 +2477,7 @@ Definition Pair (A B: Kind) := (STRUCT {
 Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_expr
     (at level 100, only parsing) : kami_expr_scope.
 
-Notation "'Invalid'" := (STRUCT { "valid" ::= $$ false ; "data" ::= getDefaultConst _ })%kami_expr
+Notation "'Invalid'" := (STRUCT { "valid" ::= $$ false ; "data" ::= $$ (getDefaultConst _) })%kami_expr
     (at level 100, only parsing) : kami_expr_scope.
 
 Definition WriteRegFile n dataT := STRUCT {
@@ -2491,8 +2491,5 @@ Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_
  * Kami Rewrite
    + Inlining Theorem (moderate)
    + Compiler verification (difficult)
- * Verify FPU
-   + Write Spec in a generic manner
-   + Use Word library to prove things.
  * PUAR: Linux/Certikos
  *)
