@@ -2495,7 +2495,7 @@ Definition Pair (A B: Kind) := (STRUCT {
 Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_expr
     (at level 100, only parsing) : kami_expr_scope.
 
-Definition Invalid (ty: Kind -> Type) k := (STRUCT { "valid" ::= $$ false ; "data" ::= $$ (getDefaultConst k) })%kami_expr.
+Definition Invalid {ty: Kind -> Type} {k} := (STRUCT { "valid" ::= $$ false ; "data" ::= $$ (getDefaultConst k) })%kami_expr.
 
 Definition WriteRegFile n dataT := STRUCT {
                                        "addr" :: Bit (Nat.log2_up n);
