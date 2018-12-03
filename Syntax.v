@@ -200,6 +200,24 @@ Section Phoas.
         end; abstract Omega.omega.
     Defined.
 
+    Definition ZeroExtendTruncMsb ni no (e: Expr (SyntaxKind (Bit ni))):
+      Expr (SyntaxKind (Bit no)).
+      refine
+        match Compare_dec.lt_dec ni no with
+        | left isLt => castBits _ (@ZeroExtend (no - ni) ni e)
+        | right isGe => UniBit (TruncMsb (ni - no) no) (castBits _ e)
+        end; abstract lia.
+    Defined.
+
+    Definition SignExtendTruncMsb ni no (e: Expr (SyntaxKind (Bit ni))):
+      Expr (SyntaxKind (Bit no)).
+      refine
+        match Compare_dec.lt_dec ni no with
+        | left isLt => castBits _ (@SignExtend ni (no - ni) e)
+        | right isGe => UniBit (TruncMsb (ni - no) no) (castBits _ e)
+        end; abstract Omega.omega.
+    Defined.
+
     Fixpoint countLeadingZeros ni no: Expr (SyntaxKind (Bit ni)) -> Expr (SyntaxKind (Bit no)).
     refine
       match ni return Expr (SyntaxKind (Bit ni)) -> Expr (SyntaxKind (Bit no)) with
@@ -2477,8 +2495,7 @@ Definition Pair (A B: Kind) := (STRUCT {
 Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_expr
     (at level 100, only parsing) : kami_expr_scope.
 
-Notation "'Invalid'" := (STRUCT { "valid" ::= $$ false ; "data" ::= $$ (getDefaultConst _) })%kami_expr
-    (at level 100, only parsing) : kami_expr_scope.
+Definition Invalid (ty: Kind -> Type) k := (STRUCT { "valid" ::= $$ false ; "data" ::= $$ (getDefaultConst k) })%kami_expr.
 
 Definition WriteRegFile n dataT := STRUCT {
                                        "addr" :: Bit (Nat.log2_up n);
@@ -2486,6 +2503,15 @@ Definition WriteRegFile n dataT := STRUCT {
 
 Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_expr
     (at level 100, only parsing) : kami_expr_scope.
+
+
+Definition extractArbitraryRange ty sz (inst: Bit sz ## ty) (range: nat * nat):
+  Bit (fst range + 1 - snd range) ## ty :=
+  (LETE i <- inst ;
+     RetE (ConstExtract (snd range) (fst range + 1 - snd range) (sz - 1 - fst range)
+                        (ZeroExtendTruncLsb _ #i)))%kami_expr.
+   
+
 
 (*
  * Kami Rewrite
