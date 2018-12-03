@@ -3742,7 +3742,7 @@ Definition flatten_inline_remove_ModWf (m : ModWf) :=
 
 
 Definition removeMeth (m : BaseModule) (s : string) :=
-  (BaseMod (getRegisters m) (getRules m) ((filter (fun df => (negb (getBool (string_dec (fst df) s))))) (getMethods m))).
+  (BaseMod (getRegisters m) (getRules m) ((filter (fun df => (negb (getBool (string_dec s (fst df)))))) (getMethods m))).
 
 Lemma Substeps_removeMeth (f : string) (m : BaseModule) (o : RegsT) (l : list FullLabel):
   Substeps m o l ->
@@ -3782,7 +3782,7 @@ Proof.
         rewrite filter_In.
         split; auto.
         simpl.
-        destruct (string_dec fn f); auto.
+        destruct (string_dec); auto.
     + apply IHSubsteps; intros.
       * specialize (H0 v).
         rewrite getNumCalls_cons in H0; simpl in H0.
@@ -3796,6 +3796,18 @@ Proof.
         specialize (getNumExecs_nonneg (f, v) [(u, (Meth (fn, existT SignT (projT1 fb) (argV, retV)), cs))]) as TMP2.
         specialize (getNumExecs_nonneg (f, v) ls) as TMP3.
         omega.
+Qed.
+
+Lemma Substeps_HideMeth (f : string) (m : BaseModule) (o :RegsT) (l : list FullLabel) :
+  Substeps (removeMeth m f) o l ->
+  Substeps m o l.
+Proof.
+  induction 1.
+  - econstructor 1; eauto.
+  - subst; econstructor 2; eauto.
+  - subst; econstructor 3; eauto.
+    simpl in HInMeths.
+    rewrite filter_In in HInMeths; destruct HInMeths; auto.
 Qed.
 
 Lemma Step_removeMeth (f : string) (m : BaseModule) (o : RegsT) (l : list FullLabel) :
@@ -3817,6 +3829,40 @@ Proof.
   auto.
 Qed.
 
+Lemma Step_removeMeth_HideMeth_noCalls (f : string) (m : BaseModule) (o : RegsT) (l : list FullLabel) :
+  Step (removeMeth m f) o l ->
+  (forall v, getNumCalls (f, v) l = 0%Z) ->
+  Step (HideMeth m f) o l.
+Proof.
+  intros; inv H.
+  econstructor.
+  - econstructor.
+    + eapply Substeps_HideMeth; eauto.
+    + intros f0 P1.
+      specialize (HMatching f0); simpl in *.
+      destruct (string_dec f (fst f0)); subst.
+      * destruct f0; simpl in *; rewrite H0.
+        apply getNumExecs_nonneg.
+      * rewrite (in_map_iff) in P1; inv P1; inv H.
+        assert (In x (filter (fun df : string * {x : Signature & MethodT x} =>
+                                negb (getBool (string_dec f (fst df)))) (getMethods m))).
+        -- rewrite filter_In; split; auto.
+           destruct (string_dec f (fst x)); simpl; auto.
+           exfalso.
+           rewrite H1 in e; tauto.
+        -- apply (in_map fst) in H; rewrite H1 in H.
+           eauto.
+  - intros.
+    unfold getListFullLabel_diff; rewrite H0.
+    assert (~In f (map fst (getMethods (removeMeth m f)))).
+    + intro; rewrite in_map_iff in H1; inv H1; inv H2.
+      simpl in H3; rewrite filter_In in H3; inv H3.
+      destruct string_dec; simpl in *;[discriminate|].
+      apply n; reflexivity.
+    + rewrite in_map_iff in H; inv H; inv H2.
+      rewrite (NotInDef_ZeroExecs_Substeps (fst x, v) H1 HSubsteps); simpl; reflexivity.
+Qed.
+
 Lemma Step_HideMeth_removeMeth_noCalls (f : string) (m : BaseModule) (o : RegsT) (l : list FullLabel) (wfMod : WfMod m):
   Step (HideMeth m f) o l ->
   (forall v, getNumCalls (f, v) l = 0%Z) ->
@@ -3836,9 +3882,9 @@ Proof.
     rewrite filter_true_list.
     + apply Step_substitute in HStep; auto.
     + intros.
-      destruct (string_dec (fst a) f).
+      destruct (string_dec).
       * exfalso.
-        apply (in_map fst) in H; rewrite e in H.
+        apply (in_map fst) in H; rewrite <- e in H.
         tauto.
       * simpl; reflexivity.
 Qed.
@@ -3860,13 +3906,299 @@ Proof.
     eapply H0; left; reflexivity.
 Qed.
 
-Lemma flatten_inline_remove_TraceInclusion (m : ModWf) :
+Lemma Trace_removeMeth_HideMeth_noCalls (f : string) (m : BaseModule) (o : RegsT) (ls : list (list FullLabel)) (wfMod : WfMod m) :
+  Trace (removeMeth m f) o ls ->
+  (forall l, In l ls -> forall v, getNumCalls (f, v) l = 0%Z) ->
+  Trace (HideMeth m f) o ls.
+Proof.
+  induction 1; subst; intros.
+  - econstructor 1; eauto.
+  - econstructor 2; eauto.
+    + eapply IHTrace; intros.
+      eapply H0; right; assumption.
+    + apply Step_removeMeth_HideMeth_noCalls; auto.
+      intros; apply H0; left; reflexivity.
+Qed.
+
+Lemma NoSelfCallBaseModule_Substeps f m o l:
+  NoSelfCallBaseModule m ->
+  Substeps m o l ->
+  In f (map fst (getMethods m)) ->
+  (forall v, getNumCalls (f, v) l = 0%Z).
+Proof.
+  induction 2; intros.
+  - apply getNumCalls_nil.
+  - rewrite HLabel in *.
+    rewrite getNumCalls_cons; simpl in *.
+    rewrite (IHSubsteps H1).
+    rewrite (NoSelfCallRule_Impl _ H HInRules HAction (f, v) H1).
+    simpl; reflexivity.
+  - rewrite HLabel in *.
+    rewrite getNumCalls_cons; simpl in *.
+    rewrite (IHSubsteps H1).
+    rewrite (NoSelfCallMeth_Impl _ H HInMeths argV HAction (f, v) H1).
+    simpl; reflexivity.
+Qed.
+
+Lemma NoSelfCallBaseModule_Step f m o l:
+  NoSelfCallBaseModule m ->
+  Step m o l ->
+  In f (map fst (getMethods m)) ->
+  (forall v, getNumCalls (f, v) l = 0%Z).
+Proof.
+  intros; inv H0.
+  eapply NoSelfCallBaseModule_Substeps; eauto.
+Qed.
+
+Lemma NoSelfCallBaseModule_Trace f m o ls :
+  NoSelfCallBaseModule m ->
+  Trace m o ls ->
+  In f (map fst (getMethods m)) ->
+  (forall l, In l ls -> forall v, getNumCalls (f, v) l = 0%Z).
+Proof.
+  induction 2; subst; simpl in *; intros.
+  - contradiction.
+  - destruct H2; subst.
+    + eapply NoSelfCallBaseModule_Step; eauto.
+    + eapply IHTrace; eauto.
+Qed.
+
+Lemma NoSelfCallBaseModule_TraceHide f (m : BaseModuleWf) o ls :
+  NoSelfCallBaseModule m ->
+  Trace (HideMeth m f) o ls ->
+  Trace (removeMeth m f) o ls.
+Proof.
+  destruct (in_dec string_dec f (map fst (getMethods m))).
+  - intros.
+    apply Trace_HideMeth_removeMeth_noCalls; auto.
+    + constructor; apply wfBaseModule.
+    + intros.
+      specialize (TraceHide_Trace H0) as P1.
+      eapply NoSelfCallBaseModule_Trace; eauto.
+  - intros.
+    apply TraceHide_Trace in H0.
+    unfold removeMeth; simpl.
+    rewrite filter_true_list.
+    + apply (Trace_flatten_same1 m H0).
+    + intros; destruct string_dec; subst.
+      * exfalso; apply n; apply (in_map fst) in H1; assumption.
+      * simpl; reflexivity.
+Qed.
+
+Lemma SubstepsRemove_Substeps m o s l :
+  Substeps (removeMeth m s) o l -> Substeps m o l.
+Proof.
+  induction 1.
+  - econstructor 1; eauto.
+  - rewrite HLabel; econstructor 2; eauto.
+  - rewrite HLabel; econstructor 3; eauto.
+    simpl in HInMeths.
+    rewrite filter_In in HInMeths; inv HInMeths; auto.
+Qed.
+
+Lemma StepRemove_Step m o s l :
+  (forall v, getNumCalls (s, v) l = 0%Z) ->
+  Step (removeMeth m s) o l ->
+  Step m o l.
+Proof.
+  intros; inv H0.
+  econstructor; eauto using SubstepsRemove_Substeps.
+  intros f P1.
+  destruct (string_dec s (fst f)); subst.
+  - destruct f; simpl in *.
+    rewrite H.
+    apply getNumExecs_nonneg.
+  - assert (In (fst f) (map fst (getMethods (removeMeth m s)))).
+    + simpl; rewrite in_map_iff in *.
+      inv P1; inv H0.
+      exists x; split; auto.
+      rewrite filter_In; split; auto.
+      destruct string_dec; simpl; auto.
+      exfalso; apply n.
+      rewrite e; auto.
+    + apply HMatching; auto.
+Qed.
+    
+Lemma removeMeth_removeHides m f :
+  (getMethods (removeMeth m f)) = (getMethods (removeHides m [f])).
+Proof.
+  simpl.
+  induction (getMethods m); simpl; auto.
+  - destruct string_dec; simpl; auto.
+    rewrite IHl; reflexivity.
+Qed.
+
+Lemma removeHides_cons m f l:
+  (getMethods (removeHides m (f::l))) = (getMethods (removeHides (removeHides m l) [f])).
+Proof.
+  simpl.
+  induction (getMethods m); simpl; auto.
+  destruct string_dec; subst; simpl.
+  - repeat rewrite IHl0; simpl.
+    destruct (in_dec string_dec (fst a) l); simpl in *; auto.
+    destruct (string_dec); simpl; auto.
+    exfalso; auto.
+  - repeat rewrite IHl0; simpl.
+    destruct (in_dec string_dec (fst a) l); simpl in *; auto.
+    destruct string_dec; auto.
+    exfalso; auto.
+Qed.
+
+Lemma removeMeth_removeHides_cons m f l:
+  (getMethods (removeHides m (f::l)) = (getMethods (removeMeth (removeHides m l) f))).
+Proof.
+  rewrite removeHides_cons.
+  rewrite removeMeth_removeHides.
+  reflexivity.
+Qed.
+
+Lemma removeHidesWfActionT (m : BaseModule)(k : Kind) (a : ActionT type k) (l : list string):
+  WfActionT m a ->
+  WfActionT (removeHides m l) a.
+Proof.
+  induction 1; econstructor; eauto.
+Qed.
+
+Lemma NoDup_filtered_keys {B : Type} (l : list (string*B)) (f : (string*B) -> bool):
+  NoDup (map fst l) -> NoDup (map fst (filter f l)).
+Proof.
+  induction l; intros; auto.
+  inv H; simpl; destruct (f a); eauto.
+  simpl; constructor; eauto.
+  intro; apply H2.
+  rewrite in_map_iff in *.
+  destruct H; destruct H; subst.
+  rewrite filter_In in H0; destruct H0.
+  eauto.
+Qed.
+
+Lemma removeHidesWf (m : BaseModule) (l : list string):
+  WfBaseModule m ->
+  WfBaseModule (removeHides m l).
+Proof.
+  intros.
+  inv H; inv H1; inv H2; inv H3.
+  repeat split; intros; auto.
+  - specialize (H0 _ H3).
+    apply removeHidesWfActionT; assumption.
+  - simpl in H3.
+    rewrite (filter_In) in H3; inv H3.
+    specialize (H _ H5 v).
+    apply removeHidesWfActionT; auto.
+  - simpl.
+    apply NoDup_filtered_keys; auto.
+Qed.
+
+Lemma removeMethWf (m : BaseModule) (f : string) :
+  WfBaseModule m ->
+  WfBaseModule (removeMeth m f).
+Proof.
+  intros.
+  specialize (WfMod_WfBaseMod_flat (BaseWf (removeHidesWf [f] H))) as P1.
+  unfold getFlat in P1.
+  assert (getAllMethods (removeHides m [f]) = getMethods (removeHides m [f])) as P2; auto.
+  rewrite P2 in P1.
+  rewrite <- removeMeth_removeHides in P1.
+  unfold removeMeth; simpl in P1; assumption.
+Qed.
+
+Definition removeHidesModWf (m : BaseModuleWf) (l : list string) :=
+  Build_BaseModuleWf (removeHidesWf l (wfBaseModule m)).
+
+Lemma HideMeth_removeMeth_TraceInclusion_r (m : BaseModuleWf) (f : string):
+  NoSelfCallBaseModule m ->
+  TraceInclusion (HideMeth m f) (removeMeth m f).
+Proof.
+  repeat intro.
+  exists o1, ls1; repeat split; auto.
+  apply NoSelfCallBaseModule_TraceHide; auto.
+  apply (WeakInclusions_WeakInclusion (WeakInclusionsRefl ls1)).
+Qed.
+
+Lemma NoSelfCallBaseModule_removeHides (m : BaseModule) (l : list string) :
+  NoSelfCallBaseModule m ->
+  NoSelfCallBaseModule (removeHides m l).
+Proof.
+  unfold NoSelfCallBaseModule; intros; inv H; split.
+  - repeat intro.
+    specialize (H0 _ H).
+    induction H0; econstructor; eauto.
+    simpl; intro.
+    apply H0.
+    rewrite in_map_iff in *; inv H4; inv H5.
+    rewrite filter_In in H6; inv H6.
+    exists x; auto.
+  - repeat intro.
+    simpl in *; rewrite filter_In in H; inv H.
+    specialize (H1 _ H2 arg).
+    induction H1; econstructor; eauto.
+    intro; apply H.
+    rewrite in_map_iff in *; inv H5; inv H6.
+    rewrite filter_In in H7; inv H7.
+    exists x; auto.
+Qed.
+
+Lemma NoSelfCallBaseModule_removeMeth (m : BaseModule) (f : string) :
+  NoSelfCallBaseModule m ->
+  NoSelfCallBaseModule (removeMeth m f).
+Proof.
+  intros; inv H.
+  split; repeat intro.
+  - specialize (H0 _ H).
+    induction H0; econstructor; eauto.
+    intro; apply H0.
+    rewrite in_map_iff in *.
+    inv H4; inv H5.
+    exists x; split; auto.
+    simpl in H6; rewrite filter_In in H6; inv H6.
+    destruct string_dec; simpl in *;[discriminate|auto].
+  - assert (In meth (getMethods m)).
+    + simpl in *; rewrite filter_In in H; inv H; auto.
+    + specialize (H1 _ H2 arg).
+      induction H1; econstructor; eauto.
+      intro; apply H1.
+      rewrite in_map_iff in *; inv H5; inv H6.
+      exists x; split; auto.
+      simpl in *; rewrite filter_In in H7.
+      inv H7; auto.
+Qed.  
+
+Lemma removeHides_removeMeth_TraceInclusion m l a :
+  TraceInclusion (removeMeth (removeHidesModWf m l) a) (removeHidesModWf m (a::l)).
+Proof.
+  specialize (TraceInclusion_flatten_r (Build_ModWf (BaseWf (removeMethWf a (wfBaseModule (removeHidesModWf m l)))))) as P1.
+  simpl in *; unfold flatten, getFlat in *; simpl in *.
+  specialize (removeMeth_removeHides_cons m a l) as P2; simpl in *.
+  rewrite <- P2 in P1.
+  unfold removeMeth, removeHides in *; simpl in *.
+  assumption.
+Qed.
+
+Theorem createHide_removeHides_TraceInclusion_r (m : BaseModuleWf) (l : list string):
+  NoSelfCallBaseModule m ->
+  TraceInclusion (createHide m l) (removeHides m l).
+Proof.
+  induction l; simpl; intros.
+  - unfold removeHides; simpl.
+    rewrite filter_true_list; simpl; auto.
+    specialize (TraceInclusion_flatten_r m) as P1.
+    simpl in *; unfold flatten, getFlat in *; simpl in *.
+    apply P1.
+  - specialize (TraceInclusion_TraceInclusion' (IHl H)) as P1.
+    specialize (TraceInclusion'_TraceInclusion (TraceInclusion_createHide P1 (s:= a))) as P2; clear P1.
+    specialize (HideMeth_removeMeth_TraceInclusion_r (removeHidesModWf m l) (f:=a) (NoSelfCallBaseModule_removeHides l H)) as P1.
+    specialize (removeHides_removeMeth_TraceInclusion) as P3; specialize (P3 m l a).
+    eauto using TraceInclusion_trans.
+Qed.
+      
+Theorem flatten_inline_remove_TraceInclusion (m : ModWf) :
+  NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_everything m) (flatten_inline_remove_ModWf m).
 Proof.
   simpl; unfold flatten_inline_everything, flatten_inline_remove.
-  induction (getHidden m); simpl.
-  - unfold removeHides; simpl.
-    rewrite filter_true_list; auto; unfold inlineAll_All_mod, inlineAll_All.
-    apply TraceInclusion_refl.
-  - admit.
-Admitted.
+  intros.
+  specialize (WfMod_WfBase_getFlat (wfMod m)) as P1; unfold getFlat in *.
+  specialize (TraceInclusion_inlineAll_pos P1) as P2; inv P2.
+  inv H0.
+  apply (createHide_removeHides_TraceInclusion_r (Build_BaseModuleWf HWfBaseModule) (getHidden m) H).
+Qed.
