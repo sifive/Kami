@@ -4018,7 +4018,85 @@ Proof.
       rewrite e; auto.
     + apply HMatching; auto.
 Qed.
-    
+
+Lemma TraceRemove_Trace m o s ls :
+  (forall l, In l ls -> forall v, getNumCalls (s, v) l = 0%Z) ->
+  Trace (removeMeth m s) o ls ->
+  Trace m o ls.
+Proof.
+  intros.
+  induction H0; subst.
+  - econstructor 1; eauto.
+  - econstructor 2; eauto.
+    + apply IHTrace.
+      intros; apply H.
+      right; assumption.
+    + eapply (StepRemove_Step); eauto.
+      eapply H.
+      left; reflexivity.
+Qed.
+
+Lemma Substeps_NoSelfCallBaseModule_Remove m o s l :
+  In s (map fst (getMethods m)) ->
+  NoSelfCallBaseModule m ->
+  Substeps (removeMeth m s) o l ->
+  (forall v, getNumCalls (s, v) l = 0%Z).
+Proof.
+  intros.
+  apply SubstepsRemove_Substeps in H1.
+  eapply NoSelfCallBaseModule_Substeps; eauto.
+Qed.
+
+Lemma Step_NoSelfCallBaseModule_Remove m o s l :
+  In s (map fst (getMethods m)) ->
+  NoSelfCallBaseModule m ->
+  Step (removeMeth m s) o l ->
+  (forall v, getNumCalls (s, v) l = 0%Z).
+Proof.
+  intros.
+  inv H1.
+  eapply Substeps_NoSelfCallBaseModule_Remove; eauto.
+Qed.
+
+Lemma Trace_NoSelfCallBaseModule_Remove m o s ls :
+  In s (map fst (getMethods m)) ->
+  NoSelfCallBaseModule m ->
+  Trace (removeMeth m s) o ls ->
+  (forall l, In l ls -> forall v, getNumCalls (s, v) l = 0%Z).
+Proof.
+  intros.
+  induction H1; subst.
+  - destruct H2.
+  - destruct H2; subst.
+    + eapply Step_NoSelfCallBaseModule_Remove; eauto.
+    + apply IHTrace; auto.
+Qed.
+
+Lemma Trace_NoSelfCallBaseModule_Remove_Hide m o s ls :
+  In s (map fst (getMethods m)) ->
+  NoSelfCallBaseModule m ->
+  Trace (removeMeth m s) o ls ->
+  Trace (HideMeth m s) o ls.
+Proof.
+  intros.
+  apply Trace_TraceHide.
+  - eapply TraceRemove_Trace; eauto.
+    eapply Trace_NoSelfCallBaseModule_Remove; eauto.
+  - intros; unfold getListFullLabel_diff.
+    rewrite (Trace_NoSelfCallBaseModule_Remove H H0 H1 _ H2 v).
+    specialize (In_nth_error _ _ H2) as P1. destruct P1 as [n P2].
+    erewrite (NotInDef_ZeroExecs_Trace); simpl; auto.
+    + apply H1.
+    + simpl; intro P1.
+      rewrite in_map_iff in P1.
+      inv P1; inv H4.
+      rewrite filter_In in H6; inv H6.
+      destruct string_dec; simpl in *.
+      * discriminate.
+      * apply n0; reflexivity.
+    + apply P2.
+Qed.
+
 Lemma removeMeth_removeHides m f :
   (getMethods (removeMeth m f)) = (getMethods (removeHides m [f])).
 Proof.
@@ -4105,7 +4183,7 @@ Qed.
 Definition removeHidesModWf (m : BaseModuleWf) (l : list string) :=
   Build_BaseModuleWf (removeHidesWf l (wfBaseModule m)).
 
-Lemma HideMeth_removeMeth_TraceInclusion_r (m : BaseModuleWf) (f : string):
+Lemma HideMeth_removeMeth_TraceInclusion (m : BaseModuleWf) (f : string):
   NoSelfCallBaseModule m ->
   TraceInclusion (HideMeth m f) (removeMeth m f).
 Proof.
@@ -4113,6 +4191,17 @@ Proof.
   exists o1, ls1; repeat split; auto.
   apply NoSelfCallBaseModule_TraceHide; auto.
   apply (WeakInclusions_WeakInclusion (WeakInclusionsRefl ls1)).
+Qed.
+
+Lemma removeMeth_HideMeth_TraceInclusion (m : BaseModuleWf) (f : string):
+  NoSelfCallBaseModule m ->
+  In f (map fst (getMethods m)) ->
+  TraceInclusion (removeMeth m f) (HideMeth m f).
+Proof.
+  repeat intro.
+  exists o1, ls1; repeat split.
+  - apply Trace_NoSelfCallBaseModule_Remove_Hide; auto.
+  - apply WeakInclusions_WeakInclusion; apply WeakInclusionsRefl.
 Qed.
 
 Lemma NoSelfCallBaseModule_removeHides (m : BaseModule) (l : list string) :
@@ -4174,7 +4263,47 @@ Proof.
   assumption.
 Qed.
 
-Theorem createHide_removeHides_TraceInclusion_r (m : BaseModuleWf) (l : list string):
+Lemma removeMeth_removeHides_TraceInclusion m l a :
+  TraceInclusion (removeHidesModWf m (a::l)) (removeMeth (removeHidesModWf m l) a).
+Proof.
+  specialize (TraceInclusion_flatten_l (Build_ModWf (BaseWf (removeMethWf a (wfBaseModule (removeHidesModWf m l)))))) as P1.
+  simpl in *; unfold flatten, getFlat in *; simpl in *.
+  specialize (removeMeth_removeHides_cons m a l) as P2; simpl in *.
+  rewrite <- P2 in P1.
+  unfold removeMeth, removeHides in *; simpl in *.
+  assumption.
+Qed.
+
+Theorem removeHides_createHide_TraceInclusion (m : BaseModuleWf) (l : list string):
+  NoSelfCallBaseModule m ->
+  SubList l (map fst (getMethods m)) ->
+  NoDup l ->
+  TraceInclusion (removeHides m l) (createHide m l).
+Proof.
+  induction l; simpl; intros.
+  - unfold removeHides; simpl.
+    rewrite filter_true_list; simpl; auto.
+    specialize (TraceInclusion_flatten_l m) as P1.
+    simpl in *; unfold flatten, getFlat in *; simpl in *.
+    assumption.
+  - specialize (removeMeth_removeHides_TraceInclusion (m:=m) (l:=l) (a:=a)) as P1.
+    assert (SubList l (map fst (getMethods m)));[repeat intro; apply (H0 x (in_cons a _ _ H2))|].
+    inv H1.
+    specialize (TraceInclusion_TraceInclusion' (IHl H H2 H6)) as P2.
+    specialize (TraceInclusion'_TraceInclusion (TraceInclusion_createHide P2 (s:=a))) as P3; clear P2.
+    assert (In a (map fst (getMethods (removeHidesModWf m l)))) as P4.
+    + simpl; rewrite in_map_iff.
+      specialize (H0 _ (in_eq _ _)).
+      rewrite in_map_iff in H0.
+      inv H0; inv H1.
+      exists x; split; auto.
+      rewrite filter_In; split; auto.
+      destruct in_dec; simpl; auto.
+    + specialize (removeMeth_HideMeth_TraceInclusion (removeHidesModWf m l) (NoSelfCallBaseModule_removeHides l H) (f:= a) P4) as P5.
+      eauto using TraceInclusion_trans.
+Qed.
+
+Theorem createHide_removeHides_TraceInclusion (m : BaseModuleWf) (l : list string):
   NoSelfCallBaseModule m ->
   TraceInclusion (createHide m l) (removeHides m l).
 Proof.
@@ -4186,7 +4315,7 @@ Proof.
     apply P1.
   - specialize (TraceInclusion_TraceInclusion' (IHl H)) as P1.
     specialize (TraceInclusion'_TraceInclusion (TraceInclusion_createHide P1 (s:= a))) as P2; clear P1.
-    specialize (HideMeth_removeMeth_TraceInclusion_r (removeHidesModWf m l) (f:=a) (NoSelfCallBaseModule_removeHides l H)) as P1.
+    specialize (HideMeth_removeMeth_TraceInclusion (removeHidesModWf m l) (f:=a) (NoSelfCallBaseModule_removeHides l H)) as P1.
     specialize (removeHides_removeMeth_TraceInclusion) as P3; specialize (P3 m l a).
     eauto using TraceInclusion_trans.
 Qed.
@@ -4200,5 +4329,5 @@ Proof.
   specialize (WfMod_WfBase_getFlat (wfMod m)) as P1; unfold getFlat in *.
   specialize (TraceInclusion_inlineAll_pos P1) as P2; inv P2.
   inv H0.
-  apply (createHide_removeHides_TraceInclusion_r (Build_BaseModuleWf HWfBaseModule) (getHidden m) H).
+  apply (createHide_removeHides_TraceInclusion (Build_BaseModuleWf HWfBaseModule) (getHidden m) H).
 Qed.
