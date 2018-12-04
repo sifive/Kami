@@ -4274,10 +4274,61 @@ Proof.
   assumption.
 Qed.
 
+Lemma createHide_Step_In m l a o ls:
+  In a l ->
+  Step (createHide m l) o ls ->
+  (In a (map fst (getAllMethods m)) ->
+   forall v, getListFullLabel_diff (a, v) ls = 0%Z).
+Proof.
+  induction l; simpl; [tauto|].
+  intros.
+  destruct H; subst; inv H0; auto.
+  apply HHidden.
+  rewrite createHide_Meths; assumption.
+Qed.
+
+Lemma createHide_idempotent m l a :
+  In a l ->
+  TraceInclusion (createHide m l) (HideMeth (createHide m l) a).
+Proof.
+  repeat intro.
+  exists o1, ls1.
+  repeat split; auto.
+  - induction H0; subst.
+    + econstructor; eauto.
+    + econstructor 2; eauto.
+      econstructor 2; eauto.
+      intros; eapply createHide_Step_In.
+      * apply H.
+      * apply HStep.
+      * rewrite createHide_Meths in H1; simpl in *; auto.
+  - apply WeakInclusions_WeakInclusion; apply WeakInclusionsRefl.
+Qed.  
+
+Lemma removeMeth_removeHides_cons_In m f l:
+  In f l ->
+  getMethods (removeHides m l) = getMethods (removeMeth (removeHides m l) f).
+Proof.
+  intros; simpl.
+  induction (getMethods m); simpl; auto.
+  - destruct in_dec; simpl; auto.
+    destruct string_dec; subst; simpl;[contradiction|].
+    rewrite IHl0 at 1; reflexivity.
+Qed.
+
+Lemma removeMeth_idempotent (m : BaseModuleWf) l a :
+  In a l ->
+  (removeHides m l) = (removeMeth (removeHides m l) a).
+Proof.
+  intros.
+  specialize (removeMeth_removeHides_cons_In m _ _ H) as P1.
+  unfold removeHides, removeMeth in *; simpl in *; rewrite P1 at 1.
+  reflexivity.
+Qed.
+
 Theorem removeHides_createHide_TraceInclusion (m : BaseModuleWf) (l : list string):
   NoSelfCallBaseModule m ->
   SubList l (map fst (getMethods m)) ->
-  NoDup l ->
   TraceInclusion (removeHides m l) (createHide m l).
 Proof.
   induction l; simpl; intros.
@@ -4287,19 +4338,24 @@ Proof.
     simpl in *; unfold flatten, getFlat in *; simpl in *.
     assumption.
   - specialize (removeMeth_removeHides_TraceInclusion (m:=m) (l:=l) (a:=a)) as P1.
-    assert (SubList l (map fst (getMethods m)));[repeat intro; apply (H0 x (in_cons a _ _ H2))|].
-    inv H1.
-    specialize (TraceInclusion_TraceInclusion' (IHl H H2 H6)) as P2.
+    assert (SubList l (map fst (getMethods m)));[repeat intro; apply (H0 x (in_cons a _ _ H1))|].
+    specialize (TraceInclusion_TraceInclusion' (IHl H H1)) as P2.
     specialize (TraceInclusion'_TraceInclusion (TraceInclusion_createHide P2 (s:=a))) as P3; clear P2.
-    assert (In a (map fst (getMethods (removeHidesModWf m l)))) as P4.
-    + simpl; rewrite in_map_iff.
-      specialize (H0 _ (in_eq _ _)).
-      rewrite in_map_iff in H0.
-      inv H0; inv H1.
-      exists x; split; auto.
-      rewrite filter_In; split; auto.
-      destruct in_dec; simpl; auto.
-    + specialize (removeMeth_HideMeth_TraceInclusion (removeHidesModWf m l) (NoSelfCallBaseModule_removeHides l H) (f:= a) P4) as P5.
+    destruct (in_dec string_dec a l).
+    + specialize (createHide_idempotent m _ _ i) as P4.
+      simpl in P1.
+      rewrite <- removeMeth_idempotent in P1; auto.
+      specialize (IHl H H1).
+      eauto using TraceInclusion_trans.
+    + assert (In a (map fst (getMethods (removeHidesModWf m l)))) as P4.
+      * simpl; rewrite in_map_iff.
+        specialize (H0 _ (in_eq _ _)).
+        rewrite in_map_iff in H0.
+        inv H0; inv H2.
+        exists x; split; auto.
+        rewrite filter_In; split; auto.
+        destruct in_dec; simpl; auto.
+      * specialize (removeMeth_HideMeth_TraceInclusion (removeHidesModWf m l) (NoSelfCallBaseModule_removeHides l H) (f:= a) P4) as P5.
       eauto using TraceInclusion_trans.
 Qed.
 
