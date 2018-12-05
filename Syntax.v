@@ -2542,31 +2542,34 @@ Fixpoint gatherLetExprVec (ty: Kind -> Type) n
                                                          _ vals)))%kami_expr
   end cont.
 
-Definition structFromExprs ty n (ls: Vector.t {k_in: (string * Kind) & (snd k_in) @# ty} n) :=
-  Struct
-    (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
-    (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j)).
-               
-Definition structFromLetExprs ty n (ls: Vector.t {k_in: (string * Kind) & (snd k_in) ## ty} n) :=
-  Struct
-    (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
-    (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j)).
+Notation structFromExprs ls :=
+  (Struct
+     (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
+     (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j))).
 
 Local Open Scope kami_expr.
 Fixpoint gatherLetExprVector (ty: Kind -> Type) n
          (acts: Vector.t ({k_in: (string * Kind) & LetExprSyntax ty (snd k_in)})%type n)
          {struct acts}:
-  LetExprSyntax ty (structFromLetExprs acts) :=
+  LetExprSyntax ty (structFromExprs acts) :=
   (match acts in Vector.t _ n return
-         LetExprSyntax ty (structFromLetExprs acts) with
-   | Vector.nil => RetE (getStructVal (Vector.nil _))
+         LetExprSyntax ty (structFromExprs acts) with
+   | Vector.nil =>
+     RetE
+       (BuildStruct
+          _ _
+          (fun i =>
+             Fin.case0
+               (fun i =>
+                  (snd (Vector.nth (Vector.map (@projT1 _ _) (Vector.nil _)) i)) @# ty)
+               i))
    | Vector.cons x n' xs =>
      (LETE val <- projT2 x;
         LETE fullStruct <- @gatherLetExprVector ty _ xs;
         RetE (BuildStruct _ _ (fun i: Fin.t (S n') =>
                                  match i as il in Fin.t (S nl) return
                                        forall (xs: Vector.t _ nl),
-                                         ty (structFromLetExprs xs) ->
+                                         ty (structFromExprs xs) ->
                                          (snd (Vector.nth
                                                  (Vector.map (@projT1 _ _)
                                                              (Vector.cons _ x _ xs)) il)) @# ty
