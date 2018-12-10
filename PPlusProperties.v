@@ -439,7 +439,7 @@ Section PPlusTraceInclusion.
       + apply WeakInclusion_flat_WeakInclusion; assumption.
   Qed.
   
-  Theorem StrongPPlusTraceInclusion_PPlusTraceInclusion m m' :
+  Lemma StrongPPlusTraceInclusion_PPlusTraceInclusion m m' :
     StrongPPlusTraceInclusion m m' ->
     PPlusTraceInclusion m m'.
   Proof.
@@ -470,7 +470,7 @@ Section PPlusTraceInclusion.
         apply H0; setoid_rewrite H10; assumption.
   Qed.
   
-  Theorem PPlusTraceInclusion_PTraceInclusion (m m' : BaseModule) :
+  Lemma PPlusTraceInclusion_PTraceInclusion (m m' : BaseModule) :
     PPlusTraceInclusion m m' ->
     PTraceInclusion (Base m) (Base m').
   Proof.
@@ -485,7 +485,7 @@ Section PPlusTraceInclusion.
       apply (WeakInclusions_flat_PermutationEquivLists_r _ _ H1 H2 H3 H4).
   Qed.
 
-  Theorem PPlusTraceInclusion_TraceInclusion (m m' : BaseModule) (Wfm: WfMod (Base m)) (Wfm': WfMod (Base m')):
+  Lemma PPlusTraceInclusion_TraceInclusion (m m' : BaseModule) (Wfm: WfMod (Base m)) (Wfm': WfMod (Base m')):
     PPlusTraceInclusion m m' ->
     TraceInclusion (Base m) (Base m').
   Proof.
