@@ -2610,7 +2610,7 @@ Definition struct_get_field_aux
                    (Lt.lt_S_n m n H) in
             let index
               :  Fin.t (S n)
-              := Fin.of_nat_lt H0 in
+              := Fin.of_nat_lt H in
             if (string_dec name (get_name index))
               then Some (
                      existT
