@@ -2581,7 +2581,93 @@ Fixpoint gatherLetExprVector (ty: Kind -> Type) n
    end).
 Local Close Scope kami_expr.
 
+Definition struct_get_field_aux
+  (ty: Kind -> Type)
+  (n : nat)
+  (get_kind : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (packet : Struct get_kind get_name @# ty)
+  (name : string)
+  :  option ({kind : Kind & kind @# ty})
+  := nat_rect
+       (fun m : nat => m < (S n) -> option ({kind : Kind & kind @# ty}))
+       (fun H : 0 < (S n)
+         => let index : Fin.t (S n)
+              := Fin.of_nat_lt H in
+            if (string_dec name (get_name index))
+              then Some (
+                     existT
+                       (fun kind : Kind => kind @# ty)
+                       (get_kind index)
+                       (ReadStruct packet index))
+              else None)
+       (fun (m : nat)
+         (F : m < (S n) -> option ({kind : Kind & kind @# ty}))
+         (H : S m < (S n))
+         => let H0
+              :  m < (S n)
+              := PeanoNat.Nat.lt_lt_succ_r m n
+                   (Lt.lt_S_n m n H) in
+            let index
+              :  Fin.t (S n)
+              := Fin.of_nat_lt H0 in
+            if (string_dec name (get_name index))
+              then Some (
+                     existT
+                       (fun kind : Kind => kind @# ty)
+                       (get_kind index)
+                       (ReadStruct packet index))
+              else F H0)
+       n
+       (PeanoNat.Nat.lt_succ_diag_r n).
 
+Definition struct_get_field
+  (ty: Kind -> Type)
+  (n : nat)
+  (get_value : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (packet : Struct get_value get_name @# ty)
+  (name : string)
+  (kind : Kind)
+  :  option (kind @# ty)
+  := match struct_get_field_aux packet name with
+       | Some field
+         => sigT_rect
+              (fun _ => option (kind @# ty))
+              (fun field_kind field_value
+                => sumbool_rect
+                     (fun _ => option (kind @# ty))
+                     (fun H : field_kind = kind
+                       => Some (
+                            eq_rect
+                              field_kind
+                              (fun k => k @# ty)
+                              field_value
+                              kind
+                              H))
+                     (fun _ : field_kind <> kind
+                       => None)
+                     (Kind_dec field_kind kind))
+              field
+       | None => None
+     end.
+
+Definition struct_get_field_default
+  (ty: Kind -> Type)
+  (n : nat)
+  (get_value : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (packet : Struct get_value get_name @# ty)
+  (name : string)
+  (kind : Kind)
+  (default : kind @# ty)
+  :  kind @# ty
+  := match struct_get_field packet name kind with
+       | Some field_value
+         => field_value
+       | None
+         => default
+     end.
 
 (*
  * Kami Rewrite
