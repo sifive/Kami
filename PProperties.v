@@ -2728,7 +2728,7 @@ Proof.
         apply mergeSeparatedBaseFile_noHides.
 Qed.
 
-Theorem WfMod_getFlat m:
+Theorem _WfMod_getFlat m:
   (WfMod m) ->
   (WfMod (Base (getFlat m))).
 Proof.
@@ -2742,7 +2742,7 @@ Proof.
 Qed.
 
 Definition WfGetFlatMod (m: ModWf) : ModWf :=
-  (Build_ModWf (WfMod_getFlat (wfMod m))).
+  (Build_ModWf (_WfMod_getFlat (wfMod m))).
 
 Definition WfMergedMod (m : ModWf) :  ModWf :=
   (Build_ModWf (merged_WellFormed (wfMod m))).
