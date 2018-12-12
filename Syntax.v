@@ -2610,7 +2610,7 @@ Definition struct_get_field_aux
                    (Lt.lt_S_n m n H) in
             let index
               :  Fin.t (S n)
-              := Fin.of_nat_lt H0 in
+              := Fin.of_nat_lt H in
             if (string_dec name (get_name index))
               then Some (
                      existT
@@ -2668,6 +2668,30 @@ Definition struct_get_field_default
        | None
          => default
      end.
+
+Section struct_get_field_default_unittest.
+
+Local Notation "X =:= Y" := (evalExpr X = evalExpr Y) (at level 75).
+
+Let test_struct
+  :=  STRUCT {
+        "field0" ::= Const type false;
+        "field1" ::= Const type (natToWord 4 2);
+        "field2" ::= Const type (natToWord 5 3)}%kami_expr.
+
+Let test0
+  := struct_get_field_default test_struct "field0" (Const type true) =:=
+     (Const type true).
+
+Let test1
+  := struct_get_field_default test_struct "field1" (Const type (natToWord 4 5)) =:=
+     (Const type (natToWord 4 2)).
+ 
+Let test2
+  := struct_get_field_default test_struct "field2" (Const type (natToWord 5 5)) =:=
+     (Const type (natToWord 5 3)).
+
+End struct_get_field_default_unittest.
 
 (*
  * Kami Rewrite
