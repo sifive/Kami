@@ -2095,29 +2095,29 @@ Notation "x != y" := (UniBool Neg (Eq x y))
 Notation "v @[ idx ] " := (ReadArray v idx) (at level 38) : kami_expr_scope.
 Notation "v '@[' idx <- val ] " := (UpdateArray v idx val) (at level 38) : kami_expr_scope.
 
-Local Ltac findStructIdx v f :=
-  let idx := eval cbv in (Vector_find (fun x => getBool (string_dec (fst x) f%string)) v) in
-      exact idx.
+(* Local Ltac findStructIdx v f := *)
+(*   let idx := eval cbv in (Vector_find (fun x => getBool (string_dec (fst x) f%string)) v) in *)
+(*       exact idx. *)
 
-Local Ltac getStructList fs f := match fs with
-                                 | (fun i: Fin.t _ =>
-                                      fst (Vector.nth ?v i)) =>
-                                   findStructIdx v f
-                                 | _ => let y := eval hnf in fs in
-                                            getStructList y f
-                                 end.
+(* Local Ltac getStructList fs f := match fs with *)
+(*                                  | (fun i: Fin.t _ => *)
+(*                                       fst (Vector.nth ?v i)) => *)
+(*                                    findStructIdx v f *)
+(*                                  | _ => let y := eval hnf in fs in *)
+(*                                             getStructList y f *)
+(*                                  end. *)
 
-Local Ltac getStructStringFn v f := match v with
-                                    | Struct ?fk ?fs => getStructList fs f
-                                    | _ => let y := eval hnf in v in
-                                               getStructStringFn y f
-                                    end.
+(* Local Ltac getStructStringFn v f := match v with *)
+(*                                     | Struct ?fk ?fs => getStructList fs f *)
+(*                                     | _ => let y := eval hnf in v in *)
+(*                                                getStructStringFn y f *)
+(*                                     end. *)
 
-Local Ltac getStructFull v f := match v with
-                                | Expr _ (SyntaxKind ?y) => getStructStringFn y f
-                                | _ => let y := eval hnf in v in
-                                           getStructFull y f
-                                end.
+(* Local Ltac getStructFull v f := match v with *)
+(*                                 | Expr _ (SyntaxKind ?y) => getStructStringFn y f *)
+(*                                 | _ => let y := eval hnf in v in *)
+(*                                            getStructFull y f *)
+(*                                 end. *)
 
 Definition option_bind
   (T U : Type)
@@ -2162,6 +2162,22 @@ Definition struct_get_field_index
               else F H0)
        n
        (PeanoNat.Nat.lt_succ_diag_r n).
+
+Ltac struct_get_field_ltac packet name :=
+  let val := eval cbv in (struct_get_field_index packet name) in
+      match val with
+      | Some ?x => exact (ReadStruct packet x)
+      | None => fail "field not found in struct"
+      | _ => fail "major error - struct_get_field_index not reducing"
+      end.
+
+Ltac struct_set_field_ltac packet name newval :=
+  let val := eval cbv in (struct_get_field_index packet name) in
+      match val with
+      | Some ?x => exact (UpdateStruct packet x newval)
+      | None => fail "field not found in struct"
+      | _ => fail "major error - struct_get_field_index not reducing"
+      end.
 
 Definition struct_get_field_aux
   (ty: Kind -> Type)
@@ -2244,30 +2260,36 @@ Definition struct_set_field
              (fun _ => None)
              (Kind_dec (get_kind index) kind).
 
-Notation "s @% f"
-  := (ltac:(
-       let val := eval cbv in (struct_get_field_aux s f) in
-       match val with
-         | Some ?x =>
-           let x2 := eval cbv [projT2] in (projT2 x) in
-           let x1 := eval cbv [projT1] in (projT1 x) in
-           exact (x2: x1 @# _)
-         | None => fail "cannot find struct field"
-       end))
+(* Notation "s @% f" *)
+(*   := (ltac:( *)
+(*        let val := eval cbv in (struct_get_field_aux s f) in *)
+(*        match val with *)
+(*          | Some ?x => *)
+(*            let x2 := eval cbv [projT2] in (projT2 x) in *)
+(*            let x1 := eval cbv [projT1] in (projT1 x) in *)
+(*            exact (x2: x1 @# _) *)
+(*          | None => fail "cannot find struct field" *)
+(*        end)) *)
+(*   (at level 38, only parsing): kami_expr_scope. *)
+
+Notation "s @% f" := ltac:(struct_get_field_ltac s f)
   (at level 38, only parsing): kami_expr_scope.
 
 Notation "name ::= value" :=
   (name, value) (only parsing): kami_switch_init_scope.
 Delimit Scope kami_switch_init_scope with switch_init.
 
-Notation "s '@%[' f <- v ]"
-  := (ltac:(
-       let val := eval cbv in (struct_set_field s f v) in
-       match val with
-         | Some ?x =>
-           exact (x)
-         | None => fail "cannot find struct field"
-       end))
+(* Notation "s '@%[' f <- v ]" *)
+(*   := (ltac:( *)
+(*        let val := eval cbv in (struct_set_field s f v) in *)
+(*        match val with *)
+(*          | Some ?x => *)
+(*            exact (x) *)
+(*          | None => fail "cannot find struct field" *)
+(*        end)) *)
+(*   (at level 38, only parsing): kami_expr_scope. *)
+
+Notation "s '@%[' f <- v ]" := ltac:(struct_set_field_ltac s f v)
   (at level 38, only parsing): kami_expr_scope.
 
 (*
