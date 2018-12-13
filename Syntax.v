@@ -139,11 +139,12 @@ Section Phoas.
 
   Definition UpdateStruct n (fk: Fin.t n -> Kind) (fs: Fin.t n -> string)
              (e: Expr (SyntaxKind (Struct fk fs))) i (v: Expr (SyntaxKind (fk i))) :=
-    BuildStruct fk fs (fun i' => match Fin.eq_dec i i' with
-                                 | left pf => match pf in _ = Y return
-                                                    Expr (SyntaxKind (fk Y)) with
-                                              | eq_refl => v
-                                              end
+    BuildStruct fk fs (fun i' => match Fin_eq_dec i i' with
+                                 | left pf =>
+                                   match pf in _ = Y return
+                                         Expr (SyntaxKind (fk Y)) with
+                                   | eq_refl => v
+                                   end
                                  | right _ => ReadStruct e i'
                                  end).
 
@@ -2118,19 +2119,190 @@ Local Ltac getStructFull v f := match v with
                                            getStructFull y f
                                 end.
 
-Notation "s @% f" := (ReadStruct s ltac:(let typeS := type of s in
-                                         getStructFull typeS f))
-                       (at level 38, only parsing) : kami_expr_scope.
+Definition option_bind
+  (T U : Type)
+  (x : option T)
+  (f : T -> option U)
+  :  option U
+  := match x with
+       | Some y => f y
+       | None => None
+     end.
+
+Notation "X >>- F" := (option_bind X F) (at level 85, only parsing).
+
+Definition struct_get_field_index
+  (ty: Kind -> Type)
+  (n : nat)
+  (get_kind : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (packet : Struct get_kind get_name @# ty)
+  (name : string)
+  :  option (Fin.t (S n))
+  := nat_rect
+       (fun m : nat => m < (S n) -> option (Fin.t (S n)))
+       (fun H : 0 < (S n)
+         => let index : Fin.t (S n)
+              := Fin.of_nat_lt H in
+            if (string_dec name (get_name index))
+              then Some index
+              else None)
+       (fun (m : nat)
+         (F : m < (S n) -> option (Fin.t (S n)))
+         (H : S m < (S n))
+         => let H0
+              :  m < (S n)
+              := PeanoNat.Nat.lt_lt_succ_r m n
+                   (Lt.lt_S_n m n H) in
+            let index
+              :  Fin.t (S n)
+              := Fin.of_nat_lt H in
+            if (string_dec name (get_name index))
+              then Some index
+              else F H0)
+       n
+       (PeanoNat.Nat.lt_succ_diag_r n).
+
+Definition struct_get_field_aux
+  (ty: Kind -> Type)
+  (n : nat)
+  (get_kind : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (packet : Struct get_kind get_name @# ty)
+  (name : string)
+  :  option ({kind : Kind & kind @# ty})
+  := struct_get_field_index packet name >>-
+       fun index
+         => Some
+              (existT
+                (fun kind : Kind => kind @# ty)
+                (get_kind index)
+                (ReadStruct packet index)).
+
+Definition struct_get_field
+  (ty: Kind -> Type)
+  (n : nat)
+  (get_value : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (packet : Struct get_value get_name @# ty)
+  (name : string)
+  (kind : Kind)
+  :  option (kind @# ty)
+  := struct_get_field_aux packet name >>-
+       sigT_rect
+         (fun _ => option (kind @# ty))
+         (fun field_kind field_value
+           => sumbool_rect
+                (fun _ => option (kind @# ty))
+                (fun H : field_kind = kind
+                  => Some (
+                       eq_rect
+                         field_kind
+                         (fun k => k @# ty)
+                         field_value
+                         kind
+                         H))
+                (fun _ : field_kind <> kind
+                  => None)
+                (Kind_dec field_kind kind)).
+
+Definition struct_get_field_default
+  (ty: Kind -> Type)
+  (n : nat)
+  (get_value : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (packet : Struct get_value get_name @# ty)
+  (name : string)
+  (kind : Kind)
+  (default : kind @# ty)
+  :  kind @# ty
+  := match struct_get_field packet name kind with
+       | Some field_value
+         => field_value
+       | None
+         => default
+     end.
+
+Section struct_get_field_default_unittest.
+
+Local Notation "X =:= Y" := (evalExpr X = evalExpr Y) (at level 75).
+
+Let test_struct
+  :=  STRUCT {
+        "field0" ::= Const type false;
+        "field1" ::= Const type (natToWord 4 2);
+        "field2" ::= Const type (natToWord 5 3)}%kami_expr.
+
+Let test0
+  : struct_get_field_default test_struct "field0" (Const type true) =:=
+    (Const type false)
+  := eq_refl (evalExpr (Const type false)).
+
+Let test1
+  : struct_get_field_default test_struct "field1" (Const type (natToWord 4 5)) =:=
+    (Const type (natToWord 4 2))
+  := eq_refl (evalExpr (Const type (natToWord 4 2))).
+ 
+Let test2
+  : struct_get_field_default test_struct "field2" (Const type (natToWord 5 5)) =:=
+    (Const type (natToWord 5 3))
+  := eq_refl (evalExpr (Const type (natToWord 5 3))).
+
+End struct_get_field_default_unittest.
+
+Definition struct_set_field
+  (ty: Kind -> Type)
+  (n : nat)
+  (get_kind : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (packet : Struct get_kind get_name @# ty)
+  (name : string)
+  (kind : Kind)
+  (value : kind @# ty)
+  :  option (Struct get_kind get_name @# ty)
+  := struct_get_field_index packet name >>-
+       fun index
+         => sumbool_rect
+              (fun _ => option (Struct get_kind get_name @# ty))
+              (fun H : get_kind index = kind
+                => Some
+                     (UpdateStruct packet index
+                       (eq_rect_r (fun k => k @# ty) value H)))
+             (fun _ => None)
+             (Kind_dec (get_kind index) kind).
+
+Notation "s @% f"
+  := (ltac:(
+       let val := eval cbv in (struct_get_field_aux s f) in
+       match val with
+         | Some ?x =>
+           let x2 := eval cbv [projT2] in (projT2 x) in
+           let x1 := eval cbv [projT1] in (projT1 x) in
+           exact (x2: x1 @# _)
+         | None => fail "cannot find struct field"
+       end))
+  (at level 38, only parsing): kami_expr_scope.
 
 Notation "name ::= value" :=
   (name, value) (only parsing): kami_switch_init_scope.
 Delimit Scope kami_switch_init_scope with switch_init.
 
+Notation "s '@%[' f <- v ]"
+  := (ltac:(
+       let val := eval cbv in (struct_set_field s f v) in
+       match val with
+         | Some ?x =>
+           exact (x)
+         | None => fail "cannot find struct field"
+       end))
+  (at level 38, only parsing): kami_expr_scope.
+
+(*
 Notation "s '@%[' f <- v ]" := (UpdateStruct s%kami_expr (ltac:(let typeS := type of s in
                                                                getStructFull typeS f))
                                              v%kami_expr)
                                  (at level 100, only parsing) : kami_expr_scope.
-
+*)
 Local Definition testExtract ty n n1 n2 (pf1: n > n1) (pf2: n1 > n2) (a: Bit n @# ty) := (a $#[n1 : n2])%kami_expr.
 
 Local Definition testConcat ty (w1: Bit 10 @# ty) (w2: Bit 2 @# ty) (w3: Bit 5 @# ty) :=
@@ -2235,20 +2407,18 @@ Notation "'LETC' name : t <- v ; c " :=
   (LETE name : t <- RetE v ; c)%kami_expr
                                (at level 12, right associativity, name at level 99) : kami_expr_scope.
 
-
 Delimit Scope kami_action_scope with kami_action.
 
 Local Open Scope kami_action.
 Local Open Scope kami_expr.
 Local Definition testFieldAccess (ty: Kind -> Type): ActionT ty (Bit 10) :=
   (LET val: testStruct <- testStructVal;
-     Ret (#val @% "hello")).
+     Ret ((#val @% "hello"))).
 Local Close Scope kami_expr.
 Local Close Scope kami_action.
 
 Local Definition testFieldUpd (ty: Kind -> Type) := 
   ((testStructVal (ty := ty)) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
-
 
 Fixpoint gatherActions (ty: Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_out (cont: list (k_in @# ty) -> ActionT ty k_out): ActionT ty k_out :=
   match acts with
@@ -2316,7 +2486,6 @@ Fixpoint getOrder (im : InModule) :=
     | _ => rest
     end
   end.
-
 
 Definition makeModule (im : InModule) :=
   let '(regs, rules, meths) := makeModule' im in
@@ -2392,7 +2561,6 @@ Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) i
 
 (* Eval compute in test. *)
 
-
 Notation "'RegisterArray' name 'using' nums : type <- init" :=
   (MERegAry (
     map (fun idx =>
@@ -2458,7 +2626,7 @@ Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
 
 (* Infix "++" := ConcatMod: kami_scope. *)
 
-Section tets.
+Section tests.
   Variable a : string.
   Local Example test := MOD_WF{
                       Register (a ++ "x") : Bool <- true
@@ -2467,18 +2635,9 @@ Section tets.
                                                      Write (a++"x"): Bool <- #y;
                                                      Retv )
                     }.
-End tets.
+End tests.
 
 Local Example test2 a b := (ConcatMod (test a) (test b))%kami.
-
-
-
-
-
-
-
-
-
 
 Definition Maybe k :=
   STRUCT {
@@ -2581,117 +2740,38 @@ Fixpoint gatherLetExprVector (ty: Kind -> Type) n
    end).
 Local Close Scope kami_expr.
 
-Definition struct_get_field_aux
-  (ty: Kind -> Type)
-  (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
-  (packet : Struct get_kind get_name @# ty)
-  (name : string)
-  :  option ({kind : Kind & kind @# ty})
-  := nat_rect
-       (fun m : nat => m < (S n) -> option ({kind : Kind & kind @# ty}))
-       (fun H : 0 < (S n)
-         => let index : Fin.t (S n)
-              := Fin.of_nat_lt H in
-            if (string_dec name (get_name index))
-              then Some (
-                     existT
-                       (fun kind : Kind => kind @# ty)
-                       (get_kind index)
-                       (ReadStruct packet index))
-              else None)
-       (fun (m : nat)
-         (F : m < (S n) -> option ({kind : Kind & kind @# ty}))
-         (H : S m < (S n))
-         => let H0
-              :  m < (S n)
-              := PeanoNat.Nat.lt_lt_succ_r m n
-                   (Lt.lt_S_n m n H) in
-            let index
-              :  Fin.t (S n)
-              := Fin.of_nat_lt H in
-            if (string_dec name (get_name index))
-              then Some (
-                     existT
-                       (fun kind : Kind => kind @# ty)
-                       (get_kind index)
-                       (ReadStruct packet index))
-              else F H0)
-       n
-       (PeanoNat.Nat.lt_succ_diag_r n).
+Section struct_set_field_unittest.
 
-Definition struct_get_field
-  (ty: Kind -> Type)
-  (n : nat)
-  (get_value : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
-  (packet : Struct get_value get_name @# ty)
-  (name : string)
-  (kind : Kind)
-  :  option (kind @# ty)
-  := match struct_get_field_aux packet name with
-       | Some field
-         => sigT_rect
-              (fun _ => option (kind @# ty))
-              (fun field_kind field_value
-                => sumbool_rect
-                     (fun _ => option (kind @# ty))
-                     (fun H : field_kind = kind
-                       => Some (
-                            eq_rect
-                              field_kind
-                              (fun k => k @# ty)
-                              field_value
-                              kind
-                              H))
-                     (fun _ : field_kind <> kind
-                       => None)
-                     (Kind_dec field_kind kind))
-              field
-       | None => None
-     end.
-
-Definition struct_get_field_default
-  (ty: Kind -> Type)
-  (n : nat)
-  (get_value : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
-  (packet : Struct get_value get_name @# ty)
-  (name : string)
-  (kind : Kind)
-  (default : kind @# ty)
-  :  kind @# ty
-  := match struct_get_field packet name kind with
-       | Some field_value
-         => field_value
-       | None
-         => default
-     end.
-
-Section struct_get_field_default_unittest.
-
-Local Notation "X =:= Y" := (evalExpr X = evalExpr Y) (at level 75).
+Open Scope kami_expr.
 
 Let test_struct
   :=  STRUCT {
         "field0" ::= Const type false;
         "field1" ::= Const type (natToWord 4 2);
-        "field2" ::= Const type (natToWord 5 3)}%kami_expr.
+        "field2" ::= Const type (natToWord 5 3)}.
 
-Let test0
-  := struct_get_field_default test_struct "field0" (Const type true) =:=
-     (Const type true).
+Let test_0
+  :  evalExpr ((test_struct @%["field0" <- (Const type true)]) @% "field0") = true
+  := eq_refl true.
 
-Let test1
-  := struct_get_field_default test_struct "field1" (Const type (natToWord 4 5)) =:=
-     (Const type (natToWord 4 2)).
- 
-Let test2
-  := struct_get_field_default test_struct "field2" (Const type (natToWord 5 5)) =:=
-     (Const type (natToWord 5 3)).
+Let test_1
+  :  evalExpr ((test_struct @%["field1" <- (Const type (natToWord 4 5))]) @% "field1") =
+     natToWord 4 5
+  := eq_refl (natToWord 4 5).
 
-End struct_get_field_default_unittest.
+Let test_2
+  :  evalExpr ((test_struct @%["field2" <- (Const type (natToWord 5 5))]) @% "field2") =
+     natToWord 5 5
+  := eq_refl (natToWord 5 5).
+
+Let test_3
+  :  (struct_set_field test_struct "field3" (Const type (natToWord 5 5))) =
+     None
+  := eq_refl None.
+
+Close Scope kami_expr.
+
+End struct_set_field_unittest.
 
 (*
  * Kami Rewrite
