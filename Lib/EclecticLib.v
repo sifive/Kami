@@ -21,6 +21,26 @@ Ltac EqDep_subst :=
          |[H : existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _] => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
          end.
 
+Fixpoint Fin_eq_dec n a {struct a}: forall (b: Fin.t n), {a = b} + {a <> b}.
+Proof.
+  refine
+    match a in Fin.t n return forall b: Fin.t n, {a = b} + {a <> b} with
+    | Fin.F1 _ => fun b => match b with
+                           | Fin.F1 _ => left eq_refl
+                           | _ => right _
+                           end
+    | Fin.FS _ x => fun b => match b in Fin.t (S m) return forall x: Fin.t m, (forall y: Fin.t m, {x = y} + {x <> y}) -> {Fin.FS x = b} + {Fin.FS x <> b}  with
+                             | Fin.F1 _ => fun _ _ => right _
+                             | Fin.FS _ y => fun _ f =>
+                                               match f y with
+                                               | left eq1 => left (f_equal Fin.FS eq1)
+                                               | right neq => right _
+                                               end
+                             end x (Fin_eq_dec _ x)
+    end; intro; clear Fin_eq_dec; try (abstract discriminate).
+  abstract (injection H; intros; EqDep_subst; tauto).
+Defined.
+
 
 Ltac constructor_simpl :=
   econstructor; eauto; simpl; unfold not; intros.
