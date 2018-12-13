@@ -2223,33 +2223,6 @@ Definition struct_get_field_default
          => default
      end.
 
-Section struct_get_field_default_unittest.
-
-Local Notation "X =:= Y" := (evalExpr X = evalExpr Y) (at level 75).
-
-Let test_struct
-  :=  STRUCT {
-        "field0" ::= Const type false;
-        "field1" ::= Const type (natToWord 4 2);
-        "field2" ::= Const type (natToWord 5 3)}%kami_expr.
-
-Let test0
-  : struct_get_field_default test_struct "field0" (Const type true) =:=
-    (Const type false)
-  := eq_refl (evalExpr (Const type false)).
-
-Let test1
-  : struct_get_field_default test_struct "field1" (Const type (natToWord 4 5)) =:=
-    (Const type (natToWord 4 2))
-  := eq_refl (evalExpr (Const type (natToWord 4 2))).
- 
-Let test2
-  : struct_get_field_default test_struct "field2" (Const type (natToWord 5 5)) =:=
-    (Const type (natToWord 5 3))
-  := eq_refl (evalExpr (Const type (natToWord 5 3))).
-
-End struct_get_field_default_unittest.
-
 Definition struct_set_field
   (ty: Kind -> Type)
   (n : nat)
@@ -2740,38 +2713,65 @@ Fixpoint gatherLetExprVector (ty: Kind -> Type) n
    end).
 Local Close Scope kami_expr.
 
-Section struct_set_field_unittest.
+Section unittests.
 
 Open Scope kami_expr.
+
+Local Notation "X ==> Y" := (evalExpr X = Y) (at level 75).
 
 Let test_struct
   :=  STRUCT {
         "field0" ::= Const type false;
         "field1" ::= Const type (natToWord 4 2);
-        "field2" ::= Const type (natToWord 5 3)}.
+        "field2" ::= Const type (natToWord 5 3)}%kami_expr.
+
+Section struct_get_field_default_unittests.
+
+Let test0
+  :  test_struct @% "field0" ==> false
+  := eq_refl false.
+
+Let test1
+  : test_struct @% "field1" ==> natToWord 4 2
+  := eq_refl (natToWord 4 2).
+ 
+Let test2
+  : test_struct @% "field2" ==> natToWord 5 3
+  := eq_refl (natToWord 5 3).
+
+Let test3
+  :  struct_get_field test_struct "field3" (Bit 5) = None
+  := eq_refl None.
+
+End struct_get_field_default_unittests.
+
+Section struct_set_field_unittests.
 
 Let test_0
-  :  evalExpr ((test_struct @%["field0" <- (Const type true)]) @% "field0") = true
+  :  (test_struct @%["field0" <- (Const type true)]) @% "field0"
+     ==> true
   := eq_refl true.
 
 Let test_1
-  :  evalExpr ((test_struct @%["field1" <- (Const type (natToWord 4 5))]) @% "field1") =
-     natToWord 4 5
+  :  (test_struct @%["field1" <- (Const type (natToWord 4 5))]) @% "field1"
+     ==> natToWord 4 5
   := eq_refl (natToWord 4 5).
 
 Let test_2
-  :  evalExpr ((test_struct @%["field2" <- (Const type (natToWord 5 5))]) @% "field2") =
-     natToWord 5 5
+  :  (test_struct @%["field2" <- (Const type (natToWord 5 5))]) @% "field2"
+     ==> natToWord 5 5
   := eq_refl (natToWord 5 5).
 
 Let test_3
-  :  (struct_set_field test_struct "field3" (Const type (natToWord 5 5))) =
-     None
+  :  struct_set_field test_struct "field3" (Const type (natToWord 5 5))
+     = None
   := eq_refl None.
+
+End struct_set_field_unittests.
 
 Close Scope kami_expr.
 
-End struct_set_field_unittest.
+End unittests.
 
 (*
  * Kami Rewrite
