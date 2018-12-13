@@ -1132,7 +1132,6 @@ Proof.
            ++ eapply HDisjRegs; right; assumption.
 Qed.
 
-
 Global Instance Substeps_perm_rewrite' :
   Proper (eq ==> eq ==> @Permutation FullLabel ==> iff) (@Substeps) | 10.
 Proof.
@@ -4399,4 +4398,253 @@ Proof.
   specialize (createHide_removeHides_TraceInclusion (Build_BaseModuleWf HWfBaseModule) (l := (getHidden m))) as P3; simpl in *.
   rewrite <- SameKeys_inlineAll_Meths in P3.
   apply (P3 P2); eauto.
+Qed.
+
+Lemma PSemAction_meth_collector_stitch f o readRegs1 newRegs1 calls1 calls2:
+  PSemAction_meth_collector f o readRegs1 newRegs1 calls1 calls2 ->
+  forall readRegs2 newRegs2 calls3 calls4,
+    DisjKey newRegs1 newRegs2 ->
+    PSemAction_meth_collector f o readRegs2 newRegs2 calls3 calls4 ->
+    PSemAction_meth_collector f o (readRegs1++readRegs2) (newRegs1++newRegs2) (calls1++calls3) (calls2++calls4).
+Proof.
+  induction 1; simpl; auto; intros.
+  rewrite H4.
+  econstructor.
+  - apply IHPSemAction_meth_collector; auto.
+    + assert (DisjKey upds1 newRegs2) as P1;[|apply P1].
+      rewrite H2 in H6; intro k; specialize (H6 k).
+      clear - H6; rewrite map_app, in_app_iff in *; firstorder.
+    + apply H7.
+  - assert (DisjKey (upds1++newRegs2) upds2) as P1;[|apply P1].
+    rewrite H2 in H6; intro k; specialize (H6 k); specialize (H0 k).
+    clear - H0 H6; rewrite map_app, in_app_iff in *; firstorder.
+  - rewrite H1; repeat rewrite <- app_assoc.
+    apply Permutation_app_head, Permutation_app_comm.
+  - rewrite H2; repeat rewrite <- app_assoc.
+    apply Permutation_app_head, Permutation_app_comm.
+  - rewrite H3; repeat rewrite <- app_assoc.
+    apply Permutation_app_head, Permutation_app_comm.
+  - simpl; reflexivity.
+  - assumption.
+Qed.
+
+Lemma PSemAction_In_inline (f : DefMethT) o:
+  forall {retK2} a,
+  forall readRegs newRegs calls (retV2 : type retK2),
+    PSemAction o (inlineSingle f a) readRegs newRegs calls retV2 ->
+    exists readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 calls3,
+      DisjKey newRegs1 newRegs2 /\
+      readRegs [=] readRegs1++readRegs2 /\
+      newRegs [=] newRegs1++newRegs2 /\
+      calls [=] calls1++calls2 /\
+      PSemAction_meth_collector f o readRegs1 newRegs1 calls1 calls3 /\
+      PSemAction o a readRegs2 newRegs2 (calls3++calls2) retV2.
+Proof.
+  intros retK2 a.
+  induction a; subst; simpl in *; intros.
+  - destruct string_dec;[destruct Signature_dec|]; subst; simpl in *.
+    + inv H0; EqDep_subst.
+      inv HPSemAction; EqDep_subst.
+      specialize (H _ _ _ _ _ HPSemActionCont); dest.
+      exists (readRegs0++x), x0, (newRegs0++x1), x2, (calls0++x3), x4, (((fst f),(existT SignT (projT1 (snd f)) (evalExpr e, v)))::x5).
+      repeat split; auto.
+      * intro k; clear - H HDisjRegs H1; rewrite H1 in *;
+          specialize (H k); specialize (HDisjRegs k).
+        rewrite map_app, in_app_iff in *; firstorder.
+      * clear -H0 HUReadRegs.
+        rewrite H0, app_assoc in *; assumption.
+      * clear -H1 HUNewRegs.
+        rewrite H1, app_assoc in *; assumption.
+      * clear -H2 HUCalls.
+        rewrite H2, app_assoc in *; assumption.
+      * econstructor 2.
+        -- eapply H3.
+        -- rewrite H1 in HDisjRegs.
+           assert (DisjKey x1 newRegs0) as P1;
+             [intro k; specialize (HDisjRegs k); rewrite map_app, in_app_iff in *;
+              clear - HDisjRegs; firstorder| apply P1].
+        -- apply Permutation_app_comm.
+        -- apply Permutation_app_comm.
+        -- apply Permutation_app_comm.
+        -- reflexivity.
+        -- assumption.
+      * econstructor; eauto.
+        simpl; reflexivity.
+    + inv H0; EqDep_subst.
+      specialize (H _ _ _ _ _ HPSemAction); dest.
+      exists x, x0, x1, x2, x3, ((fst f, existT SignT s (evalExpr e, mret))::x4), x5.
+      repeat split; auto.
+      * rewrite Permutation_app_comm; simpl.
+        rewrite H2 in HAcalls.
+        rewrite HAcalls.
+        constructor; apply Permutation_app_comm.
+      * apply (PSemAction_rewrite_calls (Permutation_app_comm _ _)).
+        apply (PSemAction_rewrite_calls (Permutation_app_comm _ _)) in H4; simpl in *.
+        econstructor; eauto.
+    + inv H0; EqDep_subst.
+      specialize (H _ _ _ _ _ HPSemAction); dest.
+      exists x, x0, x1, x2, x3, ((meth, existT SignT s (evalExpr e, mret)) ::x4), x5.
+      repeat split; auto.
+      * rewrite Permutation_app_comm; simpl; rewrite HAcalls.
+        constructor; rewrite H2.
+        apply Permutation_app_comm.
+      * apply (PSemAction_rewrite_calls (Permutation_app_comm _ _)).
+        apply (PSemAction_rewrite_calls (Permutation_app_comm _ _)) in H4; simpl in *.
+        econstructor; eauto.
+  - inv H0; EqDep_subst.
+    specialize (H _ _ _ _ _ HPSemAction); dest.
+    exists x, x0, x1, x2, x3, x4, x5; repeat split; auto.
+    econstructor; eauto.
+  - inv H0; EqDep_subst.
+    specialize (H _ _ _ _ _ HPSemActionCont); dest.
+    specialize (IHa _ _ _ _  HPSemAction); dest.
+    exists (x++x6), (x0++x7), (x1++x8), (x2++x9), (x3++x10), (x4++x11), (x5++x12).
+    repeat split; auto.
+    + rewrite H7, H1 in HDisjRegs.
+      clear - H H5 HDisjRegs.
+      intro k; specialize (H k); specialize (H5 k); specialize (HDisjRegs k).
+      repeat rewrite map_app, in_app_iff in *; firstorder.
+    + rewrite HUReadRegs, H6, H0; simpl.
+      rewrite Permutation_app_comm.
+      repeat rewrite app_assoc.
+      apply Permutation_app_tail.
+      repeat rewrite <- app_assoc.
+      apply Permutation_app_head.
+      apply Permutation_app_comm.
+    + rewrite HUNewRegs, H7, H1.
+      rewrite Permutation_app_comm.
+      repeat rewrite app_assoc.
+      apply Permutation_app_tail.
+      repeat rewrite <- app_assoc.
+      apply Permutation_app_head.
+      apply Permutation_app_comm.
+    + rewrite HUCalls, H8, H2.
+      rewrite Permutation_app_comm.
+      repeat rewrite app_assoc.
+      apply Permutation_app_tail.
+      repeat rewrite <- app_assoc.
+      apply Permutation_app_head.
+      apply Permutation_app_comm.
+    + eapply PSemAction_meth_collector_stitch; eauto.
+      rewrite H7, H1 in HDisjRegs.
+      intro k0; specialize (HDisjRegs k0); clear - HDisjRegs.
+      repeat rewrite map_app, in_app_iff in *.
+      firstorder.
+    + econstructor.
+      * assert (DisjKey x9 x2) as P1;[|apply P1].
+        rewrite H7, H1 in HDisjRegs; clear -HDisjRegs; intro k; specialize (HDisjRegs k).
+        repeat rewrite map_app, in_app_iff in *; firstorder.
+      * apply H10.
+      * apply Permutation_app_comm.
+      * apply Permutation_app_comm.
+      * assert ((x5 ++ x12) ++ x4 ++ x11 [=] (x12++x11)++(x4++x5)) as P1;[|apply P1].
+        repeat rewrite <- app_assoc; rewrite Permutation_app_comm.
+        repeat rewrite app_assoc.
+        apply Permutation_app_tail.
+        repeat rewrite <- app_assoc.
+        apply Permutation_app_head, Permutation_app_comm.
+      * apply (PSemAction_rewrite_calls (Permutation_app_comm _ _)); assumption.
+  - inv H0; EqDep_subst.
+    specialize (H _ _ _ _ _ HPSemAction); dest.
+    exists x, x0, x1, x2, x3, x4, x5.
+    repeat split; auto.
+    econstructor; eauto.
+  - inv H0; EqDep_subst.
+    specialize (H _ _ _ _ _ HPSemAction); dest.
+    exists x, ((r, existT (fullType type) k regV) ::x0), x1, x2, x3, x4, x5.
+    repeat split; eauto.
+    + rewrite HNewReads, H0; simpl; apply Permutation_middle.
+    + econstructor; eauto.
+  - inv H; EqDep_subst.
+    specialize (IHa _ _ _ _ HPSemAction); dest.
+    exists x, x0, x1, ((r, existT (fullType type) k (evalExpr e))::x2), x3, x4, x5.
+    repeat split; eauto.
+    + rewrite key_not_In_fst in HDisjRegs; rewrite H1, map_app, in_app_iff in HDisjRegs.
+      clear - HDisjRegs H.
+      intro k0; specialize (H k0); simpl.
+      destruct (string_dec r k0); subst; simpl in *; firstorder.
+    + rewrite HANewRegs, H1; simpl; apply Permutation_middle.
+    + econstructor; auto.
+      clear - H1 HDisjRegs.
+      rewrite key_not_In_fst, H1, map_app, in_app_iff in *; firstorder.
+  - inv H0; EqDep_subst.
+    + specialize (IHa1 _ _ _ _ HAction); dest.
+      specialize (H _ _ _ _ _ HPSemAction); dest.
+      rewrite H2, H7 in HDisjRegs.
+      exists (x++x6), (x0++x7), (x1++x8), (x2++x9), (x3++x10), (x4++x11), (x5++x12).
+      repeat split; auto.
+      * clear - HDisjRegs H0 H.
+        intro k0; specialize (HDisjRegs k0); specialize (H0 k0); specialize (H k0).
+        repeat rewrite map_app, in_app_iff in *; firstorder.
+      * rewrite HUReadRegs, H1, H6.
+        repeat rewrite app_assoc; apply Permutation_app_tail.
+        repeat rewrite <- app_assoc; apply Permutation_app_head, Permutation_app_comm.
+      * rewrite HUNewRegs, H2, H7.
+        repeat rewrite app_assoc; apply Permutation_app_tail.
+        repeat rewrite <- app_assoc; apply Permutation_app_head, Permutation_app_comm.
+      * rewrite HUCalls, H3, H8.
+        repeat rewrite app_assoc; apply Permutation_app_tail.
+        repeat rewrite <- app_assoc; apply Permutation_app_head, Permutation_app_comm.
+      * apply PSemAction_meth_collector_stitch; auto.
+        clear - HDisjRegs.
+        intro k; specialize (HDisjRegs k); repeat rewrite map_app, in_app_iff in *; firstorder.
+      * econstructor.
+        -- assert (DisjKey x2 x9) as P1;[|apply P1].
+           clear - HDisjRegs; intro k; specialize (HDisjRegs k).
+           repeat rewrite map_app, in_app_iff in *; firstorder.
+        -- assumption.
+        -- apply H5.
+        -- apply H10.
+        -- reflexivity.
+        -- reflexivity.
+        -- repeat rewrite <- app_assoc.
+           apply Permutation_app_head.
+           repeat rewrite app_assoc.
+           apply Permutation_app_tail, Permutation_app_comm.
+    + specialize (IHa2 _ _ _ _ HAction); dest.
+      specialize (H _ _ _ _ _ HPSemAction); dest.
+            rewrite H2, H7 in HDisjRegs.
+      exists (x++x6), (x0++x7), (x1++x8), (x2++x9), (x3++x10), (x4++x11), (x5++x12).
+      repeat split; auto.
+      * clear - HDisjRegs H0 H.
+        intro k0; specialize (HDisjRegs k0); specialize (H0 k0); specialize (H k0).
+        repeat rewrite map_app, in_app_iff in *; firstorder.
+      * rewrite HUReadRegs, H1, H6.
+        repeat rewrite app_assoc; apply Permutation_app_tail.
+        repeat rewrite <- app_assoc; apply Permutation_app_head, Permutation_app_comm.
+      * rewrite HUNewRegs, H2, H7.
+        repeat rewrite app_assoc; apply Permutation_app_tail.
+        repeat rewrite <- app_assoc; apply Permutation_app_head, Permutation_app_comm.
+      * rewrite HUCalls, H3, H8.
+        repeat rewrite app_assoc; apply Permutation_app_tail.
+        repeat rewrite <- app_assoc; apply Permutation_app_head, Permutation_app_comm.
+      * apply PSemAction_meth_collector_stitch; auto.
+        clear - HDisjRegs.
+        intro k; specialize (HDisjRegs k); repeat rewrite map_app, in_app_iff in *; firstorder.
+      * econstructor 8.
+        -- assert (DisjKey x2 x9) as P1;[|apply P1].
+           clear - HDisjRegs; intro k; specialize (HDisjRegs k).
+           repeat rewrite map_app, in_app_iff in *; firstorder.
+        -- assumption.
+        -- apply H5.
+        -- apply H10.
+        -- reflexivity.
+        -- reflexivity.
+        -- repeat rewrite <- app_assoc.
+           apply Permutation_app_head.
+           repeat rewrite app_assoc.
+           apply Permutation_app_tail, Permutation_app_comm.
+  - inv H; EqDep_subst.
+    specialize (IHa _ _ _ _ HPSemAction); dest.
+    exists x, x0, x1, x2, x3, x4, x5; repeat split; auto.
+    econstructor; eauto.
+  - inv H; EqDep_subst.
+    specialize (IHa _ _ _ _ HPSemAction); dest.
+    exists x, x0, x1, x2, x3, x4, x5; repeat split; auto.
+    econstructor; eauto.
+  - inv H; EqDep_subst.
+    exists nil, nil, nil, nil, nil, nil, nil; simpl; repeat split; auto.
+    + intro; simpl; tauto.
+    + constructor.
+    + constructor; auto.
 Qed.
