@@ -1968,6 +1968,17 @@ Proof.
       right; exists x; auto.
 Qed.
 
+Lemma inlineSingle_Rule_BaseModule_dec2 f rn rb l:
+  In (rn, rb) l ->
+  In (rn, fun ty : Kind -> Type => inlineSingle f (rb ty)) (inlineSingle_Rule_in_list f rn l).
+Proof.
+  induction l;[contradiction|].
+  intros; simpl in *.
+  destruct string_dec, a; subst; simpl in *.
+  - destruct H;[inv H|];auto.
+  - destruct H;[inv H; exfalso; apply n|];auto.
+Qed.
+
 Lemma inlineSingle_Rule_preserves_names f rn l:
   (map fst l) = (map fst (inlineSingle_Rule_in_list f rn l)).
 Proof.
@@ -4647,4 +4658,71 @@ Proof.
     + intro; simpl; tauto.
     + constructor.
     + constructor; auto.
+Qed.
+
+Lemma inlineSingle_Rule_in_list_notKey rn0 rn rb f l:
+  rn <> rn0 ->
+  In (rn0, rb) (inlineSingle_Rule_in_list f rn l) ->
+  In (rn0, rb) l.
+Proof.
+  induction l; intros; simpl in *; auto.
+  destruct string_dec, a; simpl in *; subst.
+  - destruct H0.
+    + inversion H0;contradiction.
+    + right; apply IHl; auto.
+  - destruct H0; auto.
+Qed.
+
+Lemma PPlusSubsteps_PPlusSubsteps_inline_Rule_NoExec f m o rn upds execs calls :
+  NoDup (map fst (getRules m)) ->
+  ~In (Rle rn) execs ->
+  PPlusSubsteps (inlineSingle_Rule_BaseModule f rn m) o upds execs calls ->
+  PPlusSubsteps m o upds execs calls.
+Proof.
+  induction 3; simpl in *.
+  - econstructor 1; eauto.
+  - rewrite HUpds, HExecs, HCalls.
+    econstructor 2; eauto.
+    + assert (rn <> rn0);[intro; subst; apply H0; rewrite HExecs; left; reflexivity|].
+      eapply inlineSingle_Rule_in_list_notKey; eauto.
+    + apply IHPPlusSubsteps.
+      intro; apply H0; rewrite HExecs; right; auto.
+  - rewrite HUpds, HExecs, HCalls.
+    econstructor 3; eauto.
+    apply IHPPlusSubsteps.
+    intro; apply H0; rewrite HExecs; right; auto.
+Qed.
+
+Lemma Rle_injective rn rn0 :
+  Rle rn = Rle rn0 <-> rn = rn0.
+Proof.
+  split; intro; subst; auto; inv H; auto.
+Qed.
+
+Lemma PPlus_inlineSingle_BaseModule_with_action f m o rn rb upds execs calls:
+  PPlusSubsteps (inlineSingle_Rule_BaseModule f rn m) o upds ((Rle rn)::execs) calls ->
+  In (rn, rb) (getRules m) ->
+  In f (getMethods m) ->
+  NoDup (map fst (getMethods m)) ->
+  NoDup (map fst (getRules m)) ->
+  exists upds1 upds2 calls1 calls2 reads,
+    upds [=] upds1++upds2 /\
+    calls [=] calls1++calls2 /\
+    DisjKey upds2 upds1 /\
+    SubList (getKindAttr reads) (getKindAttr (getRegisters m)) /\
+    SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) /\
+    PSemAction o (inlineSingle f (rb type)) reads upds1 calls1 WO /\
+    PPlusSubsteps m o upds2 execs calls2.
+Proof.
+  intros.
+  rewrite (inlineSingle_Rule_preserves_names f rn) in H3.
+  apply (inlineSingle_Rule_BaseModule_dec2 f) in H0; dest.
+  eapply (ExtractRuleAction) in H; simpl in *; eauto; dest.
+  simpl in *.
+  exists x1, x2, x3, x4, x; repeat split; auto.
+  - rewrite shatter_word_0 in H; assumption.
+  - apply Permutation_cons_inv in H9.
+    rewrite H9.
+    rewrite <- (inlineSingle_Rule_preserves_names) in H3.
+    apply (PPlusSubsteps_PPlusSubsteps_inline_Rule_NoExec (rn:=rn)(f:=f)); auto.
 Qed.
