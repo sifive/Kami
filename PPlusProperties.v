@@ -4440,8 +4440,7 @@ Proof.
 Qed.
 
 Lemma PSemAction_In_inline (f : DefMethT) o:
-  forall {retK2} a,
-  forall readRegs newRegs calls (retV2 : type retK2),
+  forall {retK2} a readRegs newRegs calls (retV2 : type retK2),
     PSemAction o (inlineSingle f a) readRegs newRegs calls retV2 ->
     exists readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 calls3,
       DisjKey newRegs1 newRegs2 /\
@@ -4726,3 +4725,103 @@ Proof.
     rewrite <- (inlineSingle_Rule_preserves_names) in H3.
     apply (PPlusSubsteps_PPlusSubsteps_inline_Rule_NoExec (rn:=rn)(f:=f)); auto.
 Qed.
+
+Lemma place_execs_PPlus f m o reads upds1 calls1 fcalls (execs : list RuleOrMeth):
+  PSemAction_meth_collector f o reads upds1 calls1 fcalls ->
+  NoDup (map fst (getMethods m)) ->
+  In f (getMethods m) ->
+  SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) ->
+  SubList (getKindAttr reads) (getKindAttr (getRegisters m)) ->
+  forall upds2 execs calls2,
+  DisjKey upds1 upds2 ->
+  PPlusSubsteps m o upds2 execs calls2 ->
+  PPlusSubsteps m o (upds1++upds2) ((map Meth fcalls) ++ execs) (calls1++calls2).
+Proof.
+  induction 1; simpl in *; auto.
+  intros; destruct f; simpl in *.
+  assert (upds ++ upds0 [=] upds2 ++ (upds1++upds0)) as P1;
+    [rewrite H2, app_assoc; apply Permutation_app_tail, Permutation_app_comm
+    |rewrite P1; clear P1].
+  assert (calls ++ calls0 [=] calls2 ++ (calls1++calls0)) as P1;
+    [rewrite H3, app_assoc; apply Permutation_app_tail, Permutation_app_comm
+    |rewrite P1; clear P1].
+  rewrite H4; simpl.
+  assert (SubList (getKindAttr upds1) (getKindAttr (getRegisters m))) as P2;
+    [repeat intro; apply H8; rewrite H2, map_app, in_app_iff; left; auto|].
+  assert (SubList (getKindAttr reads1) (getKindAttr (getRegisters m))) as P3;
+    [repeat intro; apply H9; rewrite H1, map_app, in_app_iff; left; auto|].
+  assert (DisjKey upds1 upds0) as P4;
+    [intro k; specialize (H10 k); rewrite H2, map_app, in_app_iff in H10;
+     clear - H10; firstorder|].
+  specialize (IHPSemAction_meth_collector H6 H7 P2 P3 _ _ _ P4 H11).
+  econstructor 3; eauto.
+  - inv H11; auto.
+  - repeat intro; apply H9.
+    rewrite H1, map_app, in_app_iff; auto.
+  - repeat intro; apply H8.
+    rewrite H2, map_app, in_app_iff; auto.
+  - rewrite H2 in H10.
+    clear - H0 H10.
+    intro k; specialize (H0 k); specialize (H10 k).
+    rewrite map_app, in_app_iff in *; firstorder.
+Qed.
+
+Lemma MatchingExecCalls_Base_add_fcalls m calls fcalls execs :
+  MatchingExecCalls_flat calls execs m ->
+  MatchingExecCalls_flat (fcalls++calls) ((map Meth fcalls)++execs) m.
+Proof.
+  induction fcalls; simpl; auto; intros.
+  specialize (IHfcalls H); clear H.
+  unfold MatchingExecCalls_flat in *; intros; specialize (IHfcalls _ H).
+  destruct (MethT_dec f a);[rewrite getNumFromCalls_eq_cons, getNumFromExecs_eq_cons
+                           |rewrite getNumFromCalls_neq_cons, getNumFromExecs_neq_cons]; auto.
+  omega.
+Qed.
+
+Lemma InRule_In_inlined_neq2 f rn1 rn2 rb m:
+  rn1 <> rn2 ->
+  In (rn2, rb) (getRules (inlineSingle_Rule_BaseModule f rn1 m)) ->
+  In (rn2, rb) (getRules m).
+Proof.
+  simpl.
+  apply inlineSingle_Rule_in_list_notKey.
+Qed.
+
+Lemma PPlusStep_NotIn_inline_Rule f m o rn upds execs calls :
+  NoDup (map fst (getRules m)) ->
+  In f (getMethods m) ->
+  ~In (Rle rn) execs ->
+  PPlusStep (inlineSingle_Rule_BaseModule f rn m) o upds execs calls ->
+  PPlusStep m o upds execs calls.
+Proof.
+  induction 4; econstructor.
+  - induction H2.
+    + econstructor 1; auto.
+    + rewrite HUpds, HExecs, HCalls.
+      econstructor 2; eauto.
+      * eapply InRule_In_inlined_neq2; eauto.
+        intro; subst; apply H1; rewrite HExecs; left; reflexivity.
+      * eapply PPlusSubsteps_PPlusSubsteps_inline_Rule_NoExec; eauto.
+        intro; apply H1; rewrite HExecs; right; assumption.
+    + rewrite HUpds, HExecs, HCalls.
+      econstructor 3; eauto.
+      eapply PPlusSubsteps_PPlusSubsteps_inline_Rule_NoExec; eauto.
+      intro; apply H1; rewrite HExecs; right; assumption.
+  - intros g P1.
+    apply H3; simpl; auto.
+Qed.
+
+Lemma PPlusStep_In_inline_Rule f m o rn rb upds execs calls:
+  In (rn, rb) (getRules m) ->
+  In f (getMethods m) ->
+  NoDup (map fst (getRules m)) ->
+  NoDup (map fst (getMethods m)) ->
+  In (Rle rn) execs ->
+  PPlusStep (inlineSingle_Rule_BaseModule f rn m) o upds execs calls ->
+  exists fcalls execs' calls',
+    (forall g, In g fcalls -> (fst g) = (fst f)) /\
+    execs [=] (map Meth fcalls)++execs' /\
+    calls [=] fcalls++calls' /\
+    PPlusStep m o upds execs' calls'.
+Proof.
+Admitted.
