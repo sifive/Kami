@@ -685,3 +685,11 @@ Theorem TraceInclusion_flatten_inline_everything_flatten_inline_remove (m : ModW
 Proof.
   eauto using flatten_inline_remove_TraceInclusion.
 Qed.
+
+Theorem TraceInclusion_inlineSingle_Rule_BaseModule_l (m : BaseModule) (f : DefMethT) (rn : string):
+  In f (getMethods m) ->
+  WfMod m ->
+  TraceInclusion (inlineSingle_Rule_BaseModule f rn m) m.
+Proof.
+  eauto using TraceInclusion_inlining_Rules_l.
+Qed.

@@ -4726,7 +4726,7 @@ Proof.
     apply (PPlusSubsteps_PPlusSubsteps_inline_Rule_NoExec (rn:=rn)(f:=f)); auto.
 Qed.
 
-Lemma place_execs_PPlus f m o reads upds1 calls1 fcalls (execs : list RuleOrMeth):
+Lemma place_execs_PPlus f m o reads upds1 calls1 fcalls :
   PSemAction_meth_collector f o reads upds1 calls1 fcalls ->
   NoDup (map fst (getMethods m)) ->
   In f (getMethods m) ->
@@ -4811,17 +4811,166 @@ Proof.
     apply H3; simpl; auto.
 Qed.
 
-Lemma PPlusStep_In_inline_Rule f m o rn rb upds execs calls:
-  In (rn, rb) (getRules m) ->
+Lemma PPlusSubsteps_undef_inline_Rule f m o rn upds execs calls:
+  ~In rn (map fst (getRules m)) ->
+  PPlusSubsteps (inlineSingle_Rule_BaseModule f rn m) o upds execs calls ->
+  PPlusSubsteps m o upds execs calls.
+Proof.
+  induction 2.
+  - econstructor 1; eauto.
+  - econstructor 2; eauto.
+    apply InRule_In_inlined_neq2 in HInRules; auto.
+    apply (in_map fst) in HInRules; simpl in *.
+    rewrite <-inlineSingle_Rule_preserves_names in HInRules.
+    intro; subst; contradiction.
+  - econstructor 3; eauto.
+Qed.
+
+Lemma PPlusStep_undef_inline_Rule f m o rn upds execs calls:
+  ~In rn (map fst (getRules m)) ->
+  PPlusStep (inlineSingle_Rule_BaseModule f rn m) o upds execs calls ->
+  PPlusStep m o upds execs calls.
+Proof.
+  induction 2.
+  econstructor.
+  - eapply PPlusSubsteps_undef_inline_Rule; eauto.
+  - apply H1.
+Qed.
+
+Lemma PPlusTrace_undef_inline_Rule f m rn l:
+  ~In rn (map fst (getRules m)) ->
+  forall o,
+  PPlusTrace (inlineSingle_Rule_BaseModule f rn m) o l ->
+  PPlusTrace m o l.
+Proof.
+  induction l; subst.
+  - intros; inv H0; simpl in *.
+    + econstructor 1; eauto.
+    + discriminate.
+  - intros.
+    inv H0;[discriminate|].
+    inv HPPlusTrace.
+    econstructor 2; eauto.
+    eapply PPlusStep_undef_inline_Rule; eauto.
+Qed.
+
+Lemma PPlusStep_In_inline_Rule f m o rn upds execs calls:
+  In rn (map fst (getRules m)) ->
   In f (getMethods m) ->
   NoDup (map fst (getRules m)) ->
   NoDup (map fst (getMethods m)) ->
   In (Rle rn) execs ->
   PPlusStep (inlineSingle_Rule_BaseModule f rn m) o upds execs calls ->
-  exists fcalls execs' calls',
-    (forall g, In g fcalls -> (fst g) = (fst f)) /\
-    execs [=] (map Meth fcalls)++execs' /\
-    calls [=] fcalls++calls' /\
-    PPlusStep m o upds execs' calls'.
+  exists fcalls,
+    PPlusStep m o upds ((map Meth fcalls)++execs) (fcalls++calls).
 Proof.
-Admitted.
+  induction 6.
+  rewrite in_map_iff in H; destruct H as [x TMP]; destruct TMP as [fst_eq H]; destruct x; subst.
+  specialize (in_split _ _ H3) as P1; dest.
+  assert (execs [=] (Rle s)::(x++x0)) as P1;[rewrite H6; rewrite Permutation_middle; reflexivity
+                                             | rewrite P1 in *].
+  specialize (PPlus_inlineSingle_BaseModule_with_action _ H4 H H0 H2 H1) as P2; dest.
+  specialize (PSemAction_In_inline _ _ H12) as P2; dest.
+  exists x12.
+  econstructor.
+  - assert (SubList (getKindAttr x6) (getKindAttr (getRegisters m))) as P2;
+      [repeat intro; apply H10; rewrite H15, map_app, in_app_iff; auto|].
+    assert (SubList (getKindAttr x8) (getKindAttr (getRegisters m))) as P3;
+      [repeat intro; apply H11; rewrite H16, map_app, in_app_iff; auto|].
+    assert (DisjKey x8 x2) as P4;
+      [rewrite H16 in H9; clear - H9; intro k; specialize (H9 k);
+       rewrite map_app, in_app_iff in *; firstorder|].
+    specialize (place_execs_PPlus H18 H2 H0 P3 P2 P4 H13) as P5.
+    assert (map Meth x12 ++ execs [=] ((Rle s)::(map Meth x12 ++ x ++ x0))) as TMP;
+      [simpl; rewrite P1; repeat rewrite Permutation_middle; apply Permutation_app_tail; auto
+      |rewrite TMP; clear TMP].
+    assert (x12++calls [=] ((x12++x11)++(x10++x4))) as TMP;
+      [rewrite H8, <- app_assoc; apply Permutation_app_head; rewrite app_assoc;
+       apply Permutation_app_tail; rewrite H17; apply Permutation_app_comm
+      |rewrite TMP; clear TMP].
+    assert (upds [=] (x9 ++(x8++x2))) as TMP;
+      [rewrite H7, H16, app_assoc; apply Permutation_app_tail, Permutation_app_comm
+      |rewrite TMP; clear TMP].
+    econstructor 2; eauto.
+    + inv P5; auto.
+    + repeat intro; apply H10; rewrite H15, map_app, in_app_iff; auto.
+    + repeat intro; apply H11; rewrite H16, map_app, in_app_iff; auto.
+    + rewrite H16 in H9; clear - H9 H14.
+      intro k; specialize (H9 k); specialize (H14 k); rewrite map_app, in_app_iff in *;
+        firstorder.
+    + assert (NoDup (map fst (getRules (inlineSingle_Rule_BaseModule f s m)))) as P6;
+        [simpl; rewrite <-inlineSingle_Rule_preserves_names; auto|].
+      assert (NoDup (map fst (getMethods (inlineSingle_Rule_BaseModule f s m)))) as P7;
+        [auto|].
+      assert ((Rle s :: x ++ x0) [=] ([Rle s]++(x++x0))) as TMP;
+        [auto|rewrite TMP in H4; clear TMP].
+      specialize (PPlusSubsteps_split_execs_OneRle P7 P6 _ _ H4).
+      intros.
+      rewrite in_app_iff in H21.
+      destruct H21.
+      * clear - H21.
+        induction x12; simpl in *;[contradiction|destruct H21; subst; auto; apply IHx12; auto].
+      * assert (In (Rle s) [Rle s]) as P8;[left; reflexivity|].
+        specialize (H20 _ _ P8 H21); simpl in *;  assumption.
+  - apply MatchingExecCalls_Base_add_fcalls.
+    intros f0 P2.
+    apply H5; auto.
+Qed.
+
+Lemma PPlusStrongTraceInclusion_inlining_Rules_l m f rn :
+  In f (getMethods m) ->
+  (WfMod (Base m)) ->
+  StrongPPlusTraceInclusion (inlineSingle_Rule_BaseModule f rn m) m.
+Proof.
+  unfold StrongPPlusTraceInclusion; induction 3; subst.
+  - exists nil; split.
+    + econstructor; eauto.
+    + constructor.
+  - dest.
+    pose proof H0 as sth.
+    specialize (H0).
+      destruct (in_dec (RuleOrMeth_dec) (Rle rn) execs),(in_dec string_dec rn (map fst (getRules m))); inv H0.
+    * destruct HWfBaseModule as [? [? [NoDupMeths [NoDupRegisters NoDupRle]]]].
+      specialize (PPlusStep_In_inline_Rule i0 H NoDupRle NoDupMeths i HPPlusStep) as TMP; dest.
+      exists ((upds, ((map Meth x0 ++ execs), (x0++calls)))::x); split.
+      -- econstructor 2; eauto.
+      -- constructor; auto.
+         unfold WeakInclusion_flat, getListFullLabel_diff_flat.
+         split; intros; simpl.
+         ++ symmetry; rewrite getNumFromExecs_app, getNumFromCalls_app, (call_execs_counts_eq);
+            omega.
+         ++ simpl in *.
+            destruct H6; exists x1; rewrite in_app_iff in *.
+            destruct H6; auto.
+            exfalso; clear -H6; induction x0; simpl in *; eauto.
+            destruct H6;[discriminate|auto].
+    * exists ((upds, (execs, calls))::x); split.
+      -- econstructor 2; eauto.
+         eapply PPlusStep_undef_inline_Rule; eauto.
+      -- econstructor; eauto.
+         unfold WeakInclusion_flat; split; intros; auto.
+    * exists ((upds, (execs, calls))::x); split.
+      -- econstructor 2; eauto.
+         eapply PPlusStep_NotIn_inline_Rule; eauto.
+         inv HWfBaseModule; dest; auto.
+      -- econstructor; eauto.
+         unfold WeakInclusion_flat; split; intros; auto.
+    * exists ((upds, (execs, calls))::x); split.
+      -- econstructor 2; eauto.
+         eapply (PPlusStep_NotIn_inline_Rule); eauto.
+         inv HWfBaseModule; dest; auto.
+      -- econstructor; eauto.
+         unfold WeakInclusion_flat; split; intros; auto.
+Qed.
+
+Theorem TraceInclusion_inlining_Rules_l m f rn:
+  In f (getMethods m) ->
+  WfMod m ->
+  TraceInclusion (inlineSingle_Rule_BaseModule f rn m) m.
+Proof.
+  intros.
+  apply PPlusTraceInclusion_TraceInclusion; auto.
+  - apply WfMod_Rule_inlined; auto.
+  - apply StrongPPlusTraceInclusion_PPlusTraceInclusion.
+    apply PPlusStrongTraceInclusion_inlining_Rules_l; auto.
+Qed.
