@@ -5126,17 +5126,82 @@ Proof.
            rewrite Permutation_app_comm in H10; rewrite H10; repeat rewrite app_assoc.
            apply Permutation_app_tail.
            rewrite Permutation_app_comm, <-app_assoc; reflexivity.
-        -- admit.
-        -- admit.
-        -- admit.
+        -- intro k; specialize (H6 k); specialize (H3 k); specialize (HDisjRegs k);
+             specialize (H11 k).
+           rewrite H4, H18 in HDisjRegs. rewrite H18 in H6.
+           clear - H2 H10 H11 HDisjRegs H3 H6.
+           repeat rewrite map_app, in_app_iff in *.
+           firstorder.
+           ++ assert (~In k (map fst (x6++x7)));[rewrite <-H2, map_app, in_app_iff;firstorder
+                                                |rewrite map_app, in_app_iff in *].
+              firstorder.
+           ++ assert (~In k (map fst (x6++x7)));[rewrite <-H2, map_app, in_app_iff;firstorder
+                                                |rewrite map_app, in_app_iff in *].
+              firstorder.
+        -- rewrite H16, map_app, SubList_app_l_iff in *; clear - H8 H12; firstorder.
+        -- rewrite H18, map_app, SubList_app_l_iff in *; clear - H7 H13; firstorder.
         -- econstructor 3; eauto.
-           ++ admit.
-           ++ admit.
+           ++ rewrite H16, map_app, SubList_app_l_iff in *; clear - H8; dest; auto.
+           ++ rewrite H18, map_app, SubList_app_l_iff in *; clear - H7; dest; auto.
            ++ repeat rewrite <-app_assoc; rewrite Permutation_app_comm, <-app_assoc.
               apply Permutation_app_head.
               rewrite <-app_assoc; apply Permutation_app_head, Permutation_app_comm.
-           ++ admit.
+           ++ rewrite H4, H18 in HDisjRegs; rewrite H18 in H6.
+              clear - H6 H3 HDisjRegs H11 H2.
+              intro k; specialize (H6 k); specialize (H3 k); specialize (HDisjRegs k);
+                specialize (H11 k).
+              repeat rewrite map_app, in_app_iff in *.
+              firstorder.
+              ** assert (~In k (map fst (x6++x7)));[rewrite <-H2, map_app, in_app_iff;firstorder
+                                                |rewrite map_app, in_app_iff in *].
+                 firstorder.
            ++ rewrite map_app; simpl; auto.
         -- apply PSemAction_meth_collector_stitch; auto.
-           admit.
-Admitted.
+           ++ rewrite H4, H18 in HDisjRegs; rewrite H18 in H6.
+              clear - H6 H3 HDisjRegs H11 H2.
+              intro k; specialize (H6 k); specialize (H3 k); specialize (HDisjRegs k);
+                specialize (H11 k).
+              repeat rewrite map_app, in_app_iff in *.
+              firstorder.
+              ** assert (~In k (map fst (x6++x7)));[rewrite <-H2, map_app, in_app_iff;firstorder
+                                                |rewrite map_app, in_app_iff in *].
+                 firstorder.
+Qed.
+
+Lemma key_neq_inlineSingle_Meth fn fb f gn l:
+  fn <> gn ->
+  In (fn, fb) (inlineSingle_Meth_in_list f gn l) ->
+  In (fn, fb) l.
+Proof.
+  intros;induction l; simpl in *; auto.
+  destruct string_dec.
+  - destruct H0, a; simpl in *; subst; auto.
+    exfalso; inv H0; apply H; reflexivity.
+  - destruct H0; auto.
+Qed.
+      
+Lemma PPlusSubsteps_NoExec_PPlusSubsteps_inline_Meth f m o gn upds execs calls :
+  NoDup (map fst (getMethods m)) ->
+  In f (getMethods m) ->
+  (forall gb, ~In (Meth (gn, gb)) execs) ->
+  PPlusSubsteps (inlineSingle_Meth_BaseModule f gn m) o upds execs calls ->
+  PPlusSubsteps m o upds execs calls.
+Proof.
+  induction 4.
+  - econstructor 1; eauto.
+  - rewrite HUpds, HExecs, HCalls.
+    econstructor 2; eauto.
+    apply IHPPlusSubsteps; repeat intro.
+    eapply H1; rewrite HExecs; right; eauto.
+  - rewrite HUpds, HExecs, HCalls.
+    econstructor 3; eauto.
+    + simpl in HInMeths.
+      eapply key_neq_inlineSingle_Meth; eauto.
+      intro; subst.
+      eapply H1; rewrite HExecs; left; reflexivity.
+    + apply IHPPlusSubsteps; repeat intro.
+      eapply H1; rewrite HExecs; right; eauto.
+Qed.
+      
+      
+  
