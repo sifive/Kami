@@ -5002,7 +5002,7 @@ Proof.
     right; assumption.
 Qed.
 
-Lemma PPlus_inline_meths f gn m o:
+Lemma PPlus_uninline_meths f gn m o:
   (fst f) <> gn ->
   NoDup (map fst (getMethods m)) ->
   forall gexecs,
@@ -5168,6 +5168,29 @@ Proof.
                  firstorder.
 Qed.
 
+Corollary PPlus_uninline_meths2 f gn m o:
+  In f (getMethods m) ->
+  (fst f) <> gn ->
+  NoDup (map fst (getMethods m)) ->
+  forall gexecs,
+    (forall g, In g gexecs -> (fst g = gn)) ->
+    forall upds calls,
+      PPlusSubsteps (inlineSingle_Meth_BaseModule f gn m) o upds (map Meth gexecs) calls ->
+      exists fcalls,
+        PPlusSubsteps m o upds (map Meth (fcalls++gexecs)) (fcalls++calls).
+Proof.
+  intros.
+  apply PPlus_uninline_meths in H3; auto; dest.
+  apply DisjKey_Commutative in H5.
+  exists x3; rewrite map_app.
+  specialize (place_execs_PPlus H9 H1 H H7 H6 H5 H8) as P1.
+  rewrite H3, H4.
+  assert (x3++x1++x2 [=] x1++x3++x2) as TMP;
+    [repeat rewrite app_assoc; apply Permutation_app_tail, Permutation_app_comm
+    |rewrite TMP; clear TMP].
+  assumption.
+Qed.
+  
 Lemma key_neq_inlineSingle_Meth fn fb f gn l:
   fn <> gn ->
   In (fn, fb) (inlineSingle_Meth_in_list f gn l) ->
@@ -5183,7 +5206,7 @@ Qed.
 Lemma PPlusSubsteps_NoExec_PPlusSubsteps_inline_Meth f m o gn upds execs calls :
   NoDup (map fst (getMethods m)) ->
   In f (getMethods m) ->
-  (forall gb, ~In (Meth (gn, gb)) execs) ->
+  (forall g,  In (Meth g) execs -> fst g <> gn) ->
   PPlusSubsteps (inlineSingle_Meth_BaseModule f gn m) o upds execs calls ->
   PPlusSubsteps m o upds execs calls.
 Proof.
@@ -5192,16 +5215,256 @@ Proof.
   - rewrite HUpds, HExecs, HCalls.
     econstructor 2; eauto.
     apply IHPPlusSubsteps; repeat intro.
-    eapply H1; rewrite HExecs; right; eauto.
+    eapply H1; eauto; rewrite HExecs; right; auto.
   - rewrite HUpds, HExecs, HCalls.
     econstructor 3; eauto.
     + simpl in HInMeths.
       eapply key_neq_inlineSingle_Meth; eauto.
       intro; subst.
-      eapply H1; rewrite HExecs; left; reflexivity.
+      eapply H1; eauto;[rewrite HExecs; left; reflexivity|];auto.
     + apply IHPPlusSubsteps; repeat intro.
-      eapply H1; rewrite HExecs; right; eauto.
+      eapply H1;[rewrite HExecs; right|]; eauto.
 Qed.
-      
-      
-  
+
+Lemma PPlusSubsteps_split  m o execs1:
+  forall execs2 upds calls,
+    NoDup (map fst (getMethods m)) ->
+    NoDup (map fst (getRules m)) ->
+    PPlusSubsteps m o upds (execs1++execs2) calls ->
+    exists upds1 upds2 calls1 calls2,
+      DisjKey upds1 upds2 /\
+      upds [=] upds1++upds2 /\
+      calls [=] calls1++calls2 /\
+      PPlusSubsteps m o upds1 execs1 calls1 /\
+      PPlusSubsteps m o upds2 execs2 calls2.
+Proof.
+  induction execs1; intros; simpl in *.
+  - exists nil, upds, nil, calls.
+    repeat split; auto.
+    + intro; simpl; auto.
+    + econstructor; inv H1; auto.
+  - destruct a.
+    + specialize (PPlusSubsteps_exec_Rule_defined _ (in_eq (Rle rn) (execs1++execs2)) H1) as TMP;
+        dest.
+      specialize (ExtractRuleAction _ H0 H2 (in_eq (Rle rn) (execs1++execs2)) H1) as TMP; dest.
+      simpl in *; apply Permutation_cons_inv in H9; rewrite <-H9 in H11.
+      specialize (IHexecs1 _ _ _ H H0 H11); dest.
+      exists (x2++x7), x8, (x4++x9), x10.
+      repeat split.
+      * rewrite H13 in H6; intro; clear - H6 H12.
+        specialize (H12 k); specialize (H6 k).
+        rewrite map_app, in_app_iff in *; firstorder.
+      * rewrite H4, H13, app_assoc; reflexivity.
+      * rewrite H5, H14, app_assoc; reflexivity.
+      * econstructor 2; auto.
+        -- inv H11; auto.
+        -- apply H2.
+        -- rewrite shatter_word_0 in H3; apply H3.
+        -- assumption.
+        -- assumption.
+        -- rewrite H13 in H6; clear - H6; intro k.
+           specialize (H6 k); rewrite map_app, in_app_iff in *; firstorder.
+        -- setoid_rewrite <- H9 in H10.
+           intro; destruct x11; auto.
+           intro; eapply H10; rewrite in_app_iff; left; apply H17.
+      * apply H16.
+    + destruct f.
+      specialize (PPlusSubsteps_exec_Meth_defined _ _ (in_eq (Meth (s, s0)) (execs1++execs2)) H1)as TMP; dest.
+      specialize (extract_exec_PPlus _ H H2 H1) as TMP; dest; subst; simpl in *.
+      specialize (IHexecs1 _ _ _ H H0 H10); dest.
+      exists (x1++x7), x8, (x3++x9), x10.
+      repeat split; auto.
+      * rewrite H11 in H7; intro k; clear - H7 H3.
+        specialize (H3 k); specialize (H7 k); rewrite map_app, in_app_iff in *; firstorder.
+      * rewrite H5, H11, app_assoc; reflexivity.
+      * rewrite H6, H12, app_assoc; reflexivity.
+      * econstructor 3.
+        -- inv H10; eauto.
+        -- apply H2.
+        -- apply H4.
+        -- assumption.
+        -- assumption.
+        -- reflexivity.
+        -- reflexivity.
+        -- reflexivity.
+        -- rewrite H11 in H7.
+           intro k; specialize (H7 k); clear - H7; rewrite map_app, in_app_iff in *.
+           firstorder.
+        -- assumption.
+Qed.
+
+Lemma PPlusSubsteps_PPlusSubsteps_inline_Meth_NotDef f gn m o:
+  forall execs upds calls,
+    ~In gn (map fst (getMethods m)) ->
+    PPlusSubsteps (inlineSingle_Meth_BaseModule f gn m) o upds execs calls ->
+    PPlusSubsteps m o upds execs calls.
+Proof.
+  induction 2.
+  - econstructor 1; eauto.
+  - rewrite HUpds, HExecs, HCalls.
+    econstructor 2; eauto.
+  - rewrite HUpds, HExecs, HCalls.
+    econstructor 3; eauto.
+    simpl in HInMeths.
+    rewrite <-Method_list_invariance in HInMeths; auto.
+Qed.
+
+Definition gexecs (gn : string) (exec : RuleOrMeth) : bool :=
+  match exec with
+  | Rle _ => false
+  | Meth f => (getBool (string_dec gn (fst f)))
+  end.
+
+Lemma gexecs_all_Meth_correct gn execs :
+  exists meths,
+    (filter (gexecs gn) execs) = (map Meth meths) /\
+    (forall g, In g meths -> fst g = gn).
+Proof.
+  induction execs.
+  - exists nil; simpl; split; intros; auto; contradiction.
+  - destruct a; auto.
+    unfold gexecs; simpl.
+    destruct string_dec; simpl; auto.
+    dest; exists (f::x).
+    simpl; rewrite <-H; split; intros; auto.
+    destruct H1; subst; auto.
+Qed.
+
+Lemma gexecs_correct gn execs:
+  (forall g, In (Meth g) (filter (gexecs gn) execs) -> fst g = gn).
+Proof.
+  induction execs; intros; simpl in *; try contradiction.
+  unfold gexecs in H; destruct a; simpl in *; auto.
+  destruct string_dec; simpl in *; auto.
+  destruct H;[inv H|]; auto.
+Qed.
+
+Lemma gexecs_complement_correct gn execs:
+  (forall g, In (Meth g) (filter (complement (gexecs gn)) execs) -> fst g <> gn).
+Proof.
+  induction execs; intros; simpl in *; try contradiction.
+  unfold gexecs in H; destruct a; simpl in *.
+  - destruct H;[discriminate|auto].
+  - destruct string_dec; simpl in *; auto.
+    destruct H; auto.
+    inv H;intro; apply n; auto.
+Qed.
+
+Lemma  inlineSingle_Meth_in_list_key_match f gn l:
+  (fst f) = gn ->
+  inlineSingle_Meth_in_list f gn l = l.
+Proof.
+  induction l; simpl; auto.
+  intros.
+  destruct string_dec.
+  - unfold inlineSingle_Meth.
+    destruct a; simpl in *; subst.
+    destruct string_dec.
+    + rewrite IHl; auto.
+    + exfalso; apply n; reflexivity.
+  - rewrite IHl; auto.
+Qed.
+
+Lemma PPlusSubsteps_Meth_key_match f gn m o upds execs calls:
+  (fst f) = gn ->
+  PPlusSubsteps (inlineSingle_Meth_BaseModule f gn m) o upds execs calls ->
+  PPlusSubsteps m o upds execs calls.
+Proof.
+  induction 2.
+  - econstructor 1; eauto.
+  - rewrite HUpds, HExecs, HCalls.
+    econstructor 2; eauto.
+  - rewrite HUpds, HExecs, HCalls.
+    econstructor 3; eauto.
+    clear - H HInMeths.
+    simpl in *; rewrite inlineSingle_Meth_in_list_key_match in HInMeths; auto.
+Qed.
+
+Lemma PPlusSubsteps_PPlusSubsteps_inline_Meth f gn m o :
+  forall execs upds calls,
+    In f (getMethods m) ->
+    NoDup (map fst (getMethods m)) ->
+    NoDup (map fst (getRules m)) ->
+    PPlusSubsteps (inlineSingle_Meth_BaseModule f gn m) o upds execs calls ->
+    exists fcalls,
+      PPlusSubsteps m o upds ((map Meth (fcalls))++execs) (fcalls++calls).
+Proof.
+  destruct (in_dec string_dec gn (map fst (getMethods m))).
+  - destruct (string_dec (fst f) gn).
+    + intros.
+      exists nil; simpl in *.
+      eapply PPlusSubsteps_Meth_key_match; eauto.
+    + rewrite in_map_iff in i; dest; destruct x; subst; simpl in *.
+      intros; specialize (separate_calls_by_filter execs (gexecs s)) as P1.
+      rewrite P1 in H3.
+      assert (NoDup (map fst (getMethods (inlineSingle_Meth_BaseModule f s m)))) as P2;
+        [simpl; rewrite SameKeys_inline_Meth; auto|].
+      assert (NoDup (map fst (getRules (inlineSingle_Meth_BaseModule f s m)))) as P3; auto.
+      specialize (PPlusSubsteps_split_execs_OneRle P2 P3 _ _ H3) as P4.
+      specialize (gexecs_all_Meth_correct s execs) as P5; dest.
+      rewrite H4 in H3.
+      apply PPlusSubsteps_split in H3; auto.
+      * dest; specialize (PPlus_uninline_meths2 H n H1 _ H5 H8) as P5; dest.
+        specialize (gexecs_complement_correct (gn:=s) execs) as P5.
+        specialize (PPlusSubsteps_NoExec_PPlusSubsteps_inline_Meth H1 H P5 H9) as P6.
+        exists x4; rewrite H6, H7, P1, H4, app_assoc, <-map_app, app_assoc.
+        eapply PPlusSubsteps_merge; eauto.
+        intros; destruct x5;[exfalso; clear -H11; induction (x4++x)|];auto.
+        apply IHl; simpl in H11; destruct H11; auto; discriminate.
+  - intros; exists nil; simpl.
+    eapply PPlusSubsteps_PPlusSubsteps_inline_Meth_NotDef; eauto.
+Qed.
+
+Lemma PPlusStep_PPlusStep_inline_Meth f gn m o :
+  forall execs upds calls,
+    In f (getMethods m) ->
+    NoDup (map fst (getMethods m)) ->
+    NoDup (map fst (getRules m)) ->
+    PPlusStep (inlineSingle_Meth_BaseModule f gn m) o upds execs calls ->
+    exists fcalls,
+      PPlusStep m o upds ((map Meth (fcalls))++execs) (fcalls++calls).
+Proof.
+  induction 4.
+  apply PPlusSubsteps_PPlusSubsteps_inline_Meth in H2; auto.
+  dest; exists x.
+  econstructor; eauto.
+  intros f0 P1.
+  rewrite getNumFromCalls_app, getNumFromExecs_app, call_execs_counts_eq.
+  specialize (H3 f0); simpl in *; rewrite SameKeys_inline_Meth in *.
+  specialize (H3 P1); omega.
+Qed.
+
+Lemma PPlusStrongTraceInclusion_inlining_Meths_l m f rn :
+  In f (getMethods m) ->
+  (WfMod (Base m)) ->
+  StrongPPlusTraceInclusion (inlineSingle_Meth_BaseModule f rn m) m.
+Proof.
+  unfold StrongPPlusTraceInclusion; induction 3; subst.
+  - exists nil; split.
+    + econstructor; eauto.
+    + constructor.
+  - inv H0; inv HWfBaseModule; dest.
+    apply (PPlusStep_PPlusStep_inline_Meth) in HPPlusStep; auto; dest.
+    exists ((upds, ((map Meth x0 ++ execs), (x0++calls)))::x); split.
+    + econstructor 2; eauto.
+    + constructor; auto.
+      unfold WeakInclusion_flat; unfold getListFullLabel_diff_flat; simpl; split; intros.
+      * rewrite getNumFromCalls_app, getNumFromExecs_app.
+        repeat rewrite call_execs_counts_eq; omega.
+      * dest; exists x1; rewrite in_app_iff in H9.
+        destruct H9; auto.
+        clear - H9; induction x0; simpl in *;[contradiction|].
+        destruct H9;[discriminate|auto].
+Qed.
+
+Theorem TraceInclusion_inlining_Meths_l m f rn:
+  In f (getMethods m) ->
+  WfMod m ->
+  TraceInclusion (inlineSingle_Meth_BaseModule f rn m) m.
+Proof.
+  intros.
+  apply PPlusTraceInclusion_TraceInclusion; auto.
+  - apply WfMod_Meth_inlined; auto.
+  - apply StrongPPlusTraceInclusion_PPlusTraceInclusion.
+    apply PPlusStrongTraceInclusion_inlining_Meths_l; auto.
+Qed.

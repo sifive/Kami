@@ -693,3 +693,11 @@ Theorem TraceInclusion_inlineSingle_Rule_BaseModule_l (m : BaseModule) (f : DefM
 Proof.
   eauto using TraceInclusion_inlining_Rules_l.
 Qed.
+
+Theorem TraceInclusion_inlineSingle_Meth_BaseModule_l (m : BaseModule) (f : DefMethT) (gn : string):
+  In f (getMethods m) ->
+  WfMod m ->
+  TraceInclusion (inlineSingle_Meth_BaseModule f gn m) m.
+Proof.
+  eauto using TraceInclusion_inlining_Meths_l.
+Qed.
