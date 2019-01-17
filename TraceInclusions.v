@@ -420,12 +420,24 @@ Proof.
   eauto using TraceInclusion_inlining_Rules_r.
 Qed.
 
+Theorem TraceInclusion_inlineSingle_Rule_BaseModuleWf_r {m : BaseModuleWf} {f : DefMethT} (rn : string) (inMeths : In f (getMethods m)):
+  TraceInclusion m (inlineSingle_Rule_BaseModuleWf rn inMeths).
+Proof.
+  eauto using TraceInclusion_inlining_Rules_Wf_r.
+Qed.
+
 Theorem TraceInclusion_inlineSingle_Meth_BaseModule_r (m : BaseModule) (f : DefMethT) (gn : string) :
   In f (getMethods m) ->
   WfMod m ->
   TraceInclusion m (inlineSingle_Meth_BaseModule f gn m).
 Proof.
   eauto using TraceInclusion_inlining_Meth_r.
+Qed.
+
+Theorem TraceInclusion_inlineSingle_Meth_BaseModuleWf_r {m : BaseModuleWf} {f : DefMethT} (gn: string) (inMeths : In f (getMethods m)):
+  TraceInclusion m (inlineSingle_Meth_BaseModuleWf gn inMeths).
+Proof.
+  eauto using TraceInclusion_inlining_Meth_Wf_r.
 Qed.
 
 Theorem TraceInclusion_inline_Meth_transform_r (f : DefMethT) (regs : list RegInitT)
@@ -439,6 +451,12 @@ Proof.
   eauto using inline_meth_transform.
 Qed.
 
+Theorem TraceInclusion_inline_Meth_transform_BaseModuleWf_r {m : BaseModuleWf} {f : DefMethT} (i : nat) (inMeths : In f (getMethods m)):
+  TraceInclusion m (inline_nth_Meth_BaseModuleWf i inMeths).
+Proof.
+  eauto using inline_meth_transform_Wf.
+Qed.
+
 Theorem TraceInclusion_inline_Rule_transform_r (f : DefMethT) (regs : list RegInitT)
         (rules : list RuleT) (meths : list DefMethT):
   WfMod (BaseMod regs rules meths) ->
@@ -448,6 +466,12 @@ Theorem TraceInclusion_inline_Rule_transform_r (f : DefMethT) (regs : list RegIn
                    (BaseMod regs (transform_nth_right (inlineSingle_Rule f) i rules) meths).
 Proof.
   eauto using inline_rule_transform.
+Qed.
+
+Theorem TraceInclusion_inline_Rule_transform_BaseModuleWf_r {m : BaseModuleWf} {f : DefMethT} (i : nat) (inMeths : In f (getMethods m)):
+  TraceInclusion m (inline_nth_Rule_BaseModuleWf i inMeths).
+Proof.
+  eauto using inline_rule_transform_Wf.
 Qed.
 
 Theorem TraceInclusion_inline_Meth_fold_right_r (f : DefMethT) (regs : list RegInitT)
@@ -461,6 +485,12 @@ Proof.
   eauto using inline_meth_fold_right.
 Qed.
 
+Theorem TraceInclusion_inline_Meth_fold_right_BaseModuleWf_r {m : BaseModuleWf} {f : DefMethT} (xs : list nat) (inMeth : In f (getMethods m)):
+  TraceInclusion m (inline_all_Meth_BaseModuleWf xs inMeth).
+Proof.
+  eauto using inline_meth_fold_right_Wf.
+Qed.
+
 Theorem TraceInclusion_inline_Rule_fold_right_r (f : DefMethT) (regs : list RegInitT)
         (rules : list RuleT) (meths : list DefMethT):
   WfMod (BaseMod regs rules meths) ->
@@ -472,7 +502,13 @@ Proof.
   eauto using inline_rule_fold_right.
 Qed.
 
-Theorem TraceInclusion_inlineSingle_Rule_r (regs : list RegInitT) (rules : list RuleT)
+Theorem TraceInclusion_inline_Rule_fold_right_BaseModuleWf_r {m : BaseModuleWf} {f : DefMethT} (xs : list nat) (inMeth : In f (getMethods m)):
+  TraceInclusion m (inline_all_Rule_BaseModuleWf xs inMeth).
+Proof.
+  eauto using inline_rule_fold_right_Wf.
+Qed.
+
+Theorem TraceInclusion_inlineSingle_all_Rule_r (regs : list RegInitT) (rules : list RuleT)
         (meths : list DefMethT) (f : DefMethT):
   WfMod (BaseMod regs rules meths) ->
   In f meths ->
@@ -482,7 +518,13 @@ Proof.
   eauto using TraceInclusion_inline_BaseModule_rules.
 Qed.
 
-Theorem TraceInclusion_inlineSingle_Meth_r (regs : list RegInitT)
+Theorem TraceInclusion_inlineSingle_all_Rule_BaseModuleWf_r {m : BaseModuleWf} {f : DefMethT} (inMeth : In f (getMethods m)):
+  TraceInclusion m (inline_BaseModule_rules_BaseModuleWf inMeth).
+Proof.
+  eauto using TraceInclusion_inline_BaseModule_rules_Wf.
+Qed.
+
+Theorem TraceInclusion_inlineSingle_all_Meth_r (regs : list RegInitT)
         (rules : list RuleT) (meths : list DefMethT) (f : DefMethT):
   WfMod (BaseMod regs rules meths) ->
   In f meths ->
@@ -492,6 +534,12 @@ Proof.
   eauto using TraceInclusion_inline_BaseModule_meths.
 Qed.
 
+Theorem TraceInclusion_inlineSingle_all_Meth_BaseModuleWf_r {m : BaseModuleWf} {f : DefMethT} (inMeth : In f (getMethods m)):
+  TraceInclusion m (inline_BaseModule_meths_BaseModuleWf inMeth).
+Proof.
+  eauto using TraceInclusion_inline_BaseModule_meths_Wf.
+Qed.
+
 Theorem TraceInclusion_inlineSingle_BaseModule_r (regs : list RegInitT) (rules : list RuleT)
         (meths : list DefMethT) (f : DefMethT):
   WfMod (BaseMod regs rules meths) ->
@@ -499,6 +547,12 @@ Theorem TraceInclusion_inlineSingle_BaseModule_r (regs : list RegInitT) (rules :
   TraceInclusion (BaseMod regs rules meths) (inlineSingle_BaseModule f regs rules meths).
 Proof.
   eauto using TraceInclusion_inline_BaseModule_all.
+Qed.
+
+Theorem TraceInclusion_inlineSingle_BaseModuleWf_r {m : BaseModuleWf} {f : DefMethT} (inMeth : In f (getMethods m)):
+  TraceInclusion m (inlineSingle_BaseModuleWf inMeth).
+Proof.
+  eauto using TraceInclusion_inline_BaseModule_all_Wf.
 Qed.
 
 Theorem TraceInclusion_inlineSingle_Rules_pos_r (regs : list RegInitT) (rules : list RuleT)
@@ -512,6 +566,12 @@ Proof.
   eauto using TraceInclusion_inlineSingle_pos_Rules.
 Qed.
 
+Theorem TraceInclusion_inlineSingle_Rules_pos_BaseModuleWf_r (m : BaseModuleWf) (n : nat):
+  TraceInclusion m (inlineSingle_Rules_pos_BaseModuleWf m n).
+Proof.
+  eauto using TraceInclusion_inlineSingle_pos_Rules_Wf.
+Qed.
+
 Theorem TraceInclusion_inlineAll_Rules_BaseMod_r (regs : list RegInitT) (rules : list RuleT)
         (meths : list DefMethT):
   WfMod (BaseMod regs rules meths) ->
@@ -520,6 +580,12 @@ Theorem TraceInclusion_inlineAll_Rules_BaseMod_r (regs : list RegInitT) (rules :
                  (BaseMod regs (inlineAll_Rules meths rules) meths).
 Proof.
   eauto using TraceInclusion_inlineAll_pos_Rules.
+Qed.
+
+Theorem TraceInclusion_inlineAll_Rules_BaseModuleWf_r (m : BaseModuleWf):
+  TraceInclusion m (inlineAll_Rules_BaseModuleWf m).
+Proof.
+  eauto using TraceInclusion_inlineAll_pos_Rules_Wf.
 Qed.
 
 Theorem TraceInclusion_inlineSingle_Meths_pos_r (regs : list RegInitT) (rules : list RuleT)
@@ -533,6 +599,12 @@ Proof.
   eauto using TraceInclusion_inlineSingle_pos_Meths.
 Qed.
 
+Theorem TraceInclusion_inlineSingle_Meths_pos_BaseModuleWf_r (m : BaseModuleWf) (n : nat):
+  TraceInclusion m (inlineSingle_Meths_pos_BaseModuleWf m n).
+Proof.
+  eauto using TraceInclusion_inlineSingle_pos_Meths_Wf.
+Qed.
+
 Theorem TraceInclusion_inlineAll_Meths_BaseMod_r (regs : list RegInitT) (rules : list RuleT)
         (meths : list DefMethT):
   WfMod (BaseMod regs rules meths) ->
@@ -542,6 +614,12 @@ Proof.
   eauto using TraceInclusion_inlineAll_pos_Meths.
 Qed.
 
+Theorem TraceInclusion_inlineAll_Meths_BaseModuleWf_r (m : BaseModuleWf):
+  TraceInclusion m (inlineAll_Meths_BaseModuleWf m).
+Proof.
+  eauto using TraceInclusion_inlineAll_pos_Meths_Wf.
+Qed.
+
 Theorem TraceInclusion_inlineAll_All_r (regs : list RegInitT) (rules : list RuleT)
         (meths : list DefMethT):
   WfMod (BaseMod regs rules meths) ->
@@ -549,6 +627,12 @@ Theorem TraceInclusion_inlineAll_All_r (regs : list RegInitT) (rules : list Rule
   TraceInclusion (BaseMod regs rules meths) (inlineAll_All regs rules meths).
 Proof.
   eauto using TraceInclusion_inlineAll_pos.
+Qed.
+
+Theorem TraceInclusion_inlineAll_All_BaseModuleWf_r (m : BaseModuleWf):
+  TraceInclusion m (inlineAll_All_BaseModuleWf m).
+Proof.
+  eauto using TraceInclusion_inlineAll_pos_Wf.
 Qed.
 
 Theorem WfMod_flatten_inline_everything (m : ModWf) :
@@ -694,12 +778,24 @@ Proof.
   eauto using TraceInclusion_inlining_Rules_l.
 Qed.
 
+Theorem TraceInclusion_inlineSingle_Rule_BaseModuleWf_l {m : BaseModuleWf} {f : DefMethT} (rn : string) (inMeths : In f (getMethods m)):
+  TraceInclusion (inlineSingle_Rule_BaseModuleWf rn inMeths) m.
+Proof.
+  eauto using TraceInclusion_inlining_Rules_Wf_l.
+Qed.
+
 Theorem TraceInclusion_inlineSingle_Meth_BaseModule_l (m : BaseModule) (f : DefMethT) (gn : string):
   In f (getMethods m) ->
   WfMod m ->
   TraceInclusion (inlineSingle_Meth_BaseModule f gn m) m.
 Proof.
   eauto using TraceInclusion_inlining_Meths_l.
+Qed.
+
+Theorem TraceInclusion_inlineSingle_Meth_BaseModuleWf_l {m : BaseModuleWf} {f : DefMethT} (gn: string) (inMeths : In f (getMethods m)):
+  TraceInclusion (inlineSingle_Meth_BaseModuleWf gn inMeths) m.
+Proof.
+  eauto using TraceInclusion_inlining_Meths_Wf_l.
 Qed.
 
 Theorem TraceInclusion_inline_Meth_transform_l (f : DefMethT) (regs : list RegInitT)
@@ -713,6 +809,12 @@ Proof.
   eauto using inline_meth_transform_l.
 Qed.
 
+Theorem TraceInclusion_inline_Meth_transform_BaseModuleWf_l {m : BaseModuleWf} {f : DefMethT} (i : nat) (inMeths : In f (getMethods m)):
+  TraceInclusion (inline_nth_Meth_BaseModuleWf i inMeths) m.
+Proof.
+  eauto using inline_meth_transform_Wf_l.
+Qed.
+
 Theorem TraceInclusion_inline_Rule_transform_l (f : DefMethT) (regs : list RegInitT)
         (rules : list RuleT) (meths : list DefMethT):
   WfMod (BaseMod regs rules meths) ->
@@ -722,6 +824,12 @@ Theorem TraceInclusion_inline_Rule_transform_l (f : DefMethT) (regs : list RegIn
                    (BaseMod regs rules meths).
 Proof.
   eauto using inline_rule_transform_l.
+Qed.
+
+Theorem TraceInclusion_inline_Rule_transform_BaseModuleWf_l {m : BaseModuleWf} {f : DefMethT} (i : nat) (inMeths : In f (getMethods m)):
+  TraceInclusion (inline_nth_Rule_BaseModuleWf i inMeths) m.
+Proof.
+  eauto using inline_rule_transform_Wf_l.
 Qed.
 
 Theorem TraceInclusion_inline_Meth_fold_right_l (f : DefMethT) (regs : list RegInitT)
@@ -735,6 +843,12 @@ Proof.
   eauto using inline_meth_fold_right_l.
 Qed.
 
+Theorem TraceInclusion_inline_Meth_fold_right_BaseModuleWf_l {m : BaseModuleWf} {f : DefMethT} (xs : list nat) (inMeth : In f (getMethods m)):
+  TraceInclusion (inline_all_Meth_BaseModuleWf xs inMeth) m.
+Proof.
+  eauto using inline_meth_fold_right_Wf_l.
+Qed.
+
 Theorem TraceInclusion_inline_Rule_fold_right_l (f : DefMethT) (regs : list RegInitT)
         (rules : list RuleT) (meths : list DefMethT):
   WfMod (BaseMod regs rules meths) ->
@@ -746,7 +860,13 @@ Proof.
   eauto using inline_rule_fold_right_l.
 Qed.
 
-Theorem TraceInclusion_inlineSingle_Rule_l (regs : list RegInitT) (rules : list RuleT)
+Theorem TraceInclusion_inline_Rule_fold_right_BaseModuleWf_l {m : BaseModuleWf} {f : DefMethT} (xs : list nat) (inMeth : In f (getMethods m)):
+  TraceInclusion (inline_all_Rule_BaseModuleWf xs inMeth) m.
+Proof.
+  eauto using inline_rule_fold_right_Wf_l.
+Qed.
+
+Theorem TraceInclusion_inlineSingle_all_Rule_l (regs : list RegInitT) (rules : list RuleT)
         (meths : list DefMethT) (f : DefMethT):
   WfMod (BaseMod regs rules meths) ->
   In f meths ->
@@ -756,7 +876,14 @@ Proof.
   eauto using TraceInclusion_inline_BaseModule_rules_l.
 Qed.
 
-Theorem TraceInclusion_inlineSingle_Meth_l (regs : list RegInitT)
+Theorem TraceInclusion_inlineSingle_all_Rule_BaseModuleWf_l {m : BaseModuleWf} {f : DefMethT} (inMeth : In f (getMethods m)):
+  TraceInclusion (inline_BaseModule_rules_BaseModuleWf inMeth) m.
+Proof.
+  eauto using TraceInclusion_inline_BaseModule_rules_Wf_l.
+Qed.
+
+
+Theorem TraceInclusion_inlineSingle_all_Meth_l (regs : list RegInitT)
         (rules : list RuleT) (meths : list DefMethT) (f : DefMethT):
   WfMod (BaseMod regs rules meths) ->
   In f meths ->
@@ -766,6 +893,12 @@ Proof.
   eauto using TraceInclusion_inline_BaseModule_meths_l.
 Qed.
 
+Theorem TraceInclusion_inlineSingle_all_Meth_BaseModuleWf_l {m : BaseModuleWf} {f : DefMethT} (inMeth : In f (getMethods m)):
+  TraceInclusion (inline_BaseModule_meths_BaseModuleWf inMeth) m.
+Proof.
+  eauto using TraceInclusion_inline_BaseModule_meths_Wf_l.
+Qed.
+
 Theorem TraceInclusion_inlineSingle_BaseModule_l (regs : list RegInitT) (rules : list RuleT)
         (meths : list DefMethT) (f : DefMethT):
   WfMod (BaseMod regs rules meths) ->
@@ -773,6 +906,12 @@ Theorem TraceInclusion_inlineSingle_BaseModule_l (regs : list RegInitT) (rules :
   TraceInclusion (inlineSingle_BaseModule f regs rules meths) (BaseMod regs rules meths).
 Proof.
   eauto using TraceInclusion_inline_BaseModule_all_l.
+Qed.
+
+Theorem TraceInclusion_inlineSingle_BaseModuleWf_l {m : BaseModuleWf} {f : DefMethT} (inMeth : In f (getMethods m)):
+  TraceInclusion (inlineSingle_BaseModuleWf inMeth) m.
+Proof.
+  eauto using TraceInclusion_inline_BaseModule_all_Wf_l.
 Qed.
 
 Theorem TraceInclusion_inlineSingle_Rules_pos_l (regs : list RegInitT) (rules : list RuleT)
@@ -786,6 +925,12 @@ Proof.
   eauto using TraceInclusion_inlineSingle_pos_Rules_l.
 Qed.
 
+Theorem TraceInclusion_inlineSingle_Rules_pos_BaseModuleWf_l (m : BaseModuleWf) (n : nat):
+  TraceInclusion (inlineSingle_Rules_pos_BaseModuleWf m n) m.
+Proof.
+  eauto using TraceInclusion_inlineSingle_pos_Rules_Wf_l.
+Qed.
+
 Theorem TraceInclusion_inlineAll_Rules_BaseMod_l (regs : list RegInitT) (rules : list RuleT)
         (meths : list DefMethT):
   WfMod (BaseMod regs rules meths) ->
@@ -793,6 +938,12 @@ Theorem TraceInclusion_inlineAll_Rules_BaseMod_l (regs : list RegInitT) (rules :
   TraceInclusion (BaseMod regs (inlineAll_Rules meths rules) meths) (BaseMod regs rules meths).
 Proof.
   eauto using TraceInclusion_inlineAll_pos_Rules_l.
+Qed.
+
+Theorem TraceInclusion_inlineAll_Rules_BaseModuleWf_l (m : BaseModuleWf):
+  TraceInclusion (inlineAll_Rules_BaseModuleWf m) m.
+Proof.
+  eauto using TraceInclusion_inlineAll_pos_Rules_Wf_l.
 Qed.
 
 Theorem TraceInclusion_inlineSingle_Meths_pos_l (regs : list RegInitT) (rules : list RuleT)
@@ -806,6 +957,12 @@ Proof.
   eauto using TraceInclusion_inlineSingle_pos_Meths_l.
 Qed.
 
+Theorem TraceInclusion_inlineSingle_Meths_pos_BaseModuleWf_l (m : BaseModuleWf) (n : nat):
+  TraceInclusion (inlineSingle_Meths_pos_BaseModuleWf m n) m.
+Proof.
+  eauto using TraceInclusion_inlineSingle_pos_Meths_Wf_l.
+Qed.
+
 Theorem TraceInclusion_inlineAll_Meths_BaseMod_l (regs : list RegInitT) (rules : list RuleT)
         (meths : list DefMethT):
   WfMod (BaseMod regs rules meths) ->
@@ -815,6 +972,12 @@ Proof.
   eauto using TraceInclusion_inlineAll_pos_Meths_l.
 Qed.
 
+Theorem TraceInclusion_inlineAll_Meths_BaseModuleWf_l (m : BaseModuleWf):
+  TraceInclusion (inlineAll_Meths_BaseModuleWf m) m.
+Proof.
+  eauto using TraceInclusion_inlineAll_pos_Meths_Wf_l.
+Qed.
+
 Theorem TraceInclusion_inlineAll_All_l (regs : list RegInitT) (rules : list RuleT)
         (meths : list DefMethT):
   WfMod (BaseMod regs rules meths) ->
@@ -822,6 +985,12 @@ Theorem TraceInclusion_inlineAll_All_l (regs : list RegInitT) (rules : list Rule
   TraceInclusion (inlineAll_All regs rules meths) (BaseMod regs rules meths).
 Proof.
   eauto using TraceInclusion_inlineAll_pos_l.
+Qed.
+
+Theorem TraceInclusion_inlineAll_All_BaseModuleWf_l (m : BaseModuleWf):
+  TraceInclusion (inlineAll_All_BaseModuleWf m) m.
+Proof.
+  eauto using TraceInclusion_inlineAll_pos_Wf_l.
 Qed.
 
 Theorem TraceInclusion_flatten_inline_everything_l (m : ModWf) :
