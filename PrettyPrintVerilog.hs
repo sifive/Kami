@@ -468,8 +468,8 @@ ppTopModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
     ins = removeDups ins'
     outs = removeDups outs'
     isHidden (x, _) = not (elem x hiddenWires)
-    insFiltered = Data.List.filter isHidden ins'
-    outsFiltered = Data.List.filter isHidden outs'
+    insFiltered = Data.List.filter isHidden ins
+    outsFiltered = Data.List.filter isHidden outs
     rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", []), fst (fst (snd x))) ) (getAllMethodsRegFileList (map snd regFs)) ++
               Data.List.map (\x -> ((fst x ++ "#_return", []), snd (fst (snd x))) ) (getAllMethodsRegFileList (map snd regFs)) ++
               Data.List.map (\x -> ((fst x ++ "#_enable", []), Bool) ) (getAllMethodsRegFileList (map snd regFs)) ++
