@@ -6296,3 +6296,21 @@ Proof.
      eauto using (wfMod m)|].
   apply (removeHides_createHide_TraceInclusion P2 H).
 Qed.
+
+Theorem TraceInclusion_flatten_inline_remove_ModWf_l (m : ModWf):
+  NoSelfCallBaseModule (inlineAll_All_mod m) ->
+  TraceInclusion (flatten_inline_remove_ModWf m) (inlined_ModWf m).
+Proof.
+  intros.
+  unfold inlined_ModWf.
+  eauto using flatten_inline_remove_TraceInclusion_l.
+Qed.
+
+Theorem TraceInclusion_flatten_inline_remove_ModWf (m : ModWf):
+  NoSelfCallBaseModule (inlineAll_All_mod m) ->
+  TraceInclusion (inlined_ModWf m) (flatten_inline_remove_ModWf m).
+Proof.
+  intros.
+  unfold inlined_ModWf.
+  eauto using flatten_inline_remove_TraceInclusion.
+Qed.

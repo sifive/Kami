@@ -1049,3 +1049,17 @@ Theorem TraceInclusion_flatten_inline_remove_flatten_inline_everything (m : ModW
 Proof.
   eauto using flatten_inline_remove_TraceInclusion_l.
 Qed.
+
+Theorem TraceInclusion_flatten_inline_remove_flatten_inline_everything_ModWf (m : ModWf):
+  NoSelfCallBaseModule (inlineAll_All_mod m) ->
+  TraceInclusion (flatten_inline_remove_ModWf m) (inlined_ModWf m).
+Proof.
+  eauto using TraceInclusion_flatten_inline_remove_ModWf_l.
+Qed.
+
+Theorem TraceInclusion_flatten_inline_everything_flatten_inline_remove_ModWf (m : ModWf):
+  NoSelfCallBaseModule (inlineAll_All_mod m) ->
+  TraceInclusion (inlined_ModWf m) (flatten_inline_remove_ModWf m).
+Proof.
+  eauto using TraceInclusion_flatten_inline_remove_ModWf.
+Qed.
