@@ -1,4 +1,4 @@
-Require Export Bool String List FunctionalExtensionality Psatz PeanoNat.
+Require Export Bool Ascii String List FunctionalExtensionality Psatz PeanoNat.
 Require Export bbv.Word Lib.VectorFacts Lib.EclecticLib.
 
 Export Word.Notations.
