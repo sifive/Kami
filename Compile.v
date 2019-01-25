@@ -425,7 +425,7 @@ Section Compile.
     | Assertion pred cont => getRtlSys cont (RtlCABool And
                                                        (convertExprToRtl pred :: enable :: nil))
                                        startList
-    | Sys ls cont => (enable, map getRtlDisp ls) :: getRtlSys cont enable (inc startList)
+    | Sys ls cont => (enable, map getRtlDisp ls) :: getRtlSys cont enable startList
     | Return x => nil
     | IfElse pred ktf t f cont =>
       getRtlSys t (RtlCABool And (convertExprToRtl pred :: enable :: nil)) (0 :: startList) ++
