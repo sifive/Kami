@@ -2556,7 +2556,7 @@ Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) i
 
 (* Eval compute in test. *)
 
-Notation "'RegisterArray' name 'using' nums : type <- init" :=
+Notation "'RegisterVec' name 'using' nums : type <- init" :=
   (MERegAry (
     map (fun idx =>
       (AddIndexToName name idx, existT optConstFullT (SyntaxKind type) (Some (makeConst init)))
