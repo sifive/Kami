@@ -1,3 +1,8 @@
+Kami Library
+=============
+
+[![Build Status](https://travis-ci.org/sifive/Kami.svg?branch=master)](https://travis-ci.org/sifive/Kami)
+
 Introduction
 ------------
 

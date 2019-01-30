@@ -1,0 +1,38 @@
+language: generic
+
+dist: xenial
+
+addons:
+  apt:
+    sources:
+      - avsm
+    packages:
+      - opam
+      - darcs
+      - aspcud
+      - m4
+
+cache:
+  apt: true
+
+env:
+  global:
+    - NJOBS=2
+  matrix:
+    - OCAML_VERSION="4.06.1" COQ_VERSION="8.8.2"
+
+before_install:
+  - opam --version
+  - opam init -j ${NJOBS} --compiler=${OCAML_VERSION} -n -y
+  - opam list
+  - opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev || true
+  - opam install --verbose -j ${NJOBS} -y coq.${COQ_VERSION}
+  - eval $(opam env)
+
+before_script:
+  - uname -a
+  - (cd ..; git clone https://github.com/mit-plv/bbv.git)
+
+script:
+  - (cd ../bbv; make -j ${NJOBS})
+  - make -j ${NJOBS}
