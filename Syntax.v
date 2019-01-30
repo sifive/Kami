@@ -388,7 +388,17 @@ Definition MethodT (sig : Signature) := forall ty, ty (fst sig) -> ActionT ty (s
 Notation Void := (Bit 0).
 
 Notation Attribute A := (string * A)%type (only parsing).
-Notation optConstFullT := (fun x => option (ConstFullT x)).
+Section optConstFullT.
+  Variable x: FullKind.
+  Inductive optConstFullT :=
+  | Uninit
+  | Init (c: ConstFullT x)
+  | RegFileUninit num k (pf: x = SyntaxKind (Array num k))
+  | RegFileInit num k (pf: x = SyntaxKind (Array num k)) (val: ConstT k)
+  | RegFileHex num k (pf: x = SyntaxKind (Array num k)) (file: string)
+  | RegFileBin num k (pf: x = SyntaxKind (Array num k)) (file: string).
+End optConstFullT.
+
 Definition RegInitT := Attribute (sigT optConstFullT).
 Definition DefMethT := Attribute (sigT MethodT).
 Definition RuleT := Attribute (Action Void).
@@ -428,27 +438,27 @@ Definition getRegFileRegisters m :=
   | RegFile dataArray read write IdxNum Data init =>
     (dataArray, existT optConstFullT (SyntaxKind (Array IdxNum Data))
                        match init with
-                       | None => None
-                       | Some init' => Some (SyntaxConst (ConstArray (fun _ => init')))
+                       | None => Uninit _
+                       | Some init' => Init (SyntaxConst (ConstArray (fun _ => init')))
                        end) :: nil
   | RegFileFile dataArray read write IdxNum Data file _ =>
-    (dataArray, existT optConstFullT (SyntaxKind (Array IdxNum Data)) None) :: nil
+    (dataArray, existT optConstFullT (SyntaxKind (Array IdxNum Data)) (Uninit _)) :: nil
   | SyncRegFile isAddr dataArray read write IdxNum Data init =>
     (dataArray, existT optConstFullT (SyntaxKind (Array IdxNum Data))
                        match init with
-                       | None => None
-                       | Some init' => Some (SyntaxConst (ConstArray (fun _ => init')))
+                       | None => Uninit _
+                       | Some init' => Init (SyntaxConst (ConstArray (fun _ => init')))
                        end)
       ::
       map (fun x => (snd x, existT optConstFullT (SyntaxKind Data)
                                    match init with
-                                   | None => None
-                                   | Some init' => Some (SyntaxConst init')
+                                   | None => Uninit _
+                                   | Some init' => Init (SyntaxConst init')
                                    end)) read
   | SyncRegFileFile isAddr dataArray read write IdxNum Data file _ =>
-    (dataArray, existT optConstFullT (SyntaxKind (Array IdxNum Data)) None)
+    (dataArray, existT optConstFullT (SyntaxKind (Array IdxNum Data)) (Uninit _))
       ::
-      map (fun x => (snd x, existT optConstFullT (SyntaxKind Data) None)) read
+      map (fun x => (snd x, existT optConstFullT (SyntaxKind Data) (Uninit _))) read
   end.
 
 Definition getRegisters m :=
@@ -1651,15 +1661,24 @@ Definition UpdRegs (u: list RegsT) (o o': RegsT)
      (forall s v, In (s, v) o' -> ((exists x, In x u /\ In (s, v) x) \/
                                    ((~ exists x, In x u /\ In s (map fst x)) /\ In (s, v) o))).
 
-Notation regInit := (fun o' r => fst o' = fst r /\
-                                 exists (pf: projT1 (snd o') = projT1 (snd r)),
-                                   match projT2 (snd r) with
-                                   | None => True
-                                   | Some x =>
-                                     match pf in _ = Y return _ Y with
-                                     | eq_refl => projT2 (snd o')
-                                     end = evalConstFullT x
-                                   end).
+Notation regInit := (fun (o': RegT) (r: RegInitT)  => fst o' = fst r /\
+                                                      exists (pf: projT1 (snd o') = projT1 (snd r)),
+                                                        match projT2 (snd r) with
+                                                        | Uninit => True
+                                                        | Init x =>
+                                                          match pf in _ = Y return _ Y with
+                                                          | eq_refl => projT2 (snd o')
+                                                          end = evalConstFullT x
+                                                        | RegFileUninit _ _ _ => True
+                                                        | RegFileInit num k pf2 val =>
+                                                          match pf in _ = Y return _ Y with
+                                                          | eq_refl => projT2 (snd o')
+                                                          end = evalConstFullT match eq_sym pf2 in _ = Y return ConstFullT Y with
+                                                                               | eq_refl => SyntaxConst (ConstArray (fun _ => val))
+                                                                               end
+                                                        | RegFileHex _ _ _ _ => True
+                                                        | RegFileBin _ _ _ _ => True
+                                                        end).
 
 
 Fixpoint findReg (s: string) (u: RegsT) :=
@@ -2577,15 +2596,15 @@ Definition makeModule (im : InModule) :=
 Definition makeConst k (c: ConstT k): ConstFullT (SyntaxKind k) := SyntaxConst c.
 
 Notation "'RegisterN' name : type <- init" :=
-  (MERegister (name%string, existT optConstFullT type (Some init)))
+  (MERegister (name%string, existT optConstFullT type (Init init)))
     (at level 12, name at level 99) : kami_scope.
 
 Notation "'Register' name : type <- init" :=
-  (MERegister (name%string, existT optConstFullT (SyntaxKind type) (Some (makeConst init))))
+  (MERegister (name%string, existT optConstFullT (SyntaxKind type) (Init (makeConst init))))
     (at level 12, name at level 99) : kami_scope.
 
 Notation "'RegisterU' name : type" :=
-  (MERegister (name%string, existT optConstFullT (SyntaxKind type) None))
+  (MERegister (name%string, existT optConstFullT (SyntaxKind type) (Uninit _)))
     (at level 12, name at level 99) : kami_scope.
 
 Section Positive.
@@ -2647,7 +2666,7 @@ Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) i
 Notation "'RegisterVec' name 'using' nums : type <- init" :=
   (MERegAry (
     map (fun idx =>
-      (AddIndexToName name idx, existT optConstFullT (SyntaxKind type) (Some (makeConst init)))
+      (AddIndexToName name idx, existT optConstFullT (SyntaxKind type) (Init (makeConst init)))
     ) nums
   ))
     (at level 12, name at level 9, nums at level 9) : kami_scope.
