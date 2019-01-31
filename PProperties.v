@@ -1008,7 +1008,7 @@ Qed.
 Lemma Forall2_RegInit_keymatch x :
   forall l,
     Forall2
-      (fun (o'0 : string * {x : FullKind & fullType type x}) (r : Attribute (sigT optConstFullT)) =>
+      (fun (o'0 : string * {x : FullKind & fullType type x}) (r : Attribute (sigT RegInitValT)) =>
          fst o'0 = fst r /\
          (exists pf : projT1 (snd o'0) = projT1 (snd r),
              match projT2 (snd r) with

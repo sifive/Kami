@@ -545,7 +545,7 @@ Definition getOutputs (calls defs: list (Attribute (Kind * Kind))) := map (fun x
                                                                           map (fun x => (getMethRet (fst x), snd (snd x))) defs ++
                                                                           map (fun x => (getMethGuard (fst x), Bool)) defs.
 
-Definition getRegInit (y: sigT optConstFullT): {x: Kind & option (ConstT x)} :=
+Definition getRegInit (y: sigT RegInitValT): {x: Kind & option (ConstT x)} :=
   existT _ _
          match projT2 y with
          | Uninit => None

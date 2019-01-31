@@ -57,7 +57,7 @@ Inductive RtlRegConst (x: Kind) :=
 | ArrayHex num k (pf: x = Array num k) (file: string)
 | ArrayBin num k (pf: x = Array num k) (file: string).
 
-Definition getRtlRegInit (x: sigT optConstFullT): sigT RtlRegConst.
+Definition getRtlRegInit (x: sigT RegInitValT): sigT RtlRegConst.
   refine (
       existT _ match projT1 x with
                | SyntaxKind k => k
