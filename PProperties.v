@@ -1008,14 +1008,23 @@ Qed.
 Lemma Forall2_RegInit_keymatch x :
   forall l,
     Forall2
-      (fun (o'0 : string * {x : FullKind & fullType type x}) (r : string * {x0 : FullKind & option (ConstFullT x0)}) =>
+      (fun (o'0 : string * {x : FullKind & fullType type x}) (r : Attribute (sigT RegInitValT)) =>
          fst o'0 = fst r /\
          (exists pf : projT1 (snd o'0) = projT1 (snd r),
              match projT2 (snd r) with
-             | Some x0 => match pf in (_ = Y) return (fullType type Y) with
+             | Uninit => True
+             | Init x0 => match pf in (_ = Y) return (fullType type Y) with
                           | eq_refl => projT2 (snd o'0)
                           end = evalConstFullT x0
-             | None => True
+             | RegFileUninit _ _ _ => True
+             | RegFileInit num k pf2 val =>
+               match pf in _ = Y return _ Y with
+               | eq_refl => projT2 (snd o'0)
+               end = evalConstFullT match eq_sym pf2 in _ = Y return ConstFullT Y with
+                                    | eq_refl => SyntaxConst (ConstArray (fun _ => val))
+                                    end
+             | RegFileHex _ _ _ _ => True
+             | RegFileBin _ _ _ _ => True
              end)) x l ->
     map fst x = map fst l.
 Proof.

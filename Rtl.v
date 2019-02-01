@@ -49,12 +49,45 @@ Inductive RtlSysT : Type :=
 | RtlFinish: RtlSysT.
 
 
+Inductive RtlRegConst (x: Kind) :=
+| NotInit
+| SimpleInit (v: ConstT x)
+| ArrayNotInit num k (pf: x = Array num k)
+| ArrayInit num k (pf: x = Array num k) (val: ConstT k)
+| ArrayHex num k (pf: x = Array num k) (file: string)
+| ArrayBin num k (pf: x = Array num k) (file: string).
+
+Definition getRtlRegInit (x: sigT RegInitValT): sigT RtlRegConst.
+  refine (
+      existT _ match projT1 x with
+               | SyntaxKind k => k
+               | NativeKind _ => Void
+               end
+             match projT2 x with
+             | Uninit => NotInit _
+             | Init y' => SimpleInit match y' in ConstFullT k return ConstT match k with
+                                                                            | SyntaxKind k' => k'
+                                                                            | _ => Void
+                                                                            end with
+                                     | SyntaxConst k c => c
+                                     | _ => WO
+                                     end
+             | RegFileUninit num k pf => NotInit _
+             | RegFileInit num k pf val =>
+               @ArrayInit _ num k _ val
+             | RegFileHex num k pf file =>
+               @ArrayHex _ num k _ file
+             | RegFileBin num k pf file =>
+               @ArrayBin _ num k _ file
+             end); rewrite pf; reflexivity.
+Defined.
+
 Record RtlModule :=
   { hiddenWires: list (string * list nat);
     regFiles: list (bool * RegFileBase);
     inputs: list (string * list nat * Kind);
     outputs: list (string * list nat * Kind);
-    regInits: list (string * sigT (fun x => option (ConstT x)));
+    regInits: list (string * sigT RtlRegConst);
     regWrites: list (string * sigT RtlExpr);
     wires: list (string * list nat * sigT RtlExpr);
     sys: list (RtlExpr Bool * list RtlSysT)

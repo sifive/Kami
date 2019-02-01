@@ -545,17 +545,29 @@ Definition getOutputs (calls defs: list (Attribute (Kind * Kind))) := map (fun x
                                                                           map (fun x => (getMethRet (fst x), snd (snd x))) defs ++
                                                                           map (fun x => (getMethGuard (fst x), Bool)) defs.
 
-Definition getRegInit (y: {x : FullKind & option (ConstFullT x)}): {x: Kind & option (ConstT x)} :=
+Definition getRegInit (y: sigT RegInitValT): {x: Kind & option (ConstT x)} :=
   existT _ _
          match projT2 y with
-         | None => None
-         | Some y' => Some match y' in ConstFullT k return ConstT match k with
+         | Uninit => None
+         | Init y' => Some match y' in ConstFullT k return ConstT match k with
                                                                   | SyntaxKind k' => k'
                                                                   | _ => Void
                                                                   end with
                            | SyntaxConst k c => c
                            | _ => WO
                            end
+         | RegFileUninit num k pf => None
+         | RegFileInit num k pf val =>
+           Some
+             match eq_sym pf in _ = Y return ConstT match Y with
+                                                    | SyntaxKind k' => k'
+                                                    | NativeKind _ => Void
+                                                    end with
+             | eq_refl => ConstArray (fun _ => val)
+             end
+             
+         | RegFileHex num k pf file => None
+         | RegFileBin num k pf file => None
          end.
 
 Fixpoint getAllWriteReadConnections' (regs: list RegInitT) (order: list string) :=
@@ -619,7 +631,7 @@ Definition getRtl_full (bm: (list string * (list RegFileBase * BaseModule))) (pr
                                          (getAllMethodsRegFileList (fst (snd bm))))
                            (SubtractList fst fst (map (fun x => (fst x, projT1 (snd x))) (getMethods (snd (snd bm))))
                                          (getAllMethodsRegFileList (fst (snd bm))));
-     regInits := map (fun x => (fst x, getRegInit (snd x))) (getRegisters (snd (snd bm)));
+     regInits := map (fun x => (fst x, getRtlRegInit (snd x))) (getRegisters (snd (snd bm)));
      regWrites := getWriteRegs (getRegisters (snd (snd bm)));
      wires := getReadRegs (getRegisters (snd (snd bm))) ++ getWires (snd (snd bm)) order ++
                           setMethodGuards (map fst (getAllMethodsRegFileList (fst (snd bm))) ++ preserveGuards) (snd (snd bm));
