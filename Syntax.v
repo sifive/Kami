@@ -1864,6 +1864,23 @@ Section inlineSingle.
     | Return e =>
       Return e
     end.
+
+  Definition concatRuleT (rle1 rle2 : RuleT) : RuleT.
+    unfold RuleT in *.
+    destruct rle1, rle2.
+    constructor.
+    - apply (append s s0).
+    - unfold Action in *.
+      intros.
+      apply (LetAction (a0 ty0) (fun _ => a ty0)).
+  Defined.
+
+  Fixpoint collapseRules (rlist : list RuleT) : RuleT :=
+    match rlist with
+    | nil => (EmptyString, (fun _ => (Return (Const _ WO))))
+    | a::l => (concatRuleT a (collapseRules l))
+    end.
+  
 End inlineSingle.
 
 Definition inlineSingle_Rule  (f : DefMethT) (rle : RuleT): RuleT.
