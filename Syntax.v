@@ -1972,7 +1972,7 @@ Section inlineSingle.
       Return e
     end.
 
-  Definition concatRuleT (rle1 rle2 : RuleT) : RuleT.
+(*  Definition concatRuleT (rle1 rle2 : RuleT) : RuleT.
     unfold RuleT in *.
     destruct rle1, rle2.
     constructor.
@@ -1986,8 +1986,7 @@ Section inlineSingle.
     match rlist with
     | nil => (EmptyString, (fun _ => (Return (Const _ WO))))
     | a::l => (concatRuleT a (collapseRules l))
-    end.
-  
+    end.*)
 End inlineSingle.
 
 Definition inlineSingle_Rule  (f : DefMethT) (rle : RuleT): RuleT.
