@@ -1755,6 +1755,38 @@ Section PPlusTrace.
       PPlusTrace o' ls'.
 End PPlusTrace.
 
+Section RuleSetTrace.
+  Variable m: BaseModule.
+  Inductive RuleSetTrace : RegsT -> list (RegsT * ((list RuleOrMeth) * MethsT)) ->
+                           list RuleT ->Prop :=
+  | RuleSetInitTrace (o' o'' : RegsT) ls' lr
+                     (HPerm : o' [=] o'')
+                     (HUpdRegs : Forall2 regInit o'' (getAllRegisters m))
+                     (HTrace: ls' = nil)
+                     (HRules: lr = nil):
+      RuleSetTrace o' ls' lr
+  | RuleeSetContinueTrace (o o' : RegsT)
+                          (upds : RegsT)
+                          (execs : list RuleOrMeth)
+                          (calls : MethsT)
+                          (lr lr' : list RuleT)
+                          (rle : RuleT)
+                          (HRules: lr = rle::lr')
+                          (Hexecs : execs = [Rle (fst rle)])
+                          (ls ls' : list (RegsT *((list RuleOrMeth) * MethsT)))
+                          (RuleSetOldTrace : RuleSetTrace o ls lr)
+                          (HPPlusStep : PPlusStep m o upds execs calls)
+                          (HUpdRegs : PPlusUpdRegs upds o o')
+                          (HRuleSetTrace : ls' =((upds, (execs, calls))::ls)):
+      RuleSetTrace o' ls' lr'.
+End RuleSetTrace.
+
+Fixpoint repeat_list {A : Type} (l : list A) (n : nat) : list A :=
+  match n with
+  | O => nil
+  | S m => l++(repeat_list l m)
+  end.
+
 Definition WeakInclusion (l1 : list FullLabel) (l2 : list FullLabel) : Prop :=
   (forall f, getListFullLabel_diff f l1 = getListFullLabel_diff f l2) /\
   ((exists rle, In (Rle rle) (map (fun x => fst (snd x)) l2)) ->
@@ -1971,6 +2003,7 @@ Section inlineSingle.
     | Return e =>
       Return e
     end.
+
 End inlineSingle.
 
 Definition inlineSingle_Rule  (f : DefMethT) (rle : RuleT): RuleT.
