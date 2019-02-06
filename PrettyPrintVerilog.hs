@@ -359,7 +359,7 @@ ppRfModule (bypass, rf@(RegFileFile name reads write idxNum dataType file isAsci
   ppDealSize0 dataType "" ("  " ++ ppDeclType (ppName name ++ "$_data") dataType ++ "[0:" ++ show (idxNum - 1) ++ "];\n") ++
   "  assign " ++ ppName write ++ "$_guard = 1'b1;\n" ++
   "  initial begin\n" ++
-  "    $readmem" ++ if isAscii then "h" else "b" ++ "(\"" ++ file ++ "\"," ppName name ++ "$_data"++ ");\n" ++
+  "    $readmem" ++ (if isAscii then "h" else "b") ++ "(\"" ++ file ++ "\"," ++ ppName name ++ "$_data"++ ");\n" ++
   "    end\n" ++
   "  end\n" ++
   concatMap (\read ->
@@ -416,15 +416,6 @@ ppRtlSys (RtlDispArray n k v f) = do
   return $ "        $write(\"[" ++ Data.List.concat (Data.List.map (\i -> show i ++ ":=" ++ ppFullBitFormat f ++ "; ") [0 .. (n-1)]) ++ "]\", " ++ Data.List.concat rest ++ ");\n"
 ppRtlSys (RtlFinish) = return $ "        $finish();\n"
 
-| NotInit
-| SimpleInit (v: ConstT x)
-| ArrayNotInit num k (pf: x = Array num k)
-| ArrayInit num k (pf: x = Array num k) (val: ConstT k)
-| ArrayHex num k (pf: x = Array num k) (file: string)
-| ArrayBin num k (pf: x = Array num k) (file: string).
-
-
-
 ppRtlModule :: RtlModule -> String
 ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
   "module _design(\n" ++
@@ -454,7 +445,7 @@ ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
   concatMap (\(nm, (ty, init)) -> case init of
                                     ArrayHex num k file -> "      $readmemh(\"" ++ file ++ "\", " ++ ppName nm ++ ");\n"
                                     ArrayBin num k file -> "      $readmemb(\"" ++ file ++ "\", " ++ ppName nm ++ ");\n"
-                                    default -> "") regInits ++
+                                    _ -> "") regInits ++
   "  end\n" ++
   
   "  always @(posedge CLK) begin\n" ++
@@ -462,9 +453,9 @@ ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
   concatMap (\(nm, (ty, init)) -> case init of
                                     SimpleInit v -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ ppConst v ++ ";\n")
                                     ArrayInit num k val -> ppDealSize0 (Array num k) "" ("      " ++ ppName nm ++ " <= " ++
-                                                                                         '{' : intercalate ", " (Data.List.replicate num (ppConst v)) ++ "}"
+                                                                                         '{' : intercalate ", " (Data.List.replicate num (ppConst val)) ++ "}"
                                                                                           ++ ";\n")
-                                    default -> "") regInits ++
+                                    _ -> "") regInits ++
   "    end\n" ++
   "    else begin\n" ++
   concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ sexpr ++ ";\n")) regExprs ++
