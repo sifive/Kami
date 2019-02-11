@@ -393,7 +393,7 @@ ppRtlInstance m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
               Data.List.map (\x -> ((fst x ++ "#_guard", []), Bool) ) (getAllMethodsRegFileList (map snd regFs))
 
 ppBitFormat :: BitFormat -> String
-ppBitFormat Binary = "b"
+ppBitFormat Binary = "d"
 ppBitFormat Decimal = "d"
 ppBitFormat Hex = "x"
 
