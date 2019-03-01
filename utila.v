@@ -17,14 +17,14 @@ Section utila.
     (* I. Kami Expression Definitions *)
 
     Definition utila_opt_pkt
-               (k : Kind)
-               (x : k @# ty)
-               (valid : Bool @# ty)
+        (k : Kind)
+        (x : k @# ty)
+        (valid : Bool @# ty)
       :  Maybe k @# ty
       := STRUCT {
-             "valid" ::= valid;
-             "data"  ::= x
-           }.
+           "valid" ::= valid;
+           "data"  ::= x
+         }.
 
     Definition utila_all
       :  list (Bool @# ty) -> Bool @# ty
@@ -36,16 +36,17 @@ Section utila.
 
     (* Kami Monadic Definitions *)
 
-    Structure utila_monad_type := utila_monad {
-                                      utila_m
-                                      : Kind -> Type;
+    Structure utila_monad_type
+      := utila_monad {
+           utila_m
+           : Kind -> Type;
 
-                                      utila_mbind
-                                      : forall (j k : Kind), utila_m j -> (ty j -> utila_m k) -> utila_m k;
+           utila_mbind
+           : forall (j k : Kind), utila_m j -> (ty j -> utila_m k) -> utila_m k;
 
-                                      utila_munit
-                                      : forall k : Kind, k @# ty -> utila_m k
-                                    }.
+           utila_munit
+           : forall k : Kind, k @# ty -> utila_m k
+         }.
 
     Definition utila_act_monad
       :  utila_monad_type
@@ -62,25 +63,27 @@ Section utila.
       Let munit := utila_munit monad.
 
       Definition utila_mopt_pkt
-                 (k : Kind)
-                 (x : k @# ty)
-                 (valid : Bool @# ty)
+          (k : Kind)
+          (x : k @# ty)
+          (valid : Bool @# ty)
         :  m (Maybe k)
         := munit (utila_opt_pkt x valid).
 
       Definition utila_mfoldr
-                 (j k : Kind)
-                 (f : j @# ty -> k @# ty -> k @# ty)
-                 (init : k @# ty)
+          (j k : Kind)
+          (f : j @# ty -> k @# ty -> k @# ty)
+          (init : k @# ty)
         :  list (m j) -> (m k)
         := fold_right
              (fun (x_expr : m j)
                   (acc_expr : m k)
-              => mbind k x_expr (fun x : ty j =>
-                                   mbind k acc_expr (fun acc : ty k =>
-                                                       munit
-                                                         (f (Var ty (SyntaxKind j) x)
-                                                            (Var ty (SyntaxKind k) acc)))))
+                => mbind k x_expr
+                     (fun x : ty j
+                        => mbind k acc_expr
+                             (fun acc : ty k
+                                => munit
+                                     (f (Var ty (SyntaxKind j) x)
+                                        (Var ty (SyntaxKind k) acc)))))
              (munit init).
 
       Definition utila_mall
@@ -108,42 +111,70 @@ Section utila.
     Definition utila_expr_any := utila_many utila_expr_monad.
 
     (*
-  Accepts a Kami predicate [f] and a list of Kami let expressions
-  that represent values, and returns a Kami let expression that
-  outputs the value that satisfies f.
+      Accepts a Kami predicate [f] and a list of Kami let expressions
+      that represent values, and returns a Kami let expression that
+      outputs the value that satisfies f.
 
-  Note: [f] must only return true for exactly one value in
-  [xs_exprs].
-     *)
+      Note: [f] must only return true for exactly one value in
+      [xs_exprs].
+    *)
     Definition utila_expr_find
-               (k : Kind)
-               (f : k @# ty -> Bool @# ty)
-               (xs_exprs : list (k ## ty))
+        (k : Kind)
+        (f : k @# ty -> Bool @# ty)
+        (xs_exprs : list (k ## ty))
       :  k ## ty
       := LETE y
          :  Bit (size k)
-                <- (utila_expr_foldr
-                      (fun x acc => ((ITE (f x) (pack x) ($0)) | acc))
-                      ($0)
-                      xs_exprs);
-           RetE (unpack k (#y)).
+         <- (utila_expr_foldr
+               (fun x acc => ((ITE (f x) (pack x) ($0)) | acc))
+               ($0)
+               xs_exprs);
+         RetE (unpack k (#y)).
 
     Arguments utila_expr_find {k} f xs_exprs.
 
     (*
-  Accepts a list of Maybe packets and returns the packet whose
-  valid flag equals true.
+      Accepts a list of Maybe packets and returns the packet whose
+      valid flag equals true.
 
-  Note: exactly one of the packets must be valid.
-     *)
+      Note: exactly one of the packets must be valid.
+    *)
     Definition utila_expr_find_pkt
-               (k : Kind)
-               (pkt_exprs : list (Maybe k ## ty))
+        (k : Kind)
+        (pkt_exprs : list (Maybe k ## ty))
       :  Maybe k ## ty
       := utila_expr_find
            (fun (pkt : Maybe k @# ty)
             => pkt @% "valid")
            pkt_exprs.
+
+    (*
+      Generates a lookup table containing entries of type
+      [result_kind].
+
+      Note: the key match predicate must never return true for more
+      than one entry in [entries].
+    *)
+    Definition utila_expr_lookup_table
+        (entry_type : Type)
+        (entries : list entry_type)
+        (key_kind : Kind)
+        (result_kind : Kind)
+        (entry_match : entry_type -> key_kind @# ty -> Bool ## ty)
+        (entry_result : entry_type -> key_kind @# ty -> result_kind ## ty)
+        (key : key_kind @# ty)
+      :  Maybe result_kind ## ty
+      := utila_expr_find_pkt
+           (map
+             (fun entry : entry_type
+                => LETE result
+                     :  result_kind
+                     <- entry_result entry key;
+                   LETE matched
+                     :  Bool
+                     <- entry_match entry key;
+                   utila_expr_opt_pkt #result #matched)
+             entries).
 
   End defs.
 
