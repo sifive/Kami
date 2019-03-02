@@ -26,6 +26,24 @@ Section utila.
            "data"  ::= x
          }.
 
+    Definition utila_opt_default
+        (k : Kind)
+        (default : k @# ty)
+        (x : Maybe k @# ty)
+      :  k @# ty
+      := ITE (x @% "valid")
+           (x @% "data")
+           default.
+
+    Definition utila_opt_bind
+        (j k : Kind)
+        (x : Maybe j @# ty)
+        (f : j @# ty -> Maybe k @# ty)
+      :  Maybe k @# ty
+      := ITE (x @% "valid")
+           (f (x @% "data"))
+           (@Invalid ty k).
+
     Definition utila_all
       :  list (Bool @# ty) -> Bool @# ty
       := fold_right (fun x acc => x && acc) ($$true).
@@ -39,18 +57,17 @@ Section utila.
     Structure utila_monad_type
       := utila_monad {
            utila_m
-           : Kind -> Type;
+             : Kind -> Type;
 
            utila_mbind
-           : forall (j k : Kind), utila_m j -> (ty j -> utila_m k) -> utila_m k;
+             : forall (j k : Kind), utila_m j -> (ty j -> utila_m k) -> utila_m k;
 
            utila_munit
-           : forall k : Kind, k @# ty -> utila_m k
-         }.
+             : forall k : Kind, k @# ty -> utila_m k;
 
-    Definition utila_act_monad
-      :  utila_monad_type
-      := utila_monad (ActionT ty) (fun j k => @LetAction ty k j) (@Return ty).
+           utila_mite
+             : forall k : Kind, Bool @# ty -> utila_m k -> utila_m k -> utila_m k
+         }.
 
     Section monad_functions.
 
@@ -62,12 +79,38 @@ Section utila.
 
       Let munit := utila_munit monad.
 
+      Let mite := utila_mite monad.
+
       Definition utila_mopt_pkt
           (k : Kind)
           (x : k @# ty)
           (valid : Bool @# ty)
         :  m (Maybe k)
         := munit (utila_opt_pkt x valid).
+
+      Definition utila_mopt_default
+          (k : Kind)
+          (default : k @# ty)
+          (x_expr : m (Maybe k))
+        :  m k
+        := mbind k x_expr
+             (fun x : ty (Maybe k)
+                => mite k
+                     ((Var ty (SyntaxKind (Maybe k)) x) @% "valid" : Bool @# ty)
+                     (munit ((Var ty (SyntaxKind (Maybe k)) x) @% "data" : k @# ty))
+                     (munit default)).
+
+      Definition utila_mopt_bind
+          (j k : Kind)
+          (x_expr : m (Maybe j))
+          (f : j @# ty -> m (Maybe k))
+        :  m (Maybe k)
+        := mbind (Maybe k) x_expr
+             (fun x : ty (Maybe j)
+               => mite (Maybe k)
+                    ((Var ty (SyntaxKind (Maybe j)) x) @% "valid" : Bool @# ty)
+                    (f ((Var ty (SyntaxKind (Maybe j)) x) @% "data"))
+                    (munit (@Invalid ty k))).
 
       Definition utila_mfoldr
           (j k : Kind)
@@ -100,9 +143,17 @@ Section utila.
 
     Definition utila_expr_monad
       :  utila_monad_type
-      := utila_monad (LetExprSyntax ty) (fun j k => @LetE ty k j) (@NormExpr ty).
+      := utila_monad (LetExprSyntax ty) (fun j k => @LetE ty k j) (@NormExpr ty)
+           (fun (k : Kind) (b : Bool @# ty) (x_expr y_expr : k ## ty)
+              => LETE x : k <- x_expr;
+                 LETE y : k <- y_expr;
+                 RetE (ITE b (#x) (#y))).
 
     Definition utila_expr_opt_pkt := utila_mopt_pkt utila_expr_monad.
+
+    Definition utila_expr_opt_default := utila_mopt_default utila_expr_monad.
+
+    Definition utila_expr_opt_bind := utila_mopt_bind utila_expr_monad.
 
     Definition utila_expr_foldr := utila_mfoldr utila_expr_monad.
 
@@ -175,6 +226,78 @@ Section utila.
                      <- entry_match entry key;
                    utila_expr_opt_pkt #result #matched)
              entries).
+
+    (*
+      Generates a lookup table containing entries of type
+      [result_kind]. Returns a default value for entries that do
+      not exist.
+
+      Note: the key match predicate must never return true for more
+      than one entry in [entries].
+    *)
+    Definition utila_expr_lookup_table_default
+        (entry_type : Type)
+        (entries : list entry_type)
+        (key_kind : Kind)
+        (result_kind : Kind)
+        (entry_match : entry_type -> key_kind @# ty -> Bool ## ty)
+        (entry_result : entry_type -> key_kind @# ty -> result_kind ## ty)
+        (default : result_kind @# ty)
+        (key : key_kind @# ty)
+      :  result_kind ## ty
+      := utila_expr_opt_default
+           default
+           (utila_expr_lookup_table
+              entries
+              entry_match
+              entry_result
+              key).
+
+    (* III. Kami Action Definitions *)
+
+    Open Scope kami_action.
+
+    Definition utila_act_monad
+      :  utila_monad_type
+      := utila_monad (@ActionT ty) (fun j k => @LetAction ty k j) (@Return ty)
+           (fun k b (x y : ActionT ty k)
+              => If b
+                   then x
+                   else y
+                   as result;
+                 Ret #result).
+
+    Definition utila_acts_opt_pkt := utila_mopt_pkt utila_act_monad.
+
+    Definition utila_acts_opt_default := utila_mopt_default utila_act_monad.
+
+    Definition utila_acts_opt_bind := utila_mopt_bind utila_act_monad.
+
+    Definition utila_acts_foldr := utila_mfoldr utila_act_monad.
+
+    Definition utila_acts_find
+        (k : Kind) 
+        (f : k @# ty -> Bool @# ty)
+        (xs_acts : list (ActionT ty k))
+      :  ActionT ty k
+      := LETA y
+           :  Bit (size k)
+              <- utila_acts_foldr
+                   (fun x acc => ((ITE (f x) (pack x) ($0)) | acc))
+                   ($0)
+                   xs_acts;
+         Ret (unpack k (#y)).
+
+    Definition utila_acts_find_pkt
+        (k : Kind)
+        (pkt_acts : list (ActionT ty (Maybe k)))
+      :  ActionT ty (Maybe k)
+      := utila_acts_find
+           (fun pkt : Maybe k @# ty
+              => pkt @% "valid")
+           pkt_acts.
+
+    Close Scope kami_action.
 
   End defs.
 
@@ -269,71 +392,42 @@ Section utila.
 
   (* III. Denotational semantics for monadic expressions. *)
 
-  Structure utila_sem_type := utila_sem {
-                                  utila_sem_m
-                                  : utila_monad_type type;
+  Structure utila_sem_type
+    := utila_sem {
+         utila_sem_m
+           : utila_monad_type type;
 
-                                  utila_sem_interp
-                                  : forall k : Kind, utila_m utila_sem_m k -> type k;
+         utila_sem_interp
+           : forall k : Kind, utila_m utila_sem_m k -> type k;
 
-                                  utila_sem_interp_foldr_nil_correct
-                                  :  forall (j k : Kind)
-                                            (f : j @# type -> k @# type -> k @# type)
-                                            (init : k @# type)
-                                            (x0 : utila_m utila_sem_m j)
-                                            (xs : list (utila_m utila_sem_m j)),
-                                      (utila_sem_interp k
-                                                        (utila_mfoldr utila_sem_m f init nil) =
-                                       evalExpr init);
+         utila_sem_interp_foldr_nil_correct
+           : forall (j k : Kind)
+               (f : j @# type -> k @# type -> k @# type)
+               (init : k @# type)
+               (x0 : utila_m utila_sem_m j)
+               (xs : list (utila_m utila_sem_m j)),
+               (utila_sem_interp k
+                  (utila_mfoldr utila_sem_m f init nil) =
+                evalExpr init);
 
-                                  utila_sem_interp_foldr_cons_correct
-                                  :  forall (j k : Kind)
-                                            (f : j @# type -> k @# type -> k @# type)
-                                            (init : k @# type)
-                                            (x0 : utila_m utila_sem_m j)
-                                            (xs : list (utila_m utila_sem_m j)),
-                                      (utila_sem_interp k
-                                                        (utila_mfoldr utila_sem_m f init (x0 :: xs)) =
-                                       (evalExpr
-                                          (f
-                                             (Var type (SyntaxKind j)
-                                                  (utila_sem_interp j x0))
-                                             (Var type (SyntaxKind k)
-                                                  (utila_sem_interp k
-                                                                    (utila_mfoldr utila_sem_m f init xs))))))
-                                }.
+         utila_sem_interp_foldr_cons_correct
+           :  forall (j k : Kind)
+                (f : j @# type -> k @# type -> k @# type)
+                (init : k @# type)
+                (x0 : utila_m utila_sem_m j)
+                (xs : list (utila_m utila_sem_m j)),
+                (utila_sem_interp k
+                   (utila_mfoldr utila_sem_m f init (x0 :: xs)) =
+                 (evalExpr
+                    (f
+                       (Var type (SyntaxKind j)
+                          (utila_sem_interp j x0))
+                       (Var type (SyntaxKind k)
+                          (utila_sem_interp k
+                             (utila_mfoldr utila_sem_m f init xs))))))
+       }.
 
   Arguments utila_sem_interp u {k}.
-
-  Section monad_ver.
-
-    Variable sem : utila_sem_type.
-
-    Let m
-      :  utila_monad_type type
-      := utila_sem_m sem.
-
-    Let M
-      :  Kind -> Type
-      := utila_m (utila_sem_m sem).
-
-    Local Notation "A || B @ X 'by' E"
-      := (eq_ind_r (fun X => B) A E) (at level 40, left associativity).
-
-    Local Notation "A || B @ X 'by' <- H"
-      := (eq_ind_r (fun X => B) A (eq_sym H)) (at level 40, left associativity).
-
-    Local Notation "{{ X }}" := (evalExpr X).
-
-    Local Notation "[[ X ]]" := (utila_sem_interp sem X).
-
-    Local Notation "#[[ X ]]" := (Var type (SyntaxKind _) [[X]]) (only parsing) : kami_expr_scope.
-
-    Local Notation "==> Y" := (fun x => utila_sem_interp sem x = Y) (at level 75).
-
-    Let utila_is_true (x : M Bool) := [[x]] = true.
-
-  End monad_ver.
 
   Section expr_ver.
 
@@ -376,7 +470,7 @@ Section utila.
           (init : k @# type)
           (x0 : j ## type)
           (xs : list (j ## type))
-      => eq_refl.
+        => eq_refl.
 
     Theorem utila_expr_all_correct
       :  forall xs : list (Bool ## type),
@@ -480,41 +574,41 @@ Section utila.
            (eq_sym H).
 
     (*
-  The following section proves that the utila_expr_find function
-  is correct. To prove, this result we make three four intuitive
-  conjectures and prove two lemmas about the expressions produced
-  by partially reducing utila_expr_find.
-     *)
+      The following section proves that the utila_expr_find function
+      is correct. To prove, this result we make three four intuitive
+      conjectures and prove two lemmas about the expressions produced
+      by partially reducing utila_expr_find.
+    *)
     Section utila_expr_find.
 
       (* The clauses used in Kami switch expressions. *)
       Let case (k : Kind) (f : k @# type -> Bool @# type) (x : k @# type) (acc : Bit (size k) @# type)
-      :  Bit (size k) @# type
+        :  Bit (size k) @# type
         := (ITE (f x) (pack x) ($ 0) | acc).
 
       Conjecture unpack_pack
         : forall (k : Kind)
-                 (x : k ## type),
-          {{unpack k
-                   (Var type (SyntaxKind (Bit (size k)))
-                        {{pack (Var type (SyntaxKind k) [[x]])}})}} =  
-          [[x]].
+            (x : k ## type),
+            {{unpack k
+                (Var type (SyntaxKind (Bit (size k)))
+                   {{pack (Var type (SyntaxKind k) [[x]])}})}} =  
+            [[x]].
 
       Conjecture kami_exprs_eq_dec
-        :  forall (k : Kind) (x y : k ## type),
+        : forall (k : Kind) (x y : k ## type),
           {x = y} + {x <> y}.
 
       Lemma kami_in_dec
-        :  forall (k : Kind) (x : k ## type) (xs : list (k ## type)),
+        : forall (k : Kind) (x : k ## type) (xs : list (k ## type)),
           {In x xs} + {~ In x xs}.
       Proof
         fun k x xs
-        => in_dec (@kami_exprs_eq_dec k) x xs.
+          => in_dec (@kami_exprs_eq_dec k) x xs.
 
       (*
-  Note: submitted a pull request to the bbv repo to include this
-  lemma in Word.v
-       *)
+        Note: submitted a pull request to the bbv repo to include this
+        lemma in Word.v
+      *)
       Lemma wor_idemp
         :  forall (n : nat) (x0 : word n), x0 ^| x0 = x0.
       Proof.
@@ -592,16 +686,16 @@ Section utila.
                                                                       @a by <- H1).
 
       (*
-  This proof proceeds using proof by cases when [xs = y0 :: ys].
-  There are four cases, either [x = y0] or [x <> y0] and either
-  [In x ys] or [~ In x ys]. If [x = y0] then [{{case f y0}} = {{pack
-  x0}}]. Otherwise [{{case f y0}} = {{$0}}]. Similarly, when [x]
-  is in [ys], [[[utila_expr_fold _ _ ys]] = {{pack x}}]. Otherwise,
-  it equals [{{$0}}]. The only case where the result would not
-  equal [{{pack x}}] is when [y0 <> x] and [~ In x ys]. But this
-  contradicts the assumption that [x] is in [(y0::ys)]. Hence, we
-  conclude that [[[utila_expr_foldr _ _ (y0 :: ys)]] = {{pack x}}].
-       *)
+        This proof proceeds using proof by cases when [xs = y0 :: ys].
+        There are four cases, either [x = y0] or [x <> y0] and either
+        [In x ys] or [~ In x ys]. If [x = y0] then [{{case f y0}} = {{pack
+        x0}}]. Otherwise [{{case f y0}} = {{$0}}]. Similarly, when [x]
+        is in [ys], [[[utila_expr_fold _ _ ys]] = {{pack x}}]. Otherwise,
+        it equals [{{$0}}]. The only case where the result would not
+        equal [{{pack x}}] is when [y0 <> x] and [~ In x ys]. But this
+        contradicts the assumption that [x] is in [(y0::ys)]. Hence, we
+        conclude that [[[utila_expr_foldr _ _ (y0 :: ys)]] = {{pack x}}].
+      *)
       Lemma utila_expr_find_lm2
         :  forall (k : Kind)
                   (f : k @# type -> Bool @# type)
@@ -763,60 +857,8 @@ Section utila.
       => utila_expr_find_correct
            (fun y : Maybe k @# type => y @% "valid") xs.
 
+    Close Scope kami_expr.
+
   End expr_ver.
-
-  Variable ty : Kind -> Type.
-
-  (* Kami Let Expressions *)
-
-  (* Kami Actions *)
-
-  Open Scope kami_action.
-
-  Definition utila_acts_opt_pkt
-             (k : Kind)
-             (x : k @# ty)
-             (valid : Bool @# ty)
-    :  ActionT ty (Maybe k)
-    := Ret (utila_opt_pkt x valid).
-
-  Definition utila_acts_foldr
-             (j k : Kind)
-             (f : j @# ty -> k @# ty -> k @# ty)
-             (init : k @# ty)
-    :  list (ActionT ty j) -> ActionT ty k
-    := fold_right
-         (fun (x_act : ActionT ty j)
-              (acc_act : ActionT ty k)
-          => LETA x   : j <- x_act;
-               LETA acc : k <- acc_act;
-               Ret (f (#x) (#acc)))
-         (Ret init).
-
-  Definition utila_acts_find
-             (k : Kind) 
-             (f : k @# ty -> Bool @# ty)
-             (xs_acts : list (ActionT ty k))
-    :  ActionT ty k
-    := LETA y
-       :  Bit (size k)
-              <- utila_acts_foldr
-              (fun x acc => ((ITE (f x) (pack x) ($0)) | acc))
-              ($0)
-              xs_acts;
-         Ret (unpack k (#y)).
-
-  Definition utila_acts_find_pkt
-             (k : Kind)
-             (pkt_acts : list (ActionT ty (Maybe k)))
-    :  ActionT ty (Maybe k)
-    := utila_acts_find
-         (fun pkt : Maybe k @# ty
-          => pkt @% "valid")
-         pkt_acts.
-
-  Close Scope kami_action.
-
-  Close Scope kami_expr.
 
 End utila.
