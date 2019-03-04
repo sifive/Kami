@@ -209,21 +209,19 @@ Section utila.
     Definition utila_expr_lookup_table
         (entry_type : Type)
         (entries : list entry_type)
-        (key_kind : Kind)
         (result_kind : Kind)
-        (entry_match : entry_type -> key_kind @# ty -> Bool ## ty)
-        (entry_result : entry_type -> key_kind @# ty -> result_kind ## ty)
-        (key : key_kind @# ty)
+        (entry_match : entry_type -> Bool ## ty)
+        (entry_result : entry_type -> result_kind ## ty)
       :  Maybe result_kind ## ty
       := utila_expr_find_pkt
            (map
              (fun entry : entry_type
                 => LETE result
                      :  result_kind
-                     <- entry_result entry key;
+                     <- entry_result entry;
                    LETE matched
                      :  Bool
-                     <- entry_match entry key;
+                     <- entry_match entry;
                    utila_expr_opt_pkt #result #matched)
              entries).
 
@@ -238,20 +236,17 @@ Section utila.
     Definition utila_expr_lookup_table_default
         (entry_type : Type)
         (entries : list entry_type)
-        (key_kind : Kind)
         (result_kind : Kind)
-        (entry_match : entry_type -> key_kind @# ty -> Bool ## ty)
-        (entry_result : entry_type -> key_kind @# ty -> result_kind ## ty)
+        (entry_match : entry_type -> Bool ## ty)
+        (entry_result : entry_type -> result_kind ## ty)
         (default : result_kind @# ty)
-        (key : key_kind @# ty)
       :  result_kind ## ty
       := utila_expr_opt_default
            default
            (utila_expr_lookup_table
               entries
               entry_match
-              entry_result
-              key).
+              entry_result).
 
     (* III. Kami Action Definitions *)
 
