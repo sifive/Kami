@@ -232,6 +232,10 @@ Local Definition testStructVal: RtlExpr testStruct :=
        "b" ::= RtlConst (natToWord _ 5) ;
        "test" ::= RtlConst true })%rtl_expr.
 
+Notation "e1 && e2" := (RtlCABool And (e1 :: e2 :: nil)) : rtl_expr_scope.
+Notation "e1 || e2" := (RtlCABool Or (e1 :: e2 :: nil)) : rtl_expr_scope.
+
+
 Local Ltac findStructIdx v f :=
   let idx := eval cbv in (Vector_find (fun x => getBool (string_dec (fst x) f%string)) v) in
       exact idx.
