@@ -95,12 +95,12 @@ Section Compile.
 
   Local Open Scope rtl_expr.
 
-  Definition combineRtlExprPreds k p1 (e1: option (_ * RtlExpr k)) p2 e2 :=
+  Definition combineRtlExprPreds k p (e1: option (_ * RtlExpr k)) e2 :=
     match e1, e2 with
     | None, None => None
-    | None, Some (x, v) => Some (p2 && x, v)
-    | Some (x, v), None => Some (p1 && x, v)
-    | Some (x1, v1), Some (x2, v2) => Some (p1 && x1 || p2 && x2, RtlITE (p1 && x1) v1 v2)
+    | None, Some (x, v) => Some ((RtlUniBool Neg p) && x, v)
+    | Some (x, v), None => Some (p && x, v)
+    | Some (x1, v1), Some (x2, v2) => Some (RtlITE p x1 x2, RtlITE (p && x1) v1 v2)
     end.
   
   Definition combineRtlExpr k (e1: option (_ * RtlExpr k)) e2 :=
@@ -111,17 +111,17 @@ Section Compile.
     | Some (x1, v1), Some (x2, v2) => Some (x1 || x2, RtlITE x1 v1 v2)
     end.
   
-  Definition combineRtlExprsPreds p1 e1 p2 e2 := {| tempWires := tempWires e1 ++ tempWires e2 ;
-                                                    regsWrite := fun s k => combineRtlExprPreds p1 (regsWrite e1 s k) p2 (regsWrite e2 s k) ;
-                                                    methCalls := fun s k => combineRtlExprPreds p1 (methCalls e1 s k) p2 (methCalls e2 s k) ;
-                                                    systCalls := map (fun x => (p1 && fst x, snd x)) (systCalls e1) ++
-                                                                     map (fun x => (p2 && fst x, snd x)) (systCalls e2) ;
-                                                    guard := match guard e1, guard e2 with
-                                                             | None, None => Some (p1 || p2)
-                                                             | Some x, None => Some ((p1 && x) || p2)
-                                                             | None, Some x => Some (x || (p2 && x))
-                                                             | Some x1, Some x2 => Some ((p1 && x1) || (p2 && x2))
-                                                             end |}.
+  Definition combineRtlExprsPreds p e1 e2 := {| tempWires := tempWires e1 ++ tempWires e2 ;
+                                                regsWrite := fun s k => combineRtlExprPreds p (regsWrite e1 s k) (regsWrite e2 s k) ;
+                                                methCalls := fun s k => combineRtlExprPreds p (methCalls e1 s k) (methCalls e2 s k) ;
+                                                systCalls := map (fun x => (p && fst x, snd x)) (systCalls e1) ++
+                                                                 map (fun x => ((RtlUniBool Neg p) && fst x, snd x)) (systCalls e2) ;
+                                                guard := match guard e1, guard e2 with
+                                                         | None, None => None
+                                                         | Some x, None => Some (x || (RtlUniBool Neg p))
+                                                         | None, Some x => Some (x || p)
+                                                         | Some x1, Some x2 => Some (RtlITE p x1 x2)
+                                                         end |}.
   
   Definition combineRtlExprs e1 e2 := {| tempWires := tempWires e1 ++ tempWires e2 ;
                                          regsWrite := fun s k => combineRtlExpr (regsWrite e1 s k) (regsWrite e2 s k) ;
@@ -243,8 +243,7 @@ Section Compile.
          do curr <- get ;
          do _ <- put (inc curr) ;
          do final <- convertActionToRtl (cont curr) retVar ;
-         let combTF := combineRtlExprsPreds predWire finalT
-                                            (RtlUniBool Neg predWire) finalF in
+         let combTF := combineRtlExprsPreds predWire finalT finalF in
          let combCont := combineRtlExprs combTF final in
          let addCurr := add tempWires combCont (name, curr, existT _ _ (RtlITE predWire
                                                                                (RtlReadWire ktf (name, currT))
