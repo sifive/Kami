@@ -52,7 +52,7 @@ Section utila.
       :  list (Bool @# ty) -> Bool @# ty
       := fold_right (fun x acc => x || acc) ($$false).
 
-    (* Kami Monadic Definitions *)
+    (* II. Kami Monadic Definitions *)
 
     Structure utila_monad_type
       := utila_monad {
@@ -137,9 +137,30 @@ Section utila.
         :  list (m Bool) -> m Bool
         := utila_mfoldr (fun x acc => x || acc) (Const ty false).
 
+      Definition utila_mfind
+           (k : Kind)
+           (f : k @# ty -> Bool @# ty)
+           (x_exprs : list (m k))
+         :  m k
+         := mbind k
+              (utila_mfoldr
+                (fun (x : k @# ty) (acc : Bit (size k) @# ty)
+                   => ((ITE (f x) (pack x) ($0)) | acc))
+                ($0)
+                x_exprs)
+              (fun (y : ty (Bit (size k)))
+                 => munit (unpack k (Var ty (SyntaxKind (Bit (size k))) y))).
+
+      Definition utila_mfind_pkt
+          (k : Kind)
+        :  list (m (Maybe k)) -> m (Maybe k)
+        := utila_mfind
+             (fun (pkt : Maybe k @# ty)
+                => pkt @% "valid").
+
     End monad_functions.
 
-    (* II. Kami Let Expression Definitions *)
+    (* III. Kami Let Expression Definitions *)
 
     Definition utila_expr_monad
       :  utila_monad_type
@@ -248,7 +269,7 @@ Section utila.
               entry_match
               entry_result).
 
-    (* III. Kami Action Definitions *)
+    (* IV. Kami Action Definitions *)
 
     Open Scope kami_action.
 
@@ -270,33 +291,15 @@ Section utila.
 
     Definition utila_acts_foldr := utila_mfoldr utila_act_monad.
 
-    Definition utila_acts_find
-        (k : Kind) 
-        (f : k @# ty -> Bool @# ty)
-        (xs_acts : list (ActionT ty k))
-      :  ActionT ty k
-      := LETA y
-           :  Bit (size k)
-              <- utila_acts_foldr
-                   (fun x acc => ((ITE (f x) (pack x) ($0)) | acc))
-                   ($0)
-                   xs_acts;
-         Ret (unpack k (#y)).
+    Definition utila_acts_find := utila_mfind utila_act_monad.
 
-    Definition utila_acts_find_pkt
-        (k : Kind)
-        (pkt_acts : list (ActionT ty (Maybe k)))
-      :  ActionT ty (Maybe k)
-      := utila_acts_find
-           (fun pkt : Maybe k @# ty
-              => pkt @% "valid")
-           pkt_acts.
+    Definition utila_acts_find_pkt := utila_mfind_pkt utila_act_monad.
 
     Close Scope kami_action.
 
   End defs.
 
-  (* IV. Correctness Proofs *)
+  (* V. Correctness Proofs *)
 
   Section ver.
 
@@ -385,7 +388,7 @@ Section utila.
 
   End ver.
 
-  (* III. Denotational semantics for monadic expressions. *)
+  (* VI. Denotational semantics for monadic expressions. *)
 
   Structure utila_sem_type
     := utila_sem {
