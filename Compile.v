@@ -5,10 +5,6 @@ Set Asymmetric Patterns.
 
 Local Open Scope string.
 
-Local Notation VarType := (list nat).
-Local Notation NoneVal := (nil: VarType).
-Local Notation InitVal := (0 :: nil: VarType).
-
 Definition getRegActionRead a s := (a ++ "#" ++ s ++ "#_read", NoneVal).
 Definition getRegActionWrite a s := (a ++ "#" ++ s ++ "#_tempwrite", NoneVal).
 Definition getRegActionFinalWrite a s := (a ++ "#" ++ s ++ "#_write", NoneVal).
@@ -81,10 +77,7 @@ Section Compile.
     | Finish => RtlFinish
     end.
 
-  Local Definition inc ns := match ns with
-                             | nil => nil
-                             | x :: xs => S x :: xs
-                             end.
+  Local Definition inc ns := S ns.
 
   Axiom cheat: forall t, t.
 

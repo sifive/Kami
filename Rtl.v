@@ -3,14 +3,13 @@ Require Import Syntax String.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
-(* TODO
- * System Calls
- * Dealing with Register Files
- *)
+Notation VarType := nat.
+Notation NoneVal := (0: VarType).
+Notation InitVal := (1: VarType).
 
 Inductive RtlExpr: Kind -> Type :=
 | RtlReadReg k: string -> RtlExpr k
-| RtlReadWire k: (string * list nat) -> RtlExpr k
+| RtlReadWire k: (string * VarType) -> RtlExpr k
 | RtlConst k: ConstT k -> RtlExpr k
 | RtlUniBool: UniBoolOp -> RtlExpr Bool -> RtlExpr Bool
 | RtlCABool: CABoolOp -> list (RtlExpr Bool) -> RtlExpr Bool
@@ -83,13 +82,13 @@ Definition getRtlRegInit (x: sigT RegInitValT): sigT RtlRegConst.
 Defined.
 
 Record RtlModule :=
-  { hiddenWires: list (string * list nat);
+  { hiddenWires: list (string * VarType);
     regFiles: list (bool * RegFileBase);
-    inputs: list (string * list nat * Kind);
-    outputs: list (string * list nat * Kind);
+    inputs: list (string * VarType * Kind);
+    outputs: list (string * VarType * Kind);
     regInits: list (string * sigT RtlRegConst);
     regWrites: list (string * sigT RtlExpr);
-    wires: list (string * list nat * sigT RtlExpr);
+    wires: list (string * VarType * sigT RtlExpr);
     sys: list (RtlExpr Bool * list RtlSysT)
   }.
 

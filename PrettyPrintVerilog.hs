@@ -83,8 +83,8 @@ ppDottedName s =
     x : nil -> x
 
 
-ppPrintVar :: (String, [Int]) -> String
-ppPrintVar (s, vs) = ppName $ s ++ concatMap (\v -> '#' : show v) vs
+ppPrintVar :: (String, Int) -> String
+ppPrintVar (s, v) = ppName $ s ++ if v /= 0 then '#' : show v else []
 
 ppWord :: [Bool] -> String
 ppWord [] = []
@@ -374,9 +374,9 @@ ppRtlInstance m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ '(' : ppPrintVar nm ++ ")")) (removeDups ins' ++ removeDups outs') ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ '(' : ppPrintVar nm ++ ")")) rfMeths ++ ");\n"
   where
-    rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", []), fst (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
-              Data.List.map (\x -> ((fst x ++ "#_return", []), snd (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
-              Data.List.map (\x -> ((fst x ++ "#_enable", []), Bool) ) (getAllMethodsRegFileList (map snd regFs))
+    rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", 0), fst (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
+              Data.List.map (\x -> ((fst x ++ "#_return", 0), snd (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
+              Data.List.map (\x -> ((fst x ++ "#_enable", 0), Bool) ) (getAllMethodsRegFileList (map snd regFs))
 ppBitFormat :: BitFormat -> String
 ppBitFormat Binary = "b"
 ppBitFormat Decimal = "d"
@@ -454,9 +454,9 @@ ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
     regInits = removeDups regInits'
     regWrites = removeDups regWrites'
     assigns = removeDups assigns'
-    rfMethsIn = Data.List.map (\x -> ((fst x ++ "#_return", []), snd (snd x)) ) (getAllMethodsRegFileList (map snd regFs))
-    rfMethsOut = Data.List.map (\x -> ((fst x ++ "#_argument", []), fst (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
-                 Data.List.map (\x -> ((fst x ++ "#_enable", []), Bool) ) (getAllMethodsRegFileList (map snd regFs))
+    rfMethsIn = Data.List.map (\x -> ((fst x ++ "#_return", 0), snd (snd x)) ) (getAllMethodsRegFileList (map snd regFs))
+    rfMethsOut = Data.List.map (\x -> ((fst x ++ "#_argument", 0), fst (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
+                 Data.List.map (\x -> ((fst x ++ "#_enable", 0), Bool) ) (getAllMethodsRegFileList (map snd regFs))
     convAssigns =
       mapM (\(nm, (ty, expr)) ->
               do
@@ -526,9 +526,9 @@ ppTopModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
     isHidden (x, _) = not (elem x hiddenWires)
     insFiltered = Data.List.filter isHidden ins
     outsFiltered = Data.List.filter isHidden outs
-    rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", []), fst (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
-              Data.List.map (\x -> ((fst x ++ "#_return", []), snd (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
-              Data.List.map (\x -> ((fst x ++ "#_enable", []), Bool) ) (getAllMethodsRegFileList (map snd regFs))
+    rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", 0), fst (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
+              Data.List.map (\x -> ((fst x ++ "#_return", 0), snd (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
+              Data.List.map (\x -> ((fst x ++ "#_enable", 0), Bool) ) (getAllMethodsRegFileList (map snd regFs))
               
 printDiff :: [(String, [String])] -> [(String, [String])] -> IO ()
 printDiff (x:xs) (y:ys) =
