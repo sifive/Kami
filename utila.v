@@ -484,7 +484,7 @@ Section utila.
 
   Section monad_ver.
 
-    Parameter sem : utila_sem_type.
+    Variable sem : utila_sem_type.
 
     Let monad : utila_monad_type type := utila_sem_m sem.
 
@@ -620,6 +620,11 @@ Section utila.
 
     Let utila_is_true (x : Bool ## type) := x ==> true.
 
+    Lemma utila_expr_unit_correct
+      :  forall (k : Kind) (x : k @# type), [[RetE x]] = {{x}}.
+    Proof
+       fun k x => eq_refl.
+
     Theorem utila_expr_foldr_correct_nil
       :  forall (j k : Kind) (f : j @# type -> k @# type -> k @# type) (init : k @# type),
         utila_expr_foldr f init nil ==> {{init}}.
@@ -643,80 +648,24 @@ Section utila.
           (xs : list (j ## type))
         => eq_refl.
 
+    Definition utila_expr_sem
+      :  utila_sem_type
+      := utila_sem
+           (utila_expr_monad type)
+           evalLetExpr
+           utila_expr_unit_correct
+           utila_expr_foldr_correct_nil
+           utila_expr_foldr_correct_cons.
+
     Theorem utila_expr_all_correct
       :  forall xs : list (Bool ## type),
         utila_expr_all xs ==> true <-> Forall utila_is_true xs.
-    Proof
-      fun xs
-      => conj
-           (list_ind
-              (fun ys => utila_expr_all ys ==> true -> Forall utila_is_true ys)
-              (fun _ => Forall_nil utila_is_true)
-              (fun y0 ys
-                   (F : utila_expr_all ys ==> true -> Forall utila_is_true ys)
-                   (H : utila_expr_all (y0 :: ys) ==> true)
-               => let H0
-                      :  y0 ==> true /\ utila_expr_all ys ==> true
-                      := andb_prop [[y0]] [[utila_expr_all ys]] H in
-                  Forall_cons y0 (proj1 H0) (F (proj2 H0)))
-              xs)
-           (@Forall_ind
-              (Bool ## type)
-              utila_is_true
-              (fun ys => utila_expr_all ys ==> true)
-              (eq_refl true)
-              (fun y0 ys
-                   (H : y0 ==> true)
-                   (H0 : Forall utila_is_true ys)
-                   (F : utila_expr_all ys ==> true)
-               => andb_true_intro (conj H F))
-              xs).
+    Proof utila_mall_correct utila_expr_sem.
 
     Theorem utila_expr_any_correct
       :  forall xs : list (Bool ## type),
         utila_expr_any xs ==> true <-> Exists utila_is_true xs.
-    Proof
-      fun xs
-      => conj
-           (list_ind
-              (fun ys => utila_expr_any ys ==> true -> Exists utila_is_true ys)
-              (fun H : false = true
-               => False_ind
-                    (Exists utila_is_true nil)
-                    (diff_false_true H))
-              (fun y0 ys
-                   (F : utila_expr_any ys ==> true -> Exists utila_is_true ys)
-                   (H : utila_expr_any (y0 :: ys) ==> true)
-               => let H0
-                      :  y0 ==> true \/ utila_expr_any ys ==> true
-                      := orb_prop [[y0]] [[utila_expr_any ys]] H in
-                  match H0 with
-                  | or_introl H1
-                    => Exists_cons_hd utila_is_true y0 ys H1 
-                  | or_intror H1
-                    => Exists_cons_tl y0 (F H1)
-                  end)
-              xs)
-           (@Exists_ind 
-              (Bool ## type)
-              (==> true)
-              (fun ys => utila_expr_any ys ==> true)
-              (fun y0 ys
-                   (H : y0 ==> true)
-               => eq_ind
-                    true
-                    (fun z : bool => (orb z [[utila_expr_any ys]]) = true)
-                    (orb_true_l [[utila_expr_any ys]])
-                    [[y0]]
-                    (eq_sym H))
-              (fun y0 ys
-                   (H : Exists utila_is_true ys)
-                   (F : utila_expr_any ys ==> true)
-               => eq_ind_r
-                    (fun z => orb [[y0]] z = true)
-                    (orb_true_r [[y0]])
-                    F)
-              xs).
+    Proof utila_many_correct utila_expr_sem.
 
     Lemma utila_ite_l
       :  forall (k : Kind) (x y : k @# type) (p : Bool @# type),
