@@ -52,7 +52,7 @@ Section utila.
       :  list (Bool @# ty) -> Bool @# ty
       := fold_right (fun x acc => x || acc) ($$false).
 
-    (* Kami Monadic Definitions *)
+    (* II. Kami Monadic Definitions *)
 
     Structure utila_monad_type
       := utila_monad {
@@ -69,17 +69,23 @@ Section utila.
              : forall k : Kind, Bool @# ty -> utila_m k -> utila_m k -> utila_m k
          }.
 
+    Arguments utila_mbind {u} j k x f.
+
+    Arguments utila_munit {u} k x.
+
+    Arguments utila_mite {u} k b x y.
+
     Section monad_functions.
 
       Variable monad : utila_monad_type.
 
       Let m := utila_m monad.
 
-      Let mbind := utila_mbind monad.
+      Let mbind := @utila_mbind monad.
 
-      Let munit := utila_munit monad.
+      Let munit := @utila_munit monad.
 
-      Let mite := utila_mite monad.
+      Let mite := @utila_mite monad.
 
       Definition utila_mopt_pkt
           (k : Kind)
@@ -137,9 +143,46 @@ Section utila.
         :  list (m Bool) -> m Bool
         := utila_mfoldr (fun x acc => x || acc) (Const ty false).
 
+      Definition utila_mfind
+           (k : Kind)
+           (f : k @# ty -> Bool @# ty)
+           (x_exprs : list (m k))
+         :  m k
+         := mbind k
+              (utila_mfoldr
+                (fun (x : k @# ty) (acc : Bit (size k) @# ty)
+                   => ((ITE (f x) (pack x) ($0)) | acc))
+                ($0)
+                x_exprs)
+              (fun (y : ty (Bit (size k)))
+                 => munit (unpack k (Var ty (SyntaxKind (Bit (size k))) y))).
+
+      Definition utila_mfind_pkt
+          (k : Kind)
+        :  list (m (Maybe k)) -> m (Maybe k)
+        := utila_mfind
+             (fun (pkt : Maybe k @# ty)
+                => pkt @% "valid").
+
     End monad_functions.
 
-    (* II. Kami Let Expression Definitions *)
+    Arguments utila_mopt_pkt {monad}.
+
+    Arguments utila_mopt_default {monad}.
+
+    Arguments utila_mopt_bind {monad}.
+
+    Arguments utila_mfoldr {monad}.
+
+    Arguments utila_mall {monad}.
+
+    Arguments utila_many {monad}.
+
+    Arguments utila_mfind {monad}.
+
+    Arguments utila_mfind_pkt {monad}.
+
+    (* III. Kami Let Expression Definitions *)
 
     Definition utila_expr_monad
       :  utila_monad_type
@@ -149,17 +192,17 @@ Section utila.
                  LETE y : k <- y_expr;
                  RetE (ITE b (#x) (#y))).
 
-    Definition utila_expr_opt_pkt := utila_mopt_pkt utila_expr_monad.
+    Definition utila_expr_opt_pkt := @utila_mopt_pkt utila_expr_monad.
 
-    Definition utila_expr_opt_default := utila_mopt_default utila_expr_monad.
+    Definition utila_expr_opt_default := @utila_mopt_default utila_expr_monad.
 
-    Definition utila_expr_opt_bind := utila_mopt_bind utila_expr_monad.
+    Definition utila_expr_opt_bind := @utila_mopt_bind utila_expr_monad.
 
-    Definition utila_expr_foldr := utila_mfoldr utila_expr_monad.
+    Definition utila_expr_foldr := @utila_mfoldr utila_expr_monad.
 
-    Definition utila_expr_all := utila_mall utila_expr_monad.
+    Definition utila_expr_all := @utila_mall utila_expr_monad.
 
-    Definition utila_expr_any := utila_many utila_expr_monad.
+    Definition utila_expr_any := @utila_many utila_expr_monad.
 
     (*
       Accepts a Kami predicate [f] and a list of Kami let expressions
@@ -248,7 +291,7 @@ Section utila.
               entry_match
               entry_result).
 
-    (* III. Kami Action Definitions *)
+    (* IV. Kami Action Definitions *)
 
     Open Scope kami_action.
 
@@ -262,41 +305,49 @@ Section utila.
                    as result;
                  Ret #result).
 
-    Definition utila_acts_opt_pkt := utila_mopt_pkt utila_act_monad.
+    Definition utila_acts_opt_pkt := @utila_mopt_pkt utila_act_monad.
 
-    Definition utila_acts_opt_default := utila_mopt_default utila_act_monad.
+    Definition utila_acts_opt_default := @utila_mopt_default utila_act_monad.
 
-    Definition utila_acts_opt_bind := utila_mopt_bind utila_act_monad.
+    Definition utila_acts_opt_bind := @utila_mopt_bind utila_act_monad.
 
-    Definition utila_acts_foldr := utila_mfoldr utila_act_monad.
+    Definition utila_acts_foldr := @utila_mfoldr utila_act_monad.
 
-    Definition utila_acts_find
-        (k : Kind) 
-        (f : k @# ty -> Bool @# ty)
-        (xs_acts : list (ActionT ty k))
-      :  ActionT ty k
-      := LETA y
-           :  Bit (size k)
-              <- utila_acts_foldr
-                   (fun x acc => ((ITE (f x) (pack x) ($0)) | acc))
-                   ($0)
-                   xs_acts;
-         Ret (unpack k (#y)).
+    Definition utila_acts_all := @utila_mall utila_act_monad.
 
-    Definition utila_acts_find_pkt
-        (k : Kind)
-        (pkt_acts : list (ActionT ty (Maybe k)))
-      :  ActionT ty (Maybe k)
-      := utila_acts_find
-           (fun pkt : Maybe k @# ty
-              => pkt @% "valid")
-           pkt_acts.
+    Definition utila_acts_any := @utila_many utila_act_monad.
+
+    Definition utila_acts_find := @utila_mfind utila_act_monad.
+
+    Definition utila_acts_find_pkt := @utila_mfind_pkt utila_act_monad.
 
     Close Scope kami_action.
 
   End defs.
 
-  (* IV. Correctness Proofs *)
+  Arguments utila_mopt_pkt {ty} {monad} {k}.
+
+  Arguments utila_mopt_default {ty} {monad} {k}.
+
+  Arguments utila_mopt_bind {ty} {monad} {j} {k}.
+
+  Arguments utila_mfoldr {ty} {monad} {j} {k}.
+
+  Arguments utila_mall {ty} {monad}.
+
+  Arguments utila_many {ty} {monad}.
+
+  Arguments utila_mfind {ty} {monad} {k}.
+
+  Arguments utila_mfind_pkt {ty} {monad} {k}.
+
+  (* V. Correctness Proofs *)
+
+  Local Notation "A || B @ X 'by' E"
+    := (eq_ind_r (fun X => B) A E) (at level 40, left associativity).
+
+  Local Notation "A || B @ X 'by' <- H"
+    := (eq_ind_r (fun X => B) A (eq_sym H)) (at level 40, left associativity).
 
   Section ver.
 
@@ -385,7 +436,7 @@ Section utila.
 
   End ver.
 
-  (* III. Denotational semantics for monadic expressions. *)
+  (* VI. Denotational semantics for monadic expressions. *)
 
   Structure utila_sem_type
     := utila_sem {
@@ -395,42 +446,167 @@ Section utila.
          utila_sem_interp
            : forall k : Kind, utila_m utila_sem_m k -> type k;
 
-         utila_sem_interp_foldr_nil_correct
+         utila_sem_unit_correct
+           : forall (k : Kind) (x : k @# type),
+               utila_sem_interp k (utila_munit (utila_sem_m) x) =
+               evalExpr x;
+
+         utila_sem_foldr_nil_correct
            : forall (j k : Kind)
                (f : j @# type -> k @# type -> k @# type)
-               (init : k @# type)
-               (x0 : utila_m utila_sem_m j)
-               (xs : list (utila_m utila_sem_m j)),
+               (init : k @# type),
                (utila_sem_interp k
-                  (utila_mfoldr utila_sem_m f init nil) =
+                  (utila_mfoldr f init nil) =
                 evalExpr init);
 
-         utila_sem_interp_foldr_cons_correct
+         utila_sem_foldr_cons_correct
            :  forall (j k : Kind)
                 (f : j @# type -> k @# type -> k @# type)
                 (init : k @# type)
                 (x0 : utila_m utila_sem_m j)
                 (xs : list (utila_m utila_sem_m j)),
                 (utila_sem_interp k
-                   (utila_mfoldr utila_sem_m f init (x0 :: xs)) =
+                   (utila_mfoldr f init (x0 :: xs)) =
                  (evalExpr
                     (f
                        (Var type (SyntaxKind j)
                           (utila_sem_interp j x0))
                        (Var type (SyntaxKind k)
                           (utila_sem_interp k
-                             (utila_mfoldr utila_sem_m f init xs))))))
+                             (utila_mfoldr f init xs))))))
        }.
 
-  Arguments utila_sem_interp u {k}.
+  Arguments utila_sem_interp {u} {k} x.
+
+  Arguments utila_sem_foldr_nil_correct {u} {j} {k}.
+
+  Arguments utila_sem_foldr_cons_correct {u} {j} {k}.
+
+  Section monad_ver.
+
+    Variable sem : utila_sem_type.
+
+    Let monad : utila_monad_type type := utila_sem_m sem.
+
+    Let m := utila_m monad.
+
+    Local Notation "{{ X }}" := (evalExpr X).
+
+    Local Notation "[[ X ]]" := (utila_sem_interp X).
+
+    Let utila_is_true (x : m Bool)
+      :  Prop
+      := [[x]] = true.
+
+    Lemma utila_mall_nil
+      :  [[utila_mall ([] : list (m Bool))]] = true.
+    Proof utila_sem_foldr_nil_correct
+            (fun x acc => x && acc)
+            (Const type true).
+
+    Lemma utila_mall_cons
+      :  forall (x0 : m Bool) (xs : list (m Bool)), [[utila_mall (x0 :: xs)]] = andb [[x0]] [[utila_mall xs]].
+    Proof utila_sem_foldr_cons_correct
+            (fun x acc => x && acc)
+            (Const type true).
+
+    Theorem utila_mall_correct
+      :  forall xs : list (m Bool),
+           [[utila_mall xs]] = true <-> Forall utila_is_true xs.
+    Proof
+      fun xs
+        => conj
+             (list_ind
+               (fun ys => [[utila_mall ys]] = true -> Forall utila_is_true ys)
+               (fun _ => Forall_nil utila_is_true)
+               (fun y0 ys
+                 (F : [[utila_mall ys]] = true -> Forall utila_is_true ys)
+                 (H : [[utila_mall (y0 :: ys)]] = true)
+                 => let H0
+                      :  [[y0]] = true /\ [[utila_mall ys]] = true
+                      := andb_prop [[y0]] [[utila_mall ys]]
+                           (eq_sym
+                             (utila_mall_cons y0 ys
+                              || X = _ @X by <- H)) in
+                    Forall_cons y0
+                      (proj1 H0)
+                      (F (proj2 H0)))
+               xs)
+             (@Forall_ind
+               (m Bool)
+               utila_is_true
+               (fun ys => [[utila_mall ys]] = true)
+               utila_mall_nil
+               (fun y0 ys
+                 (H : [[y0]] = true)
+                 (H0 : Forall utila_is_true ys)
+                 (F : [[utila_mall ys]] = true)
+                 => andb_true_intro (conj H F)
+                    || X = true @X by utila_mall_cons y0 ys)
+               xs).
+
+    Lemma utila_many_nil
+      :  [[utila_many ([] : list (m Bool)) ]] = false.
+    Proof utila_sem_foldr_nil_correct
+            (fun x acc => CABool Or [x; acc])
+            (Const type false).
+
+    Lemma utila_many_cons
+      :  forall (x0 : m Bool) (xs : list (m Bool)), [[utila_many (x0 :: xs)]] = orb [[x0]] [[utila_many xs]].
+    Proof utila_sem_foldr_cons_correct
+            (fun x acc => CABool Or [x; acc])
+            (Const type false).
+
+    Theorem utila_many_correct
+      :  forall xs : list (m Bool),
+           [[utila_many xs]] = true <-> Exists utila_is_true xs.
+    Proof
+      fun xs
+        => conj
+             (list_ind
+               (fun ys => [[utila_many ys]] = true -> Exists utila_is_true ys)
+               (fun H : [[utila_many [] ]] = true
+                 => let H0
+                      :  false = true
+                      := H || X = true  @X by <- utila_many_nil in
+                    False_ind _ (diff_false_true H0))
+               (fun y0 ys
+                 (F : [[utila_many ys]] = true -> Exists utila_is_true ys)
+                 (H : [[utila_many (y0 :: ys)]] = true)
+                 => let H0
+                      :  [[y0]] = true \/ [[utila_many ys]] = true
+                      := orb_prop [[y0]] [[utila_many ys]]
+                           (eq_sym
+                             (utila_many_cons y0 ys
+                              || X = _ @X by <- H)) in
+                    match H0 with
+                    | or_introl H1
+                      => Exists_cons_hd utila_is_true y0 ys H1
+                    | or_intror H1
+                      => Exists_cons_tl y0 (F H1)
+                    end)
+               xs)
+             (@Exists_ind
+               (m Bool)
+               utila_is_true
+               (fun ys => [[utila_many ys]] = true)
+               (fun y0 ys
+                 (H : [[y0]] = true)
+                 => orb_true_l [[utila_many ys]]
+                    || orb X [[utila_many ys]] = true @X by H
+                    || X = true                       @X by utila_many_cons y0 ys)
+               (fun y0 ys
+                 (H : Exists utila_is_true ys)
+                 (F : [[utila_many ys]] = true)
+                 => orb_true_r [[y0]]
+                    || orb [[y0]] X = true @X by F
+                    || X = true            @X by utila_many_cons y0 ys)
+               xs).
+             
+
+  End monad_ver.
 
   Section expr_ver.
-
-    Local Notation "A || B @ X 'by' E"
-      := (eq_ind_r (fun X => B) A E) (at level 40, left associativity).
-
-    Local Notation "A || B @ X 'by' <- H"
-      := (eq_ind_r (fun X => B) A (eq_sym H)) (at level 40, left associativity).
 
     Local Notation "{{ X }}" := (evalExpr X).
 
@@ -443,6 +619,11 @@ Section utila.
     Local Notation "==> Y" := (fun x => evalLetExpr x = Y) (at level 75).
 
     Let utila_is_true (x : Bool ## type) := x ==> true.
+
+    Lemma utila_expr_unit_correct
+      :  forall (k : Kind) (x : k @# type), [[RetE x]] = {{x}}.
+    Proof
+       fun k x => eq_refl.
 
     Theorem utila_expr_foldr_correct_nil
       :  forall (j k : Kind) (f : j @# type -> k @# type -> k @# type) (init : k @# type),
@@ -467,80 +648,24 @@ Section utila.
           (xs : list (j ## type))
         => eq_refl.
 
+    Definition utila_expr_sem
+      :  utila_sem_type
+      := utila_sem
+           (utila_expr_monad type)
+           evalLetExpr
+           utila_expr_unit_correct
+           utila_expr_foldr_correct_nil
+           utila_expr_foldr_correct_cons.
+
     Theorem utila_expr_all_correct
       :  forall xs : list (Bool ## type),
         utila_expr_all xs ==> true <-> Forall utila_is_true xs.
-    Proof
-      fun xs
-      => conj
-           (list_ind
-              (fun ys => utila_expr_all ys ==> true -> Forall utila_is_true ys)
-              (fun _ => Forall_nil utila_is_true)
-              (fun y0 ys
-                   (F : utila_expr_all ys ==> true -> Forall utila_is_true ys)
-                   (H : utila_expr_all (y0 :: ys) ==> true)
-               => let H0
-                      :  y0 ==> true /\ utila_expr_all ys ==> true
-                      := andb_prop [[y0]] [[utila_expr_all ys]] H in
-                  Forall_cons y0 (proj1 H0) (F (proj2 H0)))
-              xs)
-           (@Forall_ind
-              (Bool ## type)
-              utila_is_true
-              (fun ys => utila_expr_all ys ==> true)
-              (eq_refl true)
-              (fun y0 ys
-                   (H : y0 ==> true)
-                   (H0 : Forall utila_is_true ys)
-                   (F : utila_expr_all ys ==> true)
-               => andb_true_intro (conj H F))
-              xs).
+    Proof utila_mall_correct utila_expr_sem.
 
     Theorem utila_expr_any_correct
       :  forall xs : list (Bool ## type),
         utila_expr_any xs ==> true <-> Exists utila_is_true xs.
-    Proof
-      fun xs
-      => conj
-           (list_ind
-              (fun ys => utila_expr_any ys ==> true -> Exists utila_is_true ys)
-              (fun H : false = true
-               => False_ind
-                    (Exists utila_is_true nil)
-                    (diff_false_true H))
-              (fun y0 ys
-                   (F : utila_expr_any ys ==> true -> Exists utila_is_true ys)
-                   (H : utila_expr_any (y0 :: ys) ==> true)
-               => let H0
-                      :  y0 ==> true \/ utila_expr_any ys ==> true
-                      := orb_prop [[y0]] [[utila_expr_any ys]] H in
-                  match H0 with
-                  | or_introl H1
-                    => Exists_cons_hd utila_is_true y0 ys H1 
-                  | or_intror H1
-                    => Exists_cons_tl y0 (F H1)
-                  end)
-              xs)
-           (@Exists_ind 
-              (Bool ## type)
-              (==> true)
-              (fun ys => utila_expr_any ys ==> true)
-              (fun y0 ys
-                   (H : y0 ==> true)
-               => eq_ind
-                    true
-                    (fun z : bool => (orb z [[utila_expr_any ys]]) = true)
-                    (orb_true_l [[utila_expr_any ys]])
-                    [[y0]]
-                    (eq_sym H))
-              (fun y0 ys
-                   (H : Exists utila_is_true ys)
-                   (F : utila_expr_any ys ==> true)
-               => eq_ind_r
-                    (fun z => orb [[y0]] z = true)
-                    (orb_true_r [[y0]])
-                    F)
-              xs).
+    Proof utila_many_correct utila_expr_sem.
 
     Lemma utila_ite_l
       :  forall (k : Kind) (x y : k @# type) (p : Bool @# type),
