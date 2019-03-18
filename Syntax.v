@@ -426,7 +426,7 @@ Inductive Mod: Type :=
 | ConcatMod (m1 m2: Mod): Mod.
 
 Coercion Base: BaseModule >-> Mod.
-
+Coercion BaseRegFile : RegFileBase >-> BaseModule.
 Notation getKindAttr ls := (map (fun x => (fst x, projT1 (snd x))) ls).
 
 Notation "l '[=]' r" :=
@@ -819,6 +819,34 @@ Section NoCallActionT.
   | NoCallSys ls lretT c: NoCallActionT c -> @NoCallActionT lretT (Sys ls c)
   | NoCallReturn lretT e: @NoCallActionT lretT (Return e).
 End NoCallActionT.
+
+Section NeverCallBaseModule.
+  Inductive NeverCallActionT: forall k, ActionT type k -> Prop :=
+  | NeverCallMCall meth s e lretT c: False -> @NeverCallActionT lretT (MCall meth s e c)
+  | NeverCallLetExpr k (e: Expr type k) lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (LetExpr e c)
+  | NeverCallLetAction k (a: ActionT type k) lretT c: NeverCallActionT a -> (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (LetAction a c)
+  | NeverCallReadNondet k lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (ReadNondet k c)
+  | NeverCallReadReg r k lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (ReadReg r k c)
+  | NeverCallWriteReg r k (e: Expr type k) lretT c: NeverCallActionT c  -> @NeverCallActionT lretT (WriteReg r e c)
+  | NeverCallIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, NeverCallActionT (c v)) -> NeverCallActionT atrue -> NeverCallActionT afalse -> @NeverCallActionT lretT (IfElse p atrue afalse c)
+  | NeverCallAssertion (e: Expr type (SyntaxKind Bool)) lretT c: NeverCallActionT c -> @NeverCallActionT lretT (Assertion e c)
+  | NeverCallSys ls lretT c: NeverCallActionT c -> @NeverCallActionT lretT (Sys ls c)
+  | NeverCallReturn lretT e: @NeverCallActionT lretT (Return e).
+
+  Variable m : BaseModule.
+  
+  Definition NeverCallBaseModule :=
+    (forall rule, In rule (getRules m) -> NeverCallActionT (snd rule type)) /\
+    (forall meth, In meth (getMethods m) ->
+                  forall v, NeverCallActionT (projT2 (snd meth) type v)).
+End NeverCallBaseModule.
+
+
+Inductive NeverCallMod: Mod -> Prop :=
+| BaseNeverCall m (HNCBaseModule: NeverCallBaseModule m): NeverCallMod (Base m)
+| HideMethNeverCall m s  (HNCModule: NeverCallMod m): NeverCallMod (HideMeth m s)
+| ConcatModNeverCall m1 m2 (HNCModule1: NeverCallMod m1) (HNCModule2: NeverCallMod m2)
+  : NeverCallMod (ConcatMod m1 m2).
 
 Section NoSelfCallBaseModule.
   Variable m: BaseModule.
