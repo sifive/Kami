@@ -241,8 +241,6 @@ ppRfInstance :: RtlRegFileBase -> String
 ppRfInstance (rf@(Build_RtlRegFileBase isWrMask num name reads write idxNum dataType init)) =
   "  " ++ ppName name ++ " " ++
   ppName name ++ "$inst(.CLK(CLK), .RESET(RESET), " ++
-ppRfInstance (_, rf@(RegFile name reads write idxNum dataType init)) =
-  "  " ++ ppName name ++ " " ++
   (case reads of
      RtlAsync readLs ->
        concatMap (\(read, _) ->
@@ -259,13 +257,13 @@ ppRfInstance (_, rf@(RegFile name reads write idxNum dataType init)) =
   ("." ++ ppName write ++ "$_argument(" ++ ppName write ++ "$_argument)") ++
   ");\n\n"
 
-ppRfModule :: Build_RtlRegFileBase -> String
+ppRfModule :: RtlRegFileBase -> String
 ppRfModule (rf@(Build_RtlRegFileBase isWrMask num name reads write idxNum dataType init)) =
   let writeType = if isWrMask then writeRqMask idxNum num dataType else writeRq idxNum (Array num dataType) in
   "module " ++ ppName name ++ "(\n" ++
   (case reads of
      RtlAsync readLs ->
-       concatMap (\read ->
+       concatMap (\(read, _) ->
                     ("  input " ++ ppDeclType (ppName read ++ "$_enable") Bool ++ ",\n") ++
                    (ppDealSize0 (Bit (log2_up idxNum)) "" ("  input " ++ ppDeclType (ppName read ++ "$_argument") (Bit (log2_up idxNum)) ++ ",\n")) ++
                    ppDealSize0 (Array num dataType) "" ("  output " ++ ppDeclType (ppName read ++ "$_return") (Array num dataType) ++ ",\n")) readLs
@@ -311,9 +309,9 @@ ppRfModule (rf@(Build_RtlRegFileBase isWrMask num name reads write idxNum dataTy
     let readResponse readResp readAddr isByp =
           ppDealSize0 (Array num dataType) "" ("  assign " ++ ppName readResp ++ " = " ++ "{" ++
                                                 intercalate ", " (map (\i ->
-                                                                          ppDealSize0 (Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i ++ " >= " ++ show idxNum) ++ "?"
-                                                                          if isByp then writeByps readAddr i else "") ++ ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ (ppDealSize0 (Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i)) ++ "]") ++ ": 0")
-                                                [0 .. (num-1)] ++ "};\n") in
+                                                                          ppDealSize0 (Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i ++ " >= " ++ show idxNum) ++ "?" ++
+                                                                          (if isByp then writeByps readAddr i else "") ++ ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ (ppDealSize0 (Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i)) ++ "]") ++ ": 0")
+                                                                  [0 .. (num-1)]) ++ "};\n") in
       (case reads of
          RtlAsync readLs -> concatMap (\(read, bypass) ->
                                          readResponse (read ++ "$_return") (ppName (read ++ "$_argument")) bypass) readLs
@@ -322,7 +320,7 @@ ppRfModule (rf@(Build_RtlRegFileBase isWrMask num name reads write idxNum dataTy
                         if isAddr
                         then readResponse (readRs ++ "$_return") (if bypRqRs then "(" ++ (ppName (readRq ++ "$_enable") ++ "? " ++ ppName (readRq ++ "$_argument") ++ ": " ++ ppName readReg) ++ ")" else ppName readReg) bypWrRd
                         else readResponse (readReg ++ "$_temp") readRq bypWrRd ++
-                             ppDealSize0 (Array num dataType) "" ("  assign " ++ ppName readRs ++ " = " ++ if bypRqRs then "(" ++ (ppName (readRq ++ "$_enable") ++ "? " ++ ppName (readReg ++ "$_temp") ++ ": " ++ ppName readReg ++ ")"  else ppName readReg)
+                             ppDealSize0 (Array num dataType) "" ("  assign " ++ ppName readRs ++ " = " ++ if bypRqRs then "(" ++ ppName (readRq ++ "$_enable") ++ "? " ++ ppName (readReg ++ "$_temp") ++ ": " ++ ppName readReg ++ ")"  else ppName readReg)
                      ) readLs) ++
   "  always@(posedge CLK) begin\n" ++
   "    if(RESET) begin\n" ++
@@ -346,14 +344,21 @@ ppRfModule (rf@(Build_RtlRegFileBase isWrMask num name reads write idxNum dataTy
                          "      end\n"
                  ) readLs) ++
   "    end\n" ++
-  "  end\n"
+  "  end\n" ++
   "endmodule\n\n"
 
 removeDups :: Eq a => [(a, b)] -> [(a, b)]
 removeDups = nubBy (\(a, _) (b, _) -> a == b)
 
-getAllMethodsRegFileList :: [RegFileBase] -> [(String, (Kind, Kind))]
-getAllMethodsRegFileList ls = map (\(x, (y, z)) -> (x, y)) (concat (map (\x -> getMethods (BaseRegFile x)) ls))
+getAllMethodsRegFileList :: [RtlRegFileBase] -> [(String, (Kind, Kind))]
+getAllMethodsRegFileList ls = map (\(x, (y, z)) -> (x, y)) (concat (map (\(Build_RtlRegFileBase isWrMask num dataArray readLs write idxNum d init) ->
+                                                                            getMethods (BaseRegFile (
+                                                                                           Build_RegFileBase isWrMask num dataArray (case readLs of
+                                                                                                                                        RtlAsync reads -> Async (map fst reads)
+                                                                                                                                        RtlSync isAddr reads -> Sync isAddr (map (\x -> case x of
+                                                                                                                                                                                          Build_RtlSyncRead y _ _ -> y)
+                                                                                                                                                                              reads)) write idxNum d init
+                                                                                           ))) ls))
 
 
 
@@ -363,9 +368,9 @@ ppRtlInstance m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ '(' : ppPrintVar nm ++ ")")) (removeDups ins' ++ removeDups outs') ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ '(' : ppPrintVar nm ++ ")")) rfMeths ++ ");\n"
   where
-    rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", 0), fst (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
-              Data.List.map (\x -> ((fst x ++ "#_return", 0), snd (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
-              Data.List.map (\x -> ((fst x ++ "#_enable", 0), Bool) ) (getAllMethodsRegFileList (map snd regFs))
+    rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", 0), fst (snd x)) ) (getAllMethodsRegFileList regFs) ++
+              Data.List.map (\x -> ((fst x ++ "#_return", 0), snd (snd x)) ) (getAllMethodsRegFileList regFs) ++
+              Data.List.map (\x -> ((fst x ++ "#_enable", 0), Bool) ) (getAllMethodsRegFileList regFs)
 ppBitFormat :: BitFormat -> String
 ppBitFormat Binary = "b"
 ppBitFormat Decimal = "d"
@@ -401,7 +406,7 @@ ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
   "  input CLK,\n" ++
   "  input RESET\n" ++
   ");\n" ++
-  concatMap (\(nm, (ty, init)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppName nm) ty ++ ";\n")) regInits ++ "\n" ++
+  concatMap (\(nm, (SyntaxKind ty, init)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppName nm) ty ++ ";\n")) regInits ++ "\n" ++
 
   concatMap (\(nm, (ty, expr)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) assigns ++ "\n" ++
 
@@ -415,21 +420,11 @@ ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
   
   concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("  assign " ++ ppPrintVar nm ++ " = " ++ sexpr ++ ";\n")) assignExprs ++ "\n" ++
 
-  "  initial begin\n" ++
-  concatMap (\(nm, (ty, init)) -> case init of
-                                    ArrayHex num k file -> "      $readmemh(\"" ++ file ++ "\", " ++ ppName nm ++ ");\n"
-                                    ArrayBin num k file -> "      $readmemb(\"" ++ file ++ "\", " ++ ppName nm ++ ");\n"
-                                    _ -> "") regInits ++
-  "  end\n" ++
-  
   "  always @(posedge CLK) begin\n" ++
   "    if(RESET) begin\n" ++
-  concatMap (\(nm, (ty, init)) -> case init of
-                                    SimpleInit v -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ ppConst v ++ ";\n")
-                                    ArrayInit num k val -> ppDealSize0 (Array num k) "" ("      " ++ ppName nm ++ " <= " ++
-                                                                                         '{' : intercalate ", " (Data.List.replicate num (ppConst val)) ++ "}"
-                                                                                          ++ ";\n")
-                                    _ -> "") regInits ++
+  concatMap (\(nm, (SyntaxKind ty, init)) -> case init of
+                                               Just (SyntaxConst _ v) -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ ppConst v ++ ";\n")
+                                               _ -> "") regInits ++
   "    end\n" ++
   "    else begin\n" ++
   concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ sexpr ++ ";\n")) regExprs ++
@@ -443,9 +438,9 @@ ppRtlModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
     regInits = removeDups regInits'
     regWrites = removeDups regWrites'
     assigns = removeDups assigns'
-    rfMethsIn = Data.List.map (\x -> ((fst x ++ "#_return", 0), snd (snd x)) ) (getAllMethodsRegFileList (map snd regFs))
-    rfMethsOut = Data.List.map (\x -> ((fst x ++ "#_argument", 0), fst (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
-                 Data.List.map (\x -> ((fst x ++ "#_enable", 0), Bool) ) (getAllMethodsRegFileList (map snd regFs))
+    rfMethsIn = Data.List.map (\x -> ((fst x ++ "#_return", 0), snd (snd x)) ) (getAllMethodsRegFileList regFs)
+    rfMethsOut = Data.List.map (\x -> ((fst x ++ "#_argument", 0), fst (snd x)) ) (getAllMethodsRegFileList regFs) ++
+                 Data.List.map (\x -> ((fst x ++ "#_enable", 0), Bool) ) (getAllMethodsRegFileList regFs)
     convAssigns =
       mapM (\(nm, (ty, expr)) ->
               do
@@ -515,9 +510,9 @@ ppTopModule m@(Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites'
     isHidden (x, _) = not (elem x hiddenWires)
     insFiltered = Data.List.filter isHidden ins
     outsFiltered = Data.List.filter isHidden outs
-    rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", 0), fst (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
-              Data.List.map (\x -> ((fst x ++ "#_return", 0), snd (snd x)) ) (getAllMethodsRegFileList (map snd regFs)) ++
-              Data.List.map (\x -> ((fst x ++ "#_enable", 0), Bool) ) (getAllMethodsRegFileList (map snd regFs))
+    rfMeths = Data.List.map (\x -> ((fst x ++ "#_argument", 0), fst (snd x)) ) (getAllMethodsRegFileList regFs) ++
+              Data.List.map (\x -> ((fst x ++ "#_return", 0), snd (snd x)) ) (getAllMethodsRegFileList regFs) ++
+              Data.List.map (\x -> ((fst x ++ "#_enable", 0), Bool) ) (getAllMethodsRegFileList regFs)
               
 printDiff :: [(String, [String])] -> [(String, [String])] -> IO ()
 printDiff (x:xs) (y:ys) =
