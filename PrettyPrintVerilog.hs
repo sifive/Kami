@@ -237,128 +237,117 @@ ppRtlExpr who e =
         x3 <- ppRtlExpr who e3
         return $ '(' : x1 ++ " " ++ op1 ++ " " ++ x2 ++ " " ++ op2 ++ " " ++ x3 ++ ")"
 
-ppRfInstance :: (Bool, RegFileBase) -> String
+ppRfInstance :: RtlRegFileBase -> String
+ppRfInstance (rf@(Build_RtlRegFileBase isWrMask num name reads write idxNum dataType init)) =
+  "  " ++ ppName name ++ " " ++
+  ppName name ++ "$inst(.CLK(CLK), .RESET(RESET), " ++
 ppRfInstance (_, rf@(RegFile name reads write idxNum dataType init)) =
   "  " ++ ppName name ++ " " ++
-  ppName name ++ "$inst(.CLK(CLK), .RESET(RESET), " ++
-  concatMap (\read ->
-                ("." ++ ppName read ++ "$_enable(" ++ ppName read ++ "$_enable), ") ++
-                (ppDealSize0 (Bit (log2_up idxNum)) "" ("." ++ ppName read ++ "$_argument(" ++ ppName read ++ "$_argument), ")) ++
-                ppDealSize0 dataType "" ("." ++ ppName read ++ "$_return(" ++ ppName read ++ "$_return), ")) reads ++
-  ("." ++ ppName write ++ "$_enable(" ++ ppName write ++ "$_enable), ") ++
-  ("." ++ ppName write ++ "$_argument(" ++ ppName write ++ "$_argument)") ++
-  ");\n\n"
-ppRfInstance (_, rf@(RegFileFile name reads write idxNum dataType file isAscii)) =
-  "  " ++ ppName name ++ " " ++
-  ppName name ++ "$inst(.CLK(CLK), .RESET(RESET), " ++
-  concatMap (\read ->
-                ("." ++ ppName read ++ "$_enable(" ++ ppName read ++ "$_enable), ") ++
-                (ppDealSize0 (Bit (log2_up idxNum)) "" ("." ++ ppName read ++ "$_argument(" ++ ppName read ++ "$_argument), ")) ++
-                ppDealSize0 dataType "" ("." ++ ppName read ++ "$_return(" ++ ppName read ++ "$_return), ")) reads ++
-  ("." ++ ppName write ++ "$_enable(" ++ ppName write ++ "$_enable), ") ++
-  ("." ++ ppName write ++ "$_argument(" ++ ppName write ++ "$_argument)") ++
-  ");\n\n"
-ppRfInstance (_, rf@(SyncRegFile isAddr name reads write idxNum dataType init)) =
-  "  " ++ ppName name ++ " " ++
-  ppName name ++ "$inst(.CLK(CLK), .RESET(RESET), " ++
-  concatMap (\((read, readRs), _) ->
-                ("." ++ ppName read ++ "$_enable(" ++ ppName read ++ "$_enable), ") ++
-                (ppDealSize0 (Bit (log2_up idxNum)) "" ("." ++ ppName read ++ "$_argument(" ++ ppName read ++ "$_argument), ")) ++
-                ppDealSize0 dataType "" ("." ++ ppName read ++ "$_return(" ++ ppName read ++ "$_return), ") ++
-                ("." ++ ppName readRs ++ "$_enable(" ++ ppName readRs ++ "$_enable), ") ++
-                (ppDealSize0 (Bit (log2_up idxNum)) "" ("." ++ ppName readRs ++ "$_argument(" ++ ppName readRs ++ "$_argument), ")) ++
-                ppDealSize0 dataType "" ("." ++ ppName readRs ++ "$_return(" ++ ppName readRs ++ "$_return), ")
-            ) reads ++
-  ("." ++ ppName write ++ "$_enable(" ++ ppName write ++ "$_enable), ") ++
-  ("." ++ ppName write ++ "$_argument(" ++ ppName write ++ "$_argument)") ++
-  ");\n\n"
-ppRfInstance (_, rf@(SyncRegFileFile isAddr name reads write idxNum dataType file isAscii)) =
-  "  " ++ ppName name ++ " " ++
-  ppName name ++ "$inst(.CLK(CLK), .RESET(RESET), " ++
-  concatMap (\((read, readRs), _) ->
-                ("." ++ ppName read ++ "$_enable(" ++ ppName read ++ "$_enable), ") ++
-                (ppDealSize0 (Bit (log2_up idxNum)) "" ("." ++ ppName read ++ "$_argument(" ++ ppName read ++ "$_argument), ")) ++
-                ppDealSize0 dataType "" ("." ++ ppName read ++ "$_return(" ++ ppName read ++ "$_return), ") ++
-                ("." ++ ppName readRs ++ "$_enable(" ++ ppName readRs ++ "$_enable), ") ++
-                (ppDealSize0 (Bit (log2_up idxNum)) "" ("." ++ ppName readRs ++ "$_argument(" ++ ppName readRs ++ "$_argument), ")) ++
-                ppDealSize0 dataType "" ("." ++ ppName readRs ++ "$_return(" ++ ppName readRs ++ "$_return), ")
-            ) reads ++
+  (case reads of
+     RtlAsync readLs ->
+       concatMap (\(read, _) ->
+                    ("." ++ ppName read ++ "$_enable(" ++ ppName read ++ "$_enable), ") ++
+                    (ppDealSize0 (Bit (log2_up idxNum)) "" ("." ++ ppName read ++ "$_argument(" ++ ppName read ++ "$_argument), ")) ++
+                    ppDealSize0 (Array num dataType) "" ("." ++ ppName read ++ "$_return(" ++ ppName read ++ "$_return), ")) readLs
+     RtlSync isAddr readLs ->
+       concatMap (\(Build_RtlSyncRead (Build_SyncRead readRq readRs _) _ _) ->
+                    ("." ++ ppName readRq ++ "$_enable(" ++ ppName readRq ++ "$_enable), ") ++
+                    (ppDealSize0 (Bit (log2_up idxNum)) "" ("." ++ ppName readRq ++ "$_argument(" ++ ppName readRq ++ "$_argument), ")) ++
+                    ("." ++ ppName readRs ++ "$_enable(" ++ ppName readRs ++ "$_enable), ") ++
+                    ppDealSize0 (Array num dataType) "" ("." ++ ppName readRs ++ "$_return(" ++ ppName readRs ++ "$_return), ")) readLs) ++
   ("." ++ ppName write ++ "$_enable(" ++ ppName write ++ "$_enable), ") ++
   ("." ++ ppName write ++ "$_argument(" ++ ppName write ++ "$_argument)") ++
   ");\n\n"
 
-ppRfModule :: (Bool, RegFileBase) -> String
-ppRfModule (bypass, rf@(RegFile name reads write idxNum dataType init)) =
+ppRfModule :: Build_RtlRegFileBase -> String
+ppRfModule (rf@(Build_RtlRegFileBase isWrMask num name reads write idxNum dataType init)) =
+  let writeType = if isWrMask then writeRqMask idxNum num dataType else writeRq idxNum (Array num dataType) in
   "module " ++ ppName name ++ "(\n" ++
-  concatMap (\read ->
-               ("  input " ++ ppDeclType (ppName read ++ "$_enable") Bool ++ ",\n") ++
-               (ppDealSize0 (Bit (log2_up idxNum)) "" ("  input " ++ ppDeclType (ppName read ++ "$_argument") (Bit (log2_up idxNum)) ++ ",\n")) ++
-               ppDealSize0 dataType "" ("  output " ++ ppDeclType (ppName read ++ "$_return") dataType ++ ",\n")) reads ++
-  ("  input " ++ ppDeclType (ppName write ++ "$_enable") Bool ++ ",\n") ++
-  ppDealSize0 (writeRegFile idxNum dataType) "" (("  input " ++ ppDeclType (ppName write ++ "$_argument") (writeRegFile idxNum dataType) ++ ",\n")) ++
+  (case reads of
+     RtlAsync readLs ->
+       concatMap (\read ->
+                    ("  input " ++ ppDeclType (ppName read ++ "$_enable") Bool ++ ",\n") ++
+                   (ppDealSize0 (Bit (log2_up idxNum)) "" ("  input " ++ ppDeclType (ppName read ++ "$_argument") (Bit (log2_up idxNum)) ++ ",\n")) ++
+                   ppDealSize0 (Array num dataType) "" ("  output " ++ ppDeclType (ppName read ++ "$_return") (Array num dataType) ++ ",\n")) readLs
+     RtlSync isAddr readLs ->
+       concatMap (\(Build_RtlSyncRead (Build_SyncRead readRq readRs _) _ _) ->
+                    ("  input " ++ ppDeclType (ppName readRq ++ "$_enable") Bool ++ ",\n") ++
+                   (ppDealSize0 (Bit (log2_up idxNum)) "" ("  input " ++ ppDeclType (ppName readRq ++ "$_argument") (Bit (log2_up idxNum)) ++ ",\n")) ++
+                    ("  input " ++ ppDeclType (ppName readRs ++ "$_enable") Bool ++ ",\n") ++
+                   ppDealSize0 (Array num dataType) "" ("  output " ++ ppDeclType (ppName readRs ++ "$_return") (Array num dataType) ++ ",\n")) readLs) ++
+   ("  input " ++ ppDeclType (ppName write ++ "$_enable") Bool ++ ",\n") ++
+  ppDealSize0 writeType "" (("  input " ++ ppDeclType (ppName write ++ "$_argument") writeType ++ ",\n")) ++
   "  input logic CLK,\n" ++
   "  input logic RESET\n" ++
   ");\n" ++
   ppDealSize0 dataType "" ("  " ++ ppDeclType (ppName name ++ "$_data") dataType ++ "[0:" ++ show (idxNum - 1) ++ "];\n") ++
+  (case reads of
+     RtlSync isAddr readLs ->
+       concatMap (\(Build_RtlSyncRead (Build_SyncRead readRq readRs readReg) bypRqRs bypWrRd) ->
+                    if isAddr
+                    then ppDealSize0 (Bit (log2_up idxNum)) "" ("  " ++ ppDeclType (ppName readReg) (Bit (log2_up idxNum)) ++ ";\n")
+                    else ppDealSize0 (Array num dataType) "" ("  " ++ ppDeclType (ppName readReg) (Array num dataType)) ++
+                         ppDealSize0 (Array num dataType) "" ("  " ++ ppDeclType (ppName (readReg ++ "$_temp")) (Array num dataType))
+                 ) readLs
+     _ -> "") ++
+  "\n" ++
   (case init of
-     Just initVal ->
+     RFFile isAscii file ->
        "  initial begin\n" ++
-       "    for(int _i = 0; _i < " ++ show (idxNum-1) ++ "; _i=_i+1) begin\n" ++
-       ppDealSize0 dataType "" ("      " ++ ppName name ++ "$_data[_i] = " ++ ppConst initVal ++ ";\n") ++
-       "    end\n" ++
-       "  end\n"
-     Nothing -> "") ++
-  concatMap (\read ->
-               ppDealSize0 dataType "" ("  assign " ++ ppName read ++ "$_return = " ++
-                                        (if bypass
-                                         then ppName write ++ "$_enable && " ++ ppName write ++ "$_argument.addr == " ++
-                                              ppName read ++ "$_argument ? " ++ ppName write ++ "$_argument.data : "
-                                         else "") ++ ppDealSize0 dataType "" (ppName name ++ "$_data[" ++ (if idxNum == 1 then "0" else ppName read ++ "$_argument") ++ "];\n"))) reads ++
+       "    $readmem" ++ if isAscii then "h" else "b" ++ "(\"" ++ file ++ "\", " ++ ppName name ++ "$_data);\n" ++
+       "  end\n\n"
+     _ -> "") ++
+  let writeByps readAddr i = 
+        concatMap (\j -> "(" ++ 
+                         "(" ++ ppName write ++ "$_enable && (" ++
+                         "(" ++ ppDealSize0 (Bit (log2_up idxNum)) "0" (ppName write ++ "$_argument.addr + " ++ show j) ++ ") == " ++
+                         "(" ++ ppDealSize0 (Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i) ++ "))" ++
+                         (if isWrMask
+                          then " && " ++ ppName write ++ "$_argument.mask[" ++ show j ++ "]"
+                          else "") ++
+                         ") ? " ++
+                         ppDealSize0 dataType "0" (ppName write ++ "$_argument.data[" ++ show j ++ "]") ++ " : 0) | ")
+        [0 .. (num-1)] in
+    let readResponse readResp readAddr isByp =
+          ppDealSize0 (Array num dataType) "" ("  assign " ++ ppName readResp ++ " = " ++ "{" ++
+                                                intercalate ", " (map (\i ->
+                                                                          ppDealSize0 (Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i ++ " >= " ++ show idxNum) ++ "?"
+                                                                          if isByp then writeByps readAddr i else "") ++ ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ (ppDealSize0 (Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i)) ++ "]") ++ ": 0")
+                                                [0 .. (num-1)] ++ "};\n") in
+      (case reads of
+         RtlAsync readLs -> concatMap (\(read, bypass) ->
+                                         readResponse (read ++ "$_return") (ppName (read ++ "$_argument")) bypass) readLs
+         RtlSync isAddr readLs ->
+           concatMap (\(Build_RtlSyncRead (Build_SyncRead readRq readRs readReg) bypRqRs bypWrRd) ->
+                        if isAddr
+                        then readResponse (readRs ++ "$_return") (if bypRqRs then "(" ++ (ppName (readRq ++ "$_enable") ++ "? " ++ ppName (readRq ++ "$_argument") ++ ": " ++ ppName readReg) ++ ")" else ppName readReg) bypWrRd
+                        else readResponse (readReg ++ "$_temp") readRq bypWrRd ++
+                             ppDealSize0 (Array num dataType) "" ("  assign " ++ ppName readRs ++ " = " ++ if bypRqRs then "(" ++ (ppName (readRq ++ "$_enable") ++ "? " ++ ppName (readReg ++ "$_temp") ++ ": " ++ ppName readReg ++ ")"  else ppName readReg)
+                     ) readLs) ++
   "  always@(posedge CLK) begin\n" ++
+  "    if(RESET) begin\n" ++
   (case init of
-     Just initVal ->
-       "    if(RESET) begin\n" ++
-       "      for(int _i = 0; _i < " ++ show (idxNum-1) ++ "; _i=_i+1) begin\n" ++
+     RFNonFile (Just initVal) ->
+       "      for(int _i = 0; _i < " ++ show idxNum ++ "; _i=_i+1) begin\n" ++
        ppDealSize0 dataType "" ("        " ++ ppName name ++ "$_data[_i] = " ++ ppConst initVal ++ ";\n") ++
-       "      end\n" ++
-       "    end\n" ++
-       "    else "
-     Nothing -> "") ++
-  "if(" ++ ppName write ++ "$_enable) begin\n" ++
-  ppDealSize0 dataType "" ("      " ++ ppName name ++ "$_data[" ++ (if idxNum == 1 then "0" else ppName write ++ "$_argument.addr") ++ "] <= " ++ ppName write ++ "$_argument.data;\n") ++
+       "      end\n"
+     _ -> "") ++
+  "    end else begin\n" ++
+  (case reads of
+     RtlAsync readLs -> ""
+     RtlSync isAddr readLs ->
+       concatMap (\(Build_RtlSyncRead (Build_SyncRead readRq readRs readReg) bypRqRs bypWrRd) ->
+                    if isAddr
+                    then "      if(" ++ ppName (readRq ++ "$_enable") ++ ") begin\n" ++
+                         "        " ++ ppName readReg ++ " <= " ++ ppName (readRq ++ "$_argument") ++ ";\n" ++
+                         "      end\n"
+                    else "      if(" ++ ppName (readRq ++ "$_enable") ++ ") begin\n" ++
+                         "        " ++ ppName readReg ++ " <= " ++ ppName (readReg ++ "$_temp") ++ ";\n" ++
+                         "      end\n"
+                 ) readLs) ++
   "    end\n" ++
-  "  end\n" ++
+  "  end\n"
   "endmodule\n\n"
-ppRfModule (bypass, rf@(RegFileFile name reads write idxNum dataType file isAscii)) =
-  "module " ++ ppName name ++ "(\n" ++
-  concatMap (\read ->
-               ("  input " ++ ppDeclType (ppName read ++ "$_enable") Bool ++ ",\n") ++
-               (ppDealSize0 (Bit (log2_up idxNum)) "" ("  input " ++ ppDeclType (ppName read ++ "$_argument") (Bit (log2_up idxNum)) ++ ",\n")) ++
-               ppDealSize0 dataType "" ("  output " ++ ppDeclType (ppName read ++ "$_return") dataType ++ ",\n")) reads ++
-  ("  input " ++ ppDeclType (ppName write ++ "$_enable") Bool ++ ",\n") ++
-  ppDealSize0 (writeRegFile idxNum dataType) "" (("  input " ++ ppDeclType (ppName write ++ "$_argument") (writeRegFile idxNum dataType) ++ ",\n")) ++
-  "  input logic CLK,\n" ++
-  "  input logic RESET\n" ++
-  ");\n" ++
-  ppDealSize0 dataType "" ("  " ++ ppDeclType (ppName name ++ "$_data") dataType ++ "[0:" ++ show (idxNum - 1) ++ "];\n") ++
-  "  initial begin\n" ++
-  "    $readmem" ++ (if isAscii then "h" else "b") ++ "(\"" ++ file ++ "\"," ++ ppName name ++ "$_data"++ ");\n" ++
-  "    end\n" ++
-  "  end\n" ++
-  concatMap (\read ->
-               ppDealSize0 dataType "" ("  assign " ++ ppName read ++ "$_return = " ++
-                                        (if bypass
-                                         then ppName write ++ "$_enable && " ++ ppName write ++ "$_argument.addr == " ++
-                                              ppName read ++ "$_argument ? " ++ ppName write ++ "$_argument.data : "
-                                         else "") ++ ppDealSize0 dataType "" (ppName name ++ "$_data[" ++ (if idxNum == 1 then "0" else ppName read ++ "$_argument") ++ "];\n"))) reads ++
-  "  always@(posedge CLK) begin\n" ++
-  "    if(!RESET) begin\n" ++
-  "if(" ++ ppName write ++ "$_enable) begin\n" ++
-  ppDealSize0 dataType "" ("      " ++ ppName name ++ "$_data[" ++ (if idxNum == 1 then "0" else ppName write ++ "$_argument.addr") ++ "] <= " ++ ppName write ++ "$_argument.data;\n") ++
-  "    end\n" ++
-  "  end\n" ++
-  "endmodule\n\n"
-ppRfModule x = undefined
 
 removeDups :: Eq a => [(a, b)] -> [(a, b)]
 removeDups = nubBy (\(a, _) (b, _) -> a == b)
