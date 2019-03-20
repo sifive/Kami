@@ -6314,3 +6314,435 @@ Proof.
   unfold inlined_ModWf.
   eauto using flatten_inline_remove_TraceInclusion.
 Qed.
+
+Definition hidden_by (meths : list DefMethT) (h : string) : bool :=
+  (getBool (in_dec string_dec h (map fst meths))).
+
+Definition getAllBaseMethods (lb : list BaseModule) : (list DefMethT) :=
+  (concat (map getMethods lb)).
+
+(*Definition getAllRfMethods (lrf : list RegFileBase) : (list DefMethT) :=
+  (concat (map getRegFileMethods lrf)).
+
+Definition hidden_by_regFiles (lrf : list RegFileBase) (h : string) : bool :=
+  (hidden_by (getAllRfMethods lrf) h).*)
+
+Definition hidden_by_Base (lb : list BaseModule) (h : string) : bool :=
+  (hidden_by (getAllBaseMethods lb) h).
+
+Definition separateHides (tl : list string * (list RegFileBase * list BaseModule)) :
+  (list string * list string) :=
+  (filter (hidden_by_Base (map BaseRegFile (fst (snd tl)))) (fst tl), filter (complement (hidden_by_Base (map BaseRegFile (fst (snd tl))))) (fst tl)).
+
+Definition separateModHides (m: Mod) :=
+  let '(hides, (rfs, mods)) := separateMod m in
+  let '(hidesRf, hidesBm) := separateHides (hides, (rfs, mods)) in
+  (hidesRf, (rfs, flatten_inline_remove (createHideMod (mergeSeparatedBaseMod mods) hidesBm))).
+
+Definition defined_hide (m : Mod) (h : string) : bool :=
+  (getBool (in_dec string_dec h (map fst (getAllMethods m)))).
+
+Lemma distributeHideWf (m1 m2 : Mod) (h : string) (HNeverCall : NeverCallMod m1):
+  WfMod (HideMeth (ConcatMod m1 m2) h) ->
+  ~ In h (map fst (getAllMethods m1)) ->
+  WfMod (ConcatMod m1 (HideMeth m2 h)).
+Proof.
+  intros; inv H.
+  inv HWf.
+  econstructor; simpl in *; eauto.
+  - econstructor; eauto.
+    rewrite map_app, in_app_iff in *.
+    destruct HHideWf; auto.
+    exfalso; tauto.
+  - inv WfConcat1; econstructor; intros.
+    + specialize (H _ H2).
+      induction HNeverCall.
+      -- inv HNCBaseModule.
+         specialize (H3 _ H2).
+         induction H; inv H3; EqDep_subst; econstructor; eauto.
+         tauto.
+      -- eapply IHHNeverCall; eauto.
+         ++ inv HWf1; assumption.
+         ++ assert (forall f, In f (getHidden m) -> In f (getHidden (HideMeth m s))) as P0;
+              [intros; simpl in *; right; assumption|];inv WfConcat2; split.
+            ** intros; specialize (H3 _ H5).
+               clear - H3 P0.
+               induction H3; econstructor; eauto.
+            ** intros; specialize (H4 _ H5 v).
+               clear - H4 P0.
+               induction H4; econstructor; eauto.
+      -- simpl in *.
+         rewrite map_app, in_map_iff, in_app_iff in *.
+         apply Decidable.not_or in H0; dest.
+         destruct H2.
+         ++ eapply IHHNeverCall1; eauto.
+            ** intro; dest.
+               apply H0.
+               rewrite in_map_iff.
+               eauto.
+            ** right.
+               destruct HHideWf; auto.
+               exfalso.
+               rewrite map_app, in_app_iff in *.
+               clear - H0 H3 H4; tauto.
+            ** clear - HDisjRegs.
+               intro k; specialize (HDisjRegs k).
+               rewrite map_app, in_app_iff in *.
+               firstorder.
+            ** clear - HDisjRules.
+               intro k; specialize (HDisjRules k).
+               rewrite map_app, in_app_iff in *.
+               firstorder.
+            ** clear - HDisjMeths.
+               intro k; specialize (HDisjMeths k).
+               rewrite map_app, in_app_iff in *.
+               firstorder.
+            ** inv HWf1; auto.
+            ** clear - WfConcat2.
+               inv WfConcat2.
+               assert (forall f, ~In f (getHidden (ConcatMod m1 m0))
+                                 -> ~In f (getHidden m1)) as P0;
+                 [intros; simpl in *; intro; apply H1; rewrite in_app_iff; firstorder|].
+               split.
+               --- intros; specialize (H _ H1).
+                   clear - H P0. 
+                   induction H; econstructor; eauto.
+               --- intros; specialize (H0 _ H1 v).
+                   clear - H0 P0.
+                   induction H0; econstructor; eauto.
+            ** intros; eapply H1.
+               rewrite in_app_iff; left; assumption.
+         ++ eapply IHHNeverCall2; eauto.
+            ** intro; dest.
+               apply H3.
+               rewrite in_map_iff.
+               eauto.
+                        ** right.
+               destruct HHideWf; auto.
+               exfalso.
+               rewrite map_app, in_app_iff in *.
+               clear - H0 H3 H4; tauto.
+            ** clear - HDisjRegs.
+               intro k; specialize (HDisjRegs k).
+               rewrite map_app, in_app_iff in *.
+               firstorder.
+            ** clear - HDisjRules.
+               intro k; specialize (HDisjRules k).
+               rewrite map_app, in_app_iff in *.
+               firstorder.
+            ** clear - HDisjMeths.
+               intro k; specialize (HDisjMeths k).
+               rewrite map_app, in_app_iff in *.
+               firstorder.
+            ** inv HWf1; auto.
+            ** clear - WfConcat2.
+               inv WfConcat2.
+               assert (forall f, ~In f (getHidden (ConcatMod m1 m0))
+                                 -> ~In f (getHidden m0)) as P0;
+                 [intros; simpl in *; intro; apply H1; rewrite in_app_iff; firstorder|].
+               split.
+               --- intros; specialize (H _ H1).
+                   clear - H P0. 
+                   induction H; econstructor; eauto.
+               --- intros; specialize (H0 _ H1 v).
+                   clear - H0 P0.
+                   induction H0; econstructor; eauto.
+            ** intros; eapply H1.
+               rewrite in_app_iff; right; assumption.
+    + specialize (H1 _ H2 v).
+      induction HNeverCall.
+      -- inv HNCBaseModule.
+         specialize (H4 _ H2 v).
+         induction H1; inv H4; EqDep_subst; econstructor; eauto.
+         tauto.
+      -- eapply IHHNeverCall; eauto.
+         ++ inv HWf1; assumption.
+         ++ assert (forall f, In f (getHidden m) -> In f (getHidden (HideMeth m s))) as P0;
+              [intros; simpl in *; right; assumption|];inv WfConcat2; split.
+            ** intros; specialize (H3 _ H5).
+               clear - H3 P0.
+               induction H3; econstructor; eauto.
+            ** intros; specialize (H4 _ H5 v0).
+               clear - H4 P0.
+               induction H4; econstructor; eauto.
+      -- simpl in *.
+         rewrite map_app, in_map_iff, in_app_iff in *.
+         apply Decidable.not_or in H0; dest.
+         destruct H2.
+         ++ eapply IHHNeverCall1; eauto.
+            ** intro; dest.
+               apply H0.
+               rewrite in_map_iff.
+               eauto.
+            ** right.
+               destruct HHideWf; auto.
+               exfalso.
+               rewrite map_app, in_app_iff in *.
+               clear - H0 H3 H4; tauto.
+            ** clear - HDisjRegs.
+               intro k; specialize (HDisjRegs k).
+               rewrite map_app, in_app_iff in *.
+               firstorder.
+            ** clear - HDisjRules.
+               intro k; specialize (HDisjRules k).
+               rewrite map_app, in_app_iff in *.
+               firstorder.
+            ** clear - HDisjMeths.
+               intro k; specialize (HDisjMeths k).
+               rewrite map_app, in_app_iff in *.
+               firstorder.
+            ** inv HWf1; auto.
+            ** clear - WfConcat2.
+               inv WfConcat2.
+               assert (forall f, ~In f (getHidden (ConcatMod m1 m0))
+                                 -> ~In f (getHidden m1)) as P0;
+                 [intros; simpl in *; intro; apply H1; rewrite in_app_iff; firstorder|].
+               split.
+               --- intros; specialize (H _ H1).
+                   clear - H P0. 
+                   induction H; econstructor; eauto.
+               --- intros; specialize (H0 _ H1 v).
+                   clear - H0 P0.
+                   induction H0; econstructor; eauto.
+            ** intros; eapply H.
+               rewrite in_app_iff; left; assumption.
+         ++ eapply IHHNeverCall2; eauto.
+            ** intro; dest.
+               apply H3.
+               rewrite in_map_iff.
+               eauto.
+                        ** right.
+               destruct HHideWf; auto.
+               exfalso.
+               rewrite map_app, in_app_iff in *.
+               clear - H0 H3 H4; tauto.
+            ** clear - HDisjRegs.
+               intro k; specialize (HDisjRegs k).
+               rewrite map_app, in_app_iff in *.
+               firstorder.
+            ** clear - HDisjRules.
+               intro k; specialize (HDisjRules k).
+               rewrite map_app, in_app_iff in *.
+               firstorder.
+            ** clear - HDisjMeths.
+               intro k; specialize (HDisjMeths k).
+               rewrite map_app, in_app_iff in *.
+               firstorder.
+            ** inv HWf1; auto.
+            ** clear - WfConcat2.
+               inv WfConcat2.
+               assert (forall f, ~In f (getHidden (ConcatMod m1 m0))
+                                 -> ~In f (getHidden m0)) as P0;
+                 [intros; simpl in *; intro; apply H1; rewrite in_app_iff; firstorder|].
+               split.
+               --- intros; specialize (H _ H1).
+                   clear - H P0. 
+                   induction H; econstructor; eauto.
+               --- intros; specialize (H0 _ H1 v).
+                   clear - H0 P0.
+                   induction H0; econstructor; eauto.
+            ** intros; eapply H.
+               rewrite in_app_iff; right; assumption.
+Qed.
+
+Lemma distributeHidesWf1 (m1 m2 : Mod) (hl1 hl2 : list string)
+      (HNeverCall : NeverCallMod m1):
+  WfMod (createHideMod (ConcatMod m1 m2) (hl1++hl2)) ->
+  (forall h, In h hl1 -> ~ In h (map fst (getAllMethods m1))) ->
+  WfMod (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2).
+Proof.
+  induction hl1; simpl; intros; auto.
+  rewrite WfMod_createHideMod; split.
+  - simpl.
+    repeat intro.
+    rewrite map_app, in_app_iff.
+    rewrite getAllMethods_createHideMod.
+    inv H.
+    rewrite WfMod_createHideMod in HWf; dest.
+    specialize (H x (in_or_app _ _ _(or_intror _ H1))); simpl in *.
+    rewrite map_app, in_app_iff in *; destruct H; auto.
+  - apply distributeHideWf; auto.
+    constructor; inv H.
+    + rewrite getAllMethods_createHideMod in *; simpl in *.
+      rewrite map_app, in_app_iff, getAllMethods_createHideMod in *; assumption.
+    + assert (forall h : string, In h hl1 -> ~ In h (map fst (getAllMethods m1))) as P0;
+      [intros; apply H0; auto|].
+      specialize (IHhl1 HWf P0).
+      rewrite WfMod_createHideMod in IHhl1; dest; assumption.
+Qed.
+
+Lemma WfMod_perm (m : Mod) (hl1 hl2: list string):
+  hl1 [=] hl2 ->
+  WfMod (createHideMod m hl1) ->
+  WfMod (createHideMod m hl2).
+Proof.
+  intros.
+  rewrite WfMod_createHideMod in *; dest; split; auto.
+  repeat intro.
+  rewrite <- H in H2.
+  specialize (H0 _ H2).
+  assumption.
+Qed.
+
+Definition StrongTraceInclusion' (m m' : Mod) : Prop :=
+  forall (o : RegsT) (ls : list (list FullLabel)),
+    Trace m o ls ->
+    exists (ls' : list (list FullLabel)),
+      Trace m' o ls' /\ WeakInclusions ls ls'.
+
+Lemma StrongTI'_TI' (m m' : Mod) :
+  StrongTraceInclusion' m m' -> TraceInclusion' m m'.
+Proof.
+  repeat intro.
+  specialize (H _ _ H0).
+  dest.
+  exists x; split;[exists o|];assumption.
+Qed.
+
+Lemma action_noCalls {k : Kind} (o : RegsT) (a : ActionT type k) (reads u : RegsT)
+      (cs : MethsT) (fret : type k) (HNeverCallAct : NeverCallActionT a):
+  SemAction o a reads u cs fret ->
+  cs = [].
+Proof.
+  induction 1; auto; try inv HNeverCallAct; EqDep_subst; eauto.
+  - tauto.
+  - rewrite IHSemAction1, IHSemAction2; auto.
+  - rewrite IHSemAction1, IHSemAction2; auto.
+  - rewrite IHSemAction1, IHSemAction2; auto.
+Qed.
+
+Lemma Substeps_NeverCall_getNumCalls_0 (m : BaseModule)(o : RegsT)(l : list FullLabel)
+      (HNeverCallBase : NeverCallBaseModule m) :
+  Substeps m o l ->
+  forall (f : MethT), getNumCalls f l = 0%Z.
+Proof.
+  induction 1; intros; simpl.
+  - apply getNumCalls_nil.
+  - subst.
+    rewrite getNumCalls_cons, IHSubsteps; simpl.
+    inv HNeverCallBase.
+    specialize (H0 _ HInRules); simpl in *.
+    rewrite (action_noCalls H0 HAction); simpl.
+    reflexivity.
+  - subst.
+    rewrite getNumCalls_cons, IHSubsteps; simpl.
+    inv HNeverCallBase.
+    specialize (H1 _ HInMeths argV).
+    rewrite (action_noCalls H1 HAction); simpl.
+    reflexivity.
+Qed.
+
+Lemma Step_NeverCall_getNumCalls_0 (m : Mod)(o : RegsT)(l : list FullLabel)
+      (HNeverCall : NeverCallMod m) :
+  Step m o l ->
+  forall (f : MethT), getNumCalls f l = 0%Z.
+Proof.
+  induction 1; simpl; intros.
+  - inv HNeverCall.
+    rewrite (Substeps_NeverCall_getNumCalls_0 HNCBaseModule HSubsteps).
+    reflexivity.
+  - inv HNeverCall.
+    rewrite IHStep; auto.
+  - subst.
+    inv HNeverCall.
+    rewrite getNumCalls_app, IHStep1, IHStep2; auto.
+Qed.
+
+Lemma distributeHide_TraceInclusion (m1 m2 : Mod) (h : string)
+      (HNeverCall : NeverCallMod m1):
+  ~ In h (map fst (getAllMethods m1)) ->
+  TraceInclusion (HideMeth (ConcatMod m1 m2) h)
+                 (ConcatMod m1 (HideMeth m2 h)).
+Proof.
+  intros.
+  apply TraceInclusion'_TraceInclusion, StrongTI'_TI'.
+  unfold StrongTraceInclusion'.
+  intros.
+  induction H0; subst.
+  - exists nil; split;[|apply WeakInclusionsRefl].
+    econstructor; eauto.
+  - dest.
+    exists (l::x).
+    split;[|constructor; [assumption|apply WeakInclusionRefl]].
+    econstructor 2; eauto.
+    clear - HStep HNeverCall H.
+    inv HStep.
+    inv HStep0.
+    econstructor 3; eauto.
+    + econstructor 2; eauto.
+      intros; simpl in *.
+      rewrite map_app, in_app_iff in *.
+      specialize (HHidden (or_intror H0) v).
+      unfold getListFullLabel_diff in *.
+      rewrite getNumExecs_app, getNumCalls_app in *.
+      rewrite (Step_NeverCall_getNumCalls_0 HNeverCall HStep1) in *.
+      clear - HStep1 HStep2 HHidden HNeverCall H H0.
+      rewrite (NotInDef_ZeroExecs_Step (m:=m1)(o:=o1)(ls:=l1) (h, v)) in *; auto.
+    + unfold MatchingExecCalls_Concat in *; intros; simpl in *.
+      split; [|eapply HMatching1; eauto].
+      intro; apply H0.
+      rewrite (Step_NeverCall_getNumCalls_0 HNeverCall HStep1) in *.
+      reflexivity.
+Qed.
+
+Lemma distributeHides_TraceInclusion (m1 m2 : Mod) (hl : list string)
+      (HNeverCall : NeverCallMod m1) :
+  (forall h, In h hl -> ~In h (map fst (getAllMethods m1))) ->
+  TraceInclusion (createHideMod (ConcatMod m1 m2) hl)
+                 (ConcatMod m1 (createHideMod m2 hl)).
+Proof.
+  induction hl; simpl; intros.
+  - apply TraceInclusion_refl.
+  - assert (forall h : string, In h hl -> ~ In h (map fst (getAllMethods m1))) as P0;
+      [intros; apply (H _ (or_intror H0))|].
+    specialize (IHhl P0).
+    apply TraceInclusion_TraceInclusion' in IHhl.
+    specialize (TraceInclusion_createHide (s:=a) IHhl) as P1.
+    apply TraceInclusion'_TraceInclusion in P1.
+    specialize (H a (or_introl eq_refl)).
+    specialize (distributeHide_TraceInclusion HNeverCall H (m2:=(createHideMod m2 hl))) as P2.
+    eauto using TraceInclusion_trans.
+Qed.
+
+Lemma createHides_perm_TraceInclusion (m : Mod) (hl1 hl2: list string):
+  hl1 [=] hl2 ->
+  TraceInclusion (createHideMod m hl1) (createHideMod m hl2).
+Proof.
+  induction 1.
+  - apply TraceInclusion_refl.
+  - simpl.
+    apply TraceInclusion'_TraceInclusion, TraceInclusion_createHide,
+    TraceInclusion_TraceInclusion'; assumption.
+  - simpl.
+    apply TraceInclusion'_TraceInclusion, StrongTI'_TI'.
+    unfold StrongTraceInclusion'; intros.
+    exists ls; split;[|apply WeakInclusionsRefl].
+    induction H.
+    + econstructor 1; auto.
+    + econstructor 2; eauto.
+      clear - HStep.
+      inv HStep.
+      inv HStep0.
+      constructor; auto.
+      constructor; auto.
+  - eauto using TraceInclusion_trans.
+Qed.
+    
+Lemma distributeHides_app_TraceInclusion (m1 m2 : Mod) (hl1 hl2 : list string)
+      (HNeverCall : NeverCallMod m1) :
+  (forall h, In h hl1 -> ~In h (map fst (getAllMethods m1))) ->
+  TraceInclusion (createHideMod (ConcatMod m1 m2) (hl1++hl2))
+                 (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2).
+Proof.
+  intros.
+  induction hl2; simpl; [rewrite app_nil_r|].
+  - apply distributeHides_TraceInclusion; auto.
+  - apply TraceInclusion_TraceInclusion' in IHhl2.
+    specialize (TraceInclusion_createHide (s:=a) IHhl2) as P1.
+    specialize (createHides_perm_TraceInclusion
+                  (ConcatMod m1 m2)
+                  (Permutation_sym (Permutation_middle hl1 hl2 a))) as P2;
+      simpl in *.
+    apply TraceInclusion'_TraceInclusion in P1.
+    eauto using TraceInclusion_trans.
+Qed.
