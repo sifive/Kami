@@ -148,16 +148,16 @@ Section utila.
       Let mite := @utila_mite monad.
 
       Definition utila_mopt_pkt
-          (k : Kind)
-          (x : k @# ty)
-          (valid : Bool @# ty)
+        (k : Kind)
+        (x : k @# ty)
+        (valid : Bool @# ty)
         :  m (Maybe k)
         := munit (utila_opt_pkt x valid).
 
       Definition utila_mopt_default
-          (k : Kind)
-          (default : k @# ty)
-          (x_expr : m (Maybe k))
+        (k : Kind)
+        (default : k @# ty)
+        (x_expr : m (Maybe k))
         :  m k
         := mbind k x_expr
              (fun x : ty (Maybe k)
@@ -167,9 +167,9 @@ Section utila.
                      (munit default)).
 
       Definition utila_mopt_bind
-          (j k : Kind)
-          (x_expr : m (Maybe j))
-          (f : j @# ty -> m (Maybe k))
+        (j k : Kind)
+        (x_expr : m (Maybe j))
+        (f : j @# ty -> m (Maybe k))
         :  m (Maybe k)
         := mbind (Maybe k) x_expr
              (fun x : ty (Maybe j)
@@ -179,9 +179,9 @@ Section utila.
                     (munit (@Invalid ty k))).
 
       Definition utila_mfoldr
-          (j k : Kind)
-          (f : j @# ty -> k @# ty -> k @# ty)
-          (init : k @# ty)
+        (j k : Kind)
+        (f : j @# ty -> k @# ty -> k @# ty)
+        (init : k @# ty)
         :  list (m j) -> (m k)
         := fold_right
              (fun (x_expr : m j)
@@ -204,21 +204,21 @@ Section utila.
         := utila_mfoldr (fun x acc => x || acc) (Const ty false).
 
       Definition utila_mfind
-           (k : Kind)
-           (f : k @# ty -> Bool @# ty)
-           (x_exprs : list (m k))
-         :  m k
-         := mbind k
-              (utila_mfoldr
-                (fun (x : k @# ty) (acc : Bit (size k) @# ty)
-                   => ((ITE (f x) (pack x) ($0)) | acc))
-                ($0)
-                x_exprs)
-              (fun (y : ty (Bit (size k)))
-                 => munit (unpack k (Var ty (SyntaxKind (Bit (size k))) y))).
+        (k : Kind)
+        (f : k @# ty -> Bool @# ty)
+        (x_exprs : list (m k))
+        :  m k
+        := mbind k
+             (utila_mfoldr
+               (fun (x : k @# ty) (acc : Bit (size k) @# ty)
+                  => ((ITE (f x) (pack x) ($0)) | acc))
+               ($0)
+               x_exprs)
+             (fun (y : ty (Bit (size k)))
+                => munit (unpack k (Var ty (SyntaxKind (Bit (size k))) y))).
 
       Definition utila_mfind_pkt
-          (k : Kind)
+        (k : Kind)
         :  list (m (Maybe k)) -> m (Maybe k)
         := utila_mfind
              (fun (pkt : Maybe k @# ty)
@@ -273,9 +273,9 @@ Section utila.
       [xs_exprs].
     *)
     Definition utila_expr_find
-        (k : Kind)
-        (f : k @# ty -> Bool @# ty)
-        (xs_exprs : list (k ## ty))
+      (k : Kind)
+      (f : k @# ty -> Bool @# ty)
+      (xs_exprs : list (k ## ty))
       :  k ## ty
       := LETE y
          :  Bit (size k)
@@ -294,8 +294,8 @@ Section utila.
       Note: exactly one of the packets must be valid.
     *)
     Definition utila_expr_find_pkt
-        (k : Kind)
-        (pkt_exprs : list (Maybe k ## ty))
+      (k : Kind)
+      (pkt_exprs : list (Maybe k ## ty))
       :  Maybe k ## ty
       := utila_expr_find
            (fun (pkt : Maybe k @# ty)
@@ -310,11 +310,11 @@ Section utila.
       than one entry in [entries].
     *)
     Definition utila_expr_lookup_table
-        (entry_type : Type)
-        (entries : list entry_type)
-        (result_kind : Kind)
-        (entry_match : entry_type -> Bool ## ty)
-        (entry_result : entry_type -> result_kind ## ty)
+      (entry_type : Type)
+      (entries : list entry_type)
+      (result_kind : Kind)
+      (entry_match : entry_type -> Bool ## ty)
+      (entry_result : entry_type -> result_kind ## ty)
       :  Maybe result_kind ## ty
       := utila_expr_find_pkt
            (map
@@ -337,12 +337,12 @@ Section utila.
       than one entry in [entries].
     *)
     Definition utila_expr_lookup_table_default
-        (entry_type : Type)
-        (entries : list entry_type)
-        (result_kind : Kind)
-        (entry_match : entry_type -> Bool ## ty)
-        (entry_result : entry_type -> result_kind ## ty)
-        (default : result_kind @# ty)
+      (entry_type : Type)
+      (entries : list entry_type)
+      (result_kind : Kind)
+      (entry_match : entry_type -> Bool ## ty)
+      (entry_result : entry_type -> result_kind ## ty)
+      (default : result_kind @# ty)
       :  result_kind ## ty
       := utila_expr_opt_default
            default
@@ -670,64 +670,7 @@ Section utila.
     Definition utila_null (k : Kind)
       :  k @# type
       := unpack k $0.
-(*
-    Lemma utila_mfind_nil
-      :  forall (k : Kind)
-           (f : k @# type -> Bool @# type),
-           [[utila_mfind f ([] : list (m k))]] = [[munit (utila_null k)]].
-    Proof
-      fun k f
-        => (*
-             [[utila_mfind f ([] : list (m k))]] = [[munit (utila_null k)]]
-             [[utila_mfoldr
-                 (fun x acc => ITE (f x) (pack x) ($0) | acc)
-                 ($0)
-                 []]] = [[munit (utila_null k)]]
-             by utila_sem_foldr_nil_correct (fun x acc => ITE (f x) (pack x) ($0) | acc) ($0)
-             [[$0]] = [[munit (utila_null k)]]
-             by refl
-           *)
-           eq_refl [[munit (utila_null k)]]
-           || [[mbind _ _ X (fun y => munit (unpack k (Var type (SyntaxKind (Bit (size k))) y)))]] = [[munit (utila_null k)]]
-              @X by utila_sem_foldr_nil_correct
-                      (fun x acc
-                        => CABit Bor [(ITE (f x) (pack x) ($0)); acc])
-                      ($0).
-*)
-(*
-  what I need is
 
-  given [[X]] = v
-
-  [[mbind X
-      (fun x => munit (f x)) ]]
-  = [[f v]].
-*)
-(*
-    Conjecture utila_mfind_none
-      :  forall (k : Kind)
-           (f : k @# type -> Bool @# type)
-           (xs : list (m k)),
-           Forall (fun x => In x xs /\ [[f x]] = false) ->
-           [[utila_mfind f xs]] = [[munit (utila_null k)]].
-
-    Conjecture utila_mfind_hd
-      :  forall (k : Kind)
-           (f : k @# type -> Bool @# type)
-           (x0 : m k)
-           (xs : list (m k)),
-           [[f x0]] = true ->
-           Forall (fun x => In x xs /\ [[f x]] = false) ->
-           [[utila_mfind f (x0 :: xs)]] = [[x0]].
-
-    Conjecture utila_mfind_tl
-      :  forall (k : Kind)
-           (f : k @# type -> Bool @# type)
-           (x0 : m k)
-           (xs : list (m k)),
-           [[f x0]] = false ->
-           [[utila_mfind f (x0 :: xs)]] = [[utila_mfind f xs]].
-*)
   End monad_ver.
 
   Section expr_ver.
