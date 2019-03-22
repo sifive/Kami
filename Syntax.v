@@ -405,7 +405,7 @@ Definition RuleT := Attribute (Action Void).
 
 Inductive RegFileInitT (Data: Kind) :=
 | RFNonFile (init: option (ConstT Data))
-| RFFile (isAscii: bool) (file: string).
+| RFFile (isAscii: bool) (isArg: bool) (file: string).
 
 Record SyncRead := { readReqName : string ;
                      readResName : string ;

@@ -290,9 +290,13 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
      _ -> "") ++
   "\n" ++
   (case init of
-     T.RFFile isAscii file ->
+     T.RFFile isAscii isArg file ->
        "  initial begin\n" ++
-       "    $readmem" ++ (if isAscii then "h" else "b") ++ "(\"" ++ file ++ "\", " ++ ppName name ++ "$_data);\n" ++
+       (if isArg
+        then "    string _fileName;\n" ++
+             "    $value$plusargs(\"" ++ file ++ "=%s\", _fileName);\n"
+        else "") ++
+       "    $readmem" ++ (if isAscii then "h" else "b") ++ "(" ++ (if isArg then "_fileName" else "\"" ++ file ++ "\"") ++ ", " ++ ppName name ++ "$_data);\n" ++
        "  end\n\n"
      _ -> "") ++
   let writeByps readAddr i = 
