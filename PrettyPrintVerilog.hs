@@ -309,9 +309,9 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
     let readResponse readResp readAddr isByp =
           ppDealSize0 (T.Array num dataType) "" ("  assign " ++ ppName readResp ++ " = " ++ "{" ++
                                                 intercalate ", " (map (\i ->
-                                                                          ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "0" (readAddr ++ " + " ++ show i ++ " < " ++ show idxNum) ++ "?" ++
-                                                                          (if isByp then writeByps readAddr i else "") ++ ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ (ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "0" (readAddr ++ " + " ++ show i)) ++ "]") ++ ": 0")
-                                                                  [0 .. (num-1)]) ++ "};\n") in
+                                                                          ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "0" (readAddr ++ " + " ++ show i ++ " < " ++ show idxNum) ++ " ? " ++
+                                                                          (if isByp then writeByps readAddr i else "") ++ ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ (ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "0" (readAddr ++ " + " ++ show i)) ++ "]") ++ ": " ++ show (T.size dataType) ++ "'b0")
+                                                                  (reverse [0 .. (num-1)])) ++ "};\n") in
       (case reads of
          T.RtlAsync readLs -> concatMap (\(read, bypass) ->
                                          readResponse (read ++ "$_return") (ppName (read ++ "$_argument")) bypass) readLs
@@ -331,11 +331,12 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
        "      end\n"
      _ -> "") ++
   "    end else begin\n" ++
-  "      if(" ++ ppName write ++ "$_enable)\n" ++
+  "      if(" ++ ppName write ++ "$_enable) begin\n" ++
   concat (map (\i ->
                  (if isWrMask then "        if(" ++ ppName write ++ "$_argument.mask[" ++ show i ++ "])\n" else "") ++
                 ppDealSize0 dataType "" ("          " ++ ppName name ++ "$_data[" ++ ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "0" (ppName write ++ "$_argument.addr + " ++ show i) ++ "] <= " ++
                                          ppDealSize0 dataType "" (ppName write ++ "$_argument.data[" ++ show i ++ "]") ++ ";\n")) [0 .. (num-1)]) ++
+  "      end\n" ++
   (case reads of
      T.RtlAsync readLs -> ""
      T.RtlSync isAddr readLs ->
