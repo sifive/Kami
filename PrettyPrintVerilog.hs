@@ -278,7 +278,7 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
   "  input logic CLK,\n" ++
   "  input logic RESET\n" ++
   ");\n" ++
-  ppDealSize0 dataType "" ("  " ++ ppDeclType (ppName name ++ "$_data") dataType ++ "[0:" ++ show (idxNum - 1) ++ "];\n") ++
+  ppDealSize0 dataType "" ("  " ++ ppDeclType (ppName name ++ "$_data") dataType ++ "[0:" ++ show (idxNum - 1) ++ "] /* verilator public */;\n") ++
   (case reads of
      T.RtlSync isAddr readLs ->
        concatMap (\(T.Build_RtlSyncRead (T.Build_SyncRead readRq readRs readReg) bypRqRs bypWrRd) ->
