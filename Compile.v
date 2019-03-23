@@ -406,7 +406,7 @@ Section order.
                                       (map (fun rd => Build_RtlSyncRead rd
                                                                         (isBeforeCall (readReqName rd) (readResName rd))
                                                                         (isBeforeCall write ((if isAddr then readResName else readReqName) rd))) read)
-                            end) write IdxNum init
+                            end) write init
     end.
 End order.
 

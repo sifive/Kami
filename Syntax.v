@@ -403,9 +403,9 @@ Definition RegInitT := Attribute (sigT RegInitValT).
 Definition DefMethT := Attribute (sigT MethodT).
 Definition RuleT := Attribute (Action Void).
 
-Inductive RegFileInitT (Data: Kind) :=
+Inductive RegFileInitT (IdxNum: nat) (Data: Kind) :=
 | RFNonFile (init: option (ConstT Data))
-| RFFile (isAscii: bool) (isArg: bool) (file: string).
+| RFFile (isAscii: bool) (isArg: bool) (file: string) (init: Fin.t IdxNum -> ConstT Data).
 
 Record SyncRead := { readReqName : string ;
                      readResName : string ;
@@ -422,7 +422,7 @@ Record RegFileBase := { rfIsWrMask : bool ;
                         rfWrite: string ;
                         rfIdxNum: nat ;
                         rfData: Kind ;
-                        rfInit: RegFileInitT rfData }.
+                        rfInit: RegFileInitT rfIdxNum rfData }.
                        
 Inductive BaseModule: Type :=
 | BaseRegFile (rf: RegFileBase)
@@ -450,7 +450,7 @@ Definition getRegFileRegisters m :=
                                         | None => None
                                         | Some init' => Some (SyntaxConst (ConstArray (fun _ => init')))
                                         end
-                       | _ => None
+                       | RFFile isAscii isArg file init => Some (SyntaxConst (ConstArray init))
                        end) :: match readers with
                                | Async _ => nil
                                | Sync isAddr read =>
@@ -499,6 +499,22 @@ Notation "'STRUCT' { s1 ; .. ; sN }" :=
   (getStructVal (Vector.cons _ s1%struct_init _ ..
                              (Vector.cons _ sN%struct_init _ (Vector.nil _)) ..))
   : kami_expr_scope.
+
+Notation "name ::= value" :=
+  (existT (fun a : Attribute Kind => ConstT (snd a))
+          (name%string, _) value) (at level 50) : kami_struct_initial_scope.
+Delimit Scope kami_struct_initial_scope with struct_initial.
+
+Notation getStructConst ls :=
+  (ConstStruct (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
+               (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j))
+               (fun k => Vector_nth_map2_r (@projT1 _ _) (fun x => ConstT (snd x)) ls k (projT2 (Vector.nth ls k)))).
+
+Notation "'STRUCT' { s1 ; .. ; sN }" :=
+  (getStructConst (Vector.cons _ s1%struct_initial _ ..
+                               (Vector.cons _ sN%struct_initial _ (Vector.nil _)) ..))
+  : kami_init_scope.
+Delimit Scope kami_init_scope with kami_init.
 
 
 Definition WriteRq IdxNum Data := STRUCT { "addr" :: Bit (Nat.log2_up IdxNum) ;
@@ -2612,11 +2628,11 @@ Definition makeModule (im : InModule) :=
 Definition makeConst k (c: ConstT k): ConstFullT (SyntaxKind k) := SyntaxConst c.
 
 Notation "'RegisterN' name : type <- init" :=
-  (MERegister (name%string, existT RegInitValT type (Some init)))
+  (MERegister (name%string, existT RegInitValT type (Some (init)%kami_init)))
     (at level 12, name at level 99) : kami_scope.
 
 Notation "'Register' name : type <- init" :=
-  (MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst init))))
+  (MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst (init)%kami_init))))
     (at level 12, name at level 99) : kami_scope.
 
 Notation "'RegisterU' name : type" :=
@@ -2682,7 +2698,7 @@ Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) i
 Notation "'RegisterVec' name 'using' nums : type <- init" :=
   (MERegAry (
     map (fun idx =>
-      (AddIndexToName name idx, existT RegInitValT (SyntaxKind type) (Some (makeConst init)))
+      (AddIndexToName name idx, existT RegInitValT (SyntaxKind type) (Some (makeConst (init)%kami_init)))
     ) nums
   ))
     (at level 12, name at level 9, nums at level 9) : kami_scope.
@@ -2743,6 +2759,15 @@ Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
     (only parsing).
 
 (* Infix "++" := ConcatMod: kami_scope. *)
+
+Notation "'ARRAY' { x1 ; .. ; xn }" :=
+  (ConstArray (Vector.nth (Vector.cons _ x1%kami_init _ .. (Vector.cons _ xn%kami_init _ (Vector.nil _)) ..)))
+  : kami_init_scope.
+
+Notation "'ARRAY' { x1 ; .. ; xn }" :=
+  (BuildArray (Vector.nth (Vector.cons _ x1%kami_init _ .. (Vector.cons _ xn%kami_init _ (Vector.nil _)) ..)))
+  : kami_expr_scope.
+
 
 Section tests.
   Variable a : string.

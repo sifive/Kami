@@ -290,7 +290,7 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
      _ -> "") ++
   "\n" ++
   (case init of
-     T.RFFile isAscii isArg file ->
+     T.RFFile isAscii isArg file _ ->
        "  initial begin\n" ++
        (if isArg
         then "    string _fileName;\n" ++

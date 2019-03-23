@@ -63,7 +63,7 @@ Record RtlRegFileBase := { rtlIsWrMask : bool ;
                            rtlWrite: string ;
                            rtlIdxNum: nat ;
                            rtlData: Kind ;
-                           rtlInit: RegFileInitT rtlData }.
+                           rtlInit: RegFileInitT rtlIdxNum rtlData }.
 
 Record RtlModule :=
   { hiddenWires: list (string * VarType);
