@@ -3,9 +3,9 @@ Require Import Syntax String.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
-Notation VarType := nat.
-Notation NoneVal := (0: VarType).
-Notation InitVal := (1: VarType).
+Local Notation VarType := nat.
+Local Notation NoneVal := (0: VarType).
+Local Notation InitVal := (1: VarType).
 
 Inductive RtlExpr: Kind -> Type :=
 | RtlReadReg k: string -> RtlExpr k
@@ -47,69 +47,36 @@ Inductive RtlSysT : Type :=
     RtlExpr (Array n k) -> FullBitFormat -> RtlSysT
 | RtlFinish: RtlSysT.
 
+Record RtlSyncRead :=
+  { readSync : SyncRead ;
+    bypassRqRs: bool ;
+    bypassWrRd: bool }.
 
-Inductive RtlRegConst (x: Kind) :=
-| NotInit
-| SimpleInit (v: ConstT x)
-| ArrayNotInit num k (pf: x = Array num k)
-| ArrayInit num k (pf: x = Array num k) (val: ConstT k)
-| ArrayHex num k (pf: x = Array num k) (file: string)
-| ArrayBin num k (pf: x = Array num k) (file: string).
+Inductive RtlRegFileReaders :=
+| RtlAsync (reads: list (string * bool))
+| RtlSync (isAddr: bool) (reads: list RtlSyncRead).
 
-Definition getRtlRegInit (x: sigT RegInitValT): sigT RtlRegConst.
-  refine (
-      existT _ match projT1 x with
-               | SyntaxKind k => k
-               | NativeKind _ => Void
-               end
-             match projT2 x with
-             | Uninit => NotInit _
-             | Init y' => SimpleInit match y' in ConstFullT k return ConstT match k with
-                                                                            | SyntaxKind k' => k'
-                                                                            | _ => Void
-                                                                            end with
-                                     | SyntaxConst k c => c
-                                     | _ => WO
-                                     end
-             | RegFileUninit num k pf => NotInit _
-             | RegFileInit num k pf val =>
-               @ArrayInit _ num k _ val
-             | RegFileHex num k pf file =>
-               @ArrayHex _ num k _ file
-             | RegFileBin num k pf file =>
-               @ArrayBin _ num k _ file
-             end); rewrite pf; reflexivity.
-Defined.
+Record RtlRegFileBase := { rtlIsWrMask : bool ;
+                           rtlNum: nat ;
+                           rtlDataArray: string ;
+                           rtlReads: RtlRegFileReaders ;
+                           rtlWrite: string ;
+                           rtlIdxNum: nat ;
+                           rtlData: Kind ;
+                           rtlInit: RegFileInitT rtlIdxNum rtlData }.
 
 Record RtlModule :=
   { hiddenWires: list (string * VarType);
-    regFiles: list (bool * RegFileBase);
+    regFiles: list RtlRegFileBase;
     inputs: list (string * VarType * Kind);
     outputs: list (string * VarType * Kind);
-    regInits: list (string * sigT RtlRegConst);
+    regInits: list (string * sigT RegInitValT);
     regWrites: list (string * sigT RtlExpr);
     wires: list (string * VarType * sigT RtlExpr);
     sys: list (RtlExpr Bool * list RtlSysT)
   }.
 
 Section BitOps.
-  Local Fixpoint sumSizes n: (Fin.t n -> nat) -> nat :=
-    match n return (Fin.t n -> nat) -> nat with
-    | 0 => fun _ => 0
-    | S m => fun sizes => sumSizes (fun x => sizes (Fin.FS x)) + sizes Fin.F1
-    end.
-
-  Local Fixpoint size (k: Kind) {struct k} :=
-    match k with
-    | Bool => 1
-    | Bit n => n
-    | Struct n fk fs =>
-      sumSizes (fun i => size (fk i))
-    | Array n k => n * size k
-    end.
-
-  (* ConstExtract: LSB, MIDDLE, MSB *)
-  (* Concat: MSB, LSB *)
 
   Local Fixpoint concatStructExpr n {struct n}:
     forall (sizes: Fin.t n -> nat)
@@ -126,58 +93,34 @@ Section BitOps.
                  (@concatStructExpr m (fun x => (sizes (Fin.FS x))) (fun x => f (Fin.FS x)))
     end.
 
-  Fixpoint rtlPack (k: Kind): RtlExpr k -> RtlExpr (Bit (size k)) :=
-    match k return RtlExpr k -> RtlExpr (Bit (size k)) with
-    | Bool => fun e => (RtlITE e (RtlConst (WO~1)%word) (RtlConst (WO~0)%word))
-    | Bit n => fun e => e
-    | Struct n fk fs =>
-      fun e =>
-        concatStructExpr (fun i => size (fk i))
-                         (fun i => @rtlPack (fk i) (RtlReadStruct e i))
-    | Array n k =>
-      fun e =>
-        (fix help i :=
-           match i return RtlExpr (Bit (i * size k)) with
-           | 0 => RtlConst WO
-           | S m =>
-             RtlBinBit
-               (Concat (m * size k) (size k)) (help m)
-               (@rtlPack k (RtlReadArray e (RtlConst (natToWord (Nat.log2_up n) m))))
-           end) n
-    end.
-
-  Local Fixpoint sumSizesMsbs n (i: Fin.t n) {struct i}: (Fin.t n -> nat) -> nat :=
-    match i in Fin.t n return (Fin.t n -> nat) -> nat with
-    | Fin.F1 _ => fun _ => 0
-    | Fin.FS m f => fun sizes => sumSizesMsbs f (fun j => sizes (Fin.FS j)) + sizes Fin.F1
-    end.
-
-  Local Lemma helper_sumSizes n (i: Fin.t n):
-    forall (sizes: Fin.t n -> nat), sumSizes sizes = (sumSizes sizes - (sumSizesMsbs i sizes + sizes i)) + sizes i + sumSizesMsbs i sizes.
-  Proof.
-    induction i; simpl; intros; auto.
-    - lia.
-    - specialize (IHi (fun x => sizes (Fin.FS x))).
-      lia.
-  Qed.
-  Local Lemma helper_array n (i: Fin.t n):
-    forall size_k,
-      n * size_k = (n * size_k - ((proj1_sig (Fin.to_nat i) * size_k) + size_k)) + size_k + (proj1_sig (Fin.to_nat i) * size_k).
-  Proof.
-    induction i; simpl; intros; auto.
-    - lia.
-    - case_eq (Fin.to_nat i); simpl; intros.
-      rewrite H in *; simpl in *.
-      rewrite IHi at 1.
-      lia.
-  Qed.
-  
   Local Definition castBits ni no (pf: ni = no) (e: RtlExpr (Bit ni)) :=
     nat_cast (fun n => RtlExpr (Bit n)) pf e.
 
+  Fixpoint rtlPack (k: Kind): RtlExpr k -> RtlExpr (Bit (size k)).
+    refine
+      match k return RtlExpr k -> RtlExpr (Bit (size k)) with
+      | Bool => fun e => (RtlITE e (RtlConst (WO~1)%word) (RtlConst (WO~0)%word))
+      | Bit n => fun e => e
+      | Struct n fk fs =>
+        fun e =>
+          concatStructExpr (fun i => size (fk i))
+                           (fun i => @rtlPack (fk i) (RtlReadStruct e i))
+      | Array n k =>
+        fun e =>
+          (fix help i :=
+             match i return RtlExpr (Bit (i * size k)) with
+             | 0 => RtlConst WO
+             | S m =>
+               castBits _ (RtlBinBit
+                             (Concat (size k) (m * size k))
+                             (@rtlPack k (RtlReadArray e (RtlConst (natToWord (Nat.log2_up n) m))))
+                             (help m))
+             end) n
+      end; abstract lia.
+  Defined.
+
   Local Definition ConstExtract lsb n msb (e: RtlExpr (Bit (lsb + n + msb))): RtlExpr (Bit n) :=
       RtlUniBit (TruncMsb lsb n) (RtlUniBit (TruncLsb (lsb + n) msb) e).
-
 
   Fixpoint rtlUnpack (k: Kind): RtlExpr (Bit (size k)) -> RtlExpr k :=
     match k return RtlExpr (Bit (size k)) -> RtlExpr k with
@@ -195,8 +138,8 @@ Section BitOps.
     | Array n k =>
       fun e =>
         RtlBuildArray
-          (fun i => rtlUnpack _ (ConstExtract _ _ (proj1_sig (Fin.to_nat i) * size k)
-                                           (@castBits _ _ (helper_array _ _) e)))
+          (fun i => rtlUnpack _ (ConstExtract (proj1_sig (Fin.to_nat i) * size k) _ _
+                                              (@castBits _ _ (helper_array _ _) e) ))
     end.
 End BitOps.
 

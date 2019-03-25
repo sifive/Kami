@@ -3,6 +3,10 @@ Require Import Syntax Rtl Thread RecordUpdate.RecordSet.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+Local Notation VarType := nat.
+Local Notation NoneVal := (0: VarType).
+Local Notation InitVal := (1: VarType).
+
 Local Open Scope string.
 
 Definition getRegActionRead a s := (a ++ "#" ++ s ++ "#_read", NoneVal).
@@ -348,27 +352,63 @@ End ThreadRules.
 Definition getRegInit (y: sigT RegInitValT): {x: Kind & option (ConstT x)} :=
   existT _ _
          match projT2 y with
-         | Uninit => None
-         | Init y' => Some match y' in ConstFullT k return ConstT match k with
-                                                                  | SyntaxKind k' => k'
-                                                                  | _ => Void
-                                                                  end with
-                           | SyntaxConst k c => c
-                           | _ => WO
-                           end
-         | RegFileUninit num k pf => None
-         | RegFileInit num k pf val =>
-           Some
-             match eq_sym pf in _ = Y return ConstT match Y with
-                                                    | SyntaxKind k' => k'
-                                                    | NativeKind _ => Void
-                                                    end with
-             | eq_refl => ConstArray (fun _ => val)
-             end
-             
-         | RegFileHex num k pf file => None
-         | RegFileBin num k pf file => None
+         | None => None
+         | Some y' =>
+           Some match y' in ConstFullT k return ConstT match k with
+                                                       | SyntaxKind k' => k'
+                                                       | _ => Void
+                                                       end with
+                | SyntaxConst k c => c
+                | _ => WO
+                end
          end.
+
+(* tagged database entry definitions *)
+Fixpoint tag' val T (xs : list T) :=
+  match xs with
+  | nil => nil
+  | y :: ys => (val, y) :: tag' (S val) ys
+  end.
+
+Definition tag := @tag' 0.
+
+Section order.
+  Variable rules: list RuleT.
+  Variable order: list string.
+
+  Definition callingRule m := find (fun calls => getBool (In_dec string_dec m (snd calls)))
+                                   (map (fun x => (fst x, map fst (getCallsWithSignPerRule x))) rules).
+
+  Definition getPosCallingRule m :=
+    match callingRule m with
+    | Some (x, _) =>
+      match find (fun z => getBool (string_dec x (snd z))) (tag order) with
+      | Some (pos, _) => Some pos
+      | None => None
+      end
+    | None => None
+    end.
+
+  Definition isBeforeCall m1 m2 :=
+    match getPosCallingRule m1, getPosCallingRule m2 with
+    | Some x, Some y => getBool (Compare_dec.lt_dec x y)
+    | _, _ => false
+    end.
+
+  Definition getRtlRegFile (rf: RegFileBase) :=
+    match rf with
+    | Build_RegFileBase isWrMask num dataArray reads write IdxNum Data init =>
+      Build_RtlRegFileBase isWrMask num dataArray
+                           (match reads with
+                            | Async read => RtlAsync (map (fun rd => (rd, isBeforeCall write rd)) read)
+                            | Sync isAddr read =>
+                              RtlSync isAddr
+                                      (map (fun rd => Build_RtlSyncRead rd
+                                                                        (isBeforeCall (readReqName rd) (readResName rd))
+                                                                        (isBeforeCall write ((if isAddr then readResName else readReqName) rd))) read)
+                            end) write init
+    end.
+End order.
 
 Definition rtlModCreate (bm: list string * (list RegFileBase * BaseModule))
            (order: list string) :=
@@ -386,10 +426,10 @@ Definition rtlModCreate (bm: list string * (list RegFileBase * BaseModule))
   {| hiddenWires := map (fun x => getMethArg x) hides ++
                         map (fun x => getMethEn x) hides ++
                         map (fun x => getMethRet x) hides ;
-     regFiles := map (fun x => (false, x)) rfs ;
+     regFiles := map (getRtlRegFile rules order) rfs ;
      inputs := ins ;
      outputs := outs ;
-     regInits :=  map (fun x => (fst x, getRtlRegInit (snd x))) (getRegisters m) ;
+     regInits := getRegisters m ;
      regWrites := regWr ;
      wires := temps ;
      sys := syss |}.

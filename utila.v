@@ -17,9 +17,9 @@ Section utila.
     (* I. Kami Expression Definitions *)
 
     Definition utila_opt_pkt
-        (k : Kind)
-        (x : k @# ty)
-        (valid : Bool @# ty)
+      (k : Kind)
+      (x : k @# ty)
+      (valid : Bool @# ty)
       :  Maybe k @# ty
       := STRUCT {
            "valid" ::= valid;
@@ -27,18 +27,18 @@ Section utila.
          }.
 
     Definition utila_opt_default
-        (k : Kind)
-        (default : k @# ty)
-        (x : Maybe k @# ty)
+      (k : Kind)
+      (default : k @# ty)
+      (x : Maybe k @# ty)
       :  k @# ty
       := ITE (x @% "valid")
            (x @% "data")
            default.
 
     Definition utila_opt_bind
-        (j k : Kind)
-        (x : Maybe j @# ty)
-        (f : j @# ty -> Maybe k @# ty)
+      (j k : Kind)
+      (x : Maybe j @# ty)
+      (f : j @# ty -> Maybe k @# ty)
       :  Maybe k @# ty
       := ITE (x @% "valid")
            (f (x @% "data"))
@@ -51,6 +51,66 @@ Section utila.
     Definition utila_any
       :  list (Bool @# ty) -> Bool @# ty
       := fold_right (fun x acc => x || acc) ($$false).
+
+    (*
+      Note: [f] must only return true for exactly one value in
+      [xs].
+    *)
+    Definition utila_find
+      (k : Kind)
+      (f : k @# ty -> Bool @# ty)
+      (xs : list (k @# ty))
+      :  k @# ty
+      := unpack k
+           (fold_right
+             (fun x acc => ((ITE (f x) (pack x) ($0)) | acc))
+             ($0)
+             xs).
+
+    (*
+      Note: exactly one of the packets must be valid.
+    *)
+    Definition utila_find_pkt
+      :  forall k : Kind, list (Maybe k @# ty) -> Maybe k @# ty
+      := fun k => utila_find (fun x : Maybe k @# ty => x @% "valid").
+
+    (*
+      Note: the key match predicate must never return true for more
+      than one entry in [entries].
+    *)
+    Definition utila_lookup_table
+      (entry_type : Type)
+      (entries : list entry_type)
+      (result_kind : Kind)
+      (entry_match : entry_type -> Bool @# ty)
+      (entry_result : entry_type -> result_kind @# ty)
+      :  Maybe result_kind @# ty
+      := utila_find_pkt
+           (map
+             (fun entry
+                => utila_opt_pkt 
+                     (entry_result entry)
+                     (entry_match entry))
+             entries).
+
+    (*
+      Note: the key match predicate must never return true for more
+      than one entry in [entries].
+    *)
+    Definition utila_lookup_table_default
+      (entry_type : Type)
+      (entries : list entry_type)
+      (result_kind : Kind)
+      (entry_match : entry_type -> Bool @# ty)
+      (entry_result : entry_type -> result_kind @# ty)
+      (default : result_kind @# ty)
+      :  result_kind @# ty
+      := utila_opt_default
+           default
+           (utila_lookup_table
+              entries
+              entry_match
+              entry_result).
 
     (* II. Kami Monadic Definitions *)
 
@@ -88,16 +148,16 @@ Section utila.
       Let mite := @utila_mite monad.
 
       Definition utila_mopt_pkt
-          (k : Kind)
-          (x : k @# ty)
-          (valid : Bool @# ty)
+        (k : Kind)
+        (x : k @# ty)
+        (valid : Bool @# ty)
         :  m (Maybe k)
         := munit (utila_opt_pkt x valid).
 
       Definition utila_mopt_default
-          (k : Kind)
-          (default : k @# ty)
-          (x_expr : m (Maybe k))
+        (k : Kind)
+        (default : k @# ty)
+        (x_expr : m (Maybe k))
         :  m k
         := mbind k x_expr
              (fun x : ty (Maybe k)
@@ -107,9 +167,9 @@ Section utila.
                      (munit default)).
 
       Definition utila_mopt_bind
-          (j k : Kind)
-          (x_expr : m (Maybe j))
-          (f : j @# ty -> m (Maybe k))
+        (j k : Kind)
+        (x_expr : m (Maybe j))
+        (f : j @# ty -> m (Maybe k))
         :  m (Maybe k)
         := mbind (Maybe k) x_expr
              (fun x : ty (Maybe j)
@@ -119,9 +179,9 @@ Section utila.
                     (munit (@Invalid ty k))).
 
       Definition utila_mfoldr
-          (j k : Kind)
-          (f : j @# ty -> k @# ty -> k @# ty)
-          (init : k @# ty)
+        (j k : Kind)
+        (f : j @# ty -> k @# ty -> k @# ty)
+        (init : k @# ty)
         :  list (m j) -> (m k)
         := fold_right
              (fun (x_expr : m j)
@@ -144,21 +204,21 @@ Section utila.
         := utila_mfoldr (fun x acc => x || acc) (Const ty false).
 
       Definition utila_mfind
-           (k : Kind)
-           (f : k @# ty -> Bool @# ty)
-           (x_exprs : list (m k))
-         :  m k
-         := mbind k
-              (utila_mfoldr
-                (fun (x : k @# ty) (acc : Bit (size k) @# ty)
-                   => ((ITE (f x) (pack x) ($0)) | acc))
-                ($0)
-                x_exprs)
-              (fun (y : ty (Bit (size k)))
-                 => munit (unpack k (Var ty (SyntaxKind (Bit (size k))) y))).
+        (k : Kind)
+        (f : k @# ty -> Bool @# ty)
+        (x_exprs : list (m k))
+        :  m k
+        := mbind k
+             (utila_mfoldr
+               (fun (x : k @# ty) (acc : Bit (size k) @# ty)
+                  => ((ITE (f x) (pack x) ($0)) | acc))
+               ($0)
+               x_exprs)
+             (fun (y : ty (Bit (size k)))
+                => munit (unpack k (Var ty (SyntaxKind (Bit (size k))) y))).
 
       Definition utila_mfind_pkt
-          (k : Kind)
+        (k : Kind)
         :  list (m (Maybe k)) -> m (Maybe k)
         := utila_mfind
              (fun (pkt : Maybe k @# ty)
@@ -213,9 +273,9 @@ Section utila.
       [xs_exprs].
     *)
     Definition utila_expr_find
-        (k : Kind)
-        (f : k @# ty -> Bool @# ty)
-        (xs_exprs : list (k ## ty))
+      (k : Kind)
+      (f : k @# ty -> Bool @# ty)
+      (xs_exprs : list (k ## ty))
       :  k ## ty
       := LETE y
          :  Bit (size k)
@@ -234,8 +294,8 @@ Section utila.
       Note: exactly one of the packets must be valid.
     *)
     Definition utila_expr_find_pkt
-        (k : Kind)
-        (pkt_exprs : list (Maybe k ## ty))
+      (k : Kind)
+      (pkt_exprs : list (Maybe k ## ty))
       :  Maybe k ## ty
       := utila_expr_find
            (fun (pkt : Maybe k @# ty)
@@ -250,11 +310,11 @@ Section utila.
       than one entry in [entries].
     *)
     Definition utila_expr_lookup_table
-        (entry_type : Type)
-        (entries : list entry_type)
-        (result_kind : Kind)
-        (entry_match : entry_type -> Bool ## ty)
-        (entry_result : entry_type -> result_kind ## ty)
+      (entry_type : Type)
+      (entries : list entry_type)
+      (result_kind : Kind)
+      (entry_match : entry_type -> Bool ## ty)
+      (entry_result : entry_type -> result_kind ## ty)
       :  Maybe result_kind ## ty
       := utila_expr_find_pkt
            (map
@@ -277,12 +337,12 @@ Section utila.
       than one entry in [entries].
     *)
     Definition utila_expr_lookup_table_default
-        (entry_type : Type)
-        (entries : list entry_type)
-        (result_kind : Kind)
-        (entry_match : entry_type -> Bool ## ty)
-        (entry_result : entry_type -> result_kind ## ty)
-        (default : result_kind @# ty)
+      (entry_type : Type)
+      (entries : list entry_type)
+      (result_kind : Kind)
+      (entry_match : entry_type -> Bool ## ty)
+      (entry_result : entry_type -> result_kind ## ty)
+      (default : result_kind @# ty)
       :  result_kind ## ty
       := utila_expr_opt_default
            default
@@ -490,6 +550,10 @@ Section utila.
 
     Let m := utila_m monad.
 
+    Let mbind := utila_mbind monad.
+
+    Let munit := utila_munit monad.
+
     Local Notation "{{ X }}" := (evalExpr X).
 
     Local Notation "[[ X ]]" := (utila_sem_interp X).
@@ -602,7 +666,10 @@ Section utila.
                     || orb [[y0]] X = true @X by F
                     || X = true            @X by utila_many_cons y0 ys)
                xs).
-             
+
+    Definition utila_null (k : Kind)
+      :  k @# type
+      := unpack k $0.
 
   End monad_ver.
 
@@ -855,90 +922,90 @@ Section utila.
                         {{pack #[[x]]}}
                      := fun in_x_xs
                         => F (conj 
-                                (conj in_x_xs fx_true)
-                                (fun y (H0 : In y xs /\ {{f #[[y]]}} = true)
+                               (conj in_x_xs fx_true)
+                               (fun y (H0 : In y xs /\ {{f #[[y]]}} = true)
                                  => eq_x y
-                                         (conj
-                                            (or_intror (x0 = y) (proj1 H0))
-                                            (proj2 H0)))) in
+                                      (conj
+                                        (or_intror (x0 = y) (proj1 H0))
+                                        (proj2 H0)))) in
                  sumbool_ind
                    (fun _
-                    => [[utila_expr_foldr (case f) ($0) (x0 :: xs)]] =
-                       {{pack #[[x]]}})
+                      => [[utila_expr_foldr (case f) ($0) (x0 :: xs)]] =
+                         {{pack #[[x]]}})
                    (* II.A *)
                    (fun eq_x0_x : x0 = x
-                    => let fx0_true
-                           :  {{f #[[x0]]}} = true
-                           := fx_true || {{f #[[a]]}} = true @a by eq_x0_x in
-                       let red0
-                           :  [[utila_expr_foldr (case f) ($0) (x0 :: xs)]] =
-                              {{pack #[[x]]}} ^|
-                                              [[utila_expr_foldr (case f) _ xs]]
-                           := utila_expr_foldr_correct_cons (case f) ($0) x0 xs
-                              || _ = a ^| [[utila_expr_foldr (case f) _ xs]]
-                                       @a by <- wor_wzero
-                                                (if {{f #[[x0]]}}
-                                                 then {{pack #[[x0]]}}
-                                                 else $0)
-                                             || _ = (if a : bool then _ else _) ^| _
-                                                                                @a by <- fx0_true 
-                                                                                      || _ = {{pack #[[a]]}} ^| _
-                                                                                                             @a by <- eq_x0_x in
-                       sumbool_ind
-                         (fun _
-                          => [[utila_expr_foldr (case f) ($0) (x0 :: xs)]] =
-                             {{pack #[[x]]}})
-                         (* II.A.1 *)
-                         (fun in_x_xs : In x xs
-                          => red0
-                             || _ = _ ^| a
-                                      @a by <- eq_pack_x in_x_xs
-                                            || _ = a
-                                                     @a by <- wor_idemp {{pack #[[x]]}})
-                         (* II.A.2 *)
-                         (fun not_in_x_xs : ~ In x xs
-                          => let eq_0
-                                 :  [[utila_expr_foldr (case f) ($0) xs]] = {{$0}}
-                                 := utila_expr_find_lm1
-                                      f ($0) xs
-                                      (fun y (in_y_xs : In y xs)
-                                       => not_true_is_false {{f #[[y]]}}
-                                                            (fun fy_true : {{f #[[y]]}} = true
-                                                             => not_in_x_xs
-                                                                  (in_y_xs
-                                                                   || In a xs
-                                                                         @a by eq_x y (conj (or_intror _ in_y_xs) fy_true)))) in
-                             red0
-                             || _ = _ ^| a
-                                      @a by <- eq_0
-                                            || _ = a
-                                                     @a by <- wzero_wor {{pack #[[x]]}})
-                         (kami_in_dec x xs))
+                     => let fx0_true
+                            :  {{f #[[x0]]}} = true
+                            := fx_true || {{f #[[a]]}} = true @a by eq_x0_x in
+                        let red0
+                            :  [[utila_expr_foldr (case f) ($0) (x0 :: xs)]] =
+                               {{pack #[[x]]}} ^|
+                                               [[utila_expr_foldr (case f) _ xs]]
+                            := utila_expr_foldr_correct_cons (case f) ($0) x0 xs
+                               || _ = a ^| [[utila_expr_foldr (case f) _ xs]]
+                                  @a by <- wor_wzero
+                                             (if {{f #[[x0]]}}
+                                               then {{pack #[[x0]]}}
+                                               else $0)
+                               || _ = (if a : bool then _ else _) ^| _
+                                  @a by <- fx0_true 
+                               || _ = {{pack #[[a]]}} ^| _
+                                  @a by <- eq_x0_x in
+                        sumbool_ind
+                          (fun _
+                           => [[utila_expr_foldr (case f) ($0) (x0 :: xs)]] =
+                              {{pack #[[x]]}})
+                          (* II.A.1 *)
+                          (fun in_x_xs : In x xs
+                           => red0
+                              || _ = _ ^| a
+                                 @a by <- eq_pack_x in_x_xs
+                              || _ = a
+                                 @a by <- wor_idemp {{pack #[[x]]}})
+                          (* II.A.2 *)
+                          (fun not_in_x_xs : ~ In x xs
+                           => let eq_0
+                                  :  [[utila_expr_foldr (case f) ($0) xs]] = {{$0}}
+                                  := utila_expr_find_lm1
+                                       f ($0) xs
+                                       (fun y (in_y_xs : In y xs)
+                                         => not_true_is_false {{f #[[y]]}}
+                                              (fun fy_true : {{f #[[y]]}} = true
+                                                => not_in_x_xs
+                                                     (in_y_xs
+                                                       || In a xs
+                                                          @a by eq_x y (conj (or_intror _ in_y_xs) fy_true)))) in
+                              red0
+                              || _ = _ ^| a
+                                 @a by <- eq_0
+                              || _ = a
+                                 @a by <- wzero_wor {{pack #[[x]]}})
+                          (kami_in_dec x xs))
                    (* II.B *)
                    (fun not_eq_x0_x : x0 <> x
-                    => let fx0_false
-                           :  {{f #[[x0]]}} = false
-                           := not_true_is_false {{f #[[x0]]}}
-                                                (fun fx0_true : {{f #[[x0]]}} = true
-                                                 => not_eq_x0_x
-                                                      (eq_sym (eq_x x0 (conj (or_introl _ eq_refl) fx0_true)))) in
-                       (* prove partial reduction - assume that x0 <> x *)
-                       sumbool_ind
-                         (fun _
-                          => [[utila_expr_foldr (case f) ($0) (x0 :: xs)]] =
-                             {{pack #[[x]]}})
-                         (* II.B.1 *)
-                         (fun in_x_xs : In x xs
-                          => utila_expr_find_lm0 f ($0) x0 xs fx0_false
-                             || _ = a @a by <- eq_pack_x in_x_xs)
-                         (* II.B.2 contradictory case - x must be in x0 :: xs. *)
-                         (fun not_in_x_xs : ~ In x xs
-                          => False_ind _
-                                       (or_ind
-                                          not_eq_x0_x
-                                          not_in_x_xs
-                                          (proj1 (proj1 H))))
-                         (kami_in_dec x xs))
+                     => let fx0_false
+                            :  {{f #[[x0]]}} = false
+                            := not_true_is_false {{f #[[x0]]}}
+                                 (fun fx0_true : {{f #[[x0]]}} = true
+                                   => not_eq_x0_x
+                                        (eq_sym (eq_x x0 (conj (or_introl _ eq_refl) fx0_true)))) in
+                        (* prove partial reduction - assume that x0 <> x *)
+                        sumbool_ind
+                          (fun _
+                           => [[utila_expr_foldr (case f) ($0) (x0 :: xs)]] =
+                              {{pack #[[x]]}})
+                          (* II.B.1 *)
+                          (fun in_x_xs : In x xs
+                           => utila_expr_find_lm0 f ($0) x0 xs fx0_false
+                              || _ = a @a by <- eq_pack_x in_x_xs)
+                          (* II.B.2 contradictory case - x must be in x0 :: xs. *)
+                          (fun not_in_x_xs : ~ In x xs
+                           => False_ind _
+                                        (or_ind
+                                           not_eq_x0_x
+                                           not_in_x_xs
+                                           (proj1 (proj1 H))))
+                          (kami_in_dec x xs))
                    (kami_exprs_eq_dec x0 x)).       
 
       Theorem utila_expr_find_correct

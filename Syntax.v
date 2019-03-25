@@ -293,7 +293,7 @@ Section Phoas.
       | Fin.FS m f => fun sizes => sumSizesMsbs f (fun j => sizes (Fin.FS j)) + sizes Fin.F1
       end.
 
-    Local Lemma helper_sumSizes n (i: Fin.t n):
+    Lemma helper_sumSizes n (i: Fin.t n):
       forall (sizes: Fin.t n -> nat), sumSizes sizes = (sumSizes sizes - (sumSizesMsbs i sizes + sizes i)) + sizes i + sumSizesMsbs i sizes.
     Proof.
       induction i; simpl; intros; auto.
@@ -302,7 +302,7 @@ Section Phoas.
         lia.
     Qed.
     
-    Local Lemma helper_array n (i: Fin.t n):
+    Lemma helper_array n (i: Fin.t n):
       forall size_k,
         n * size_k = (proj1_sig (Fin.to_nat i) * size_k) + size_k + (n * size_k - ((proj1_sig (Fin.to_nat i) * size_k) + size_k)) .
     Proof.
@@ -390,32 +390,40 @@ Notation Void := (Bit 0).
 Notation Attribute A := (string * A)%type (only parsing).
 Section RegInitValT.
   Variable x: FullKind.
-  Inductive RegInitValT :=
-  | Uninit
-  | Init (c: ConstFullT x)
-  | RegFileUninit num k (pf: x = SyntaxKind (Array num k))
-  | RegFileInit num k (pf: x = SyntaxKind (Array num k)) (val: ConstT k)
-  | RegFileHex num k (pf: x = SyntaxKind (Array num k)) (file: string)
-  | RegFileBin num k (pf: x = SyntaxKind (Array num k)) (file: string).
+  Definition RegInitValT := option (ConstFullT x).
+  (* | Uninit *)
+  (* | Init (c: ConstFullT x) *)
+  (* | RegFileUninit num k (pf: x = SyntaxKind (Array num k)) *)
+  (* | RegFileInit num k (pf: x = SyntaxKind (Array num k)) (val: ConstT k) *)
+  (* | RegFileHex num k (pf: x = SyntaxKind (Array num k)) (file: string) *)
+  (* | RegFileBin num k (pf: x = SyntaxKind (Array num k)) (file: string). *)
 End RegInitValT.
 
 Definition RegInitT := Attribute (sigT RegInitValT).
 Definition DefMethT := Attribute (sigT MethodT).
 Definition RuleT := Attribute (Action Void).
 
-Inductive RegFileBase: Type :=
-| RegFile (dataArray: string) (read: list string) (write: string) (IdxNum: nat) (Data: Kind)
-          (init: option (ConstT Data))
-| RegFileFile (dataArray: string) (read: list string) (write: string) (IdxNum: nat) (Data: Kind) (file: string)
-              (isAscii: bool)
-| SyncRegFile (isAddr: bool)
-              (dataArray: string) (read: list (string * string * string)) (write: string)
-              (IdxNum: nat) (Data: Kind) (init: option (ConstT Data))
-| SyncRegFileFile
-    (isAddr: bool)
-    (dataArray: string) (read: list (string * string * string)) (write: string)
-    (IdxNum: nat) (Data: Kind) (file: string) (isAscii: bool).
+Inductive RegFileInitT (IdxNum: nat) (Data: Kind) :=
+| RFNonFile (init: option (ConstT Data))
+| RFFile (isAscii: bool) (isArg: bool) (file: string) (init: Fin.t IdxNum -> ConstT Data).
 
+Record SyncRead := { readReqName : string ;
+                     readResName : string ;
+                     readRegName : string }.
+
+Inductive RegFileReaders :=
+| Async (reads: list string)
+| Sync (isAddr: bool) (reads: list SyncRead).
+
+Record RegFileBase := { rfIsWrMask : bool ;
+                        rfNum: nat ;
+                        rfDataArray: string ;
+                        rfRead: RegFileReaders ;
+                        rfWrite: string ;
+                        rfIdxNum: nat ;
+                        rfData: Kind ;
+                        rfInit: RegFileInitT rfIdxNum rfData }.
+                       
 Inductive BaseModule: Type :=
 | BaseRegFile (rf: RegFileBase)
 | BaseMod (regs: list RegInitT) (rules: list RuleT) (dms: list DefMethT).
@@ -426,7 +434,7 @@ Inductive Mod: Type :=
 | ConcatMod (m1 m2: Mod): Mod.
 
 Coercion Base: BaseModule >-> Mod.
-Coercion BaseRegFile : RegFileBase >-> BaseModule.
+
 Notation getKindAttr ls := (map (fun x => (fst x, projT1 (snd x))) ls).
 
 Notation "l '[=]' r" :=
@@ -435,30 +443,21 @@ Notation "l '[=]' r" :=
 
 Definition getRegFileRegisters m :=
   match m with
-  | RegFile dataArray read write IdxNum Data init =>
+  | @Build_RegFileBase isWrMask num dataArray readers write IdxNum Data init =>
     (dataArray, existT RegInitValT (SyntaxKind (Array IdxNum Data))
                        match init with
-                       | None => Uninit _
-                       | Some init' => Init (SyntaxConst (ConstArray (fun _ => init')))
-                       end) :: nil
-  | RegFileFile dataArray read write IdxNum Data file _ =>
-    (dataArray, existT RegInitValT (SyntaxKind (Array IdxNum Data)) (Uninit _)) :: nil
-  | SyncRegFile isAddr dataArray read write IdxNum Data init =>
-    (dataArray, existT RegInitValT (SyntaxKind (Array IdxNum Data))
-                       match init with
-                       | None => Uninit _
-                       | Some init' => Init (SyntaxConst (ConstArray (fun _ => init')))
-                       end)
-      ::
-      map (fun x => (snd x, existT RegInitValT (SyntaxKind Data)
-                                   match init with
-                                   | None => Uninit _
-                                   | Some init' => Init (SyntaxConst init')
-                                   end)) read
-  | SyncRegFileFile isAddr dataArray read write IdxNum Data file _ =>
-    (dataArray, existT RegInitValT (SyntaxKind (Array IdxNum Data)) (Uninit _))
-      ::
-      map (fun x => (snd x, existT RegInitValT (SyntaxKind Data) (Uninit _))) read
+                       | RFNonFile x => match x with
+                                        | None => None
+                                        | Some init' => Some (SyntaxConst (ConstArray (fun _ => init')))
+                                        end
+                       | RFFile isAscii isArg file init => Some (SyntaxConst (ConstArray init))
+                       end) :: match readers with
+                               | Async _ => nil
+                               | Sync isAddr read =>
+                                 if isAddr
+                                 then map (fun x => (readRegName x, existT RegInitValT (SyntaxKind (Bit (Nat.log2_up IdxNum))) None)) read
+                                 else map (fun x => (readRegName x, existT RegInitValT (SyntaxKind (Array num Data)) None)) read
+                               end
   end.
 
 Definition getRegisters m :=
@@ -501,164 +500,128 @@ Notation "'STRUCT' { s1 ; .. ; sN }" :=
                              (Vector.cons _ sN%struct_init _ (Vector.nil _)) ..))
   : kami_expr_scope.
 
+Notation "name ::= value" :=
+  (existT (fun a : Attribute Kind => ConstT (snd a))
+          (name%string, _) value) (at level 50) : kami_struct_initial_scope.
+Delimit Scope kami_struct_initial_scope with struct_initial.
+
+Notation getStructConst ls :=
+  (ConstStruct (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
+               (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j))
+               (fun k => Vector_nth_map2_r (@projT1 _ _) (fun x => ConstT (snd x)) ls k (projT2 (Vector.nth ls k)))).
+
+Notation "'STRUCT' { s1 ; .. ; sN }" :=
+  (getStructConst (Vector.cons _ s1%struct_initial _ ..
+                               (Vector.cons _ sN%struct_initial _ (Vector.nil _)) ..))
+  : kami_init_scope.
+Delimit Scope kami_init_scope with kami_init.
+
 
 Definition WriteRq IdxNum Data := STRUCT { "addr" :: Bit (Nat.log2_up IdxNum) ;
                                            "data" :: Data }.
 
+Definition WriteRqMask IdxNum num Data := STRUCT { "addr" :: Bit (Nat.log2_up IdxNum) ;
+                                                   "data" :: Array num Data ;
+                                                   "mask" :: Array num Bool }.
+
+Definition buildNumDataArray num dataArray IdxNum Data ty (idx: ty (Bit (Nat.log2_up IdxNum))) :=
+  ReadReg dataArray (SyntaxKind (Array IdxNum Data))
+          (fun val =>
+             Return (BuildArray (fun i: Fin.t num =>
+                                   ReadArray
+                                     (Var ty _ val)
+                                     (CABit Add (Var ty (SyntaxKind _) idx ::
+                                                     Const ty (natToWord _ (proj1_sig (Fin.to_nat i))) :: nil))))).
+                                                                                                                   
+Definition updateNumDataArray num dataArray IdxNum Data ty (idxData: ty (WriteRq IdxNum (Array num Data))):
+  ActionT ty Void :=
+  ReadReg dataArray (SyntaxKind (Array IdxNum Data))
+          (fun val =>
+             WriteReg dataArray
+                      (fold_left (fun newArr i =>
+                                    (UpdateArray newArr
+                                                 (CABit Add (ReadStruct (Var ty (SyntaxKind _) idxData)
+                                                                        Fin.F1 :: Const ty (natToWord _ (proj1_sig (Fin.to_nat i))) :: nil))
+                                                 (ReadArrayConst (ReadStruct (Var ty (SyntaxKind _) idxData)
+                                                                             (Fin.FS Fin.F1)) i))) (getFins num)
+                                 (Var ty (SyntaxKind (Array IdxNum Data)) val))
+                      (Return (Const _ WO))).
+
+Definition updateNumDataArrayMask num dataArray IdxNum Data ty (idxData: ty (WriteRqMask IdxNum num Data)):
+  ActionT ty Void :=
+  ReadReg dataArray (SyntaxKind (Array IdxNum Data))
+          (fun val =>
+             WriteReg dataArray
+                      (fold_left (fun newArr i =>
+                                    ITE
+                                      (ReadArrayConst (ReadStruct (Var ty (SyntaxKind _) idxData) (Fin.FS (Fin.FS Fin.F1))) i)
+                                      (UpdateArray newArr
+                                                   (CABit Add (ReadStruct (Var ty (SyntaxKind _) idxData)
+                                                                          Fin.F1 :: Const ty (natToWord _ (proj1_sig (Fin.to_nat i))) :: nil))
+                                                   (ReadArrayConst (ReadStruct (Var ty (SyntaxKind _) idxData)
+                                                                               (Fin.FS Fin.F1)) i))
+                                      newArr
+                                 ) (getFins num)
+                                 (Var ty (SyntaxKind (Array IdxNum Data)) val))
+                      (Return (Const _ WO))).
+
+Definition readRegFile num dataArray (read: list string) IdxNum Data :=
+  (map (fun x => (x, existT MethodT (Bit (Nat.log2_up IdxNum), Array num Data)
+                            (buildNumDataArray num dataArray IdxNum Data))) read).
+
+Definition writeRegFileFn (isWrMask: bool) num dataArray (write: string) IdxNum Data :=
+  (write,
+   if isWrMask
+   then existT MethodT (WriteRqMask IdxNum num Data, Void)
+               (updateNumDataArrayMask num dataArray IdxNum Data)
+   else existT MethodT (WriteRq IdxNum (Array num Data), Void)
+               (updateNumDataArray num dataArray IdxNum Data)).
+
+Definition readSyncRegFile (isAddr: bool) num dataArray (read: list SyncRead) IdxNum Data :=
+  if isAddr
+  then
+    ((map (fun r =>
+             (readReqName r,
+              existT MethodT (Bit (Nat.log2_up IdxNum), Void)
+                     (fun ty idx =>
+                        WriteReg (readRegName r) (Var ty (SyntaxKind _) idx)
+                                 (Return (Const _ WO)))))) read)
+      ++
+      (map (fun r =>
+              (readResName r,
+               existT MethodT (Void, Array num Data)
+                      (fun ty _ =>
+                         ReadReg (readRegName r) (SyntaxKind (Bit (Nat.log2_up IdxNum)))
+                                 (buildNumDataArray num dataArray IdxNum Data ty))))
+           read)
+  else
+    ((map (fun r =>
+             (readReqName r,
+              existT MethodT (Bit (Nat.log2_up IdxNum), Void)
+                     (fun ty idx =>
+                        LetAction (buildNumDataArray num dataArray IdxNum Data ty idx)
+                                  (fun vals => WriteReg (readRegName r) (Var ty (SyntaxKind _) vals)
+                                                        (Return (Const _ WO)))))) read)
+      ++
+      (map (fun r =>
+              (readResName r,
+               existT MethodT (Void, Array num Data)
+                      (fun ty x =>
+                         ReadReg (readRegName r) (SyntaxKind (Array num Data))
+                                 (fun data =>
+                                    Return (Var ty (SyntaxKind (Array num Data)) data)))))
+           read)).
+
 Definition getRegFileMethods m :=
   match m with
-  | RegFile dataArray read write IdxNum Data init =>
-    (write, existT MethodT (WriteRq IdxNum Data, Void)
-                   (fun ty x =>
-                      ReadReg dataArray _
-                              (fun val =>
-                                 WriteReg dataArray
-                                          (UpdateArray (Var ty _ val)
-                                                       (ReadStruct (Var ty (SyntaxKind _) x)
-                                                                   Fin.F1)
-                                                       (ReadStruct (Var ty (SyntaxKind _) x)
-                                                                   (Fin.FS Fin.F1)))
-                                          (Return (Const _ WO)))))
-      :: (map (fun x =>
-                 (x,
-                  existT MethodT (Bit (Nat.log2_up IdxNum), Data)
-                         (fun ty x =>
-                            ReadReg dataArray (SyntaxKind (Array IdxNum Data))
-                                    (fun val =>
-                                       ReadReg dataArray _
-                                               (fun val =>
-                                                  Return (ReadArray
-                                                            (Var ty _ val)
-                                                            (Var ty (SyntaxKind _) x)))))))
-              read)
-  | RegFileFile dataArray read write IdxNum Data file _ =>
-    (write, existT MethodT (WriteRq IdxNum Data, Void)
-                   (fun ty x =>
-                      ReadReg dataArray _
-                              (fun val =>
-                                 WriteReg dataArray
-                                          (UpdateArray (Var ty _ val)
-                                                       (ReadStruct (Var ty (SyntaxKind _) x)
-                                                                   Fin.F1)
-                                                       (ReadStruct (Var ty (SyntaxKind _) x)
-                                                                   (Fin.FS Fin.F1)))
-                                          (Return (Const _ WO)))))
-      :: (map (fun x =>
-                 (x,
-                  existT MethodT (Bit (Nat.log2_up IdxNum), Data)
-                         (fun ty x =>
-                            ReadReg dataArray (SyntaxKind (Array IdxNum Data))
-                                    (fun val =>
-                                       ReadReg dataArray _
-                                               (fun val =>
-                                                  Return (ReadArray
-                                                            (Var ty _ val)
-                                                            (Var ty (SyntaxKind _) x)))))))
-              read)
-  | SyncRegFile isAddr dataArray read write IdxNum Data init =>
-    (write, existT MethodT (WriteRq IdxNum Data, Void)
-                   (fun ty x =>
-                      ReadReg dataArray _
-                              (fun val =>
-                                 WriteReg dataArray
-                                          (UpdateArray (Var ty _ val)
-                                                       (ReadStruct (Var ty (SyntaxKind _) x)
-                                                                   Fin.F1)
-                                                       (ReadStruct (Var ty (SyntaxKind _) x)
-                                                                   (Fin.FS Fin.F1)))
-                                          (Return(Const _ WO)))))
-      ::
-      if isAddr
-      then
-      ((map (fun r =>
-               (fst (fst r),
-                existT MethodT (Bit (Nat.log2_up IdxNum), Void)
-                       (fun ty x =>
-                          WriteReg (snd r) (Var ty (SyntaxKind _) x)
-                                   (Return (Const _ WO)))))) read)
-        ++
-        (map (fun r =>
-                (snd (fst r),
-                 existT MethodT (Void, Data)
-                        (fun ty x =>
-                           ReadReg (snd r) (SyntaxKind (Bit (Nat.log2_up IdxNum)))
-                                   (fun idx =>
-                                      ReadReg dataArray (SyntaxKind (Array IdxNum Data))
-                                              (fun val =>
-                                                 Return (ReadArray
-                                                           (Var ty _ val)
-                                                           (Var ty (SyntaxKind _) idx)))))))
-             read)
-      else
-        ((map (fun r =>
-                 (fst (fst r),
-                  existT MethodT (Bit (Nat.log2_up IdxNum), Void)
-                         (fun ty x =>
-                            ReadReg (snd r) (SyntaxKind (Bit (Nat.log2_up IdxNum)))
-                                    (fun data =>
-                                       WriteReg (snd r) (Var ty (SyntaxKind _) data)
-                                                (Return (Const _ WO)))))) read))
-          ++
-          (map (fun r =>
-                  (snd (fst r),
-                   existT MethodT (Void, Data)
-                          (fun ty x =>
-                             ReadReg (snd r) (SyntaxKind Data)
-                                     (fun data =>
-                                        Return (Var ty _ data)))))
-               read)
-  | SyncRegFileFile isAddr dataArray read write IdxNum Data file _ =>
-    (write, existT MethodT (WriteRq IdxNum Data, Void)
-                   (fun ty x =>
-                      ReadReg dataArray _
-                              (fun val =>
-                                 WriteReg dataArray
-                                          (UpdateArray (Var ty _ val)
-                                                       (ReadStruct (Var ty (SyntaxKind _) x)
-                                                                   Fin.F1)
-                                                       (ReadStruct (Var ty (SyntaxKind _) x)
-                                                                   (Fin.FS Fin.F1)))
-                                          (Return(Const _ WO)))))
-      ::
-      if isAddr
-      then
-      ((map (fun r =>
-               (fst (fst r),
-                existT MethodT (Bit (Nat.log2_up IdxNum), Void)
-                       (fun ty x =>
-                          WriteReg (snd r) (Var ty (SyntaxKind _) x)
-                                   (Return (Const _ WO)))))) read)
-        ++
-        (map (fun r =>
-                (snd (fst r),
-                 existT MethodT (Void, Data)
-                        (fun ty x =>
-                           ReadReg (snd r) (SyntaxKind (Bit (Nat.log2_up IdxNum)))
-                                   (fun idx =>
-                                      ReadReg dataArray (SyntaxKind (Array IdxNum Data))
-                                              (fun val =>
-                                                 Return (ReadArray
-                                                           (Var ty _ val)
-                                                           (Var ty (SyntaxKind _) idx)))))))
-             read)
-      else
-        ((map (fun r =>
-                 (fst (fst r),
-                  existT MethodT (Bit (Nat.log2_up IdxNum), Void)
-                         (fun ty x =>
-                            ReadReg (snd r) (SyntaxKind (Bit (Nat.log2_up IdxNum)))
-                                    (fun data =>
-                                       WriteReg (snd r) (Var ty (SyntaxKind _) data)
-                                                (Return (Const _ WO)))))) read))
-          ++
-          (map (fun r =>
-                  (snd (fst r),
-                   existT MethodT (Void, Data)
-                          (fun ty x =>
-                             ReadReg (snd r) (SyntaxKind Data)
-                                     (fun data =>
-                                        Return (Var ty _ data)))))
-               read)
+  | @Build_RegFileBase isWrMask num dataArray readers write IdxNum Data init =>
+    writeRegFileFn isWrMask num dataArray write IdxNum Data ::
+                   match readers with
+                   | Async read =>
+                     readRegFile num dataArray read IdxNum Data
+                   | Sync isAddr read =>
+                     readSyncRegFile isAddr num dataArray read IdxNum Data
+                   end
   end.
 
 Fixpoint getMethods m :=
@@ -1086,7 +1049,6 @@ Section Semantics.
              end
     end.
 
-
   Fixpoint evalExpr exprT (e: Expr type exprT): fullType type exprT :=
     match e in Expr _ exprT return fullType type exprT with
       | Var _ v => v
@@ -1104,10 +1066,14 @@ Section Semantics.
       | ReadStruct n fk fs e i => (@evalExpr _ e) i
       | BuildStruct n fk fs fv => fun i => @evalExpr _ (fv i)
       | ReadArray n k fv i =>
-        match n return (Fin.t n -> fullType type (SyntaxKind k)) ->
-                       fullType type (SyntaxKind k) with
-        | 0 => fun _ => evalConstT (getDefaultConst k)
-        | S m => fun fv => fv (natToFin m (wordToNat (@evalExpr _ i)))
+        (* match n return (Fin.t n -> fullType type (SyntaxKind k)) -> *)
+        (*                fullType type (SyntaxKind k) with *)
+        (* | 0 => fun _ => evalConstT (getDefaultConst k) *)
+        (* | S m => fun fv => fv (natToFin m (wordToNat (@evalExpr _ i))) *)
+        (* end (@evalExpr _ fv) *)
+        match lt_dec (wordToNat (@evalExpr _ i)) n with
+        | left pf => fun fv => fv (Fin.of_nat_lt pf)
+        | right _ => fun _ => evalConstT (getDefaultConst k)
         end (@evalExpr _ fv)
       | ReadArrayConst n k fv i =>
         (@evalExpr _ fv) i
@@ -1497,30 +1463,14 @@ fun method
 Lemma num_method_execs_positive
   : forall (method : MethT) (labels : list FullLabel),
       0 <= getNumExecs method labels.
-Proof
-fun method
-  => list_ind _
-       (ltac:(discriminate) : 0 <= getNumExecs method [])
-       (fun (label : FullLabel) (labels : list FullLabel)
-         (H : 0 <= getNumFromExecs method (map PPT_execs labels))
-         => RuleOrMeth_ind
-              (fun rule_method : RuleOrMeth
-                => 0 <= match rule_method with
-                        | Rle _ => _
-                        | Meth _ => _
-                        end)
-              (fun _ => H)
-              (fun method0 : MethT
-                => sumbool_ind
-                     (fun methods_eq
-                       => 0 <=
-                            if methods_eq
-                              then 1 + getNumFromExecs method (map PPT_execs labels)
-                              else getNumFromExecs method (map PPT_execs labels))
-                     (fun _ => Z.add_nonneg_nonneg 1 _ (Zle_0_pos 1) H)
-                     (fun _ => H)
-                     (MethT_dec method method0))
-              (fst (snd label))).
+Proof.
+  induction labels; unfold getNumExecs in *; simpl; try lia.
+  destruct a; simpl; auto.
+  destruct p; simpl; auto.
+  destruct r0; simpl; auto.
+  destruct (MethT_dec method f); simpl; auto; subst.
+  destruct (getNumFromExecs f (map PPT_execs labels)); simpl; auto; try lia.
+Defined.
 
 Close Scope Z_scope.
 
@@ -1714,20 +1664,11 @@ Definition UpdRegs (u: list RegsT) (o o': RegsT)
 Notation regInit := (fun (o': RegT) (r: RegInitT)  => fst o' = fst r /\
                                                       exists (pf: projT1 (snd o') = projT1 (snd r)),
                                                         match projT2 (snd r) with
-                                                        | Uninit => True
-                                                        | Init x =>
+                                                        | None => True
+                                                        | Some x =>
                                                           match pf in _ = Y return _ Y with
                                                           | eq_refl => projT2 (snd o')
                                                           end = evalConstFullT x
-                                                        | RegFileUninit _ _ _ => True
-                                                        | RegFileInit num k pf2 val =>
-                                                          match pf in _ = Y return _ Y with
-                                                          | eq_refl => projT2 (snd o')
-                                                          end = evalConstFullT match eq_sym pf2 in _ = Y return ConstFullT Y with
-                                                                               | eq_refl => SyntaxConst (ConstArray (fun _ => val))
-                                                                               end
-                                                        | RegFileHex _ _ _ _ => True
-                                                        | RegFileBin _ _ _ _ => True
                                                         end).
 
 
@@ -2687,15 +2628,15 @@ Definition makeModule (im : InModule) :=
 Definition makeConst k (c: ConstT k): ConstFullT (SyntaxKind k) := SyntaxConst c.
 
 Notation "'RegisterN' name : type <- init" :=
-  (MERegister (name%string, existT RegInitValT type (Init init)))
+  (MERegister (name%string, existT RegInitValT type (Some (init)%kami_init)))
     (at level 12, name at level 99) : kami_scope.
 
 Notation "'Register' name : type <- init" :=
-  (MERegister (name%string, existT RegInitValT (SyntaxKind type) (Init (makeConst init))))
+  (MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst (init)%kami_init))))
     (at level 12, name at level 99) : kami_scope.
 
 Notation "'RegisterU' name : type" :=
-  (MERegister (name%string, existT RegInitValT (SyntaxKind type) (Uninit _)))
+  (MERegister (name%string, existT RegInitValT (SyntaxKind type) None))
     (at level 12, name at level 99) : kami_scope.
 
 Section Positive.
@@ -2757,7 +2698,7 @@ Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) i
 Notation "'RegisterVec' name 'using' nums : type <- init" :=
   (MERegAry (
     map (fun idx =>
-      (AddIndexToName name idx, existT RegInitValT (SyntaxKind type) (Init (makeConst init)))
+      (AddIndexToName name idx, existT RegInitValT (SyntaxKind type) (Some (makeConst (init)%kami_init)))
     ) nums
   ))
     (at level 12, name at level 9, nums at level 9) : kami_scope.
@@ -2818,6 +2759,15 @@ Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
     (only parsing).
 
 (* Infix "++" := ConcatMod: kami_scope. *)
+
+Notation "'ARRAY' { x1 ; .. ; xn }" :=
+  (ConstArray (Vector.nth (Vector.cons _ x1%kami_init _ .. (Vector.cons _ xn%kami_init _ (Vector.nil _)) ..)))
+  : kami_init_scope.
+
+Notation "'ARRAY' { x1 ; .. ; xn }" :=
+  (BuildArray (Vector.nth (Vector.cons _ x1%kami_init _ .. (Vector.cons _ xn%kami_init _ (Vector.nil _)) ..)))
+  : kami_expr_scope.
+
 
 Section tests.
   Variable a : string.

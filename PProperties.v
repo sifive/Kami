@@ -1012,19 +1012,10 @@ Lemma Forall2_RegInit_keymatch x :
          fst o'0 = fst r /\
          (exists pf : projT1 (snd o'0) = projT1 (snd r),
              match projT2 (snd r) with
-             | Uninit => True
-             | Init x0 => match pf in (_ = Y) return (fullType type Y) with
+             | None => True
+             | Some x0 => match pf in (_ = Y) return (fullType type Y) with
                           | eq_refl => projT2 (snd o'0)
                           end = evalConstFullT x0
-             | RegFileUninit _ _ _ => True
-             | RegFileInit num k pf2 val =>
-               match pf in _ = Y return _ Y with
-               | eq_refl => projT2 (snd o'0)
-               end = evalConstFullT match eq_sym pf2 in _ = Y return ConstFullT Y with
-                                    | eq_refl => SyntaxConst (ConstArray (fun _ => val))
-                                    end
-             | RegFileHex _ _ _ _ => True
-             | RegFileBin _ _ _ _ => True
              end)) x l ->
     map fst x = map fst l.
 Proof.
