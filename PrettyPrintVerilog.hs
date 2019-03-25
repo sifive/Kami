@@ -240,7 +240,7 @@ ppRtlExpr who e =
 ppRfInstance :: T.RtlRegFileBase -> String
 ppRfInstance (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum dataType init)) =
   "  " ++ ppName name ++ " " ++
-  ppName name ++ "$inst(.CLK(CLK), .RESET(RESET), " ++
+  ppName name ++ "$_inst(.CLK(CLK), .RESET(RESET), " ++
   (case reads of
      T.RtlAsync readLs ->
        concatMap (\(read, _) ->
