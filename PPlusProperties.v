@@ -3788,7 +3788,7 @@ Section flatten_and_inline_all.
       right; assumption.
   Qed.
   
-  Lemma TraceInclusion_createHide m m' s:
+  Lemma TraceInclusion'_HideMeth m m' s:
     TraceInclusion' m m' ->
     TraceInclusion' (HideMeth m s) (HideMeth m' s).
   Proof.
@@ -3841,6 +3841,22 @@ Section flatten_and_inline_all.
         Omega.omega.
       + rewrite H10, P1 in H6; clear - H6; Omega.omega.
   Qed.
+
+  Corollary TraceInclusion_HideMeth m m' s:
+    TraceInclusion m m' ->
+    TraceInclusion (HideMeth m s) (HideMeth m' s).
+  Proof.
+    intros.
+    apply TraceInclusion'_TraceInclusion.
+    apply TraceInclusion_TraceInclusion' in H.
+    eauto using TraceInclusion'_HideMeth.
+  Qed.
+
+  Lemma TraceInclusion'_TraceInclusion_iff m m' :
+    TraceInclusion m m' <-> TraceInclusion' m m'.
+  Proof.
+    split; intros; eauto using TraceInclusion'_TraceInclusion, TraceInclusion_TraceInclusion'.
+  Qed.
   
   Lemma Trace_createHide l m m' :
     TraceInclusion (Base m) (Base m') ->
@@ -3850,7 +3866,7 @@ Section flatten_and_inline_all.
     intros.
     apply TraceInclusion_TraceInclusion' in H.
     apply TraceInclusion'_TraceInclusion.
-    apply TraceInclusion_createHide.
+    apply TraceInclusion'_HideMeth.
     apply TraceInclusion_TraceInclusion'; apply TraceInclusion'_TraceInclusion in H; auto.
   Qed.
 
@@ -4729,7 +4745,7 @@ Proof.
   - specialize (removeMeth_removeHides_TraceInclusion (m:=m) (l:=l) (a:=a)) as P1.
     assert (SubList l (map fst (getMethods m))) as P2;[repeat intro; apply (subList x (in_cons a _ _ H0))|].
     specialize (TraceInclusion_TraceInclusion' (IHl P2 H)) as P3.
-    specialize (TraceInclusion'_TraceInclusion (TraceInclusion_createHide P3 (s:=a))) as P4; clear P3.
+    specialize (TraceInclusion'_TraceInclusion (TraceInclusion'_HideMeth P3 (s:=a))) as P4; clear P3.
     destruct (in_dec string_dec a l).
     + specialize (createHide_idempotent m _ _ i) as P5.
       simpl in P1.
@@ -4760,7 +4776,7 @@ Proof.
     apply P1.
   - specialize (SubList_cons subList) as P0; inv P0.
     specialize (TraceInclusion_TraceInclusion' (IHl H1 H)) as P1.
-    specialize (TraceInclusion'_TraceInclusion (TraceInclusion_createHide P1 (s:= a))) as P2; clear P1.
+    specialize (TraceInclusion'_TraceInclusion (TraceInclusion'_HideMeth P1 (s:= a))) as P2; clear P1.
     specialize (HideMeth_removeMeth_TraceInclusion (removeHides_ModWf m l) (f:=a) (NoSelfCallBaseModule_removeHides l H)) as P1.
     specialize (removeHides_removeMeth_TraceInclusion) as P3; specialize (P3 m l a).
     eauto using TraceInclusion_trans.
@@ -6315,33 +6331,6 @@ Proof.
   eauto using flatten_inline_remove_TraceInclusion.
 Qed.
 
-Definition hidden_by (meths : list DefMethT) (h : string) : bool :=
-  (getBool (in_dec string_dec h (map fst meths))).
-
-Definition getAllBaseMethods (lb : list BaseModule) : (list DefMethT) :=
-  (concat (map getMethods lb)).
-
-(*Definition getAllRfMethods (lrf : list RegFileBase) : (list DefMethT) :=
-  (concat (map getRegFileMethods lrf)).
-
-Definition hidden_by_regFiles (lrf : list RegFileBase) (h : string) : bool :=
-  (hidden_by (getAllRfMethods lrf) h).*)
-
-Definition hidden_by_Base (lb : list BaseModule) (h : string) : bool :=
-  (hidden_by (getAllBaseMethods lb) h).
-
-Definition separateHides (tl : list string * (list RegFileBase * list BaseModule)) :
-  (list string * list string) :=
-  (filter (hidden_by_Base (map BaseRegFile (fst (snd tl)))) (fst tl), filter (complement (hidden_by_Base (map BaseRegFile (fst (snd tl))))) (fst tl)).
-
-Definition separateModHides (m: Mod) :=
-  let '(hides, (rfs, mods)) := separateMod m in
-  let '(hidesRf, hidesBm) := separateHides (hides, (rfs, mods)) in
-  (hidesRf, (rfs, flatten_inline_remove (createHideMod (mergeSeparatedBaseMod mods) hidesBm))).
-
-Definition defined_hide (m : Mod) (h : string) : bool :=
-  (getBool (in_dec string_dec h (map fst (getAllMethods m)))).
-
 Lemma distributeHideWf (m1 m2 : Mod) (h : string) (HNeverCall : NeverCallMod m1):
   WfMod (HideMeth (ConcatMod m1 m2) h) ->
   ~ In h (map fst (getAllMethods m1)) ->
@@ -6545,7 +6534,7 @@ Proof.
                rewrite in_app_iff; right; assumption.
 Qed.
 
-Lemma distributeHidesWf1 (m1 m2 : Mod) (hl1 hl2 : list string)
+Lemma distributeHidesWf (m1 m2 : Mod) (hl1 hl2 : list string)
       (HNeverCall : NeverCallMod m1):
   WfMod (createHideMod (ConcatMod m1 m2) (hl1++hl2)) ->
   (forall h, In h hl1 -> ~ In h (map fst (getAllMethods m1))) ->
@@ -6697,7 +6686,7 @@ Proof.
       [intros; apply (H _ (or_intror H0))|].
     specialize (IHhl P0).
     apply TraceInclusion_TraceInclusion' in IHhl.
-    specialize (TraceInclusion_createHide (s:=a) IHhl) as P1.
+    specialize (TraceInclusion'_HideMeth (s:=a) IHhl) as P1.
     apply TraceInclusion'_TraceInclusion in P1.
     specialize (H a (or_introl eq_refl)).
     specialize (distributeHide_TraceInclusion HNeverCall H (m2:=(createHideMod m2 hl))) as P2.
@@ -6711,7 +6700,7 @@ Proof.
   induction 1.
   - apply TraceInclusion_refl.
   - simpl.
-    apply TraceInclusion'_TraceInclusion, TraceInclusion_createHide,
+    apply TraceInclusion'_TraceInclusion, TraceInclusion'_HideMeth,
     TraceInclusion_TraceInclusion'; assumption.
   - simpl.
     apply TraceInclusion'_TraceInclusion, StrongTI'_TI'.
@@ -6738,7 +6727,7 @@ Proof.
   induction hl2; simpl; [rewrite app_nil_r|].
   - apply distributeHides_TraceInclusion; auto.
   - apply TraceInclusion_TraceInclusion' in IHhl2.
-    specialize (TraceInclusion_createHide (s:=a) IHhl2) as P1.
+    specialize (TraceInclusion'_HideMeth (s:=a) IHhl2) as P1.
     specialize (createHides_perm_TraceInclusion
                   (ConcatMod m1 m2)
                   (Permutation_sym (Permutation_middle hl1 hl2 a))) as P2;
@@ -6746,3 +6735,279 @@ Proof.
     apply TraceInclusion'_TraceInclusion in P1.
     eauto using TraceInclusion_trans.
 Qed.
+
+Lemma factorHideWf (m1 m2 : Mod) (h : string) (HNeverCall : NeverCallMod m1):
+  WfMod (ConcatMod m1 (HideMeth m2 h)) ->
+  WfMod (HideMeth (ConcatMod m1 m2) h) /\
+  ~ In h (map fst (getAllMethods m1)).
+Proof.
+  intros.
+  inv H.
+  split.
+  - constructor; simpl; inv HWf2.
+    + rewrite map_app, in_app_iff.
+      right; assumption.
+    + constructor; auto.
+      clear - WfConcat1 HNeverCall.
+      inv WfConcat1; constructor; intros.
+      * induction HNeverCall; simpl in *; eauto.
+        -- inv HNCBaseModule.
+           specialize (H _ H1).
+           specialize (H2 _ H1).
+           clear - H H2.
+           induction H; inv H2; EqDep_subst; econstructor; eauto.
+           tauto.
+        -- rewrite in_app_iff in *.
+           destruct H1.
+           ++ apply IHHNeverCall1; intros; eauto;
+                [eapply H| eapply H0];rewrite in_app_iff; left; assumption.
+           ++ apply IHHNeverCall2; intros; eauto;
+                [eapply H| eapply H0];rewrite in_app_iff; right; assumption.
+      * induction HNeverCall; simpl in *; eauto.
+        -- inv HNCBaseModule.
+           specialize (H0 _ H1 v).
+           specialize (H3 _ H1 v).
+           clear - H0 H3.
+           induction H0; inv H3; EqDep_subst; econstructor; eauto.
+           tauto.
+        -- rewrite in_app_iff in *.
+           destruct H1.
+           ++ apply IHHNeverCall1; intros; eauto;
+                [eapply H| eapply H0];rewrite in_app_iff; left; assumption.
+           ++ apply IHHNeverCall2; intros; eauto;
+                [eapply H| eapply H0];rewrite in_app_iff; right; assumption.
+  - intro.
+    inv HWf2.
+    simpl in *.
+    clear - HDisjMeths H HHideWf.
+    specialize (HDisjMeths h); firstorder.
+Qed.
+
+Lemma factorHidesWf (m1 m2 : Mod) (hl1 hl2: list string)
+      (HNeverCall : NeverCallMod m1):
+  WfMod (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2) ->
+  WfMod (createHideMod (ConcatMod m1 m2) (hl1++hl2)) /\
+  (forall h, In h hl1 -> ~ In h (map fst (getAllMethods m1))).
+Proof.
+  induction hl1; simpl in *; auto.
+  intros.
+  rewrite WfMod_createHideMod in H; dest; split; intros;[constructor|].
+  - rewrite getAllMethods_createHideMod; simpl in *.
+    rewrite map_app, in_app_iff, getAllMethods_createHideMod in *.
+    inv H0; inv HWf2.
+    rewrite getAllMethods_createHideMod in *.
+    right; assumption.
+  - specialize (factorHideWf HNeverCall H0) as P0; dest.
+    eapply IHhl1.
+    rewrite WfMod_createHideMod; split; auto.
+    inv H1; assumption.
+  - destruct H1; subst.
+    + inv H0; inv HWf2.
+      rewrite getAllMethods_createHideMod in *.
+      specialize (HDisjMeths h); simpl in *; rewrite getAllMethods_createHideMod in *.
+      clear - HHideWf HDisjMeths; firstorder.
+    + eapply IHhl1; auto.
+      rewrite WfMod_createHideMod; split; auto.
+      specialize (factorHideWf HNeverCall H0) as P0; dest.
+      inv H2; assumption.
+Qed.
+
+Lemma factorHide_TraceInclusion (m1 m2 : Mod) (h : string)
+      (HNeverCall : NeverCallMod m1):
+  ~In h (map fst (getAllMethods m1)) ->
+  TraceInclusion (ConcatMod m1 (HideMeth m2 h) ) (HideMeth (ConcatMod m1 m2) h).
+Proof.
+  intros.
+  apply TraceInclusion'_TraceInclusion, StrongTI'_TI'.
+  repeat intro.
+  induction H0; subst; simpl in *.
+  - exists nil; split;[econstructor; eauto|apply WeakInclusionsRefl].
+  - dest.
+    exists (l::x); split.
+    + econstructor 2; eauto.
+      econstructor 2; inv HStep.
+      * inv HStep2.
+        econstructor 3; eauto.
+        clear - HMatching1 HNeverCall.
+        unfold MatchingExecCalls_Concat in *.
+        intros; simpl in *; split;[|eapply HMatching1; eauto].
+        specialize (HMatching1 _ H H0); dest.
+        apply Decidable.not_or in H1; dest; assumption.
+      * intros; inv HStep2.
+        unfold MatchingExecCalls_Concat, getListFullLabel_diff in *; simpl in *.
+        rewrite map_app, in_app_iff in *; destruct H3;[tauto|specialize (HHidden H3 v)].
+        rewrite getNumExecs_app, getNumCalls_app.
+        specialize (Step_NeverCall_getNumCalls_0 HNeverCall HStep1 (h, v)) as P0.
+        specialize (NotInDef_ZeroExecs_Step (h, v) H HStep1) as P1.
+        clear - HHidden P0 P1; omega.
+    + constructor;[assumption |apply WeakInclusionRefl].
+Qed.
+
+Lemma factorHides_TraceInclusion1 (m1 m2 : Mod) (hl : list string)
+      (HNeverCall : NeverCallMod m1):
+  (forall h, In h hl -> ~In h (map fst (getAllMethods m1))) ->
+  TraceInclusion (ConcatMod m1 (createHideMod m2 hl))
+                 (createHideMod (ConcatMod m1 m2) hl).
+Proof.
+  induction hl; simpl; intros.
+  - apply TraceInclusion_refl.
+  - assert (forall h : string, In h hl -> ~ In h (map fst (getAllMethods m1))) as TMP.
+    {intros; eapply H; right; assumption. }
+    specialize (IHhl TMP); clear TMP.
+    specialize (TraceInclusion_HideMeth IHhl (s:=a)) as P1.
+    specialize (factorHide_TraceInclusion (m2:=createHideMod m2 hl)
+                                          HNeverCall (H _ (or_introl eq_refl))) as P2.
+    eauto using TraceInclusion_trans.
+Qed.
+
+Lemma factorHides_TraceInclusion_app (m1 m2 : Mod) (hl1 hl2 : list string)
+      (HNeverCall : NeverCallMod m1):
+  (forall h, In h hl1 -> ~In h (map fst (getAllMethods m1))) ->
+  TraceInclusion (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2)
+                 (createHideMod (ConcatMod m1 m2) (hl1++hl2)).
+Proof.
+  induction hl2; simpl;[rewrite app_nil_r|].
+  - intros.
+    apply factorHides_TraceInclusion1; auto.
+  - intros; specialize (TraceInclusion_HideMeth (IHhl2 H) (s:=a)) as P0.
+    specialize (createHides_perm_TraceInclusion
+                  (ConcatMod m1 m2) (Permutation_middle hl1 hl2 a)) as P1.
+    simpl in *.
+    eauto using TraceInclusion_trans.
+Qed.
+
+Lemma removeMeth_neg (m : BaseModule) (f g : string):
+  g <> f ->
+  In f (map fst (getMethods m)) ->
+  In f (map fst (getMethods (removeMeth m g))).
+Proof.
+  intros.
+  simpl in *.
+  rewrite in_map_iff in *; dest.
+  exists x; split; subst; auto.
+  rewrite filter_In; split; auto.
+  destruct string_dec; simpl in *; auto.
+Qed.
+
+Lemma removeHides_neg (m : BaseModule) (l : list string):
+  forall f, In f (map fst (getMethods m)) /\ ~ In f l ->
+            In f (map fst (getMethods (removeHides m l))).
+Proof.
+  intros; dest.
+  induction l.
+  - simpl in *; rewrite (filter_true_list); auto.
+  - rewrite removeMeth_removeHides_cons.
+    simpl in H0; apply Decidable.not_or in H0; dest.
+    apply removeMeth_neg; eauto.
+Qed.
+
+Lemma removeMeth_notIn (m : BaseModule) (f g : string) :
+  In f (map fst (getMethods (removeMeth m g))) ->
+  In f (map fst (getMethods m)) /\
+  g <> f.
+Proof.
+  intros.
+  simpl in *.
+  rewrite in_map_iff in *; dest.
+  split;[exists x; split|]; auto; rewrite filter_In in *; dest; auto.
+  destruct string_dec; simpl in *; [discriminate|subst; assumption].
+Qed.
+
+Lemma removeHides_notIn (m : BaseModule) (l : list string):
+  forall f, In f (map fst (getMethods (removeHides m l))) ->
+            In f (map fst (getMethods m)) /\ ~ In f l.
+Proof.
+  intros; split; auto; induction l; auto.
+  - simpl in H; rewrite in_map_iff in *; dest.
+    rewrite filter_true_list in H0; auto.
+    exists x; split; auto.
+  - rewrite removeMeth_removeHides_cons in H.
+    apply removeMeth_notIn in H; dest; auto.
+  - rewrite removeMeth_removeHides_cons in H.
+    apply removeMeth_notIn in H; dest.
+    intro; inv H1; auto.
+    apply IHl; assumption.
+Qed.
+
+Definition hidden_by (meths : list DefMethT) (h : string) : bool :=
+  (getBool (in_dec string_dec h (map fst meths))).
+
+Definition getAllBaseMethods (lb : list BaseModule) : (list DefMethT) :=
+  (concat (map getMethods lb)).
+
+Definition hidden_by_Base (lb : list BaseModule) (h : string) : bool :=
+  (hidden_by (getAllBaseMethods lb) h).
+
+Definition separateHides (tl : list string * (list RegFileBase * list BaseModule)) :
+  (list string * list string) :=
+  (filter (hidden_by_Base (map BaseRegFile (fst (snd tl)))) (fst tl), filter (complement (hidden_by_Base (map BaseRegFile (fst (snd tl))))) (fst tl)).
+
+Definition separateModHides (m: Mod) :=
+  let '(hides, (rfs, mods)) := separateMod m in
+  let '(hidesRf, hidesBm) := separateHides (hides, (rfs, mods)) in
+  (hidesRf, (rfs, flatten_inline_remove (createHideMod (mergeSeparatedBaseMod mods) hidesBm))).
+
+Definition defined_hide (m : Mod) (h : string) : bool :=
+  (getBool (in_dec string_dec h (map fst (getAllMethods m)))).
+
+Lemma createHideMod_createHide_BaseModule (m : BaseModule) (l : list string) :
+  (createHide m l) = (createHideMod m l).
+Proof.
+  induction l; simpl in *; auto.
+  rewrite IHl; reflexivity.
+Qed.
+
+Lemma Concat_removeHide (m1 : Mod) {m2 : BaseModule} (l : list string) (NoSelfCall : NoSelfCallBaseModule m2):
+  WfMod (ConcatMod m1 (createHideMod m2 l)) ->
+  TraceInclusion (ConcatMod m1 (createHideMod m2 l)) (ConcatMod m1 (removeHides m2 l)).
+Proof.
+  intros.
+  apply _ModularSubstitution; auto.
+  - intros; apply iff_refl.
+  - intros; split; intros; split; dest; auto.
+    + apply removeHides_neg; split.
+      * rewrite getAllMethods_createHideMod in *; assumption.
+      * rewrite getHidden_createHideMod, in_app_iff in *; apply Decidable.not_or in H1;
+          dest; assumption.
+    + specialize (removeHides_notIn _ _ _ H0) as P0; dest.
+      rewrite getAllMethods_createHideMod; assumption.
+    + specialize (removeHides_notIn _ _ _ H0) as P0; dest.
+      rewrite getHidden_createHideMod, in_app_iff; simpl in *.
+      intro; apply H3; destruct H4;[auto|tauto].
+  - inv H; constructor; simpl in *; auto.
+    + rewrite getAllRegisters_createHideMod in *; assumption.
+    + rewrite getAllRules_createHideMod in *; assumption.
+    + repeat intro; specialize (HDisjMeths k).
+      destruct HDisjMeths; auto.
+      right; intro; apply H.
+      rewrite in_map_iff in *; dest; rewrite filter_In in *; dest.
+      exists x; split; auto; rewrite getAllMethods_createHideMod.
+      assumption.
+    + constructor; apply removeHidesWf.
+      rewrite WfMod_createHideMod in HWf2; dest; inv H0.
+      assumption.
+    + inv WfConcat1; constructor.
+      * intros; specialize (H _ H1).
+        clear - H.
+        induction H; econstructor; eauto.
+      * intros; specialize (H0 _ H1 v).
+        clear - H0.
+        induction H0; econstructor; eauto.
+    + inv WfConcat2; constructor.
+      * intros; simpl in *.
+        rewrite getAllRules_createHideMod in *.
+        specialize (H _ H1); assumption.
+      * intros; simpl in *.
+        rewrite filter_In in *; dest.
+        rewrite getAllMethods_createHideMod in *.
+        specialize (H0 _ H1 v); assumption.
+  - apply TraceInclusion_refl.
+  - inv H.
+    rewrite WfMod_createHideMod in *; dest.
+    inv H0.
+    specialize (createHide_removeHides_TraceInclusion (Build_BaseModuleWf HWfBaseModule)) as P0.
+    simpl in *.
+    rewrite <- createHideMod_createHide_BaseModule.
+    apply P0; auto.
+Qed.
+      
