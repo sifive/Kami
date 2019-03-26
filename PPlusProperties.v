@@ -7117,27 +7117,33 @@ Proof.
 Qed.
 
 Lemma RegFileBase_noCalls (rf : RegFileBase) :
-  NeverCallMod rf.
+  NeverCallMod (BaseRegFile rf).
 Proof.
   constructor; split; simpl; intros;[tauto|].
   unfold getRegFileMethods in *.
   destruct rf; simpl in *.
-  - rewrite in_map_iff in *.
-    destruct H; subst; simpl; dest; subst.
-    + repeat econstructor; eauto.
-    + repeat econstructor; eauto.
-  - rewrite in_map_iff in *.
-    destruct H; subst; simpl; dest; subst.
-    + repeat econstructor; eauto.
-    + repeat econstructor; eauto.
-  - destruct H; subst; simpl; dest; subst.
-    + repeat econstructor; eauto.
-    + destruct isAddr; rewrite in_app_iff in *; repeat rewrite in_map_iff in *;
-        destruct H; dest; subst; repeat econstructor; eauto.
-  - destruct H; subst; simpl; dest; subst.
-    + repeat econstructor; eauto.
-    + destruct isAddr; rewrite in_app_iff in *; repeat rewrite in_map_iff in *;
-        destruct H; dest; subst; repeat econstructor; eauto.
+  destruct H; subst; simpl in *.
+  - destruct rfIsWrMask; repeat econstructor; eauto.
+  - destruct rfRead; induction reads; simpl in *.
+    + tauto.
+    + destruct H; subst.
+      * repeat econstructor.
+      * eauto.
+    + unfold readSyncRegFile in *.
+      destruct isAddr; simpl in *;tauto.
+    + unfold readSyncRegFile in *; simpl in *.
+      destruct isAddr.
+      * simpl in H; destruct H; subst.
+        -- repeat econstructor.
+        -- repeat rewrite in_app_iff in *.
+           destruct H.
+           ++ apply IHreads; auto.
+           ++ inv H; [repeat econstructor| eauto].
+      * inv H.
+        -- repeat econstructor.
+        -- rewrite in_app_iff in *.
+           destruct H0; eauto.
+           inv H;[repeat econstructor|eauto].
 Qed.
 
 Corollary mergeFile_noCalls (rfl : list RegFileBase) :
