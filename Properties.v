@@ -90,7 +90,6 @@ Section InverseSemAction.
     | WriteReg r k e a =>
       exists pnews,
       In (r, k) (getKindAttr o) /\
-      key_not_In r pnews /\
       SemAction o a reads pnews calls retC /\
       news = (r, (existT _ _ (evalExpr e))) :: pnews
     | IfElse p _ aT aF c =>
@@ -4515,7 +4514,6 @@ Proof.
   - apply NoDup_app; auto.
   - simpl.
     constructor; auto.
-    unfold key_not_In in *.
     intro.
     rewrite in_map_iff in H0; dest.
     destruct x; simpl in *; subst.
@@ -5155,7 +5153,7 @@ Ltac discharge_SemAction :=
          | |- if ?P then SemAction _ _ _ _ _ _ else SemAction _ _ _ _ _ _ => case_eq P; let H := fresh in intros H; rewrite ?H in *; try discriminate
          | |- SemAction _ (convertLetExprSyntax_ActionT _) _ _ _ _ => eapply convertLetExprSyntax_ActionT_same
          | |- SemAction _ _ _ _ _ _ => econstructor
-         end; rewrite ?key_not_In_fst in *; simpl in *; try tauto; simpl in *; unfold not; intros; rewrite ?DisjKeyWeak_same by apply string_dec;
+         end; simpl in *; try tauto; simpl in *; unfold not; intros; rewrite ?DisjKeyWeak_same by apply string_dec;
   unfold DisjKeyWeak; intros; simpl in *;
   repeat match goal with
          | H: _ \/ _ |- _ => destruct H; discharge_appendage
