@@ -492,7 +492,7 @@ ppTopModule :: T.RtlModule -> String
 ppTopModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
   concatMap ppRfModule regFs ++
   ppRtlModule m ++
-  "module top(\n" ++
+  "module system(\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  input " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) insFiltered ++ "\n" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  output " ++ ppDeclType (ppPrintVar nm) ty ++ ",\n")) outsFiltered ++ "\n" ++
   "  input CLK,\n" ++
