@@ -1656,7 +1656,14 @@ Definition separateModHides (m: Mod) :=
   let '(hidesRf, hidesBm) := separateHides (hides, (rfs, mods)) in
   (hidesRf, (rfs, createHide (inlineAll_All_mod (mergeSeparatedBaseMod mods)) hidesBm)).
 
+Definition separateModRemove (m : Mod) :=
+  let '(hides, (rfs, mods)) := separateMod m in
+  let '(hidesRf, hidesBm) := separateHides (hides, (rfs, mods)) in
+  (hidesRf, (rfs, removeHides (inlineAll_All_mod (mergeSeparatedBaseMod mods)) hidesBm)).
 
+Definition baseNoSelfCalls (m : Mod) :=
+  let '(hides, (rfs, mods)) := separateMod m in
+  NoSelfCallBaseModule (inlineAll_All_mod (mergeSeparatedBaseMod mods)).
 
 
 
