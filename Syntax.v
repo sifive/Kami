@@ -3,7 +3,7 @@ Require Export bbv.Word Lib.VectorFacts Lib.EclecticLib.
 
 Export Word.Notations.
 
-Require Import Permutation.
+Require Import Permutation RecordUpdate.RecordSet.
 Require Import ZArith.
 Import ListNotations.
 
@@ -346,9 +346,7 @@ Section Phoas.
   | DispString: string -> SysT
   | DispBool: Expr (SyntaxKind Bool) -> FullBitFormat -> SysT
   | DispBit: forall n, Expr (SyntaxKind (Bit n)) -> FullBitFormat -> SysT
-  | DispStruct: forall n fk fs, Expr (SyntaxKind (@Struct n fk fs)) ->
-                                  (Fin.t n -> FullBitFormat)
-                                  -> SysT
+  | DispStruct: forall n fk fs, Expr (SyntaxKind (@Struct n fk fs)) -> (Fin.t n -> FullBitFormat) -> SysT
   | DispArray: forall n k, Expr (SyntaxKind (Array n k)) -> FullBitFormat -> SysT
   | Finish: SysT.
   
@@ -379,7 +377,6 @@ Section Phoas.
     end.
 End Phoas.
 
-
 Definition Action (retTy : Kind) := forall ty, ActionT ty retTy.
 
 Definition Signature := (Kind * Kind)%type.
@@ -388,15 +385,10 @@ Definition MethodT (sig : Signature) := forall ty, ty (fst sig) -> ActionT ty (s
 Notation Void := (Bit 0).
 
 Notation Attribute A := (string * A)%type (only parsing).
+
 Section RegInitValT.
   Variable x: FullKind.
   Definition RegInitValT := option (ConstFullT x).
-  (* | Uninit *)
-  (* | Init (c: ConstFullT x) *)
-  (* | RegFileUninit num k (pf: x = SyntaxKind (Array num k)) *)
-  (* | RegFileInit num k (pf: x = SyntaxKind (Array num k)) (val: ConstT k) *)
-  (* | RegFileHex num k (pf: x = SyntaxKind (Array num k)) (file: string) *)
-  (* | RegFileBin num k (pf: x = SyntaxKind (Array num k)) (file: string). *)
 End RegInitValT.
 
 Definition RegInitT := Attribute (sigT RegInitValT).
@@ -437,10 +429,6 @@ Coercion Base: BaseModule >-> Mod.
 
 Notation getKindAttr ls := (map (fun x => (fst x, projT1 (snd x))) ls).
 
-Notation "l '[=]' r" :=
-  ((@Permutation _ (l) (r)))
-    (at level 70, no associativity).
-
 Definition getRegFileRegisters m :=
   match m with
   | @Build_RegFileBase isWrMask num dataArray readers write IdxNum Data init =>
@@ -455,7 +443,8 @@ Definition getRegFileRegisters m :=
                                | Async _ => nil
                                | Sync isAddr read =>
                                  if isAddr
-                                 then map (fun x => (readRegName x, existT RegInitValT (SyntaxKind (Bit (Nat.log2_up IdxNum))) None)) read
+                                 then map (fun x => (readRegName x, existT RegInitValT (SyntaxKind (Bit (Nat.log2_up IdxNum)))
+                                                                           None)) read
                                  else map (fun x => (readRegName x, existT RegInitValT (SyntaxKind (Array num Data)) None)) read
                                end
   end.
@@ -485,38 +474,6 @@ Notation getStruct ls :=
 Notation "'STRUCT' { s1 ; .. ; sN }" :=
   (getStruct (Vector.cons _ s1%kami_struct _ .. (Vector.cons _ sN%kami_struct _ (Vector.nil _)) ..)).
 
-Notation "name ::= value" :=
-  (existT (fun a : Attribute Kind => Expr _ (SyntaxKind (snd a)))
-          (name%string, _) value) (at level 50) : kami_struct_init_scope.
-Delimit Scope kami_struct_init_scope with struct_init.
-
-Notation getStructVal ls :=
-  (BuildStruct (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
-               (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j))
-               (fun k => Vector_nth_map2_r (@projT1 _ _) (fun x => Expr _ (SyntaxKind (snd x))) ls k (projT2 (Vector.nth ls k)))).
-
-Notation "'STRUCT' { s1 ; .. ; sN }" :=
-  (getStructVal (Vector.cons _ s1%struct_init _ ..
-                             (Vector.cons _ sN%struct_init _ (Vector.nil _)) ..))
-  : kami_expr_scope.
-
-Notation "name ::= value" :=
-  (existT (fun a : Attribute Kind => ConstT (snd a))
-          (name%string, _) value) (at level 50) : kami_struct_initial_scope.
-Delimit Scope kami_struct_initial_scope with struct_initial.
-
-Notation getStructConst ls :=
-  (ConstStruct (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
-               (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j))
-               (fun k => Vector_nth_map2_r (@projT1 _ _) (fun x => ConstT (snd x)) ls k (projT2 (Vector.nth ls k)))).
-
-Notation "'STRUCT' { s1 ; .. ; sN }" :=
-  (getStructConst (Vector.cons _ s1%struct_initial _ ..
-                               (Vector.cons _ sN%struct_initial _ (Vector.nil _)) ..))
-  : kami_init_scope.
-Delimit Scope kami_init_scope with kami_init.
-
-
 Definition WriteRq IdxNum Data := STRUCT { "addr" :: Bit (Nat.log2_up IdxNum) ;
                                            "data" :: Data }.
 
@@ -541,7 +498,9 @@ Definition updateNumDataArray num dataArray IdxNum Data ty (idxData: ty (WriteRq
                       (fold_left (fun newArr i =>
                                     (UpdateArray newArr
                                                  (CABit Add (ReadStruct (Var ty (SyntaxKind _) idxData)
-                                                                        Fin.F1 :: Const ty (natToWord _ (proj1_sig (Fin.to_nat i))) :: nil))
+                                                                        Fin.F1 ::
+                                                                        Const ty (natToWord _ (proj1_sig (Fin.to_nat i))) ::
+                                                                        nil))
                                                  (ReadArrayConst (ReadStruct (Var ty (SyntaxKind _) idxData)
                                                                              (Fin.FS Fin.F1)) i))) (getFins num)
                                  (Var ty (SyntaxKind (Array IdxNum Data)) val))
@@ -556,8 +515,10 @@ Definition updateNumDataArrayMask num dataArray IdxNum Data ty (idxData: ty (Wri
                                     ITE
                                       (ReadArrayConst (ReadStruct (Var ty (SyntaxKind _) idxData) (Fin.FS (Fin.FS Fin.F1))) i)
                                       (UpdateArray newArr
-                                                   (CABit Add (ReadStruct (Var ty (SyntaxKind _) idxData)
-                                                                          Fin.F1 :: Const ty (natToWord _ (proj1_sig (Fin.to_nat i))) :: nil))
+                                                   (CABit Add (ReadStruct
+                                                                 (Var ty (SyntaxKind _) idxData)
+                                                                 Fin.F1 :: Const ty (natToWord _ (proj1_sig (Fin.to_nat i))) ::
+                                                                 nil))
                                                    (ReadArrayConst (ReadStruct (Var ty (SyntaxKind _) idxData)
                                                                                (Fin.FS Fin.F1)) i))
                                       newArr
@@ -674,9 +635,12 @@ Section WfBaseMod.
   | WfLetExpr k (e: Expr type k) lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (LetExpr e c)
   | WfLetAction k (a: ActionT type k) lretT c: WfActionT a -> (forall v, WfActionT (c v)) -> @WfActionT lretT (LetAction a c)
   | WfReadNondet k lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (ReadNondet k c)
-  | WfReadReg r k lretT c: (forall v, WfActionT (c v)) -> In (r, k) (getKindAttr (getRegisters m)) -> @WfActionT lretT (ReadReg r k c)
-  | WfWriteReg r k (e: Expr type k) lretT c: WfActionT c  -> In (r, k) (getKindAttr (getRegisters m)) -> @WfActionT lretT (WriteReg r e c)
-  | WfIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, WfActionT (c v)) -> WfActionT atrue -> WfActionT afalse -> @WfActionT lretT (IfElse p atrue afalse c)
+  | WfReadReg r k lretT c: (forall v, WfActionT (c v)) -> In (r, k) (getKindAttr (getRegisters m)) ->
+                           @WfActionT lretT (ReadReg r k c)
+  | WfWriteReg r k (e: Expr type k) lretT c: WfActionT c  -> In (r, k) (getKindAttr (getRegisters m)) ->
+                                             @WfActionT lretT (WriteReg r e c)
+  | WfIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, WfActionT (c v)) -> WfActionT atrue ->
+                                                         WfActionT afalse -> @WfActionT lretT (IfElse p atrue afalse c)
   | WfAssertion (e: Expr type (SyntaxKind Bool)) lretT c: WfActionT c -> @WfActionT lretT (Assertion e c)
   | WfSys ls lretT c: WfActionT c -> @WfActionT lretT (Sys ls c)
   | WfReturn lretT e: @WfActionT lretT (Return e).
@@ -693,14 +657,20 @@ Section WfBaseMod.
 End WfBaseMod.
 
 Inductive WfConcatActionT : forall lretT, ActionT type lretT -> Mod -> Prop :=
-| WfConcatMCall meth s e lretT c m' :(forall v, WfConcatActionT (c v) m') -> ~In meth (getHidden m') -> @WfConcatActionT lretT (MCall meth s e c) m'
-| WfConcatLetExpr k (e : Expr type k) lretT c m' : (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetExpr e c) m'
-| WfConcatLetAction k (a : ActionT type k) lretT c m' : WfConcatActionT a m' -> (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (LetAction a c) m'
+| WfConcatMCall meth s e lretT c m' :(forall v, WfConcatActionT (c v) m') -> ~In meth (getHidden m') ->
+                                     @WfConcatActionT lretT (MCall meth s e c) m'
+| WfConcatLetExpr k (e : Expr type k) lretT c m' : (forall v, WfConcatActionT (c v) m') ->
+                                                   @WfConcatActionT lretT (LetExpr e c) m'
+| WfConcatLetAction k (a : ActionT type k) lretT c m' : WfConcatActionT a m' -> (forall v, WfConcatActionT (c v) m') ->
+                                                        @WfConcatActionT lretT (LetAction a c) m'
 | WfConcatReadNondet k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadNondet k c) m'
 | WfConcatReadReg r k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadReg r k c) m'
 | WfConcatWriteReg r k (e: Expr type k) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (WriteReg r e c) m'
-| WfConcatIfElse p k (atrue: ActionT type k) afalse lretT c m': (forall v, WfConcatActionT (c v) m') -> WfConcatActionT atrue m' -> WfConcatActionT afalse m' -> @WfConcatActionT lretT (IfElse p atrue afalse c) m'
-| WfConcatAssertion (e: Expr type (SyntaxKind Bool)) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Assertion e c) m'
+| WfConcatIfElse p k (atrue: ActionT type k) afalse lretT c m': (forall v, WfConcatActionT (c v) m') ->
+                                                                WfConcatActionT atrue m' -> WfConcatActionT afalse m' ->
+                                                                @WfConcatActionT lretT (IfElse p atrue afalse c) m'
+| WfConcatAssertion (e: Expr type (SyntaxKind Bool)) lretT c m': WfConcatActionT c m' ->
+                                                                 @WfConcatActionT lretT (Assertion e c) m'
 | WfConcatSys ls lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Sys ls c) m'
 | WfConcatReturn lretT e m': @WfConcatActionT lretT (Return e) m'.
 
@@ -742,31 +712,6 @@ Definition getModWfOrd (m: BaseModuleWfOrd) :=
 Coercion getModWf: BaseModuleWf >-> ModWf.
 Coercion getModWfOrd: BaseModuleWfOrd >-> ModWfOrd.
 
-
-Ltac Struct_neq :=
-  match goal with
-  | |- Struct _ _ <> Struct _ _ =>
-    let H := fresh in intro H;
-                      injection H;
-                      intros;
-                      repeat (existT_destruct Nat.eq_dec)
-  end.
-
-Ltac discharge_wf :=
-  repeat match goal with
-         | |- @WfMod _ => constructor_simpl
-         | |- @WfConcat _ _ => constructor_simpl
-         | |- _ /\ _ => constructor_simpl
-         | |- @WfConcatActionT _ _ _ => constructor_simpl
-         | |- @WfBaseModule _ => constructor_simpl
-         | |- @WfActionT _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
-         | |- @WfActionT _ _ _ => constructor_simpl
-         | |- NoDup _ => constructor_simpl
-         | H: _ \/ _ |- _ => destruct H; subst; simpl
-         end; repeat (discharge_DisjKey || tauto || congruence);
-  try (discharge_DisjKey || tauto || congruence).
-
-
 Section NoCallActionT.
   Variable ls: list string.
   
@@ -782,34 +727,6 @@ Section NoCallActionT.
   | NoCallSys ls lretT c: NoCallActionT c -> @NoCallActionT lretT (Sys ls c)
   | NoCallReturn lretT e: @NoCallActionT lretT (Return e).
 End NoCallActionT.
-
-Section NeverCallBaseModule.
-  Inductive NeverCallActionT: forall k, ActionT type k -> Prop :=
-  | NeverCallMCall meth s e lretT c: False -> @NeverCallActionT lretT (MCall meth s e c)
-  | NeverCallLetExpr k (e: Expr type k) lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (LetExpr e c)
-  | NeverCallLetAction k (a: ActionT type k) lretT c: NeverCallActionT a -> (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (LetAction a c)
-  | NeverCallReadNondet k lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (ReadNondet k c)
-  | NeverCallReadReg r k lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (ReadReg r k c)
-  | NeverCallWriteReg r k (e: Expr type k) lretT c: NeverCallActionT c  -> @NeverCallActionT lretT (WriteReg r e c)
-  | NeverCallIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, NeverCallActionT (c v)) -> NeverCallActionT atrue -> NeverCallActionT afalse -> @NeverCallActionT lretT (IfElse p atrue afalse c)
-  | NeverCallAssertion (e: Expr type (SyntaxKind Bool)) lretT c: NeverCallActionT c -> @NeverCallActionT lretT (Assertion e c)
-  | NeverCallSys ls lretT c: NeverCallActionT c -> @NeverCallActionT lretT (Sys ls c)
-  | NeverCallReturn lretT e: @NeverCallActionT lretT (Return e).
-
-  Variable m : BaseModule.
-  
-  Definition NeverCallBaseModule :=
-    (forall rule, In rule (getRules m) -> NeverCallActionT (snd rule type)) /\
-    (forall meth, In meth (getMethods m) ->
-                  forall v, NeverCallActionT (projT2 (snd meth) type v)).
-End NeverCallBaseModule.
-
-
-Inductive NeverCallMod: Mod -> Prop :=
-| BaseNeverCall m (HNCBaseModule: NeverCallBaseModule m): NeverCallMod (Base m)
-| HideMethNeverCall m s  (HNCModule: NeverCallMod m): NeverCallMod (HideMeth m s)
-| ConcatModNeverCall m1 m2 (HNCModule1: NeverCallMod m1) (HNCModule2: NeverCallMod m2)
-  : NeverCallMod (ConcatMod m1 m2).
 
 Section NoSelfCallBaseModule.
   Variable m: BaseModule.
@@ -836,6 +753,15 @@ End NoSelfCallBaseModule.
 
 
 (* Semantics *)
+
+Local Ltac Struct_neq :=
+  match goal with
+  | |- Struct _ _ <> Struct _ _ =>
+    let H := fresh in intro H;
+                      injection H;
+                      intros;
+                      repeat (existT_destruct Nat.eq_dec)
+  end.
 
 Definition Kind_dec (k1: Kind): forall k2, {k1 = k2} + {k1 <> k2}.
 Proof.
@@ -1040,15 +966,6 @@ Definition MethsT := (list MethT).
 
 
 Section Semantics.
-  Fixpoint natToFin n (i: nat): Fin.t (S n) :=
-    match i with
-    | 0 => Fin.F1
-    | S i' => match n with
-             | 0 => Fin.F1
-             | S n' => Fin.FS (natToFin n' i')
-             end
-    end.
-
   Fixpoint evalExpr exprT (e: Expr type exprT): fullType type exprT :=
     match e in Expr _ exprT return fullType type exprT with
       | Var _ v => v
@@ -1066,11 +983,6 @@ Section Semantics.
       | ReadStruct n fk fs e i => (@evalExpr _ e) i
       | BuildStruct n fk fs fv => fun i => @evalExpr _ (fv i)
       | ReadArray n k fv i =>
-        (* match n return (Fin.t n -> fullType type (SyntaxKind k)) -> *)
-        (*                fullType type (SyntaxKind k) with *)
-        (* | 0 => fun _ => evalConstT (getDefaultConst k) *)
-        (* | S m => fun fv => fv (natToFin m (wordToNat (@evalExpr _ i))) *)
-        (* end (@evalExpr _ fv) *)
         match lt_dec (wordToNat (@evalExpr _ i)) n with
         | left pf => fun fv => fv (Fin.of_nat_lt pf)
         | right _ => fun _ => evalConstT (getDefaultConst k)
@@ -1191,112 +1103,6 @@ Section Semantics.
       (HNewRegs: newRegs = nil)
       (HCalls: calls = nil) :
       SemAction (Return e) readRegs newRegs calls evale.
-
-
-  Inductive PSemAction:
-    forall k, ActionT type k -> RegsT -> RegsT -> MethsT -> type k -> Prop :=
-  | PSemMCall
-      meth s (marg: Expr type (SyntaxKind (fst s)))
-      (mret: type (snd s))
-      retK (fret: type retK)
-      (cont: type (snd s) -> ActionT type retK)
-      readRegs newRegs (calls: MethsT) acalls
-      (HAcalls: acalls [=] (meth, (existT _ _ (evalExpr marg, mret))) :: calls)
-      (HPSemAction: PSemAction (cont mret) readRegs newRegs calls fret):
-      PSemAction (MCall meth s marg cont) readRegs newRegs acalls fret
-  | PSemLetExpr
-      k (e: Expr type k) retK (fret: type retK)
-      (cont: fullType type k -> ActionT type retK) readRegs newRegs calls
-      (HPSemAction: PSemAction (cont (evalExpr e)) readRegs newRegs calls fret):
-      PSemAction (LetExpr e cont) readRegs newRegs calls fret
-  | PSemLetAction
-      k (a: ActionT type k) (v: type k) retK (fret: type retK)
-      (cont: type k -> ActionT type retK)
-      readRegs newRegs readRegsCont newRegsCont calls callsCont
-      (HDisjRegs: DisjKey newRegs newRegsCont)
-      (HPSemAction: PSemAction a readRegs newRegs calls v)
-      ureadRegs unewRegs ucalls
-      (HUReadRegs: ureadRegs [=] readRegs ++ readRegsCont)
-      (HUNewRegs: unewRegs [=] newRegs ++ newRegsCont)
-      (HUCalls: ucalls [=] calls ++ callsCont)
-      (HPSemActionCont: PSemAction (cont v) readRegsCont newRegsCont callsCont fret):
-      PSemAction (LetAction a cont) (ureadRegs) (unewRegs)
-                (ucalls) fret
-  | PSemReadNondet
-      valueT (valueV: fullType type valueT)
-      retK (fret: type retK) (cont: fullType type valueT -> ActionT type retK)
-      readRegs newRegs calls
-      (HPSemAction: PSemAction (cont valueV) readRegs newRegs calls fret):
-      PSemAction (ReadNondet _ cont) readRegs newRegs calls fret
-  | PSemReadReg
-      (r: string) regT (regV: fullType type regT)
-      retK (fret: type retK) (cont: fullType type regT -> ActionT type retK)
-      readRegs newRegs calls areadRegs
-      (HRegVal: In (r, existT _ regT regV) o)
-      (HPSemAction: PSemAction (cont regV) readRegs newRegs calls fret)
-      (HNewReads: areadRegs [=] (r, existT _ regT regV) :: readRegs):
-      PSemAction (ReadReg r _ cont) areadRegs newRegs calls fret
-  | PSemWriteReg
-      (r: string) k
-      (e: Expr type k)
-      retK (fret: type retK)
-      (cont: ActionT type retK) readRegs newRegs calls anewRegs
-      (HRegVal: In (r, k) (getKindAttr o))
-      (HDisjRegs: key_not_In r newRegs)
-      (HANewRegs: anewRegs [=] (r, (existT _ _ (evalExpr e))) :: newRegs)
-      (HPSemAction: PSemAction cont readRegs newRegs calls fret):
-      PSemAction (WriteReg r e cont) readRegs anewRegs calls fret
-  | PSemIfElseTrue
-      (p: Expr type (SyntaxKind Bool)) k1
-      (a: ActionT type k1)
-      (a': ActionT type k1)
-      (r1: type k1)
-      k2 (cont: type k1 -> ActionT type k2)
-      readRegs1 readRegs2  newRegs1 newRegs2 calls1 calls2 (r2: type k2)
-      (HDisjRegs: DisjKey newRegs1 newRegs2)
-      (HTrue: evalExpr p = true)
-      (HAction: PSemAction a readRegs1 newRegs1 calls1 r1)
-      (HPSemAction: PSemAction (cont r1) readRegs2 newRegs2 calls2 r2)
-      ureadRegs unewRegs ucalls
-      (HUReadRegs: ureadRegs [=] readRegs1 ++ readRegs2)
-      (HUNewRegs: unewRegs [=] newRegs1 ++ newRegs2)
-      (HUCalls: ucalls [=] calls1 ++ calls2) :
-      PSemAction (IfElse p a a' cont) ureadRegs unewRegs ucalls r2
-  | PSemIfElseFalse
-      (p: Expr type (SyntaxKind Bool)) k1
-      (a: ActionT type k1)
-      (a': ActionT type k1)
-      (r1: type k1)
-      k2 (cont: type k1 -> ActionT type k2)
-      readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 (r2: type k2)
-      (HDisjRegs: DisjKey newRegs1 newRegs2)
-      (HFalse: evalExpr p = false)
-      (HAction: PSemAction a' readRegs1 newRegs1 calls1 r1)
-      (HPSemAction: PSemAction (cont r1) readRegs2 newRegs2 calls2 r2)
-      ureadRegs unewRegs ucalls
-      (HUReadRegs: ureadRegs [=] readRegs1 ++ readRegs2)
-      (HUNewRegs: unewRegs [=] newRegs1 ++ newRegs2)
-      (HUCalls: ucalls [=] calls1 ++ calls2):
-      PSemAction (IfElse p a a' cont) ureadRegs unewRegs ucalls r2
-  | PSemAssertTrue
-      (p: Expr type (SyntaxKind Bool)) k2
-      (cont: ActionT type k2) readRegs2 newRegs2 calls2 (r2: type k2)
-      (HTrue: evalExpr p = true)
-      (HPSemAction: PSemAction cont readRegs2 newRegs2 calls2 r2):
-      PSemAction (Assertion p cont) readRegs2 newRegs2 calls2 r2
-  | PSemDisplay
-      (ls: list (SysT type)) k (cont: ActionT type k)
-      r readRegs newRegs calls
-      (HPSemAction: PSemAction cont readRegs newRegs calls r):
-      PSemAction (Sys ls cont) readRegs newRegs calls r
-  | PSemReturn
-      k (e: Expr type (SyntaxKind k)) evale
-      (HEvalE: evale = evalExpr e)
-      readRegs newRegs calls
-      (HReadRegs: readRegs = nil)
-      (HNewRegs: newRegs = nil)
-      (HCalls: calls = nil) :
-      PSemAction (Return e) readRegs newRegs calls evale.  
 End Semantics.
 
 Inductive RuleOrMeth :=
@@ -1316,85 +1122,87 @@ Proof.
   apply prod_dec; simpl; auto; apply isEq.
 Defined.
 
-(*
+Section MethT_dec.
+  (*
   Asserts that, if the values passed to, and
   returned by, a method are equal, the Gallina
   values passed to, and returned by, a method
   are also equal.
-*)
-Lemma method_values_eq
+   *)
+  Lemma method_values_eq
   :  forall (s : Signature) (x y : SignT s), existT SignT s x = existT SignT s y -> x = y.
-Proof (Eqdep_dec.inj_pair2_eq_dec Signature Signature_dec SignT).
-            
-(*
+  Proof (Eqdep_dec.inj_pair2_eq_dec Signature Signature_dec SignT).
+  
+  (*
   Asserts that the values passed two and returned
   by two method calls differ if their signatures
   differ.
-*)
-Lemma method_values_neq 
-  :  forall (s r : Signature) (x : SignT s) (y : SignT r), s <> r -> existT SignT s x <> existT SignT r y.
-Proof (fun s r x y H H0 => H (projT1_eq H0)).
+   *)
+  Lemma method_values_neq 
+    :  forall (s r : Signature) (x : SignT s) (y : SignT r), s <> r -> existT SignT s x <> existT SignT r y.
+  Proof (fun s r x y H H0 => H (projT1_eq H0)).
 
-(*
+  (*
   Determines whether or not the Gallina terms
   passed to, and returned by, two method calls
   are equal.
-*)
-Definition method_denotation_values_dec
-  :  forall (s : Signature) (x y : SignT s), {x = y} + {x <> y}
-  := fun s => prod_dec (isEq (fst s)) (isEq (snd s)).
+   *)
+  Definition method_denotation_values_dec
+    :  forall (s : Signature) (x y : SignT s), {x = y} + {x <> y}
+    := fun s => prod_dec (isEq (fst s)) (isEq (snd s)).
 
-(*
+  (*
   Determines whether or not the values passed to,
   and returned by, two method calls that have
   the same Kami signature are equal.
-*)
-Definition method_values_dec
-  :  forall (s : Signature) (x y : SignT s), {existT SignT s x = existT SignT s y} + {existT SignT s x <> existT SignT s y}
-  := fun s x y
+   *)
+  Definition method_values_dec
+    :  forall (s : Signature) (x y : SignT s), {existT SignT s x = existT SignT s y} + {existT SignT s x <> existT SignT s y}
+    := fun s x y
        => sumbool_rec
             (fun _ => {existT SignT s x = existT SignT s y} + {existT SignT s x <> existT SignT s y})
             (fun H : x = y
-              => left
-                   (eq_ind x
-                     (fun z => existT SignT s x = existT SignT s z)
-                     (eq_refl (existT SignT s x))
-                     y H))
+             => left
+                  (eq_ind x
+                          (fun z => existT SignT s x = existT SignT s z)
+                          (eq_refl (existT SignT s x))
+                          y H))
             (fun H : x <> y
-              => right
-                   (fun H0 : existT SignT s x = existT SignT s y
-                     => H (method_values_eq H0)))
+             => right
+                  (fun H0 : existT SignT s x = existT SignT s y
+                   => H (method_values_eq H0)))
             (method_denotation_values_dec x y).
 
-(*
+  (*
   Determines whether or not the values passed to,
   and returned by, two method calls are equal.
-*)
-Definition sigT_SignT_dec
-  :  forall x y: (sigT SignT), {x = y} + {x <> y}
-  := sigT_rect _
-       (fun (s : Signature) (x : SignT s)
-          => sigT_rect _
-               (fun (r : Signature)
-                 => sumbool_rect _
-                      (fun H : s = r
-                        => eq_rect s
-                             (fun t => forall y : SignT t, {existT SignT s x = existT SignT t y} + {existT SignT s x <> existT SignT t y})
-                             (fun y : SignT s => method_values_dec x y)
-                             r H)
-                      (fun (H : s <> r) (_ : SignT r)
-                        => right (method_values_neq H))
-                      (Signature_dec s r))).
+   *)
+  Definition sigT_SignT_dec
+    :  forall x y: (sigT SignT), {x = y} + {x <> y}
+    := sigT_rect _
+                 (fun (s : Signature) (x : SignT s)
+                  => sigT_rect _
+                               (fun (r : Signature)
+                                => sumbool_rect _
+                                                (fun H : s = r
+                                                 => eq_rect s
+                                                            (fun t => forall y : SignT t, {existT SignT s x = existT SignT t y} + {existT SignT s x <> existT SignT t y})
+                                                            (fun y : SignT s => method_values_dec x y)
+                                                            r H)
+                                                (fun (H : s <> r) (_ : SignT r)
+                                                 => right (method_values_neq H))
+                                                (Signature_dec s r))).
 
-Lemma MethT_dec: forall s1 s2: MethT, {s1 = s2} + {s1 <> s2}.
-Proof.
-  intros.
-  destruct s1, s2.
-  apply prod_dec.
-  - apply string_dec.
-  - apply sigT_SignT_dec.
-Defined.
-
+  Lemma MethT_dec: forall s1 s2: MethT, {s1 = s2} + {s1 <> s2}.
+  Proof.
+    intros.
+    destruct s1, s2.
+    apply prod_dec.
+    - apply string_dec.
+    - apply sigT_SignT_dec.
+  Defined.
+End MethT_dec.
+  
 Fixpoint getNumFromCalls (f : MethT) (l : MethsT) : Z :=
   match l with
   |g::l' => match MethT_dec f g with
@@ -1421,58 +1229,6 @@ Fixpoint getNumFromExecs (f : MethT) (l : list RuleOrMeth) : Z :=
 
 Definition getNumExecs (f : MethT) (l : list FullLabel) :=
   getNumFromExecs f (map (fun x => fst (snd x)) l).
-
-Open Scope Z_scope.
-
-Notation PPT_execs := (fun x => fst (snd x)).
-Notation PPT_calls := (fun x => snd (snd x)).
-
-(*
-  Proves that the number of method calls returned
-  by [getNumCalls] is always greater than or
-  equal to 0.
-*)
-Lemma num_method_calls_positive
-  : forall (method : MethT) (labels : list FullLabel),
-      0 <= getNumCalls method labels.
-Proof 
-fun method
-  => list_ind _
-       (ltac:(discriminate) : 0 <= getNumCalls method [])
-       (fun (label : FullLabel) (labels : list FullLabel)
-         (H : 0 <= getNumFromCalls method (concat (map PPT_calls labels)))
-         => list_ind _ H
-              (fun (method0 : MethT) (methods : MethsT)
-                (H0 : 0 <= getNumFromCalls method (methods ++ concat (map PPT_calls labels)))
-                => sumbool_ind
-                     (fun methods_eq
-                       => 0 <=
-                            if methods_eq
-                              then 1 + getNumFromCalls method (methods ++ concat (map PPT_calls labels))
-                              else getNumFromCalls method (methods ++ concat (map PPT_calls labels)))
-                     (fun _ => Z.add_nonneg_nonneg 1 _ (Zle_0_pos 1) H0)
-                     (fun _ => H0)
-                     (MethT_dec method method0))
-              (snd (snd label))).
-
-(*
-  Proves that the number of method executions
-  counted by [getNumExecs] is always greater
-  than or equal to 0.
-*)
-Lemma num_method_execs_positive
-  : forall (method : MethT) (labels : list FullLabel),
-      0 <= getNumExecs method labels.
-Proof.
-  induction labels; unfold getNumExecs in *; simpl; try lia.
-  destruct a; simpl; auto.
-  destruct p; simpl; auto.
-  destruct r0; simpl; auto.
-  destruct (MethT_dec method f); simpl; auto; subst.
-  destruct (getNumFromExecs f (map PPT_execs labels)); simpl; auto; try lia.
-Defined.
-
-Close Scope Z_scope.
 
 Definition getListFullLabel_diff (f : MethT) (l : list FullLabel) :=
   ((getNumExecs f l) - (getNumCalls f l))%Z.
@@ -1526,78 +1282,6 @@ Section BaseModule.
             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
             (HSubsteps: Substeps ls):
       Substeps l.
-
-  Inductive PSubsteps: list FullLabel -> Prop :=
-  | NilPSubstep (HRegs: getKindAttr o [=] getKindAttr (getRegisters m)) : PSubsteps nil
-  | PAddRule (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
-             rn rb
-             (HInRules: In (rn, rb) (getRules m))
-             reads u cs
-             (HPAction: PSemAction o (rb type) reads u cs WO)
-             (HReadsGood: SubList (getKindAttr reads)
-                                  (getKindAttr (getRegisters m)))
-             (HUpdGood: SubList (getKindAttr u)
-                                (getKindAttr (getRegisters m)))
-             l ls (HLabel: l [=] (u, (Rle rn, cs)) :: ls)
-             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
-             (HNoRle: forall x, In x ls -> match fst (snd x) with
-                                           | Rle _ => False
-                                           | _ => True
-                                           end)
-             (HPSubstep: PSubsteps ls):
-      PSubsteps l
-  | PAddMeth (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
-             fn fb
-             (HInMeths: In (fn, fb) (getMethods m))
-             reads u cs argV retV
-             (HPAction: PSemAction o ((projT2 fb) type argV) reads u cs retV)
-             (HReadsGood: SubList (getKindAttr reads)
-                                  (getKindAttr (getRegisters m)))
-             (HUpdGood: SubList (getKindAttr u)
-                                (getKindAttr (getRegisters m)))
-             l ls (HLabel: l [=] (u, (Meth (fn, existT _ _ (argV, retV)), cs)) :: ls )
-             (HDisjRegs: forall x, In x ls -> DisjKey (fst x) u)
-             (HPSubsteps: PSubsteps ls):
-      PSubsteps l.
-
-  Inductive PPlusSubsteps: RegsT -> list RuleOrMeth -> MethsT -> Prop :=
-  | NilPPlusSubstep (HRegs: getKindAttr o [=] getKindAttr (getRegisters m)) : PPlusSubsteps nil nil nil
-  | PPlusAddRule (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
-            rn rb
-            (HInRules: In (rn, rb) (getRules m))
-            reads u cs
-            (HPAction: PSemAction o (rb type) reads u cs WO)
-            (HReadsGood: SubList (getKindAttr reads)
-                                 (getKindAttr (getRegisters m)))
-            (HUpdGood: SubList (getKindAttr u)
-                               (getKindAttr (getRegisters m)))
-            upds execs calls oldUpds oldExecs oldCalls
-            (HUpds: upds [=] u ++ oldUpds)
-            (HExecs: execs [=] Rle rn :: oldExecs)
-            (HCalls: calls [=] cs ++ oldCalls)
-            (HDisjRegs: DisjKey oldUpds u)
-            (HNoRle: forall x, In x oldExecs -> match x with
-                                                | Rle _ => False
-                                                | _ => True
-                                                end)
-            (HPSubstep: PPlusSubsteps oldUpds oldExecs oldCalls):
-      PPlusSubsteps upds execs calls
-  | PPlusAddMeth (HRegs: getKindAttr o [=] getKindAttr (getRegisters m))
-            fn fb
-            (HInMeths: In (fn, fb) (getMethods m))
-            reads u cs argV retV
-            (HPAction: PSemAction o ((projT2 fb) type argV) reads u cs retV)
-            (HReadsGood: SubList (getKindAttr reads)
-                                 (getKindAttr (getRegisters m)))
-            (HUpdGood: SubList (getKindAttr u)
-                               (getKindAttr (getRegisters m)))
-            upds execs calls oldUpds oldExecs oldCalls
-            (HUpds: upds [=] u ++ oldUpds)
-            (HExecs: execs [=] Meth (fn, existT _ _ (argV, retV)) :: oldExecs)
-            (HCalls: calls [=] cs ++ oldCalls)
-            (HDisjRegs: DisjKey oldUpds u)
-            (HPSubstep: PPlusSubsteps oldUpds oldExecs oldCalls):
-      PPlusSubsteps upds execs calls.
 End BaseModule.
 
 Inductive Step: Mod -> RegsT -> list FullLabel -> Prop :=
@@ -1620,42 +1304,6 @@ Inductive Step: Mod -> RegsT -> list FullLabel -> Prop :=
                 (HLabels: l = l1 ++ l2):
     Step (ConcatMod m1 m2) o l.
 
-Inductive PStep: Mod -> RegsT -> list FullLabel -> Prop :=
-| PBaseStep m o l (HPSubsteps: PSubsteps m o l) (HMatching: MatchingExecCalls_Base l m):
-    PStep (Base m) o l
-| PHideMethStep m s o l (HPStep: PStep m o l)
-               (HHidden : In s (map fst (getAllMethods m)) -> (forall v, (getListFullLabel_diff (s, v) l = 0%Z))):
-    PStep (HideMeth m s) o l
-| PConcatModStep m1 m2 o1 o2 l1 l2
-                 (HPStep1: PStep m1 o1 l1)
-                 (HPStep2: PStep m2 o2 l2)
-                 (HMatching1: MatchingExecCalls_Concat l1 l2 m2)
-                 (HMatching2: MatchingExecCalls_Concat l2 l1 m1)
-                 (HNoRle: forall x y, In x l1 -> In y l2 -> match fst (snd x), fst (snd y) with
-                                                            | Rle _, Rle _ => False
-                                                            | _, _ => True
-                                                            end)
-                 o l
-                 (HRegs: o [=] o1 ++ o2)
-                 (HLabels: l [=] l1 ++ l2):
-    PStep (ConcatMod m1 m2) o l.
-
-Section PPlusStep.
-  Variable m: BaseModule.
-  Variable o: RegsT.
-  
-  Definition MatchingExecCalls_flat (calls : MethsT) (execs : list RuleOrMeth) (m : BaseModule) :=
-    forall (f : MethT),
-      In (fst f) (map fst (getMethods m)) ->
-      (getNumFromCalls f calls <= getNumFromExecs f execs)%Z.
-  
-  Inductive PPlusStep :  RegsT -> list RuleOrMeth -> MethsT -> Prop :=
-  | BasePPlusStep upds execs calls:
-      PPlusSubsteps m o upds execs calls ->
-      MatchingExecCalls_flat calls execs m -> PPlusStep upds execs calls.
-End PPlusStep.
-
-
 Definition UpdRegs (u: list RegsT) (o o': RegsT)
   := getKindAttr o = getKindAttr o' /\
      (forall s v, In (s, v) o' -> ((exists x, In x u /\ In (s, v) x) \/
@@ -1670,7 +1318,6 @@ Notation regInit := (fun (o': RegT) (r: RegInitT)  => fst o' = fst r /\
                                                           | eq_refl => projT2 (snd o')
                                                           end = evalConstFullT x
                                                         end).
-
 
 Fixpoint findReg (s: string) (u: RegsT) :=
   match u with
@@ -1702,81 +1349,7 @@ Section Trace.
                   (HUpdRegs: UpdRegs (map fst l) o o')
                   (HTrace: ls' = l :: ls):
       Trace o' ls'.
-
-  Definition PUpdRegs (u: list RegsT) (o o': RegsT)
-    := getKindAttr o [=] getKindAttr o' /\
-       (forall s v, In (s, v) o' -> ((exists x, In x u /\ In (s, v) x) \/
-                                     ((~ exists x, In x u /\ In s (map fst x)) /\ In (s, v) o))).
-
-  Inductive PTrace: RegsT -> list (list FullLabel) -> Prop :=
-  | PInitTrace (o' o'' : RegsT) ls'
-               (HPerm : o' [=] o'')
-               (HUpdRegs : Forall2 regInit o'' (getAllRegisters m))
-               (HTrace: ls' = nil):
-      PTrace o' ls'
-  | PContinueTrace o ls l o' ls'
-                   (PHOldTrace: PTrace o ls)
-                   (HPStep: PStep m o l)
-                   (HPUpdRegs: PUpdRegs (map fst l) o o')
-                   (HTrace: ls' = l :: ls):
-      PTrace o' ls'.
 End Trace.
-
-Definition PPlusUpdRegs (u o o' : RegsT) :=
-  getKindAttr o [=] getKindAttr o' /\
-  (forall s v, In (s, v) o' -> In (s, v) u \/ (~ In s (map fst u) /\ In (s, v) o)).
-  
-Section PPlusTrace.
-  Variable m: BaseModule.
-  Inductive PPlusTrace : RegsT -> list (RegsT * ((list RuleOrMeth) * MethsT)) -> Prop :=
-  | PPlusInitTrace (o' o'' : RegsT) ls'
-                   (HPerm : o' [=] o'')
-                   (HUpdRegs : Forall2 regInit o'' (getRegisters m))
-                   (HTrace : ls' = nil):
-      PPlusTrace o' ls'
-  | PPlusContinueTrace (o o' : RegsT)
-                       (upds : RegsT)
-                       (execs : list RuleOrMeth)
-                       (calls : MethsT)
-                       (ls ls' : list (RegsT * ((list RuleOrMeth) * MethsT)))
-                       (PPlusOldTrace : PPlusTrace o ls)
-                       (HPPlusStep : PPlusStep m o upds execs calls)
-                       (HUpdRegs : PPlusUpdRegs upds o o')
-                       (HPPlusTrace : ls' = ((upds, (execs, calls))::ls)):
-      PPlusTrace o' ls'.
-End PPlusTrace.
-
-Section RuleSetTrace.
-  Variable m: BaseModule.
-  Inductive RuleSetTrace : RegsT -> list (RegsT * ((list RuleOrMeth) * MethsT)) ->
-                           list RuleT ->Prop :=
-  | RuleSetInitTrace (o' o'' : RegsT) ls' lr
-                     (HPerm : o' [=] o'')
-                     (HUpdRegs : Forall2 regInit o'' (getAllRegisters m))
-                     (HTrace: ls' = nil)
-                     (HRules: lr = nil):
-      RuleSetTrace o' ls' lr
-  | RuleeSetContinueTrace (o o' : RegsT)
-                          (upds : RegsT)
-                          (execs : list RuleOrMeth)
-                          (calls : MethsT)
-                          (lr lr' : list RuleT)
-                          (rle : RuleT)
-                          (HRules: lr = rle::lr')
-                          (Hexecs : execs = [Rle (fst rle)])
-                          (ls ls' : list (RegsT *((list RuleOrMeth) * MethsT)))
-                          (RuleSetOldTrace : RuleSetTrace o ls lr)
-                          (HPPlusStep : PPlusStep m o upds execs calls)
-                          (HUpdRegs : PPlusUpdRegs upds o o')
-                          (HRuleSetTrace : ls' =((upds, (execs, calls))::ls)):
-      RuleSetTrace o' ls' lr'.
-End RuleSetTrace.
-
-Fixpoint repeat_list {A : Type} (l : list A) (n : nat) : list A :=
-  match n with
-  | O => nil
-  | S m => l++(repeat_list l m)
-  end.
 
 Definition WeakInclusion (l1 : list FullLabel) (l2 : list FullLabel) : Prop :=
   (forall f, getListFullLabel_diff f l1 = getListFullLabel_diff f l2) /\
@@ -1790,45 +1363,6 @@ Definition TraceInclusion m1 m2 :=
      Trace m2 o2 ls2 /\
      length ls1 = length ls2 /\
      (nthProp2 WeakInclusion ls1 ls2).
-
-Definition PTraceList (m : Mod) (ls : list (list FullLabel)) :=
-  (exists (o : RegsT), PTrace m o ls).
-
-Inductive WeakInclusions : list (list FullLabel) -> list (list (FullLabel)) -> Prop :=
-| WI_Nil : WeakInclusions nil nil
-| WI_Cons : forall (ls ls' : list (list FullLabel)) (l l' : list FullLabel), WeakInclusions ls ls' -> WeakInclusion l l' -> WeakInclusions (l::ls)(l'::ls').
-
-Definition PTraceInclusion (m m' : Mod) :=
-  forall (o : RegsT) (ls : list (list FullLabel)),
-    PTrace m o ls -> exists (ls' : list (list FullLabel)), PTraceList m' ls' /\ WeakInclusions ls ls'.
-
-Section PPlusTraceInclusion.
-
-  Definition getListFullLabel_diff_flat f (t : (RegsT *((list RuleOrMeth)*MethsT))) : Z:=
-    (getNumFromExecs f (PPT_execs t) - getNumFromCalls f (PPT_calls t))%Z. 
-  
-  Definition WeakInclusion_flat (t1 t2 : (RegsT *((list RuleOrMeth) * MethsT))) :=
-    (forall (f : MethT), (getListFullLabel_diff_flat f t1 = getListFullLabel_diff_flat f t2)%Z) /\
-    ((exists rle, In (Rle rle) (PPT_execs t2)) ->
-     (exists rle, In (Rle rle) (PPT_execs t1))).
-
-
-  Inductive WeakInclusions_flat : list (RegsT * ((list RuleOrMeth) * MethsT)) -> list (RegsT *((list RuleOrMeth) * MethsT)) -> Prop :=
-  |WIf_Nil : WeakInclusions_flat nil nil
-  |WIf_Cons : forall (lt1 lt2 : list (RegsT *((list RuleOrMeth) * MethsT))) (t1 t2 : RegsT *((list RuleOrMeth) * MethsT)),
-      WeakInclusions_flat lt1 lt2 -> WeakInclusion_flat t1 t2 -> WeakInclusions_flat (t1::lt1) (t2::lt2).
-
-  Definition PPlusTraceList (m : BaseModule)(lt : list (RegsT * ((list RuleOrMeth) * MethsT))) :=
-    (exists (o : RegsT), PPlusTrace m o lt).
-
-  Definition PPlusTraceInclusion (m m' : BaseModule) :=
-    forall (o : RegsT)(tl : list (RegsT *((list RuleOrMeth) * MethsT))),
-      PPlusTrace m o tl -> exists (tl' : list (RegsT * ((list RuleOrMeth) * MethsT))),  PPlusTraceList m' tl' /\ WeakInclusions_flat tl tl'.
-
-  Definition StrongPPlusTraceInclusion (m m' : BaseModule) :=
-    forall (o : RegsT)(tl : list (RegsT *((list RuleOrMeth) * MethsT))),
-      PPlusTrace m o tl -> exists (tl' : list (RegsT * ((list RuleOrMeth) * MethsT))), PPlusTrace m' o tl' /\ WeakInclusions_flat tl tl'.
-End PPlusTraceInclusion.
 
 
 
@@ -1891,9 +1425,10 @@ Definition getCallsWithSignPerMod (m: Mod) :=
 Definition getCallsPerMod (m: Mod) := map fst (getCallsWithSignPerMod m).
 
 
-(* Utility functions *)
 
-(* TODO: For each of these functions, get a well-formedness theorem and possibly trace inclusion theorem *)
+
+
+(* Utility functions *)
 
 Fixpoint createHide (m: BaseModule) (hides: list string) :=
   match hides with
@@ -1950,14 +1485,18 @@ Definition concatFlat m1 m2 := BaseMod (getRegisters m1 ++ getRegisters m2)
                                        (getRules m1 ++ getRules m2)
                                        (getMethods m1 ++ getMethods m2).
 
-(* Inlining *)
 
+
+
+
+
+
+(* Inlining *)
 
 Section inlineSingle.
   Variable ty: Kind -> Type.
   Variable f: DefMethT.
 
-  (* not expressible as a module *)
   Fixpoint inlineSingle k (a: ActionT ty k): ActionT ty k :=
     match a with
     | MCall g sign arg cont =>
@@ -1997,18 +1536,10 @@ Section inlineSingle.
 
 End inlineSingle.
 
-Definition inlineSingle_Rule  (f : DefMethT) (rle : RuleT): RuleT.
-Proof.
-  unfold RuleT in *.
-  destruct rle.
-  constructor.
-  - apply s.
-  - unfold Action in *.
-    intro.
-    apply (inlineSingle f (a ty)).
-Defined.
+Definition inlineSingle_Rule  (f : DefMethT) (rle : RuleT): RuleT :=
+  let (s, a) := rle in
+  (s, fun ty => inlineSingle f (a ty)).
 
-(* BaseModule version of inlineSingle_Rule done *)
 Definition inlineSingle_Rule_map_BaseModule (f : DefMethT) (m : BaseModule) :=
   BaseMod (getRegisters m) (map (inlineSingle_Rule f) (getRules m)) (getMethods m).
 
@@ -2021,26 +1552,18 @@ Fixpoint inlineSingle_Rule_in_list (f : DefMethT) (rn : string) (lr : list RuleT
   | nil => nil
   end.
 
-(* BaseModule version of inlineSingle_Rule_in_list done *)
 Definition inlineSingle_Rule_BaseModule (f : DefMethT) (rn : string) (m : BaseModule) :=
   BaseMod (getRegisters m) (inlineSingle_Rule_in_list f rn (getRules m)) (getMethods m).
 
-Definition inlineSingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT.
-Proof.
-  unfold DefMethT in *.
-  destruct meth.
-  constructor.
-  - apply s.
-  - destruct (string_dec (fst f) s).
-    + apply s0.
-    + destruct s0.
-      unfold MethodT; unfold MethodT in m.
-      exists x.
-      intros.
-      apply (inlineSingle f (m ty X)).
-Defined.
+Definition inlineSingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT :=
+  let (name, sig_body) := meth in
+  (name,
+   if string_dec (fst f) name
+   then sig_body
+   else
+     let (sig, body) := sig_body in
+     existT _ sig (fun ty arg => inlineSingle f (body ty arg))).
 
-(* BaseModule version of inlineSingle_Meth done *)
 Definition inlineSingle_Meth_map_BaseModule (f : DefMethT) (m : BaseModule) :=
   BaseMod (getRegisters m) (getRules m) (map (inlineSingle_Meth f) (getMethods m)).
 
@@ -2053,7 +1576,6 @@ Fixpoint inlineSingle_Meth_in_list (f : DefMethT) (gn : string) (lm : list DefMe
   | nil => nil
   end.
 
-(* BaseModule version of inlineSingle_Meth_in_list done *)
 Definition inlineSingle_Meth_BaseModule (f : DefMethT) (fn : string) (m : BaseModule) :=
   BaseMod (getRegisters m) (getRules m) (inlineSingle_Meth_in_list f fn (getMethods m)).
 
@@ -2061,15 +1583,12 @@ Section inlineSingle_nth.
   Variable (f : DefMethT).
   Variable (regs: list RegInitT) (rules: list RuleT) (meths: list DefMethT).
 
-  (* BaseModule version of both inlineSingle_Rule and inlineSingle_Meth done *)
   Definition inlineSingle_BaseModule : BaseModule :=
     BaseMod regs (map (inlineSingle_Rule f) rules) (map (inlineSingle_Meth f) meths).
 
-  (* Iterated BaseModule version of inlineSingle_Meth done *)
   Definition inlineSingle_BaseModule_nth_Meth xs : BaseModule :=
     BaseMod regs rules (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs).
 
-  (* Iterated BaseModule version of inlineSingle_Rule done *)
   Definition inlineSingle_BaseModule_nth_Rule xs : BaseModule :=
     BaseMod regs (fold_right (transform_nth_right (inlineSingle_Rule f)) rules xs) meths.
 End inlineSingle_nth.
@@ -2082,7 +1601,6 @@ Definition inlineSingle_Rules_pos meths n rules :=
 
 Definition inlineAll_Rules meths rules := fold_left (fun newRules n => inlineSingle_Rules_pos meths n newRules) (0 upto (length meths)) rules.
 
-(* BaseModule version of inlineAll_Rules done *)
 Definition inlineAll_Rules_mod m :=
   (BaseMod (getRegisters m) (inlineAll_Rules (getMethods m) (getRules m)) (getMethods m)).
 
@@ -2094,18 +1612,15 @@ Definition inlineSingle_Meths_pos newMeths n :=
 
 Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (0 upto (length meths)) meths.
 
-(* BaseModule version of inlineAll_Meths done *)
 Definition inlineAll_Meths_mod m :=
   (BaseMod (getRegisters m) (getRules m) (inlineAll_Meths (getMethods m))).
 
 Definition inlineAll_All regs rules meths :=
   (BaseMod regs (inlineAll_Rules (inlineAll_Meths meths) rules) (inlineAll_Meths meths)).
 
-(* BaseModule version of inlineAll_All done *)
 Definition inlineAll_All_mod m :=
   inlineAll_All (getAllRegisters m) (getAllRules m) (getAllMethods m).
 
-(* Module version of inlineAll_All done *)
 Definition flatten_inline_everything m :=
   createHide (inlineAll_All_mod m) (getHidden m).
 
@@ -2113,13 +1628,33 @@ Definition removeHides (m: BaseModule) s :=
   BaseMod (getRegisters m) (getRules m)
           (filter (fun df => negb (getBool (in_dec string_dec (fst df) s))) (getMethods m)).
 
-(* BaseModule of inlineAll_All which removes initially hidden methods *)
 Definition flatten_inline_remove m :=
   removeHides (inlineAll_All_mod m) (getHidden m).
   
 
 
+(* Last Set of Utility Functions *)
 
+Definition hiddenBy (meths : list DefMethT) (h : string) : bool :=
+  (getBool (in_dec string_dec h (map fst meths))).
+
+Definition getAllBaseMethods (lb : list BaseModule) : (list DefMethT) :=
+  (concat (map getMethods lb)).
+
+Definition hiddenByBase (lb : list BaseModule) (h : string) : bool :=
+  (hiddenBy (getAllBaseMethods lb) h).
+
+Local Notation complement f := (fun x => negb (f x)).
+
+Definition separateHides (tl : list string * (list RegFileBase * list BaseModule)) :
+  (list string * list string) :=
+  (filter (hiddenByBase (map BaseRegFile (fst (snd tl)))) (fst tl),
+   filter (complement (hiddenByBase (map BaseRegFile (fst (snd tl))))) (fst tl)).
+
+Definition separateModHides (m: Mod) :=
+  let '(hides, (rfs, mods)) := separateMod m in
+  let '(hidesRf, hidesBm) := separateHides (hides, (rfs, mods)) in
+  (hidesRf, (rfs, createHide (inlineAll_All_mod (mergeSeparatedBaseMod mods)) hidesBm)).
 
 
 
@@ -2142,20 +1677,6 @@ Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (only parsing) : kami
 Notation "$ n" := (Const _ (natToWord _ n)): kami_expr_scope.
 Notation "$$ e" := (Const ltac:(assumption) e) (at level 8, only parsing) : kami_expr_scope.
 
-Local Definition testStruct :=
-  (STRUCT {
-       "hello" :: Bit 10 ;
-       "a" :: Bit 3 ;
-       "b" :: Bit 5 ;
-       "test" :: Bool }).
-
-Local Definition testStructVal {ty}: testStruct @# ty :=
-  (STRUCT {
-       "hello" ::= $ 4 ;
-       "a" ::= $ 23 ;
-       "b" ::= $ 5 ;
-       "test" ::= $$ true })%kami_expr.
-
 Notation "! v" := (UniBool Neg v) (at level 35): kami_expr_scope.
 Notation "e1 && e2" := (CABool And (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 || e2" := (CABool Or (e1 :: e2 :: nil)) : kami_expr_scope.
@@ -2175,22 +1696,18 @@ Notation "a $[ i : j ]":=
               end
         end) (at level 100, i at level 99, only parsing) : kami_expr_scope.
 
-Section testBit.
-  Variable ty: Kind -> Type.
-  Local Definition testBit := ($$ (natToWord 23 35))%kami_expr.
-End testBit.
-
 Notation "a $#[ i : j ]":=
   ltac:(let aTy := type of a in
-        let aTySimpl := eval compute in aTy in
-            match aTySimpl with
-            | Expr _ (SyntaxKind (Bit ?w)) =>
-              exact (ConstExtract
-                       j
-                       (i + 1 - j)%nat
-                       (w - 1 - i)%nat
-                       (@castBits _ w (j + (i + 1 - j) + (w - 1 - i)) ltac:(abstract (lia || nia)) a))
-            end) (at level 100, i at level 99, only parsing) : kami_expr_scope.
+        match aTy with
+        | Expr _ (SyntaxKind ?bv) =>
+          let bvSimpl := eval compute in bv in
+              match bvSimpl with
+              | Bit ?w =>
+                let middle := eval simpl in (i + 1 - j)%nat in
+                    let top := eval simpl in (w - 1 - i)%nat in
+                exact (ConstExtract j middle top (@castBits _ w (j + middle + top) ltac:(abstract (lia || nia)) a))
+              end
+        end) (at level 100, i at level 99, only parsing) : kami_expr_scope.
 
 Notation "e1 + e2" := (CABit (Add) (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 * e2" := (CABit (Mul) (e1 :: e2 :: nil)) : kami_expr_scope.
@@ -2226,42 +1743,6 @@ Notation "x != y" := (UniBool Neg (Eq x y))
 Notation "v @[ idx ] " := (ReadArray v idx) (at level 38) : kami_expr_scope.
 Notation "v '@[' idx <- val ] " := (UpdateArray v idx val) (at level 38) : kami_expr_scope.
 
-(* Local Ltac findStructIdx v f := *)
-(*   let idx := eval cbv in (Vector_find (fun x => getBool (string_dec (fst x) f%string)) v) in *)
-(*       exact idx. *)
-
-(* Local Ltac getStructList fs f := match fs with *)
-(*                                  | (fun i: Fin.t _ => *)
-(*                                       fst (Vector.nth ?v i)) => *)
-(*                                    findStructIdx v f *)
-(*                                  | _ => let y := eval hnf in fs in *)
-(*                                             getStructList y f *)
-(*                                  end. *)
-
-(* Local Ltac getStructStringFn v f := match v with *)
-(*                                     | Struct ?fk ?fs => getStructList fs f *)
-(*                                     | _ => let y := eval hnf in v in *)
-(*                                                getStructStringFn y f *)
-(*                                     end. *)
-
-(* Local Ltac getStructFull v f := match v with *)
-(*                                 | Expr _ (SyntaxKind ?y) => getStructStringFn y f *)
-(*                                 | _ => let y := eval hnf in v in *)
-(*                                            getStructFull y f *)
-(*                                 end. *)
-
-Definition option_bind
-  (T U : Type)
-  (x : option T)
-  (f : T -> option U)
-  :  option U
-  := match x with
-       | Some y => f y
-       | None => None
-     end.
-
-Notation "X >>- F" := (option_bind X F) (at level 85, only parsing).
-
 Definition struct_get_field_index
   (ty: Kind -> Type)
   (n : nat)
@@ -2294,7 +1775,7 @@ Definition struct_get_field_index
        n
        (PeanoNat.Nat.lt_succ_diag_r n).
 
-Ltac struct_get_field_ltac packet name :=
+Local Ltac struct_get_field_ltac packet name :=
   let val := eval cbv in (struct_get_field_index packet name) in
       match val with
       | Some ?x => exact (ReadStruct packet x)
@@ -2306,7 +1787,7 @@ Ltac struct_get_field_ltac packet name :=
         fail 0 newstr
       end.
 
-Ltac struct_set_field_ltac packet name newval :=
+Local Ltac struct_set_field_ltac packet name newval :=
   let val := eval cbv in (struct_get_field_index packet name) in
       match val with
       | Some ?x => exact (UpdateStruct packet x newval)
@@ -2318,7 +1799,404 @@ Ltac struct_set_field_ltac packet name newval :=
         fail 0 newstr
       end.
 
-Definition struct_get_field_aux
+Notation "s @% f" := ltac:(struct_get_field_ltac s%kami_expr f%string)
+  (at level 38, only parsing): kami_expr_scope.
+
+Notation "name ::= value" :=
+  (existT (fun a : Attribute Kind => Expr _ (SyntaxKind (snd a)))
+          (name%string, _) value) (at level 50) : kami_struct_init_scope.
+Delimit Scope kami_struct_init_scope with struct_init.
+
+Notation getStructVal ls :=
+  (BuildStruct (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
+               (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j))
+               (fun k => Vector_nth_map2_r (@projT1 _ _) (fun x => Expr _ (SyntaxKind (snd x))) ls k (projT2 (Vector.nth ls k)))).
+
+Notation "'STRUCT' { s1 ; .. ; sN }" :=
+  (getStructVal (Vector.cons _ s1%struct_init _ ..
+                             (Vector.cons _ sN%struct_init _ (Vector.nil _)) ..))
+  : kami_expr_scope.
+
+Notation "name ::= value" :=
+  (name, value) (only parsing): kami_switch_init_scope.
+Delimit Scope kami_switch_init_scope with switch_init.
+
+Notation "s '@%[' f <- v ]" := ltac:(struct_set_field_ltac s f v)
+  (at level 38, only parsing): kami_expr_scope.
+
+Notation "'IF' e1 'then' e2 'else' e3" := (ITE e1 e2 e3) : kami_expr_scope.
+
+Notation "nkind <[ def ]>" := (@NativeKind nkind def) (at level 100): kami_expr_scope.
+
+(* One hot switches *)
+Notation "'Switch' val 'Retn' retK 'With' { s1 ; .. ; sN }" :=
+  (unpack retK (CABit Bor (cons (IF val == fst s1%switch_init then pack (snd s1%switch_init) else $0)%kami_expr ..
+                                (cons (IF val == fst sN%switch_init then pack (snd sN%switch_init)else $0)%kami_expr nil) ..))):
+    kami_expr_scope.
+
+Notation "'Switch' val 'Of' inK 'Retn' retK 'With' { s1 ; .. ; sN }" :=
+  (unpack retK (CABit Bor (cons (IF val == ((fst s1%switch_init): inK @# _) then pack (snd s1%switch_init) else $0)%kami_expr ..
+                                (cons (IF val == ((fst sN%switch_init): inK @# _) then pack (snd sN%switch_init)else $0)%kami_expr nil) ..))):
+    kami_expr_scope.
+
+(* Notations for Let Expressions *)
+Notation "'LETE' name <- expr ; cont " :=
+  (LetE expr%kami_expr (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_expr_scope.
+Notation "'LETE' name : t <- expr ; cont " :=
+  (LetE (k' := t) expr%kami_expr (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_expr_scope.
+Notation "'RetE' expr" :=
+  (NormExpr expr%kami_expr) (at level 12) : kami_expr_scope.
+Notation "'LETC' name <- v ; c " :=
+  (LETE name <- RetE v ; c)%kami_expr
+                           (at level 12, right associativity, name at level 99) : kami_expr_scope.
+Notation "'LETC' name : t <- v ; c " :=
+  (LETE name : t <- RetE v ; c)%kami_expr
+                               (at level 12, right associativity, name at level 99) : kami_expr_scope.
+
+Notation "k ## ty" := (LetExprSyntax ty k) (no associativity, at level 98, only parsing).
+
+(** Notations for action *)
+
+Notation "'Call' meth ( a : argT ) ; cont " :=
+  (MCall meth%string (argT, Void) a%kami_expr (fun _ => cont))
+    (at level 12, right associativity, meth at level 0, a at level 99) : kami_action_scope.
+Notation "'Call' name : retT <- meth ( a : argT ) ; cont " :=
+  (MCall meth%string (argT, retT) a%kami_expr (fun name => cont))
+    (at level 12, right associativity, name at level 0, meth at level 0, a at level 99) : kami_action_scope.
+Notation "'Call' meth () ; cont " :=
+  (MCall meth%string (Void, Void) (Const _ Default) (fun _ => cont))
+    (at level 12, right associativity, meth at level 0) : kami_action_scope.
+Notation "'Call' name : retT <- meth () ; cont " :=
+  (MCall meth%string (Void, retT) (Const _ Default) (fun name => cont))
+    (at level 12, right associativity, name at level 0, meth at level 0) : kami_action_scope.
+Notation "'LETN' name : fullkind <- expr ; cont " :=
+  (LetExpr (k := fullkind) expr%kami_expr (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_action_scope.
+Notation "'LET' name <- expr ; cont " :=
+  (LetExpr expr%kami_expr (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_action_scope.
+Notation "'LET' name : t <- expr ; cont " :=
+  (LetExpr (k := SyntaxKind t) expr%kami_expr (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_action_scope.
+Notation "'LETA' name <- act ; cont " :=
+  (LetAction act (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_action_scope.
+Notation "'LETA' name : t <- act ; cont " :=
+  (LetAction (k := t) act (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_action_scope.
+Notation "'NondetN' name : fullkind ; cont" :=
+  (ReadNondet fullkind (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_action_scope.
+Notation "'Nondet' name : kind ; cont" :=
+  (ReadNondet (SyntaxKind kind) (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_action_scope.
+Notation "'ReadN' name : fullkind <- reg ; cont " :=
+  (ReadReg reg fullkind (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_action_scope.
+Notation "'Read' name <- reg ; cont" :=
+  (ReadReg reg _ (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_action_scope.
+Notation "'Read' name : kind <- reg ; cont " :=
+  (ReadReg reg (SyntaxKind kind) (fun name => cont))
+    (at level 12, right associativity, name at level 99) : kami_action_scope.
+Notation "'WriteN' reg : fullkind <- expr ; cont " :=
+  (@WriteReg _ _ reg fullkind expr%kami_expr cont)
+    (at level 12, right associativity, reg at level 99) : kami_action_scope.
+Notation "'Write' reg <- expr ; cont " :=
+  (WriteReg reg expr%kami_expr cont)
+    (at level 12, right associativity, reg at level 99) : kami_action_scope.
+Notation "'Write' reg : kind <- expr ; cont " :=
+  (@WriteReg _ _ reg (SyntaxKind kind) expr%kami_expr cont)
+    (at level 12, right associativity, reg at level 99) : kami_action_scope.
+Notation "'If' cexpr 'then' tact 'else' fact 'as' name ; cont " :=
+  (IfElse cexpr%kami_expr tact fact (fun name => cont))
+    (at level 13, right associativity) : kami_action_scope.
+Notation "'If' cexpr 'then' tact 'else' fact ; cont " :=
+  (IfElse cexpr%kami_expr tact fact (fun _ => cont))
+    (at level 13, right associativity) : kami_action_scope.
+Notation "'If' cexpr 'then' tact ; cont" :=
+  (IfElse cexpr%kami_expr tact (Return (Const _ Default)) (fun _ => cont))
+    (at level 13, right associativity) : kami_action_scope.
+Notation "'Assert' expr ; cont " :=
+  (Assertion expr%kami_expr cont)
+    (at level 12, right associativity) : kami_action_scope.
+Notation "'System' sysexpr ; cont " :=
+  (Sys sysexpr%kami_expr cont)
+    (at level 12, right associativity) : kami_action_scope.
+Notation "'Ret' expr" :=
+  (Return expr%kami_expr)%kami_expr (at level 12) : kami_action_scope.
+Notation "'Retv'" := (Return (Const _ (k := Void) Default)) : kami_action_scope.
+
+
+Delimit Scope kami_action_scope with kami_action.
+
+(* Complex List Actions *)
+Fixpoint gatherActions (ty: Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_out
+         (cont: list (k_in @# ty) -> ActionT ty k_out): ActionT ty k_out :=
+  match acts with
+  | nil => cont nil
+  | x :: xs =>
+    (LETA val <- x;
+       gatherActions xs (fun vals => cont ((#val)%kami_expr :: vals)))%kami_action
+  end.
+
+Notation "'GatherActions' actionList 'as' val ; cont" :=
+  (gatherActions actionList (fun val => cont))
+    (at level 12, right associativity, val at level 99) : kami_action_scope.
+
+Definition readNames (ty: Kind -> Type) k names := map (fun r => Read tmp: k <- r; Ret #tmp)%kami_action names.
+
+Notation "'ReadToList' names 'of' k 'as' val ; cont" :=
+  (gatherActions (readNames _ k names) (fun val => cont))
+    (at level 12, right associativity, val at level 99) : kami_action_scope.
+
+Definition callNames (ty: Kind -> Type) k names := map (fun r => Call tmp : k <- r(); Ret #tmp)%kami_action names.
+
+Notation "'CallToList' names 'of' k 'as' val ; cont" :=
+  (gatherActions (callNames _ k names) (fun val => cont))
+    (at level 12, right associativity, val at level 99): kami_action_scope.
+
+Definition writeNames (ty: Kind -> Type) k namesVals :=
+  map (fun r => Write (fst r) : k <- snd r; Ret (Const ty WO))%kami_action namesVals.
+
+Notation "'WriteToList' names 'of' k 'using' vals ; cont" :=
+  (gatherActions (@writeNames _ k (List.combine names vals)) (fun _ => cont))
+    (at level 12, right associativity, vals at level 99) : kami_action_scope.
+
+(* Notation for normal mods *)
+
+Inductive ModuleElt :=
+| MERegister (_ : RegInitT)
+| MERegAry (_ : list RegInitT)
+| MERule (_ : Attribute (Action Void))
+| MEMeth (_ : DefMethT).
+
+Inductive InModule :=
+| NilInModule
+| ConsInModule (_ : ModuleElt) (_ : InModule).
+
+Fixpoint makeModule' (im : InModule) :=
+  match im with
+  | NilInModule => (nil, nil, nil)
+  | ConsInModule e i =>
+    let '(iregs, irules, imeths) := makeModule' i in
+    match e with
+    | MERegister mreg => (mreg :: iregs, irules, imeths)
+    | MERegAry mregs => (mregs ++ iregs, irules, imeths)
+    | MERule mrule => (iregs, mrule :: irules, imeths)
+    | MEMeth mmeth => (iregs, irules, mmeth :: imeths)
+    end
+  end.
+
+Definition makeModule (im : InModule) :=
+  let '(regs, rules, meths) := makeModule' im in
+  BaseMod regs rules meths.
+
+Definition makeConst k (c: ConstT k): ConstFullT (SyntaxKind k) := SyntaxConst c.
+
+Delimit Scope kami_init_scope with kami_init.
+
+Notation "'ARRAY' { x1 ; .. ; xn }" :=
+  (ConstArray (Vector.nth (Vector.cons _ x1%kami_init _ .. (Vector.cons _ xn%kami_init _ (Vector.nil _)) ..)))
+  : kami_init_scope.
+
+Notation "'ARRAY' { x1 ; .. ; xn }" :=
+  (BuildArray (Vector.nth (Vector.cons _ x1%kami_init _ .. (Vector.cons _ xn%kami_init _ (Vector.nil _)) ..)))
+  : kami_expr_scope.
+
+Notation "name ::= value" :=
+  (existT (fun a : Attribute Kind => ConstT (snd a))
+          (name%string, _) value) (at level 50) : kami_struct_initial_scope.
+Delimit Scope kami_struct_initial_scope with struct_initial.
+
+Notation getStructConst ls :=
+  (ConstStruct (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
+               (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j))
+               (fun k => Vector_nth_map2_r (@projT1 _ _) (fun x => ConstT (snd x)) ls k (projT2 (Vector.nth ls k)))).
+
+Notation "'STRUCT' { s1 ; .. ; sN }" :=
+  (getStructConst (Vector.cons _ s1%struct_initial _ ..
+                               (Vector.cons _ sN%struct_initial _ (Vector.nil _)) ..))
+  : kami_init_scope.
+
+Delimit Scope kami_scope with kami.
+
+Notation "'RegisterN' name : type <- init" :=
+  (MERegister (name%string, existT RegInitValT type (Some (init)%kami_init)))
+    (at level 12, name at level 99) : kami_scope.
+
+Notation "'Register' name : type <- init" :=
+  (MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst (init)%kami_init))))
+    (at level 12, name at level 99) : kami_scope.
+
+Notation "'RegisterU' name : type" :=
+  (MERegister (name%string, existT RegInitValT (SyntaxKind type) None))
+    (at level 12, name at level 99) : kami_scope.
+
+Notation "'Method' name () : retT := c" :=
+  (MEMeth (name%string, existT MethodT (Void, retT)
+                               (fun ty (_: ty Void) => c%kami_action : ActionT ty retT)))
+    (at level 12, name at level 9) : kami_scope.
+
+Notation "'Method' name ( param : dom ) : retT := c" :=
+  (MEMeth (name%string, existT MethodT (dom, retT)
+                               (fun ty (param : ty dom) => c%kami_action : ActionT ty retT)))
+    (at level 12, name at level 9, param at level 99) : kami_scope.
+
+Notation "'Rule' name := c" :=
+  (MERule (name%string, fun ty => (c)%kami_action : ActionT ty Void))
+    (at level 12) : kami_scope.
+
+Notation "'MODULE' { m1 'with' .. 'with' mN }" :=
+  (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..))
+    (only parsing).
+
+Fixpoint getOrder (im : InModule) :=
+  match im with
+  | NilInModule => nil
+  | ConsInModule e i =>
+    let rest := getOrder i in
+    match e with
+    | MERule mrule => fst mrule :: rest
+    | MEMeth mmeth => fst mmeth :: rest
+    | _ => rest
+    end
+  end.
+
+Ltac _discharge_wf :=
+  repeat match goal with
+         | |- @WfMod _ => constructor_simpl
+         | |- @WfConcat _ _ => constructor_simpl
+         | |- _ /\ _ => constructor_simpl
+         | |- @WfConcatActionT _ _ _ => constructor_simpl
+         | |- @WfBaseModule _ => constructor_simpl
+         | |- @WfActionT _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
+         | |- @WfActionT _ _ _ => constructor_simpl
+         | |- NoDup _ => constructor_simpl
+         | H: _ \/ _ |- _ => destruct H; subst; simpl
+         end; repeat (discharge_DisjKey || tauto || congruence);
+  try (discharge_DisjKey || tauto || congruence).
+
+Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
+  {| baseModuleWf := {| baseModule := makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) ;
+                        wfBaseModule := ltac:(_discharge_wf) |} ;
+     baseModuleOrd := getOrder (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) |}
+    (only parsing).
+
+Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
+  {| modWf := {| module := Base (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..)) ;
+                 wfMod := ltac:(_discharge_wf) |} ;
+     modOrd := getOrder (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) |}
+    (only parsing).
+
+
+
+
+Section Positive.
+  Local Open Scope positive_scope.
+  Fixpoint of_pos (p : positive) (rest : string) : string :=
+    match p with
+    | 1 => String "1" rest
+    | 2 => String "2" rest
+    | 3 => String "3" rest
+    | 4 => String "4" rest
+    | 5 => String "5" rest
+    | 6 => String "6" rest
+    | 7 => String "7" rest
+    | 8 => String "8" rest
+    | 9 => String "9" rest
+    | 10 => String "A" rest
+    | 11 => String "B" rest
+    | 12 => String "C" rest
+    | 13 => String "D" rest
+    | 14 => String "E" rest
+    | 15 => String "F" rest
+    | p'~0~0~0~0 => of_pos p' (String "0" rest)
+    | p'~0~0~0~1 => of_pos p' (String "1" rest)
+    | p'~0~0~1~0 => of_pos p' (String "2" rest)
+    | p'~0~0~1~1 => of_pos p' (String "3" rest)
+    | p'~0~1~0~0 => of_pos p' (String "4" rest)
+    | p'~0~1~0~1 => of_pos p' (String "5" rest)
+    | p'~0~1~1~0 => of_pos p' (String "6" rest)
+    | p'~0~1~1~1 => of_pos p' (String "7" rest)
+    | p'~1~0~0~0 => of_pos p' (String "8" rest)
+    | p'~1~0~0~1 => of_pos p' (String "9" rest)
+    | p'~1~0~1~0 => of_pos p' (String "A" rest)
+    | p'~1~0~1~1 => of_pos p' (String "B" rest)
+    | p'~1~1~0~0 => of_pos p' (String "C" rest)
+    | p'~1~1~0~1 => of_pos p' (String "D" rest)
+    | p'~1~1~1~0 => of_pos p' (String "E" rest)
+    | p'~1~1~1~1 => of_pos p' (String "F" rest)
+    end.
+  Local Close Scope positive_scope.
+  Definition natToHexStr (n : nat) : string :=
+    match (BinNat.N.of_nat n) with
+    | N0     => "0"
+    | Npos p => of_pos p ""
+    end.
+End Positive.
+
+Definition AddIndexToName name idx := (name ++ "_" ++ natToHexStr idx)%string.
+
+Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) idxs.
+
+
+Notation "'RegisterVec' name 'using' nums : type <- init" :=
+  (MERegAry (
+    map (fun idx =>
+      (AddIndexToName name idx, existT RegInitValT (SyntaxKind type) (Some (makeConst (init)%kami_init)))
+    ) nums
+  ))
+    (at level 12, name at level 9, nums at level 9) : kami_scope.
+
+
+
+(* Gallina Record Notations *)
+Notation "x {* proj  :=  v *}" := (set proj (constructor v) x)
+                                    (at level 14, left associativity).
+Notation "x {* proj  ::=  f *}" := (set proj f x)
+                                     (at level 14, f at next level, left associativity).
+
+
+
+
+(* Useful Struct *)
+Definition Maybe k :=  STRUCT {
+                           "valid" :: Bool;
+                           "data"  :: k }.
+
+Definition Pair (A B: Kind) := STRUCT {
+                                   "fst" :: A;
+                                   "snd" :: B }.
+
+
+Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_expr
+    (at level 100, only parsing) : kami_expr_scope.
+
+Definition Invalid {ty: Kind -> Type} {k} := (STRUCT { "valid" ::= $$ false ; "data" ::= $$ (getDefaultConst k) })%kami_expr.
+
+Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_expr
+    (at level 100, only parsing) : kami_expr_scope.
+
+
+
+(* Helper functions for struct - Gallina versions of getters and setters *)
+
+Local Definition option_bind
+  (T U : Type)
+  (x : option T)
+  (f : T -> option U)
+  :  option U
+  := match x with
+       | Some y => f y
+       | None => None
+     end.
+
+Local Notation "X >>- F" := (option_bind X F) (at level 85, only parsing).
+
+Local Definition struct_get_field_aux
   (ty: Kind -> Type)
   (n : nat)
   (get_kind : Fin.t (S n) -> Kind)
@@ -2399,413 +2277,43 @@ Definition struct_set_field
              (fun _ => None)
              (Kind_dec (get_kind index) kind).
 
-(* Notation "s @% f" *)
-(*   := (ltac:( *)
-(*        let val := eval cbv in (struct_get_field_aux s f) in *)
-(*        match val with *)
-(*          | Some ?x => *)
-(*            let x2 := eval cbv [projT2] in (projT2 x) in *)
-(*            let x1 := eval cbv [projT1] in (projT1 x) in *)
-(*            exact (x2: x1 @# _) *)
-(*          | None => fail "cannot find struct field" *)
-(*        end)) *)
-(*   (at level 38, only parsing): kami_expr_scope. *)
-
-Notation "s @% f" := ltac:(struct_get_field_ltac s f)
-  (at level 38, only parsing): kami_expr_scope.
-
-Notation "name ::= value" :=
-  (name, value) (only parsing): kami_switch_init_scope.
-Delimit Scope kami_switch_init_scope with switch_init.
-
-(* Notation "s '@%[' f <- v ]" *)
-(*   := (ltac:( *)
-(*        let val := eval cbv in (struct_set_field s f v) in *)
-(*        match val with *)
-(*          | Some ?x => *)
-(*            exact (x) *)
-(*          | None => fail "cannot find struct field" *)
-(*        end)) *)
-(*   (at level 38, only parsing): kami_expr_scope. *)
-
-Notation "s '@%[' f <- v ]" := ltac:(struct_set_field_ltac s f v)
-  (at level 38, only parsing): kami_expr_scope.
-
-(*
-Notation "s '@%[' f <- v ]" := (UpdateStruct s%kami_expr (ltac:(let typeS := type of s in
-                                                               getStructFull typeS f))
-                                             v%kami_expr)
-                                 (at level 100, only parsing) : kami_expr_scope.
-*)
-Local Definition testExtract ty n n1 n2 (pf1: n > n1) (pf2: n1 > n2) (a: Bit n @# ty) := (a $#[n1 : n2])%kami_expr.
-
-Local Definition testConcat ty (w1: Bit 10 @# ty) (w2: Bit 2 @# ty) (w3: Bit 5 @# ty) :=
-  {< w1, w2, w3 >}%kami_expr.
-
-Local Definition testArrayAccess ty (v: Array 4 (Bit 10) @# ty) (idx : Bit 2 @# ty) := (v @[ idx <- v @[ idx ]])%kami_expr.
-
-Notation "'IF' e1 'then' e2 'else' e3" := (ITE e1 e2 e3) : kami_expr_scope.
-
-Local Definition testConstNat ty (w1 w2: Bit 10 @# ty): Bit 10 @# ty := (w1 + w2 + $4 + $6)%kami_expr.
-
-Notation "nkind <[ def ]>" := (@NativeKind nkind def) (at level 100): kami_expr_scope.
-
-(** Notations for action *)
-
-Notation "'Call' meth ( a : argT ) ; cont " :=
-  (MCall meth%string (argT, Void) a%kami_expr (fun _ => cont))
-    (at level 12, right associativity, meth at level 0, a at level 99) : kami_action_scope.
-Notation "'Call' name : retT <- meth ( a : argT ) ; cont " :=
-  (MCall meth%string (argT, retT) a%kami_expr (fun name => cont))
-    (at level 12, right associativity, name at level 0, meth at level 0, a at level 99) : kami_action_scope.
-Notation "'Call' meth () ; cont " :=
-  (MCall meth%string (Void, Void) (Const _ Default) (fun _ => cont))
-    (at level 12, right associativity, meth at level 0) : kami_action_scope.
-Notation "'Call' name : retT <- meth () ; cont " :=
-  (MCall meth%string (Void, retT) (Const _ Default) (fun name => cont))
-    (at level 12, right associativity, name at level 0, meth at level 0) : kami_action_scope.
-Notation "'LETN' name : fullkind <- expr ; cont " :=
-  (LetExpr (k := fullkind) expr%kami_expr (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
-Notation "'LET' name <- expr ; cont " :=
-  (LetExpr expr%kami_expr (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
-Notation "'LET' name : t <- expr ; cont " :=
-  (LetExpr (k := SyntaxKind t) expr%kami_expr (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
-Notation "'LETA' name <- act ; cont " :=
-  (LetAction act (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
-Notation "'LETA' name : t <- act ; cont " :=
-  (LetAction (k := t) act (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
-Notation "'NondetN' name : fullkind ; cont" :=
-  (ReadNondet fullkind (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
-Notation "'Nondet' name : kind ; cont" :=
-  (ReadNondet (SyntaxKind kind) (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
-Notation "'ReadN' name : fullkind <- reg ; cont " :=
-  (ReadReg reg fullkind (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
-Notation "'Read' name <- reg ; cont" :=
-  (ReadReg reg _ (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
-Notation "'Read' name : kind <- reg ; cont " :=
-  (ReadReg reg (SyntaxKind kind) (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
-Notation "'WriteN' reg : fullkind <- expr ; cont " :=
-  (@WriteReg _ _ reg fullkind expr%kami_expr cont)
-    (at level 12, right associativity, reg at level 99) : kami_action_scope.
-Notation "'Write' reg <- expr ; cont " :=
-  (WriteReg reg expr%kami_expr cont)
-    (at level 12, right associativity, reg at level 99) : kami_action_scope.
-Notation "'Write' reg : kind <- expr ; cont " :=
-  (@WriteReg _ _ reg (SyntaxKind kind) expr%kami_expr cont)
-    (at level 12, right associativity, reg at level 99) : kami_action_scope.
-Notation "'If' cexpr 'then' tact 'else' fact 'as' name ; cont " :=
-  (IfElse cexpr%kami_expr tact fact (fun name => cont))
-    (at level 13, right associativity) : kami_action_scope.
-Notation "'If' cexpr 'then' tact 'else' fact ; cont " :=
-  (IfElse cexpr%kami_expr tact fact (fun _ => cont))
-    (at level 13, right associativity) : kami_action_scope.
-Notation "'If' cexpr 'then' tact ; cont" :=
-  (IfElse cexpr%kami_expr tact (Return (Const _ Default)) (fun _ => cont))
-    (at level 13, right associativity) : kami_action_scope.
-Notation "'Assert' expr ; cont " :=
-  (Assertion expr%kami_expr cont)
-    (at level 12, right associativity) : kami_action_scope.
-Notation "'System' sysexpr ; cont " :=
-  (Sys sysexpr%kami_expr cont)
-    (at level 12, right associativity) : kami_action_scope.
-Notation "'Ret' expr" :=
-  (Return expr%kami_expr) (at level 12) : kami_action_scope.
-Notation "'Retv'" := (Return (Const _ (k := Void) Default)) : kami_action_scope.
-
-Notation "'LETE' name <- expr ; cont " :=
-  (LetE expr%kami_expr (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_expr_scope.
-Notation "'LETE' name : t <- expr ; cont " :=
-  (LetE (k' := t) expr%kami_expr (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_expr_scope.
-Notation "'RetE' expr" :=
-  (NormExpr expr%kami_expr) (at level 12) : kami_expr_scope.
-
-Notation "k ## ty" := (LetExprSyntax ty k) (no associativity, at level 98, only parsing).
-
-Notation "'LETC' name <- v ; c " :=
-  (LETE name <- RetE v ; c)%kami_expr
-                           (at level 12, right associativity, name at level 99) : kami_expr_scope.
-
-Notation "'LETC' name : t <- v ; c " :=
-  (LETE name : t <- RetE v ; c)%kami_expr
-                               (at level 12, right associativity, name at level 99) : kami_expr_scope.
-
-Delimit Scope kami_action_scope with kami_action.
-
-Local Open Scope kami_action.
-Local Open Scope kami_expr.
-Local Definition testFieldAccess (ty: Kind -> Type): ActionT ty (Bit 10) :=
-  (LET val: testStruct <- testStructVal;
-     Ret ((#val @% "hello"))).
-Local Close Scope kami_expr.
-Local Close Scope kami_action.
-
-Local Definition testFieldUpd (ty: Kind -> Type) := 
-  ((testStructVal (ty := ty)) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
-
-Fixpoint gatherActions (ty: Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_out (cont: list (k_in @# ty) -> ActionT ty k_out): ActionT ty k_out :=
-  match acts with
-  | nil => cont nil
-  | x :: xs =>
-    (LETA val <- x;
-       gatherActions xs (fun vals => cont ((#val)%kami_expr :: vals)))%kami_action
-  end.
-
-Notation "'GatherActions' actionList 'as' val ; cont" :=
-  (gatherActions actionList (fun val => cont) (* nil *))
-    (at level 12, right associativity, val at level 99) : kami_action_scope.
-
-Definition readNames (ty: Kind -> Type) k names := map (fun r => Read tmp: k <- r; Ret #tmp)%kami_action names.
-
-Notation "'ReadToList' names 'of' k 'as' val ; cont" :=
-  (gatherActions (readNames _ k names) (fun val => cont) (* nil *))
-    (at level 12, right associativity, val at level 99) : kami_action_scope.
-
-Definition callNames (ty: Kind -> Type) k names := map (fun r => Call tmp : k <- r(); Ret #tmp)%kami_action names.
-
-Notation "'CallToList' names 'of' k 'as' val ; cont" :=
-  (gatherActions (callNames _ k names) (fun val => cont) (* nil *))
-    (at level 12, right associativity, val at level 99): kami_action_scope.
-
-Definition writeNames (ty: Kind -> Type) k namesVals := map (fun r => Write (fst r) : k <- snd r; Ret (Const ty WO))%kami_action namesVals.
-
-Notation "'WriteToList' names 'of' k 'using' vals ; cont" :=
-  (gatherActions (@writeNames _ k (List.combine names vals)) (fun _ => cont) (* nil *))
-    (at level 12, right associativity, vals at level 99) : kami_action_scope.
-
-(** * Notation for normal mods *)
-
-Inductive ModuleElt :=
-| MERegister (_ : RegInitT)
-| MERegAry (_ : list RegInitT)
-| MERule (_ : Attribute (Action Void))
-| MEMeth (_ : DefMethT).
-
-Inductive InModule :=
-| NilInModule
-| ConsInModule (_ : ModuleElt) (_ : InModule).
-
-Fixpoint makeModule' (im : InModule) :=
-  match im with
-  | NilInModule => (nil, nil, nil)
-  | ConsInModule e i =>
-    let '(iregs, irules, imeths) := makeModule' i in
-    match e with
-    | MERegister mreg => (mreg :: iregs, irules, imeths)
-    | MERegAry mregs => (mregs ++ iregs, irules, imeths)
-    | MERule mrule => (iregs, mrule :: irules, imeths)
-    | MEMeth mmeth => (iregs, irules, mmeth :: imeths)
-    end
-  end.
-
-Fixpoint getOrder (im : InModule) :=
-  match im with
-  | NilInModule => nil
-  | ConsInModule e i =>
-    let rest := getOrder i in
-    match e with
-    | MERule mrule => fst mrule :: rest
-    | MEMeth mmeth => fst mmeth :: rest
-    | _ => rest
-    end
-  end.
-
-Definition makeModule (im : InModule) :=
-  let '(regs, rules, meths) := makeModule' im in
-  BaseMod regs rules meths.
-
-Definition makeConst k (c: ConstT k): ConstFullT (SyntaxKind k) := SyntaxConst c.
-
-Notation "'RegisterN' name : type <- init" :=
-  (MERegister (name%string, existT RegInitValT type (Some (init)%kami_init)))
-    (at level 12, name at level 99) : kami_scope.
-
-Notation "'Register' name : type <- init" :=
-  (MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst (init)%kami_init))))
-    (at level 12, name at level 99) : kami_scope.
-
-Notation "'RegisterU' name : type" :=
-  (MERegister (name%string, existT RegInitValT (SyntaxKind type) None))
-    (at level 12, name at level 99) : kami_scope.
-
-Section Positive.
-    Import BinPosDef.
-    Local Open Scope positive_scope.
-    Fixpoint of_pos (p : positive) (rest : string) : string :=
-        match p with
-        | 1 => String "1" rest
-        | 2 => String "2" rest
-        | 3 => String "3" rest
-        | 4 => String "4" rest
-        | 5 => String "5" rest
-        | 6 => String "6" rest
-        | 7 => String "7" rest
-        | 8 => String "8" rest
-        | 9 => String "9" rest
-        | 10 => String "A" rest
-        | 11 => String "B" rest
-        | 12 => String "C" rest
-        | 13 => String "D" rest
-        | 14 => String "E" rest
-        | 15 => String "F" rest
-        | p'~0~0~0~0 => of_pos p' (String "0" rest)
-        | p'~0~0~0~1 => of_pos p' (String "1" rest)
-        | p'~0~0~1~0 => of_pos p' (String "2" rest)
-        | p'~0~0~1~1 => of_pos p' (String "3" rest)
-        | p'~0~1~0~0 => of_pos p' (String "4" rest)
-        | p'~0~1~0~1 => of_pos p' (String "5" rest)
-        | p'~0~1~1~0 => of_pos p' (String "6" rest)
-        | p'~0~1~1~1 => of_pos p' (String "7" rest)
-        | p'~1~0~0~0 => of_pos p' (String "8" rest)
-        | p'~1~0~0~1 => of_pos p' (String "9" rest)
-        | p'~1~0~1~0 => of_pos p' (String "A" rest)
-        | p'~1~0~1~1 => of_pos p' (String "B" rest)
-        | p'~1~1~0~0 => of_pos p' (String "C" rest)
-        | p'~1~1~0~1 => of_pos p' (String "D" rest)
-        | p'~1~1~1~0 => of_pos p' (String "E" rest)
-        | p'~1~1~1~1 => of_pos p' (String "F" rest)
-        end.
-    Local Close Scope positive_scope.
-    Definition natToHexStr (n : nat) : string :=
-        match (BinNat.N.of_nat n) with
-        | N0     => "0"
-        | Npos p => of_pos p ""
-        end.
-End Positive.
-
-Definition AddIndexToName name idx := (name ++ "_" ++ natToHexStr idx)%string.
-
-Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) idxs.
 
 
-(* Definition test ty : ActionT ty Void := *)
-(*   (CallToList (AddIndicesToNames "ext_source" (0 upto 10 )) of Bool as ext_sources; *)
-(*      WriteToList (AddIndicesToNames "clicintip" ( 0 upto 10)) of Bool using ext_sources; Retv)%kami_action. *)
 
-(* Eval compute in test. *)
 
-Notation "'RegisterVec' name 'using' nums : type <- init" :=
-  (MERegAry (
-    map (fun idx =>
-      (AddIndexToName name idx, existT RegInitValT (SyntaxKind type) (Some (makeConst (init)%kami_init)))
-    ) nums
-  ))
-    (at level 12, name at level 9, nums at level 9) : kami_scope.
 
-Delimit Scope kami_scope with kami.
 
-Notation "'Method' name () : retT := c" :=
-  (MEMeth (name%string, existT MethodT (Void, retT)
-                               (fun ty (_: ty Void) => c%kami_action : ActionT ty retT)))
-    (at level 12, name at level 9) : kami_scope.
 
-Notation "'Method' name ( param : dom ) : retT := c" :=
-  (MEMeth (name%string, existT MethodT (dom, retT)
-                               (fun ty (param : ty dom) => c%kami_action : ActionT ty retT)))
-    (at level 12, name at level 9, param at level 99) : kami_scope.
 
-Notation "'Rule' name := c" :=
-  (MERule (name%string, fun ty => (c)%kami_action : ActionT ty Void))
-    (at level 12) : kami_scope.
 
-Notation "'MODULE' { m1 'with' .. 'with' mN }" :=
-  (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..))
-    (only parsing).
 
-Notation "'Switch' val 'Retn' retK 'With' { s1 ; .. ; sN }" :=
-  (unpack retK (CABit Bor (cons (IF val == fst s1%switch_init then pack (snd s1%switch_init) else $0)%kami_expr ..
-                                (cons (IF val == fst sN%switch_init then pack (snd sN%switch_init)else $0)%kami_expr nil) ..))):
-    kami_expr_scope.
 
-Notation "'Switch' val 'Of' inK 'Retn' retK 'With' { s1 ; .. ; sN }" :=
-  (unpack retK (CABit Bor (cons (IF val == ((fst s1%switch_init): inK @# _) then pack (snd s1%switch_init) else $0)%kami_expr ..
-                                (cons (IF val == ((fst sN%switch_init): inK @# _) then pack (snd sN%switch_init)else $0)%kami_expr nil) ..))):
-    kami_expr_scope.
 
-Definition testSwitch ty (val: Bit 5 @# ty) (a b: Bool @# ty) : Bool @# ty :=
+
+(* Testing the Notations *)
+
+Local Example testSwitch ty (val: Bit 5 @# ty) (a b: Bool @# ty) : Bool @# ty :=
   (Switch val Retn Bool With {
             $$ (natToWord 5 5) ::= $$ true ;
             $$ (natToWord 5 6) ::= $$ false
           })%kami_expr.
 
-Definition testSwitch2 ty (val: Bit 5 @# ty) (a b: Bool @# ty) : Bool @# ty :=
+Local Example testSwitch2 ty (val: Bit 5 @# ty) (a b: Bool @# ty) : Bool @# ty :=
   (Switch val Of Bit 5 Retn Bool With {
             $$ (natToWord 5 5) ::= $$ true ;
             $$ (natToWord 5 6) ::= $$ false
           })%kami_expr.
 
 
-Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
-  {| baseModuleWf := {| baseModule := makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) ;
-                        wfBaseModule := ltac:(discharge_wf) |} ;
-     baseModuleOrd := getOrder (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) |}
-    (only parsing).
-
-Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
-  {| modWf := {| module := Base (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..)) ;
-                 wfMod := ltac:(discharge_wf) |} ;
-     modOrd := getOrder (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) |}
-    (only parsing).
-
-(* Infix "++" := ConcatMod: kami_scope. *)
-
-Notation "'ARRAY' { x1 ; .. ; xn }" :=
-  (ConstArray (Vector.nth (Vector.cons _ x1%kami_init _ .. (Vector.cons _ xn%kami_init _ (Vector.nil _)) ..)))
-  : kami_init_scope.
-
-Notation "'ARRAY' { x1 ; .. ; xn }" :=
-  (BuildArray (Vector.nth (Vector.cons _ x1%kami_init _ .. (Vector.cons _ xn%kami_init _ (Vector.nil _)) ..)))
-  : kami_expr_scope.
-
-
-Section tests.
-  Variable a : string.
-  Local Example test := MOD_WF{
-                      Register (a ++ "x") : Bool <- true
-                        with Register (a ++ "y") : Bool <- false
-                        with Rule (a ++ "r1") := ( Read y: Bool <- a++"y";
-                                                     Write (a++"x"): Bool <- #y;
-                                                     Retv )
-                    }.
-End tests.
+Local Example test a := MOD_WF{
+                            Register (a ++ "x") : Bool <- true
+                              with Register (a ++ "y") : Bool <- false
+                              with Rule (a ++ "r1") := ( Read y: Bool <- a++"y";
+                                                           Write (a++"x"): Bool <- #y;
+                                                           Retv )
+                          }.
 
 Local Example test2 a b := (ConcatMod (test a) (test b))%kami.
-
-Definition Maybe k :=
-  STRUCT {
-      "valid" :: Bool;
-      "data"  :: k
-    }.
-
-Definition Pair (A B: Kind) := (STRUCT {
-                                    "fst" :: A;
-                                    "snd" :: B
-                               }).
-
-
-Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_expr
-    (at level 100, only parsing) : kami_expr_scope.
-
-Definition Invalid {ty: Kind -> Type} {k} := (STRUCT { "valid" ::= $$ false ; "data" ::= $$ (getDefaultConst k) })%kami_expr.
-
-Definition WriteRegFile n dataT := STRUCT {
-                                       "addr" :: Bit (Nat.log2_up n);
-                                       "data" :: dataT }.
-
-Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_expr
-    (at level 100, only parsing) : kami_expr_scope.
-
 
 Definition extractArbitraryRange ty sz (inst: Bit sz ## ty) (range: nat * nat):
   Bit (fst range + 1 - snd range) ## ty :=
@@ -2814,138 +2322,113 @@ Definition extractArbitraryRange ty sz (inst: Bit sz ## ty) (range: nat * nat):
                         (ZeroExtendTruncLsb _ #i)))%kami_expr.
    
 
+Local Definition testStruct :=
+  (STRUCT {
+       "hello" :: Bit 10 ;
+       "a" :: Bit 3 ;
+       "b" :: Bit 5 ;
+       "test" :: Bool }).
 
-Fixpoint gatherLetExpr (ty: Kind -> Type)
-         (acts: list (string * {k_in: Kind & LetExprSyntax ty k_in})%type)
-         k_out
-         (cont: list (string * {k_in: Kind & k_in @# ty}) -> LetExprSyntax ty k_out):
-            LetExprSyntax ty k_out :=
-  match acts with
-  | nil => cont nil
-  | cons x xs =>
-    (LETE val <- (projT2 (snd x));
-       gatherLetExpr xs (fun vals => cont (cons (fst x, existT _ (projT1 (snd x)) (#val)%kami_expr) vals)))%kami_expr
-  end.
+Local Definition testStructVal {ty}: testStruct @# ty :=
+  (STRUCT {
+       "hello" ::= $ 4 ;
+       "a" ::= $ 23 ;
+       "b" ::= $ 5 ;
+       "test" ::= $$ true })%kami_expr.
 
-Fixpoint gatherLetExprVec (ty: Kind -> Type) n
-         (acts: Vector.t ({k_in: (string * Kind) & LetExprSyntax ty (snd k_in)})%type n)
-         k_out
-         (cont: Vector.t ({k_in: (string * Kind) & (snd k_in) @# ty}) n -> LetExprSyntax ty k_out):
-            LetExprSyntax ty k_out :=
-  match acts in Vector.t _ n return (Vector.t ({k_in: (string * Kind) & (snd k_in) @# ty}) n ->
-                                     LetExprSyntax ty k_out) -> LetExprSyntax ty k_out with
-  | Vector.nil => fun cont => cont (Vector.nil _)
-  | Vector.cons x _ xs =>
-    fun cont =>
-      (LETE val <- (projT2 x);
-         gatherLetExprVec xs (fun vals => cont
-                                            (Vector.cons _
-                                                         (existT _ (projT1 x) (#val)%kami_expr)
-                                                         _ vals)))%kami_expr
-  end cont.
 
-Notation structFromExprs ls :=
-  (Struct
-     (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
-     (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j))).
 
+Local Open Scope kami_action.
 Local Open Scope kami_expr.
-Fixpoint gatherLetExprVector (ty: Kind -> Type) n
-         (acts: Vector.t ({k_in: (string * Kind) & LetExprSyntax ty (snd k_in)})%type n)
-         {struct acts}:
-  LetExprSyntax ty (structFromExprs acts) :=
-  (match acts in Vector.t _ n return
-         LetExprSyntax ty (structFromExprs acts) with
-   | Vector.nil =>
-     RetE
-       (BuildStruct
-          _ _
-          (fun i =>
-             Fin.case0
-               (fun i =>
-                  (snd (Vector.nth (Vector.map (@projT1 _ _) (Vector.nil _)) i)) @# ty)
-               i))
-   | Vector.cons x n' xs =>
-     (LETE val <- projT2 x;
-        LETE fullStruct <- @gatherLetExprVector ty _ xs;
-        RetE (BuildStruct _ _ (fun i: Fin.t (S n') =>
-                                 match i as il in Fin.t (S nl) return
-                                       forall (xs: Vector.t _ nl),
-                                         ty (structFromExprs xs) ->
-                                         (snd (Vector.nth
-                                                 (Vector.map (@projT1 _ _)
-                                                             (Vector.cons _ x _ xs)) il)) @# ty
-                                 with
-                                 | Fin.F1 _ => fun _ _ => #val
-                                 | Fin.FS _ j => fun _ fullStruct => ReadStruct #fullStruct j
-                                 end xs fullStruct))
-     )
-   end).
+Local Definition testFieldAccess (ty: Kind -> Type): ActionT ty (Bit 10) :=
+  (LET val: testStruct <- testStructVal;
+     Ret (#val @% "hello"))%kami_action.
 Local Close Scope kami_expr.
+Local Close Scope kami_action.
+
 
 Section unittests.
 
-Open Scope kami_expr.
+  Open Scope kami_expr.
 
-Local Notation "X ==> Y" := (evalExpr X = Y) (at level 75).
+  Local Notation "X ==> Y" := (evalExpr X = Y) (at level 75).
 
-Let test_struct
-  :=  STRUCT {
-        "field0" ::= Const type false;
-        "field1" ::= Const type (natToWord 4 2);
-        "field2" ::= Const type (natToWord 5 3)}%kami_expr.
+  Let test_struct
+    :=  STRUCT {
+            "field0" ::= Const type false;
+            "field1" ::= Const type (natToWord 4 2);
+            "field2" ::= Const type (natToWord 5 3)}%kami_expr.
 
-Section struct_get_field_default_unittests.
+  Section struct_get_field_default_unittests.
 
-Let test0
-  :  test_struct @% "field0" ==> false
-  := eq_refl false.
+    Let test0
+    :  test_struct @% "field0" ==> false
+      := eq_refl false.
 
-Let test1
-  : test_struct @% "field1" ==> natToWord 4 2
-  := eq_refl (natToWord 4 2).
- 
-Let test2
-  : test_struct @% "field2" ==> natToWord 5 3
-  := eq_refl (natToWord 5 3).
+    Let test1
+      : test_struct @% "field1" ==> natToWord 4 2
+      := eq_refl (natToWord 4 2).
+    
+    Let test2
+      : test_struct @% "field2" ==> natToWord 5 3
+      := eq_refl (natToWord 5 3).
 
-Let test3
-  :  struct_get_field test_struct "field3" (Bit 5) = None
-  := eq_refl None.
+  End struct_get_field_default_unittests.
 
-End struct_get_field_default_unittests.
+  Section struct_set_field_unittests.
 
-Section struct_set_field_unittests.
+    Let test_0
+    :  (test_struct @%["field0" <- (Const type true)]) @% "field0"
+                                                       ==> true
+      := eq_refl true.
 
-Let test_0
-  :  (test_struct @%["field0" <- (Const type true)]) @% "field0"
-     ==> true
-  := eq_refl true.
+    Let test_1
+      :  (test_struct @%["field1" <- (Const type (natToWord 4 5))]) @% "field1"
+                                                                    ==> natToWord 4 5
+      := eq_refl (natToWord 4 5).
 
-Let test_1
-  :  (test_struct @%["field1" <- (Const type (natToWord 4 5))]) @% "field1"
-     ==> natToWord 4 5
-  := eq_refl (natToWord 4 5).
+    Let test_2
+      :  (test_struct @%["field2" <- (Const type (natToWord 5 5))]) @% "field2"
+                                                                    ==> natToWord 5 5
+      := eq_refl (natToWord 5 5).
+  End struct_set_field_unittests.
 
-Let test_2
-  :  (test_struct @%["field2" <- (Const type (natToWord 5 5))]) @% "field2"
-     ==> natToWord 5 5
-  := eq_refl (natToWord 5 5).
-
-Let test_3
-  :  struct_set_field test_struct "field3" (Const type (natToWord 5 5))
-     = None
-  := eq_refl None.
-
-End struct_set_field_unittests.
-
-Close Scope kami_expr.
+  Close Scope kami_expr.
 
 End unittests.
 
-(*
- * Kami Rewrite
-   + Inlining Theorem (moderate)
+
+Local Definition testConcat ty (w1: Bit 10 @# ty) (w2: Bit 2 @# ty) (w3: Bit 5 @# ty) :=
+  {< w1, w2, w3 >}%kami_expr.
+
+Local Definition testArrayAccess ty (v: Array 4 (Bit 10) @# ty) (idx : Bit 2 @# ty) := (v @[ idx <- v @[ idx ]])%kami_expr.
+
+Local Definition testConstNat ty (w1 w2: Bit 10 @# ty): Bit 10 @# ty := (w1 + w2 + $4 + $6)%kami_expr.
+
+Local Definition testFieldUpd (ty: Kind -> Type) := 
+  ((testStructVal (ty := ty)) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
+
+Local Definition testExtract ty n n1 n2 (pf1: n > n1) (pf2: n1 > n2) (a: Bit n @# ty) := (a $#[n1 : n2])%kami_expr.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(* TODO
    + Compiler verification (difficult)
- * PUAR: Linux/Certikos
+   + PUAR: Linux/Certikos
  *)

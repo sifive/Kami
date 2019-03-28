@@ -6,6 +6,114 @@ Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
 Require Import ZArith Lib.EclecticLib.
 
+Local Notation PPT_execs := (fun x => fst (snd x)).
+Local Notation PPT_calls := (fun x => snd (snd x)).
+
+Local Open Scope Z_scope.
+
+Section NeverCallBaseModule.
+  Inductive NeverCallActionT: forall k, ActionT type k -> Prop :=
+  | NeverCallMCall meth s e lretT c: False -> @NeverCallActionT lretT (MCall meth s e c)
+  | NeverCallLetExpr k (e: Expr type k) lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (LetExpr e c)
+  | NeverCallLetAction k (a: ActionT type k) lretT c: NeverCallActionT a -> (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (LetAction a c)
+  | NeverCallReadNondet k lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (ReadNondet k c)
+  | NeverCallReadReg r k lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (ReadReg r k c)
+  | NeverCallWriteReg r k (e: Expr type k) lretT c: NeverCallActionT c  -> @NeverCallActionT lretT (WriteReg r e c)
+  | NeverCallIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, NeverCallActionT (c v)) -> NeverCallActionT atrue -> NeverCallActionT afalse -> @NeverCallActionT lretT (IfElse p atrue afalse c)
+  | NeverCallAssertion (e: Expr type (SyntaxKind Bool)) lretT c: NeverCallActionT c -> @NeverCallActionT lretT (Assertion e c)
+  | NeverCallSys ls lretT c: NeverCallActionT c -> @NeverCallActionT lretT (Sys ls c)
+  | NeverCallReturn lretT e: @NeverCallActionT lretT (Return e).
+
+  Variable m : BaseModule.
+  
+  Definition NeverCallBaseModule :=
+    (forall rule, In rule (getRules m) -> NeverCallActionT (snd rule type)) /\
+    (forall meth, In meth (getMethods m) ->
+                  forall v, NeverCallActionT (projT2 (snd meth) type v)).
+End NeverCallBaseModule.
+
+
+Inductive NeverCallMod: Mod -> Prop :=
+| BaseNeverCall m (HNCBaseModule: NeverCallBaseModule m): NeverCallMod (Base m)
+| HideMethNeverCall m s  (HNCModule: NeverCallMod m): NeverCallMod (HideMeth m s)
+| ConcatModNeverCall m1 m2 (HNCModule1: NeverCallMod m1) (HNCModule2: NeverCallMod m2)
+  : NeverCallMod (ConcatMod m1 m2).
+
+(*
+  Proves that the number of method calls returned
+  by [getNumCalls] is always greater than or
+  equal to 0.
+*)
+Lemma num_method_calls_positive
+  : forall (method : MethT) (labels : list FullLabel),
+      0 <= getNumCalls method labels.
+Proof 
+fun method
+  => list_ind _
+       (ltac:(discriminate) : 0 <= getNumCalls method [])
+       (fun (label : FullLabel) (labels : list FullLabel)
+         (H : 0 <= getNumFromCalls method (concat (map PPT_calls labels)))
+         => list_ind _ H
+              (fun (method0 : MethT) (methods : MethsT)
+                (H0 : 0 <= getNumFromCalls method (methods ++ concat (map PPT_calls labels)))
+                => sumbool_ind
+                     (fun methods_eq
+                       => 0 <=
+                            if methods_eq
+                              then 1 + getNumFromCalls method (methods ++ concat (map PPT_calls labels))
+                              else getNumFromCalls method (methods ++ concat (map PPT_calls labels)))
+                     (fun _ => Z.add_nonneg_nonneg 1 _ (Zle_0_pos 1) H0)
+                     (fun _ => H0)
+                     (MethT_dec method method0))
+              (snd (snd label))).
+
+(*
+  Proves that the number of method executions
+  counted by [getNumExecs] is always greater
+  than or equal to 0.
+*)
+Lemma num_method_execs_positive
+  : forall (method : MethT) (labels : list FullLabel),
+      0 <= getNumExecs method labels.
+Proof.
+  induction labels; unfold getNumExecs in *; simpl; try lia.
+  destruct a; simpl; auto.
+  destruct p; simpl; auto.
+  destruct r0; simpl; auto.
+  destruct (MethT_dec method f); simpl; auto; subst.
+  destruct (getNumFromExecs f (map PPT_execs labels)); simpl; auto; try lia.
+Defined.
+
+Local Close Scope Z_scope.
+
+
+Section PPlusTraceInclusion.
+
+  Definition getListFullLabel_diff_flat f (t : (RegsT *((list RuleOrMeth)*MethsT))) : Z:=
+    (getNumFromExecs f (PPT_execs t) - getNumFromCalls f (PPT_calls t))%Z. 
+  
+  Definition WeakInclusion_flat (t1 t2 : (RegsT *((list RuleOrMeth) * MethsT))) :=
+    (forall (f : MethT), (getListFullLabel_diff_flat f t1 = getListFullLabel_diff_flat f t2)%Z) /\
+    ((exists rle, In (Rle rle) (PPT_execs t2)) ->
+     (exists rle, In (Rle rle) (PPT_execs t1))).
+
+
+  Inductive WeakInclusions_flat : list (RegsT * ((list RuleOrMeth) * MethsT)) -> list (RegsT *((list RuleOrMeth) * MethsT)) -> Prop :=
+  |WIf_Nil : WeakInclusions_flat nil nil
+  |WIf_Cons : forall (lt1 lt2 : list (RegsT *((list RuleOrMeth) * MethsT))) (t1 t2 : RegsT *((list RuleOrMeth) * MethsT)),
+      WeakInclusions_flat lt1 lt2 -> WeakInclusion_flat t1 t2 -> WeakInclusions_flat (t1::lt1) (t2::lt2).
+
+  Definition PPlusTraceList (m : BaseModule)(lt : list (RegsT * ((list RuleOrMeth) * MethsT))) :=
+    (exists (o : RegsT), PPlusTrace m o lt).
+
+  Definition PPlusTraceInclusion (m m' : BaseModule) :=
+    forall (o : RegsT)(tl : list (RegsT *((list RuleOrMeth) * MethsT))),
+      PPlusTrace m o tl -> exists (tl' : list (RegsT * ((list RuleOrMeth) * MethsT))),  PPlusTraceList m' tl' /\ WeakInclusions_flat tl tl'.
+
+  Definition StrongPPlusTraceInclusion (m m' : BaseModule) :=
+    forall (o : RegsT)(tl : list (RegsT *((list RuleOrMeth) * MethsT))),
+      PPlusTrace m o tl -> exists (tl' : list (RegsT * ((list RuleOrMeth) * MethsT))), PPlusTrace m' o tl' /\ WeakInclusions_flat tl tl'.
+End PPlusTraceInclusion.
 
 Section BaseModule.
   Variable m: BaseModule.
@@ -699,7 +807,7 @@ Qed.
 Definition called_by (f : DefMethT) (call :MethT) : bool :=
   (getBool (string_dec (fst f) (fst call))).
 
-Notation complement f := (fun x => negb (f x)).
+Local Notation complement f := (fun x => negb (f x)).
 
 Definition called_execs (calls : MethsT) (exec : RuleOrMeth) : bool :=
   match exec with
@@ -7262,28 +7370,6 @@ Proof.
   eauto using WfConcatActionT_inlineSingle_Rule_pos.
 Qed.
 
-Definition hidden_by (meths : list DefMethT) (h : string) : bool :=
-  (getBool (in_dec string_dec h (map fst meths))).
-
-Definition getAllBaseMethods (lb : list BaseModule) : (list DefMethT) :=
-  (concat (map getMethods lb)).
-
-Definition hidden_by_Base (lb : list BaseModule) (h : string) : bool :=
-  (hidden_by (getAllBaseMethods lb) h).
-
-Definition separateHides (tl : list string * (list RegFileBase * list BaseModule)) :
-  (list string * list string) :=
-  (filter (hidden_by_Base (map BaseRegFile (fst (snd tl)))) (fst tl),
-   filter (complement (hidden_by_Base (map BaseRegFile (fst (snd tl))))) (fst tl)).
-
-Definition separateModHides (m: Mod) :=
-  let '(hides, (rfs, mods)) := separateMod m in
-  let '(hidesRf, hidesBm) := separateHides (hides, (rfs, mods)) in
-  (hidesRf, (rfs, createHide (inlineAll_All_mod (mergeSeparatedBaseMod mods)) hidesBm)).
-
-Definition defined_hide (m : Mod) (h : string) : bool :=
-  (getBool (in_dec string_dec h (map fst (getAllMethods m)))).
-
 Lemma mergeSeparatedDistributed_Wf (m : ModWf):
   let t := separateModHides m in
   WfMod (createHideMod (ConcatMod (mergeSeparatedBaseFile (fst (snd t))) (snd (snd t))) (fst t)).
@@ -7294,7 +7380,7 @@ Proof.
   destruct separateBaseMod; simpl in *.
   specialize (separate_calls_by_filter
                 (getHidden m)
-                (hidden_by_Base (map BaseRegFile l))) as P1.
+                (hiddenByBase (map BaseRegFile l))) as P1.
   rewrite Permutation_app_comm in P1.
   apply (WfMod_perm _ P1) in P0.
   apply distributeHidesWf in P0.
@@ -7324,12 +7410,12 @@ Proof.
            apply (WfBaseMod_inlineAll_All P0).
       * clear - WfConcat1.
         assert (getHidden (createHide (inlineAll_All_mod (mergeSeparatedBaseMod l0))
-                                      (filter (complement (hidden_by_Base (map BaseRegFile l)))
+                                      (filter (complement (hiddenByBase (map BaseRegFile l)))
                                               (getHidden m)))
                 =
                 getHidden (createHideMod
                              (mergeSeparatedBaseMod l0)
-                             (filter (complement (hidden_by_Base (map BaseRegFile l)))
+                             (filter (complement (hiddenByBase (map BaseRegFile l)))
                                      (getHidden m)))
                ) as P0.
         { rewrite createHide_hides, getHidden_createHideMod, mergeSeparatedBaseMod_noHides,
@@ -7362,7 +7448,7 @@ Proof.
   - apply mergeFile_noCalls.
   - intros.
     clear - H.
-    unfold hidden_by_Base, hidden_by in *.
+    unfold hiddenByBase, hiddenBy in *.
     rewrite filter_In in *; dest.
     destruct in_dec; simpl in *;[discriminate|].
     intro; apply n; clear n H0 H.
