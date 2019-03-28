@@ -7265,7 +7265,6 @@ Proof.
     apply RegFileBase_noCalls.
 Qed.
 
-
 Lemma WfConcatActionT_inlineSingle_Meth {k : Kind} (f: DefMethT) (a : ActionT type k) m:
   (forall v, WfConcatActionT (projT2 (snd f) type v) m) ->
   WfConcatActionT a m ->
