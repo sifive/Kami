@@ -7157,6 +7157,111 @@ Proof.
     apply RegFileBase_noCalls.
 Qed.
 
+Lemma WfConcatActionT_inlineSingle_Meth {k : Kind} (f: DefMethT) (a : ActionT type k) m:
+  (forall v, WfConcatActionT (projT2 (snd f) type v) m) ->
+  WfConcatActionT a m ->
+  WfConcatActionT (inlineSingle f a) m.
+Proof.
+  intros.
+  induction a; unfold inlineSingle; inv H0; EqDep_subst; try econstructor; eauto.
+  destruct string_dec;[destruct Signature_dec|]; subst; simpl in *; econstructor; eauto.
+  econstructor; eauto.
+Qed.
+
+Lemma WfConcatActionT_inlineSingle_Rule_map rule (f : DefMethT) rules m:
+  (forall v, WfConcatActionT (projT2 (snd f) type v) m) ->
+  In rule (map (inlineSingle_Rule f) rules) ->
+  (forall rule', In rule' rules ->
+                 WfConcatActionT (snd rule' type) m) ->
+  WfConcatActionT (snd rule type) m.
+Proof.
+  intros.
+  induction rules; simpl in *;[tauto|].
+  destruct H0; subst; eauto.
+  specialize (H1 _ (or_introl (eq_refl _))).
+  unfold inlineSingle_Rule; destruct a, f; simpl in *.
+  eapply WfConcatActionT_inlineSingle_Meth; eauto.
+Qed.
+
+Lemma WfConcatActionT_inlineSingle_Meth_map meth (f : DefMethT) meths m:
+  (forall v, WfConcatActionT (projT2 (snd f) type v) m) ->
+  In meth (map (inlineSingle_Meth f) meths) ->
+  (forall meth', In meth' meths ->
+                 (forall v', WfConcatActionT (projT2 (snd meth') type v') m)) ->
+  (forall v, WfConcatActionT (projT2 (snd meth) type v) m).
+Proof.
+  intros.
+  induction meths; simpl in *;[tauto|].
+  destruct H0; subst; eauto.
+  specialize (H1 _ (or_introl (eq_refl _))).
+  unfold inlineSingle_Meth; destruct a, f; simpl in *.
+  destruct (string_dec s1 s), s0; subst; simpl; eauto.
+  eapply WfConcatActionT_inlineSingle_Meth; eauto.
+Qed.
+
+Lemma WfConcatActionT_inlineSingle_Rule_pos rule meths m xs:
+    (forall (f : DefMethT), In f meths ->
+                            (forall v, WfConcatActionT (projT2 (snd f) type v) m)) ->
+    forall (rules : list RuleT),
+      (forall rule', In rule' rules ->
+                     WfConcatActionT (snd rule' type) m) ->
+      In rule (fold_left
+                 (fun (newRules : list RuleT) (n : nat) =>
+                    inlineSingle_Rules_pos meths n newRules) xs rules) ->
+      WfConcatActionT (snd rule type) m.
+Proof.
+  induction xs; simpl; intros; simpl in *; auto.
+  eapply IHxs;[ | | apply H1]; eauto.
+  unfold inlineSingle_Rules_pos in *.
+  case_eq (nth_error meths a); intros; eauto.
+  rewrite H2 in H1.
+  eapply WfConcatActionT_inlineSingle_Rule_map; eauto.
+  apply H.
+  apply (nth_error_In _ _ H2).
+Qed.
+
+Lemma WfConcatActionT_inlineSingle_Meth_pos meth m xs:
+  forall meths,
+    (forall (f : DefMethT), In f meths ->
+                            (forall v, WfConcatActionT (projT2 (snd f) type v) m)) ->
+    In meth (fold_left inlineSingle_Meths_pos xs meths) ->
+    (forall v, WfConcatActionT (projT2 (snd meth) type v) m).
+Proof.
+  induction xs; simpl; intros; simpl in *; auto.
+  eapply IHxs;[|apply H0].
+  intros.
+  unfold inlineSingle_Meths_pos in H1.
+  case_eq (nth_error meths a); intros.
+  - rewrite H2 in H1.
+    eapply WfConcatActionT_inlineSingle_Meth_map; eauto.
+    eapply H.
+    apply (nth_error_In _ _ H2).
+  - rewrite H2 in H1.
+    apply H; auto.
+Qed.
+
+Corollary WfConcatActionT_inlineAll_Meths meth meths m:
+    (forall (f : DefMethT), In f meths ->
+                            (forall v, WfConcatActionT (projT2 (snd f) type v) m)) ->
+    In meth (inlineAll_Meths meths) ->
+    (forall v, WfConcatActionT (projT2 (snd meth) type v) m).
+Proof.
+  unfold inlineAll_Meths.
+  eauto using WfConcatActionT_inlineSingle_Meth_pos.
+Qed.
+
+Corollary WfConcatActionT_inlineAll_Rules rule (rules : list RuleT) meths m:
+    (forall (f : DefMethT), In f meths ->
+                            (forall v, WfConcatActionT (projT2 (snd f) type v) m)) ->
+    (forall rule', In rule' rules ->
+                   WfConcatActionT (snd rule' type) m) ->
+    In rule (inlineAll_Rules meths rules) ->
+    WfConcatActionT (snd rule type) m.
+Proof.
+  unfold inlineAll_Rules.
+  eauto using WfConcatActionT_inlineSingle_Rule_pos.
+Qed.
+
 Definition hidden_by (meths : list DefMethT) (h : string) : bool :=
   (getBool (in_dec string_dec h (map fst meths))).
 
@@ -7168,7 +7273,8 @@ Definition hidden_by_Base (lb : list BaseModule) (h : string) : bool :=
 
 Definition separateHides (tl : list string * (list RegFileBase * list BaseModule)) :
   (list string * list string) :=
-  (filter (hidden_by_Base (map BaseRegFile (fst (snd tl)))) (fst tl), filter (complement (hidden_by_Base (map BaseRegFile (fst (snd tl))))) (fst tl)).
+  (filter (hidden_by_Base (map BaseRegFile (fst (snd tl)))) (fst tl),
+   filter (complement (hidden_by_Base (map BaseRegFile (fst (snd tl))))) (fst tl)).
 
 Definition separateModHides (m: Mod) :=
   let '(hides, (rfs, mods)) := separateMod m in
@@ -7177,11 +7283,6 @@ Definition separateModHides (m: Mod) :=
 
 Definition defined_hide (m : Mod) (h : string) : bool :=
   (getBool (in_dec string_dec h (map fst (getAllMethods m)))).
-
-(*Lemma SameKey_getAllRules
-      (getAllRules
-       (createHide (inlineAll_All_mod (mergeSeparatedBaseMod l0))
-          (getHidden (mergeSeparatedBaseMod l0))))*)
 
 Lemma mergeSeparatedDistributed_Wf (m : ModWf):
   let t := separateModHides m in
@@ -7245,9 +7346,19 @@ Proof.
       * clear - WfConcat2.
         inv WfConcat2; split; intros.
         -- rewrite createHide_Rules in H1; simpl in H1.
-           admit.
+           rewrite getAllRules_createHideMod in *.
+           rewrite getAllMethods_createHideMod in *.
+           assert
+             (forall meth,
+                 In meth (inlineAll_Meths (getAllMethods (mergeSeparatedBaseMod l0))) ->
+                 forall v : type (fst (projT1 (snd meth))),
+                   WfConcatActionT (projT2 (snd meth) type v) (mergeSeparatedBaseFile l)).
+           { intros. eapply WfConcatActionT_inlineAll_Meths; eauto. }
+           clear H0.
+           eapply WfConcatActionT_inlineAll_Rules; eauto.
         -- rewrite createHide_Meths in H1; simpl in H1.
-           admit.
+           rewrite getAllMethods_createHideMod in *.
+           eapply  WfConcatActionT_inlineAll_Meths; eauto.
   - apply mergeFile_noCalls.
   - intros.
     clear - H.
@@ -7259,5 +7370,7 @@ Proof.
     unfold getAllBaseMethods; simpl.
     rewrite map_app, in_app_iff in *.
     destruct H1;[left|right];auto.
-Admitted.
-           
+Qed.
+
+Definition mergeSeparatedDistributed_ModWf (m : ModWf) : ModWf :=
+  Build_ModWf (mergeSeparatedDistributed_Wf m).
