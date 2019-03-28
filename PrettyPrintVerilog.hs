@@ -364,10 +364,10 @@ ppRtlSys (T.RtlDispBit _ e f) = do
   return $ "        $write(\"" ++ ppFullBitFormat f ++ "\", " ++ s ++ ");\n"
 ppRtlSys (T.RtlDispStruct n fk fs fv ff) = do
   rest <- mapM (\i -> ppRtlExpr "sys" (T.RtlReadStruct n fk fs fv i)) (T.getFins n)
-  return $ "        $write(\"{" ++ Data.List.concat (Data.List.map (\i -> fs i ++ ":=" ++ ppFullBitFormat (ff i) ++ "; ") (T.getFins n)) ++ "}\", " ++ Data.List.concat rest ++ ");\n"
+  return $ "        $write(\"{" ++ Data.List.concat (Data.List.map (\i -> fs i ++ ":=" ++ ppFullBitFormat (ff i) ++ "; ") (T.getFins n)) ++ "}\", " ++ intercalate ", " rest ++ ");\n"
 ppRtlSys (T.RtlDispArray n k v f) = do
   rest <- mapM (\i -> ppRtlExpr "sys" (T.RtlReadArray n k v (T.RtlConst k (T.ConstBit (T._Nat__log2_up n) (T.natToWord (T._Nat__log2_up n) i))))) [0 .. (n-1)]
-  return $ "        $write(\"[" ++ Data.List.concat (Data.List.map (\i -> show i ++ ":=" ++ ppFullBitFormat f ++ "; ") [0 .. (n-1)]) ++ "]\", " ++ Data.List.concat rest ++ ");\n"
+  return $ "        $write(\"[" ++ Data.List.concat (Data.List.map (\i -> show i ++ ":=" ++ ppFullBitFormat f ++ "; ") [0 .. (n-1)]) ++ "]\", " ++ intercalate ", " rest ++ ");\n"
 ppRtlSys (T.RtlFinish) = return $ "        $finish();\n"
 
 ppRtlModule :: T.RtlModule -> String

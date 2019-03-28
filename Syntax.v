@@ -2156,8 +2156,8 @@ Notation "'RegisterVec' name 'using' nums : type <- init" :=
 (* Gallina Record Notations *)
 Notation "x {* proj  :=  v *}" := (set proj (constructor v) x)
                                     (at level 14, left associativity).
-Notation "x {* proj  ::=  f *}" := (set proj f x)
-                                     (at level 14, f at next level, left associativity).
+Notation "x {* proj  ::==  f *}" := (set proj f x)
+                                      (at level 14, f at next level, left associativity).
 
 
 
