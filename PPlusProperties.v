@@ -7374,3 +7374,55 @@ Qed.
 
 Definition mergeSeparatedDistributed_ModWf (m : ModWf) : ModWf :=
   Build_ModWf (mergeSeparatedDistributed_Wf m).
+
+Lemma ConcatMod_CreateHide_RemoveHides (m1 : Mod) (m2 : BaseModule) (hl1 hl2 : list string):
+  (forall h, ~In h hl1 \/ ~In h hl2) ->
+  WfMod (createHideMod (ConcatMod m1 (createHide m2 hl1)) hl2)->
+  WfMod (createHideMod (ConcatMod m1 (removeHides m2 hl1)) hl2).
+Proof.
+  intros.
+  rewrite WfMod_createHideMod in *; split; dest.
+  - repeat intro.
+    specialize (H0 _ H2).
+    simpl in *; rewrite map_app, in_app_iff in *.
+    destruct H0; auto.
+    right.
+    rewrite createHide_Meths in *.
+    rewrite in_map_iff in *; dest.
+    exists x0; split; auto.
+    rewrite filter_In; split; auto.
+    destruct in_dec; simpl in *; auto.
+    exfalso.
+    clear - H H0 H2 i; specialize (H x); subst.
+    firstorder. 
+  - clear - H1.
+    inv H1; rewrite createHide_Rules, createHide_Meths, createHide_Regs in *.
+    constructor; simpl; auto.
+    + intro; destruct (HDisjMeths k); auto.
+      clear - H; right; rewrite in_map_iff in *; intro; apply H; dest.
+      rewrite filter_In in *; dest.
+      exists x; auto.
+    + rewrite WfMod_createHide in HWf2; dest.
+      clear - H0.
+      inv H0; constructor.
+      apply removeHidesWf; auto.
+    + unfold WfConcat in *; dest; repeat split.
+      * clear - H1; intros.
+        specialize (H1 _ H).
+        induction H1; econstructor; eauto.
+      * clear - H2; intros.
+        specialize (H2 _ H v).
+        induction H2; econstructor; eauto.
+    + unfold WfConcat in *; dest; repeat split.
+      * clear - H; intros.
+        rewrite createHide_Rules in *.
+        simpl in *.
+        specialize (H _ H0).
+        induction H; econstructor; eauto.
+      * clear - H0; intros.
+        rewrite createHide_Meths in *.
+        simpl in *.
+        rewrite filter_In in *; dest.
+        specialize (H0 _ H v).
+        induction H0; econstructor; eauto.
+Qed.
