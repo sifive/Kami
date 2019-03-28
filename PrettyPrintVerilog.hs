@@ -2,9 +2,9 @@
 
 import qualified Target as T
 import Data.List
-import Data.List.Split
+import Data.Char
 import Control.Monad.State.Lazy
-import qualified Data.HashMap.Lazy as H
+import qualified Data.Map.Lazy as H
 import Debug.Trace
 
 instance Show T.Coq_word where
@@ -49,25 +49,12 @@ ppDeclType :: String -> T.Kind -> String
 ppDeclType s k = ppTypeName k ++ ppType k ++ " " ++ s
 
 ppName :: String -> String
-ppName s = intercalate "$" (Data.List.map (\x -> ppDottedName x) (splitOneOf "$#?" s))
-  {-
-  if elem '.' s
-  then intercalate "$" (case splitOneOf ".#" s of
-                          x : y : xs -> x : y : xs
-                          ys -> ys)
-  else Data.List.map (\x -> case x of
-                         '#' -> '$'
-                         c -> c) s
--}
-
+ppName s = map (\x -> if isAlphaNum x || x == '_' then x else '$') s
 
 
 ppType :: T.Kind -> String
 ppType T.Bool = ""
 ppType (T.Bit i) = "[" ++ show (i-1) ++ ":0]"
-  -- if i > 0
-  -- then "[" ++ show (i-1) ++ ":0]"
-  -- else ""
 ppType v@(T.Array i k) =
   let (k', is) = ppTypeVec k i
   in case k' of
@@ -75,13 +62,6 @@ ppType v@(T.Array i k) =
        _ -> concatMap ppVecLen is ++ ppType k'
 ppType (T.Struct n fk fs) =
   "{" ++ concatMap (\i -> ppDealSize0 (fk i) "" (' ' : ppDeclType (ppName $ fs i) (fk i) ++ ";")) (T.getFins n) ++ "}"
-
-ppDottedName :: String -> String
-ppDottedName s =
-  case splitOn "." s of
-    x : y : nil -> y ++ "$" ++ x
-    x : nil -> x
-
 
 ppPrintVar :: (String, Int) -> String
 ppPrintVar (s, v) = ppName $ s ++ if v /= 0 then '#' : show v else []
@@ -97,7 +77,7 @@ ppConst (T.ConstArray n k fv) = '{' : intercalate ", " (Data.List.map ppConst (D
 ppConst (T.ConstStruct n fk fs fv) = '{' : intercalate ", " (snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins n)) (Data.List.map ppConst (Data.List.map fv (T.getFins n))))))) ++ "}"
 
 
-ppRtlExpr :: String -> T.RtlExpr -> State (H.HashMap String (Int, T.Kind)) String
+ppRtlExpr :: String -> T.RtlExpr -> State (H.Map String (Int, T.Kind)) String
 ppRtlExpr who e =
   case e of
     T.RtlReadReg k s -> return $ ppDealSize0 k "0" (ppName s)
@@ -143,16 +123,6 @@ ppRtlExpr who e =
           x1 <- ppRtlExpr who e1
           x2 <- ppRtlExpr who e2
           return $ '{' : x1 ++ ", " ++ x2 ++ "}"
-      -- if n /= 0
-      -- then
-      --   do
-      --     x1 <- ppRtlExpr who e1
-      --     x2 <- ppRtlExpr who e2
-      --     return $ '{' : x1 ++ ", " ++ x2 ++ "}"
-      -- else
-      --   do
-      --     x1 <- ppRtlExpr who e1
-      --     return x1
     T.RtlBinBitBool _ _ (_) e1 e2 -> binExpr e1 "<" e2
     T.RtlITE _ p e1 e2 -> triExpr p "?" e1 ":" e2
     T.RtlEq _ e1 e2 -> binExpr e1 "==" e2
@@ -182,7 +152,7 @@ ppRtlExpr who e =
         return $ if T.size k == 0 || n == 0 then "0" else '{': intercalate ", " strs ++ "}"
   where
     filterKind0 num fk es = snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins num)) (Data.List.map es (T.getFins num)))))
-    optionAddToTrunc :: T.Kind -> T.RtlExpr -> State (H.HashMap String (Int, T.Kind)) String
+    optionAddToTrunc :: T.Kind -> T.RtlExpr -> State (H.Map String (Int, T.Kind)) String
     optionAddToTrunc k e =
       case e of
         T.RtlReadReg k s -> return $ case k of
@@ -195,12 +165,12 @@ ppRtlExpr who e =
           x <- ppRtlExpr who e
           new <- addToTrunc k x
           return new
-    createTrunc :: T.Kind -> T.RtlExpr -> Int -> Int -> State (H.HashMap String (Int, T.Kind)) String
+    createTrunc :: T.Kind -> T.RtlExpr -> Int -> Int -> State (H.Map String (Int, T.Kind)) String
     createTrunc k e msb lsb =
       do
         new <- optionAddToTrunc k e
         return $ new ++ '[' : show msb ++ ':' : show lsb ++ "]"
-    addToTrunc :: T.Kind -> String -> State (H.HashMap String (Int, T.Kind)) String
+    addToTrunc :: T.Kind -> String -> State (H.Map String (Int, T.Kind)) String
     addToTrunc kind s =
       do
         x <- get
@@ -384,7 +354,7 @@ ppBitFormat T.Hex = "x"
 ppFullBitFormat :: T.FullBitFormat -> String
 ppFullBitFormat (sz, f) = "%" ++ show sz ++ ppBitFormat f
 
-ppRtlSys :: T.RtlSysT -> State (H.HashMap String (Int, T.Kind)) String
+ppRtlSys :: T.RtlSysT -> State (H.Map String (Int, T.Kind)) String
 ppRtlSys (T.RtlDispString s) = return $ "        $write(\"" ++ s ++ "\");\n"
 ppRtlSys (T.RtlDispBool e f) = do
   s <- ppRtlExpr "sys" e
@@ -480,14 +450,6 @@ sumOutEdge x = case x of
                  (a, b) : ys -> Data.List.length b + sumOutEdge ys
 
 
--- ppRfInstance :: RegFileBase -> string
--- ppRfInstance rf@(RegFile dataArray reads write idxNum dataT init) =
---   "  RegFile " ++ dataArray ++ "#(.idxNum(" ++ idxNum ++ "), .dataSz(" ++ size dataT ++ ")) (" ++
-  
-  
--- ppRfInstance rf@(SyncRegFile isAddr dataArray reads write idxNum dataT init) =
-
-
 ppTopModule :: T.RtlModule -> String
 ppTopModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
   concatMap ppRfModule regFs ++
@@ -532,11 +494,4 @@ ppRfFile (((name, reads), write), ((idxType, dataType), T.ConstArray num k fv)) 
 ppRfName :: (((String, [(String, Bool)]), String), ((Int, T.Kind), T.ConstT)) -> String
 ppRfName (((name, reads), write), ((idxType, dataType), T.ConstArray num k fv)) = ppName name ++ ".mem"
 
-main =
-  -- do
-  --   let !t = show rtlMod
-  --   putStr t
-  do
-    putStrLn $ ppTopModule T.rtlMod
-    --let (Build_RtlModule hiddenMeths regFs _ _ _ _ _ _) = rtlMod in
-    --  mapM_ (\rf -> writeFile (ppRfName rf) (ppRfFile rf)) regFs
+main = putStrLn $ ppTopModule T.rtlMod
