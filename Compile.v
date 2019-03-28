@@ -1,4 +1,4 @@
-Require Import Syntax RecordUpdate.RecordSet Rtl Thread.
+Require Import Syntax RecordUpdate.RecordSet Rtl StateMonad.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
