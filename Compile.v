@@ -138,11 +138,13 @@ Section Compile.
                                                   | Some x1, Some x2 => Some (x1 && x2)
                                                   end |}.
 
-  Import ApplicativeNotations.
+  Delimit Scope settable_scope with set.
+  Infix "<*>" := (applicative_ap) (at level 11, left associativity) : settable_scope.
+
   Global Instance etaX_RtlExprs : Settable _ :=
-    mkSettable
-      (constructor Build_RtlExprs
-                   <*> tempWires <*> regsWrite <*> methCalls <*> systCalls <*> guard)%set.
+    settable!
+      Build_RtlExprs
+                   <tempWires ; regsWrite ; methCalls ; systCalls ; guard>%set.
 
   Local Notation "x [ proj  :=  v ]" := (set proj (constructor v) x)
                                       (at level 14, left associativity).
