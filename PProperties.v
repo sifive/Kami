@@ -5,7 +5,6 @@ Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
 Require Import ZArith.
-Import BasicKamiLtacs.
 
 Lemma PSemAction_SemAction o k:
   forall (a : ActionT type k) (readRegs newRegs : RegsT) (calls : MethsT) (fret : type k),

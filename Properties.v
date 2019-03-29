@@ -5,7 +5,6 @@ Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
 Require Import ZArith.
-Import BasicKamiLtacs.
 
 Definition filterRegs f m (o: RegsT) :=
   filter (fun x => f (getBool (in_dec string_dec (fst x) (map fst (getAllRegisters m))))) o.

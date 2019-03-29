@@ -5,7 +5,6 @@ Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
 Require Import ZArith Lib.EclecticLib.
-Import BasicKamiLtacs.
 
 Local Notation PPT_execs := (fun x => fst (snd x)).
 Local Notation PPT_calls := (fun x => snd (snd x)).
@@ -7539,17 +7538,17 @@ Theorem mergeSeparatedRemoved_TraceInclusion_l (m : ModWf):
   baseNoSelfCalls m ->
   TraceInclusion (mergeSeparatedRemoved_ModWf m) m.
 Proof.
-  specialize (WfMod_merge (wfMod m)) as TMP1.
-  specialize (TraceInclusion_Merge_r m) as P0; simpl in *;
+  specialize (WfMod_merge (wfMod m)) as P0.
+  specialize (TraceInclusion_Merge_r m) as P1; simpl in *;
     unfold mergeSeparatedMod in *.
-  specialize (mergeSeparatedDistributed_Wf m) as P1.
+  specialize (mergeSeparatedDistributed_Wf m) as P2.
   intros; simpl; unfold separateModRemove, separateModHides, baseNoSelfCalls in *.
   destruct separateMod, p; simpl in *.
-  rewrite createHideMod_createHide_BaseModule in P1.
-  specialize (Concat_createHide _ _ _ H P1) as P2.
-  specialize (mergeFile_noCalls l0) as P3.
+  rewrite createHideMod_createHide_BaseModule in P2.
+  specialize (Concat_createHide _ _ _ H P2) as P3.
+  specialize (mergeFile_noCalls l0) as P4.
   assert (forall h, In h (filter (complement (hiddenByBase (map BaseRegFile l0))) l) ->
-                    ~ In h (map fst (getAllMethods (mergeSeparatedBaseFile l0)))) as P4.
+                    ~ In h (map fst (getAllMethods (mergeSeparatedBaseFile l0)))) as P5.
   { repeat intro.
     rewrite filter_In in H0; dest.
     unfold hiddenByBase, getAllBaseMethods, hiddenBy in H2.
@@ -7562,14 +7561,14 @@ Proof.
   }
   specialize (factorHides_TraceInclusion_app
                 (inlineAll_All_mod (mergeSeparatedBaseMod l1))
-                _ (filter (hiddenByBase (map BaseRegFile l0)) l) P3 P4) as P5.
+                _ (filter (hiddenByBase (map BaseRegFile l0)) l) P4 P5) as P6.
   specialize (createHides_perm_TraceInclusion
                 (ConcatMod (mergeSeparatedBaseFile l0)
                            (inlineAll_All_mod (mergeSeparatedBaseMod l1)))
                 (Permutation_sym
                    (Permutation_trans
                       (separate_calls_by_filter l (hiddenByBase (map BaseRegFile l0)))
-                      (Permutation_app_comm _ _)))) as P6.
+                      (Permutation_app_comm _ _)))) as P7.
   assert (TraceInclusion
             (createHideMod
                (ConcatMod (mergeSeparatedBaseFile l0)
@@ -7582,7 +7581,7 @@ Proof.
     - reflexivity.
     - simpl; rewrite <-SameKeys_inlineAll_Meths, mergeSeparatedBaseMod_noHides.
       reflexivity.
-    - rewrite WfMod_createHideMod in TMP1; dest.
+    - rewrite WfMod_createHideMod in P0; dest.
       inv H1.
       constructor; auto.
       + clear - HDisjRules.
@@ -7607,11 +7606,11 @@ Proof.
           rewrite mergeSeparatedBaseFile_noHides; auto.
         * induction (projT2 (snd meth) type v); econstructor; eauto.
           rewrite mergeSeparatedBaseFile_noHides; auto.
-    - rewrite WfMod_createHideMod in TMP1; dest.
+    - rewrite WfMod_createHideMod in P0; dest.
       assumption.
     - apply TraceInclusion_refl.
     - unfold inlineAll_All_mod.
-      rewrite WfMod_createHideMod in TMP1; dest.
+      rewrite WfMod_createHideMod in P0; dest.
       inv H1.
       specialize (TraceInclusion_inlineAll_pos_l (WfMod_WfBase_getFlat HWf2)) as TMP2; dest.
       specialize (TraceInclusion_flatten_l (Build_ModWf HWf2)) as TMP3; simpl in *.
@@ -7626,17 +7625,17 @@ Theorem mergeSeparatedRemoved_TraceInclusion_r (m : ModWf):
   baseNoSelfCalls m ->
   TraceInclusion m (mergeSeparatedRemoved_ModWf m).
 Proof.
-  specialize (WfMod_merge (wfMod m)) as TMP1.
-  specialize (TraceInclusion_Merge_l m) as P0; simpl in *;
+  specialize (WfMod_merge (wfMod m)) as P0.
+  specialize (TraceInclusion_Merge_l m) as P1; simpl in *;
     unfold mergeSeparatedMod in *.
-  specialize (mergeSeparatedDistributed_Wf m) as P1.
+  specialize (mergeSeparatedDistributed_Wf m) as P2.
   intros; simpl; unfold separateModRemove, separateModHides, baseNoSelfCalls in *.
   destruct separateMod, p; simpl in *.
-  rewrite createHideMod_createHide_BaseModule in P1.
-  specialize (Concat_removeHide _ _ _ H P1) as P2.
-  specialize (mergeFile_noCalls l0) as P3.
+  rewrite createHideMod_createHide_BaseModule in P2.
+  specialize (Concat_removeHide _ _ _ H P2) as P3.
+  specialize (mergeFile_noCalls l0) as P4.
   assert (forall h, In h (filter (complement (hiddenByBase (map BaseRegFile l0))) l) ->
-                    ~ In h (map fst (getAllMethods (mergeSeparatedBaseFile l0)))) as P4.
+                    ~ In h (map fst (getAllMethods (mergeSeparatedBaseFile l0)))) as P5.
   { repeat intro.
     rewrite filter_In in H0; dest.
     unfold hiddenByBase, getAllBaseMethods, hiddenBy in H2.
@@ -7649,13 +7648,13 @@ Proof.
   }
   specialize (distributeHides_app_TraceInclusion
                 (inlineAll_All_mod (mergeSeparatedBaseMod l1))
-                _ (filter (hiddenByBase (map BaseRegFile l0)) l) P3 P4) as P5.
+                _ (filter (hiddenByBase (map BaseRegFile l0)) l) P4 P5) as P6.
   specialize (createHides_perm_TraceInclusion
                 (ConcatMod (mergeSeparatedBaseFile l0)
                            (inlineAll_All_mod (mergeSeparatedBaseMod l1)))
                 (Permutation_trans
                    (separate_calls_by_filter l (hiddenByBase (map BaseRegFile l0)))
-                   (Permutation_app_comm _ _))) as P6.
+                   (Permutation_app_comm _ _))) as P7.
   assert (TraceInclusion
             (createHideMod
                (ConcatMod (mergeSeparatedBaseFile l0)
@@ -7668,9 +7667,9 @@ Proof.
     - reflexivity.
     - simpl; rewrite <-SameKeys_inlineAll_Meths, mergeSeparatedBaseMod_noHides.
       reflexivity.
-    - rewrite WfMod_createHideMod in TMP1; dest.
+    - rewrite WfMod_createHideMod in P0; dest.
       assumption.
-    - rewrite WfMod_createHideMod in TMP1; dest.
+    - rewrite WfMod_createHideMod in P0; dest.
       inv H1.
       constructor; auto.
       + clear - HDisjRules.
@@ -7697,7 +7696,7 @@ Proof.
           rewrite mergeSeparatedBaseFile_noHides; auto.
     - apply TraceInclusion_refl.
     - unfold inlineAll_All_mod.
-      rewrite WfMod_createHideMod in TMP1; dest.
+      rewrite WfMod_createHideMod in P0; dest.
       inv H1.
       specialize (TraceInclusion_inlineAll_pos (WfMod_WfBase_getFlat HWf2)) as TMP2; dest.
       specialize (TraceInclusion_flatten_r (Build_ModWf HWf2)) as TMP3; simpl in *.

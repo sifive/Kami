@@ -6,7 +6,6 @@ Export Word.Notations.
 Require Import Permutation RecordUpdate.RecordSet.
 Require Import ZArith.
 Import ListNotations.
-Import BasicKamiLtacs.
 
 Global Set Implicit Arguments.
 Global Set Asymmetric Patterns.

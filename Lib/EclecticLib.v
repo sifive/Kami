@@ -5,6 +5,14 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+Ltac existT_destruct dec :=
+  match goal with
+  | H: existT _ _ _ = existT _ _ _ |- _ =>
+    apply EqdepFacts.eq_sigT_eq_dep in H;
+    apply (Eqdep_dec.eq_dep_eq_dec dec) in H;
+    subst
+  end.
+
 Fixpoint Fin_eq_dec n a {struct a}: forall (b: Fin.t n), {a = b} + {a <> b}.
 Proof.
   refine
@@ -22,13 +30,7 @@ Proof.
                                                end
                              end x (Fin_eq_dec _ x)
     end; intro; clear Fin_eq_dec; try (abstract discriminate).
-  abstract (injection H; intros;
-            match goal with
-            | H: existT _ _ _ = existT _ _ _ |- _ =>
-              apply EqdepFacts.eq_sigT_eq_dep in H;
-              apply (Eqdep_dec.eq_dep_eq_dec Nat.eq_dec) in H;
-              subst
-            end; tauto).
+  abstract (injection H; intros; existT_destruct Nat.eq_dec; tauto).
 Defined.
 
 
@@ -1449,54 +1451,40 @@ Qed.
 
 
 (* Useful Ltacs *)
+Ltac EqDep_subst :=
+  repeat match goal with
+         |[H : existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _] => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
+         end.
 
-Module BasicKamiLtacs.
-  Ltac existT_destruct dec :=
-    match goal with
-    | H: existT _ _ _ = existT _ _ _ |- _ =>
-      apply EqdepFacts.eq_sigT_eq_dep in H;
-      apply (Eqdep_dec.eq_dep_eq_dec dec) in H;
-      subst
-    end.
+Ltac constructor_simpl :=
+  econstructor; eauto; simpl; unfold not; intros.
 
-  Ltac EqDep_subst :=
-    repeat match goal with
-           |[H : existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _] => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
-           end.
+Ltac inv H :=
+  inversion H; subst; clear H.
 
-  Ltac constructor_simpl :=
-    econstructor; eauto; simpl; unfold not; intros.
+Ltac dest :=
+  repeat (match goal with
+          | H: _ /\ _ |- _ => destruct H
+          | H: exists _, _ |- _ => destruct H
+          end).
+Ltac discharge_appendage :=
+  repeat match goal with
+         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
+           rewrite append_remove_prefix in H; subst
+         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
+           rewrite append_remove_suffix in H; subst
+         | H: _ \/ _ |- _ => destruct H; subst
+         end.
 
-  Ltac inv H :=
-    inversion H; subst; clear H.
-
-  Ltac dest :=
-    repeat (match goal with
-            | H: _ /\ _ |- _ => destruct H
-            | H: exists _, _ |- _ => destruct H
-            end).
-  Ltac discharge_appendage :=
-    repeat match goal with
-           | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
-             rewrite append_remove_prefix in H; subst
-           | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
-             rewrite append_remove_suffix in H; subst
-           | H: _ \/ _ |- _ => destruct H; subst
-           end.
-
-  Ltac discharge_DisjKey :=
-    try match goal with
-        | |- DisjKey ?P ?Q => rewrite DisjKeyWeak_same by apply string_dec;
-                              unfold DisjKeyWeak; simpl; intros
-        end;
-    discharge_appendage;
-    subst;
-    auto;
-    try discriminate.
-
-End BasicKamiLtacs.
-
-Import BasicKamiLtacs.
+Ltac discharge_DisjKey :=
+  try match goal with
+      | |- DisjKey ?P ?Q => rewrite DisjKeyWeak_same by apply string_dec;
+                            unfold DisjKeyWeak; simpl; intros
+      end;
+  discharge_appendage;
+  subst;
+  auto;
+  try discriminate.
 
 Local Example test_normaldisj:
   DisjKey (map (fun x => (x, 1)) ("a" :: "b" :: "c" :: nil))%string
