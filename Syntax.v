@@ -6,6 +6,7 @@ Export Word.Notations.
 Require Import Permutation RecordUpdate.RecordSet.
 Require Import ZArith.
 Import ListNotations.
+Import BasicKamiLtacs.
 
 Global Set Implicit Arguments.
 Global Set Asymmetric Patterns.
@@ -2072,7 +2073,7 @@ Fixpoint getOrder (im : InModule) :=
     end
   end.
 
-Ltac _discharge_wf :=
+Ltac discharge_wf :=
   repeat match goal with
          | |- @WfMod _ => constructor_simpl
          | |- @WfConcat _ _ => constructor_simpl
@@ -2088,13 +2089,13 @@ Ltac _discharge_wf :=
 
 Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
   {| baseModuleWf := {| baseModule := makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) ;
-                        wfBaseModule := ltac:(_discharge_wf) |} ;
+                        wfBaseModule := ltac:(discharge_wf) |} ;
      baseModuleOrd := getOrder (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) |}
     (only parsing).
 
 Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
   {| modWf := {| module := Base (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..)) ;
-                 wfMod := ltac:(_discharge_wf) |} ;
+                 wfMod := ltac:(discharge_wf) |} ;
      modOrd := getOrder (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) |}
     (only parsing).
 

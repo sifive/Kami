@@ -5,6 +5,7 @@ Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
 Require Import ZArith.
+Import BasicKamiLtacs.
 
 Definition filterRegs f m (o: RegsT) :=
   filter (fun x => f (getBool (in_dec string_dec (fst x) (map fst (getAllRegisters m))))) o.
@@ -2122,7 +2123,7 @@ Section StepSimulation.
           rewrite nthProp2_cons; split; auto.
   Qed.
 
-  Theorem _StepSimulation:
+  Theorem StepSimulation:
     TraceInclusion imp spec.
   Proof.
     unfold TraceInclusion; intros.
@@ -2173,10 +2174,10 @@ Section SimulationZero.
              UpdRegs [uSpec] oSpec oSpec' /\
              simRel oImp' oSpec')).
 
-  Theorem _simulationZero:
+  Theorem simulationZero:
     TraceInclusion (Base imp) (Base spec).
   Proof.
-    apply _StepSimulation with (simRel := simRel); auto; intros.
+    apply StepSimulation with (simRel := simRel); auto; intros.
     inv H.
     pose proof HSubsteps as sth.
     inv HSubsteps; simpl in *.
@@ -3806,7 +3807,7 @@ Proof.
   split; induction 1; econstructor; eauto.
 Qed.
 
-Theorem _flatten_WfMod m: WfMod m -> WfMod (flatten m).
+Theorem flatten_WfMod m: WfMod m -> WfMod (flatten m).
 Proof.
   unfold flatten.
   induction 1; simpl; auto; intros.
@@ -3852,8 +3853,8 @@ Proof.
            ++ eapply NoDup_DisjKey; eauto.
 Qed.
 
-Definition flattened_ModWf m: ModWf :=
-  (Build_ModWf (_flatten_WfMod (wfMod m))).
+Definition flatten_ModWf m: ModWf :=
+  (Build_ModWf (flatten_WfMod (wfMod m))).
 
 Section TraceSubstitute.
   Variable m: ModWf.
@@ -3884,7 +3885,7 @@ Section TraceSubstitute.
       + destruct m; auto.
   Qed.
 
-  Theorem _TraceInclusion_flatten_r: TraceInclusion m (flattened_ModWf m).
+  Theorem TraceInclusion_flatten_r: TraceInclusion m (flatten_ModWf m).
   Proof.
     unfold TraceInclusion; intros.
     exists o1, ls1.
@@ -3892,7 +3893,7 @@ Section TraceSubstitute.
     apply Trace_flatten_same1; auto.
   Qed.
 
-  Theorem _TraceInclusion_flatten_l: TraceInclusion (flattened_ModWf m) m.
+  Theorem TraceInclusion_flatten_l: TraceInclusion (flatten_ModWf m) m.
   Proof.
     apply TraceInclusion'_TraceInclusion.
     unfold TraceInclusion'; intros.
@@ -4145,7 +4146,7 @@ Section ModularSubstitution.
   Variable wfAConcatB: WfMod (ConcatMod a b).
   Variable wfA'ConcatB': WfMod (ConcatMod a' b').
 
-  Theorem _ModularSubstitution: TraceInclusion a a' ->
+  Theorem ModularSubstitution: TraceInclusion a a' ->
                              TraceInclusion b b' ->
                              TraceInclusion (ConcatMod a b) (ConcatMod a' b').
   Proof.
@@ -4435,7 +4436,7 @@ Section SimulationZeroAct.
                  UpdRegs [uSpec] oSpec oSpec' /\
                  simRel oImp' oSpec')).
 
-  Theorem _simulationZeroAct:
+  Theorem simulationZeroAct:
     TraceInclusion (Base imp) (Base spec).
   Proof.
     pose proof (wfBaseModule imp) as wfImp.
@@ -4443,7 +4444,7 @@ Section SimulationZeroAct.
     inv wfImp.
     inv wfSpec.
     dest.
-    apply _simulationZero with (simRel := simRel); auto; simpl; intros.
+    apply simulationZero with (simRel := simRel); auto; simpl; intros.
     inv H9; [|discriminate].
     inv HLabel.
     specialize (@simulation oImp reads u rn cs oImp' rb HInRules HAction H10 _ H11).
@@ -4643,7 +4644,7 @@ Section SimulationGen.
         tauto.
   Qed.
         
-  Theorem _simulationGen:
+  Theorem simulationGen:
     TraceInclusion (Base imp) (Base spec).
   Proof.
     pose proof (wfBaseModule imp) as wfImp.
@@ -4651,7 +4652,7 @@ Section SimulationGen.
     inv wfImp.
     inv wfSpec.
     dest.
-    apply _StepSimulation with (simRel := simRel); auto; simpl; intros.
+    apply StepSimulation with (simRel := simRel); auto; simpl; intros.
     inv H9.
     pose proof (SubstepsSingle HSubsteps) as sth.
     destruct lImp; [tauto| simpl in *].
@@ -5113,10 +5114,10 @@ Section SimulationGeneralEx.
       SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
       exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
 
-  Theorem _simulationGeneralEx:
+  Theorem simulationGeneralEx:
     TraceInclusion (Base imp) (Base spec).
   Proof.
-    eapply _simulationGen; eauto; intros.
+    eapply simulationGen; eauto; intros.
     - pose proof (SemAction_NoDup_u H0) as sth.
       pose proof (simRelImpGood H2) as sth2.
       apply (f_equal (map fst)) in sth2.
@@ -5173,10 +5174,10 @@ Section SimulationZeroA.
                  UpdRegs [uSpec] oSpec oSpec' /\
                  simRel (doUpdRegs uImp oImp) oSpec')).
 
-  Theorem _simulationZeroA:
+  Theorem simulationZeroA:
     TraceInclusion (Base imp) (Base spec).
   Proof.
-    eapply _simulationZeroAct; eauto; intros.
+    eapply simulationZeroAct; eauto; intros.
     pose proof (SemAction_NoDup_u H0) as sth.
     pose proof (simRelImpGood H2) as sth2.
     apply (f_equal (map fst)) in sth2.
@@ -5244,10 +5245,10 @@ Section SimulationGeneral.
       SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
       exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
 
-  Theorem _simulationGeneral:
+  Theorem simulationGeneral:
     TraceInclusion (Base imp) (Base spec).
   Proof.
-    eapply _simulationGeneralEx; eauto; intros.
+    eapply simulationGeneralEx; eauto; intros.
     - specialize (@simulationRule _ _ _ _ _ _ H H0 oSpec H1).
       destruct simulationRule; auto.
       dest.
@@ -5315,10 +5316,10 @@ Section SimulationZeroAction.
                SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
                  simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec))).
 
-  Theorem _simulationZeroAction:
+  Theorem simulationZeroAction:
     TraceInclusion (Base imp) (Base spec).
   Proof.
-    eapply _simulationZeroA; eauto; intros.
+    eapply simulationZeroA; eauto; intros.
     specialize (@simulation _ _ _ _ _ _ H H0 _ H1).
     destruct simulation; auto.
     right.
@@ -5378,7 +5379,7 @@ Ltac discharge_NoSelfCall :=
          end.
 
 Ltac discharge_simulationGeneral mySimRel disjReg :=
-  apply _simulationGeneral with (simRel := mySimRel); auto; simpl; intros;
+  apply simulationGeneral with (simRel := mySimRel); auto; simpl; intros;
   (repeat match goal with
           | H: _ \/ _ |- _ => destruct H
           | H: False |- _ => exfalso; apply H

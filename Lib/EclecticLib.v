@@ -5,22 +5,6 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
-
-(* Useful Ltacs *)
-
-Ltac existT_destruct dec :=
-  match goal with
-  | H: existT _ _ _ = existT _ _ _ |- _ =>
-    apply EqdepFacts.eq_sigT_eq_dep in H;
-    apply (Eqdep_dec.eq_dep_eq_dec dec) in H;
-    subst
-  end.
-
-Ltac EqDep_subst :=
-  repeat match goal with
-         |[H : existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _] => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
-         end.
-
 Fixpoint Fin_eq_dec n a {struct a}: forall (b: Fin.t n), {a = b} + {a <> b}.
 Proof.
   refine
@@ -38,21 +22,14 @@ Proof.
                                                end
                              end x (Fin_eq_dec _ x)
     end; intro; clear Fin_eq_dec; try (abstract discriminate).
-  abstract (injection H; intros; EqDep_subst; tauto).
+  abstract (injection H; intros;
+            match goal with
+            | H: existT _ _ _ = existT _ _ _ |- _ =>
+              apply EqdepFacts.eq_sigT_eq_dep in H;
+              apply (Eqdep_dec.eq_dep_eq_dec Nat.eq_dec) in H;
+              subst
+            end; tauto).
 Defined.
-
-
-Ltac constructor_simpl :=
-  econstructor; eauto; simpl; unfold not; intros.
-
-Ltac inv H :=
-  inversion H; subst; clear H.
-
-Ltac dest :=
-  repeat (match goal with
-            | H: _ /\ _ |- _ => destruct H
-            | H: exists _, _ |- _ => destruct H
-          end).
 
 
 
@@ -687,7 +664,7 @@ Section DisjKey.
       NoDup (map fst (l1 ++ l2)).
   Proof.
     induction l1; simpl; auto; intros.
-    inv H.
+    inversion H; subst; clear H.
     unfold DisjKey in H1; simpl in H1.
     assert (sth: forall k, ~ In k (map fst l1) \/ ~ In k (map fst l2)) by (clear - H1; firstorder fail).
     specialize (IHl1 _ H5 H0 sth).
@@ -1445,25 +1422,81 @@ Proof.
 Qed.
 
 
-Ltac discharge_appendage :=
-  repeat match goal with
-         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
-           rewrite append_remove_prefix in H; subst
-         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
-           rewrite append_remove_suffix in H; subst
-         | H: _ \/ _ |- _ => destruct H; subst
-         end.
+Lemma key_not_In_fst A B (ls: list (A*B)):
+  forall k,
+    key_not_In k ls <->
+    ~ In k (map fst ls).
+Proof.
+  induction ls; simpl; auto; split; intros; try tauto.
+  - unfold key_not_In in *; simpl; intros; auto.
+  - intro.
+    unfold key_not_In in H; simpl in *.
+    assert (sth: key_not_In k ls) by (firstorder fail).
+    pose proof (proj1 (IHls _) sth) as sth2.
+    destruct H0; [subst|tauto].
+    specialize (H (snd a)).
+    destruct a; simpl in *.
+    firstorder fail.
+  - unfold key_not_In in *; simpl; intros; auto.
+    intro.
+    destruct a; simpl in *.
+    destruct H0.
+    + inversion H0; subst; clear H0.
+      firstorder fail.
+    + apply (in_map fst) in H0; simpl in *.
+      firstorder fail.
+Qed.
 
-Ltac discharge_DisjKey :=
-  try match goal with
-      | |- DisjKey ?P ?Q => rewrite DisjKeyWeak_same by apply string_dec;
-                            unfold DisjKeyWeak; simpl; intros
-      end;
-  discharge_appendage;
-  subst;
-  auto;
-  try discriminate.
 
+(* Useful Ltacs *)
+
+Module BasicKamiLtacs.
+  Ltac existT_destruct dec :=
+    match goal with
+    | H: existT _ _ _ = existT _ _ _ |- _ =>
+      apply EqdepFacts.eq_sigT_eq_dep in H;
+      apply (Eqdep_dec.eq_dep_eq_dec dec) in H;
+      subst
+    end.
+
+  Ltac EqDep_subst :=
+    repeat match goal with
+           |[H : existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _] => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
+           end.
+
+  Ltac constructor_simpl :=
+    econstructor; eauto; simpl; unfold not; intros.
+
+  Ltac inv H :=
+    inversion H; subst; clear H.
+
+  Ltac dest :=
+    repeat (match goal with
+            | H: _ /\ _ |- _ => destruct H
+            | H: exists _, _ |- _ => destruct H
+            end).
+  Ltac discharge_appendage :=
+    repeat match goal with
+           | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
+             rewrite append_remove_prefix in H; subst
+           | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
+             rewrite append_remove_suffix in H; subst
+           | H: _ \/ _ |- _ => destruct H; subst
+           end.
+
+  Ltac discharge_DisjKey :=
+    try match goal with
+        | |- DisjKey ?P ?Q => rewrite DisjKeyWeak_same by apply string_dec;
+                              unfold DisjKeyWeak; simpl; intros
+        end;
+    discharge_appendage;
+    subst;
+    auto;
+    try discriminate.
+
+End BasicKamiLtacs.
+
+Import BasicKamiLtacs.
 
 Local Example test_normaldisj:
   DisjKey (map (fun x => (x, 1)) ("a" :: "b" :: "c" :: nil))%string
@@ -1490,27 +1523,3 @@ Proof.
 Qed.
 
 
-Lemma key_not_In_fst A B (ls: list (A*B)):
-  forall k,
-    key_not_In k ls <->
-    ~ In k (map fst ls).
-Proof.
-  induction ls; simpl; auto; split; intros; try tauto.
-  - unfold key_not_In in *; simpl; intros; auto.
-  - intro.
-    unfold key_not_In in H; simpl in *.
-    assert (sth: key_not_In k ls) by (firstorder fail).
-    pose proof (proj1 (IHls _) sth) as sth2.
-    destruct H0; [subst|tauto].
-    specialize (H (snd a)).
-    destruct a; simpl in *.
-    firstorder fail.
-  - unfold key_not_In in *; simpl; intros; auto.
-    intro.
-    destruct a; simpl in *.
-    destruct H0.
-    + inv H0.
-      firstorder fail.
-    + apply (in_map fst) in H0; simpl in *.
-      firstorder fail.
-Qed.

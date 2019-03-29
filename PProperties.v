@@ -5,6 +5,7 @@ Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
 Require Import ZArith.
+Import BasicKamiLtacs.
 
 Lemma PSemAction_SemAction o k:
   forall (a : ActionT type k) (readRegs newRegs : RegsT) (calls : MethsT) (fret : type k),
@@ -2660,7 +2661,7 @@ Proof.
     rewrite H; intro; contradiction.
 Qed.
 
-Theorem merged_WellFormed m:
+Theorem WfMod_merge m:
   WfMod m ->
   WfMod (mergeSeparatedMod (separateMod m)).
 Proof.
@@ -2728,7 +2729,7 @@ Proof.
         apply mergeSeparatedBaseFile_noHides.
 Qed.
 
-Theorem _WfMod_getFlat m:
+Theorem WfMod_getFlat m:
   (WfMod m) ->
   (WfMod (Base (getFlat m))).
 Proof.
@@ -2742,13 +2743,13 @@ Proof.
 Qed.
 
 Definition WfGetFlatMod (m: ModWf) : ModWf :=
-  (Build_ModWf (_WfMod_getFlat (wfMod m))).
+  (Build_ModWf (WfMod_getFlat (wfMod m))).
 
-Definition WfMergedMod (m : ModWf) :  ModWf :=
-  (Build_ModWf (merged_WellFormed (wfMod m))).
+Definition merge_ModWf (m : ModWf) :  ModWf :=
+  (Build_ModWf (WfMod_merge (wfMod m))).
 
 Lemma merged_perm_equality m :
-  ModWf_perm m (WfMergedMod m).
+  ModWf_perm m (merge_ModWf m).
 Proof.
   constructor; simpl.
   - apply separateBaseMod_flatten.
@@ -2758,7 +2759,7 @@ Proof.
 Qed.
 
 Theorem TraceInclusion_Merge_l (m : ModWf) :
-  TraceInclusion m (WfMergedMod m).
+  TraceInclusion m (merge_ModWf m).
 Proof.
   apply PTraceInclusion_TraceInclusion; try apply wfMod.
   repeat intro.
@@ -2770,7 +2771,7 @@ Proof.
 Qed.
 
 Theorem TraceInclusion_Merge_r (m : ModWf) :
-  TraceInclusion (WfMergedMod m) m.
+  TraceInclusion (merge_ModWf m) m.
 Proof.
   apply PTraceInclusion_TraceInclusion; try apply wfMod.
   repeat intro.
