@@ -2072,6 +2072,25 @@ Fixpoint getOrder (im : InModule) :=
     end
   end.
 
+Ltac discharge_appendage :=
+  repeat match goal with
+         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
+           rewrite append_remove_prefix in H; subst
+         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
+           rewrite append_remove_suffix in H; subst
+         | H: _ \/ _ |- _ => destruct H; subst
+         end.
+
+Ltac discharge_DisjKey :=
+  try match goal with
+      | |- DisjKey ?P ?Q => rewrite DisjKeyWeak_same by apply string_dec;
+                            unfold DisjKeyWeak; simpl; intros
+      end;
+  discharge_appendage;
+  subst;
+  auto;
+  try discriminate.
+
 Ltac discharge_wf :=
   repeat match goal with
          | |- @WfMod _ => constructor_simpl

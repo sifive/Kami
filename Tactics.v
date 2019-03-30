@@ -1,14 +1,5 @@
 Require Import Lib.EclecticLib Syntax Properties.
 
-Ltac discharge_appendage :=
-  repeat match goal with
-         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
-           rewrite append_remove_prefix in H; subst
-         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
-           rewrite append_remove_suffix in H; subst
-         | H: _ \/ _ |- _ => destruct H; subst
-         end.
-
 Ltac discharge_string_dec :=
   repeat match goal with
          | |- context[string_dec ?P ?Q] => destruct (string_dec P Q);
@@ -31,16 +22,6 @@ Ltac discharge_SemAction :=
                               | string => try discriminate
                               end
          end.
-
-Ltac discharge_DisjKey :=
-  try match goal with
-      | |- DisjKey ?P ?Q => rewrite DisjKeyWeak_same by apply string_dec;
-                            unfold DisjKeyWeak; simpl; intros
-      end;
-  discharge_appendage;
-  subst;
-  auto;
-  try discriminate.
 
 Local Example test_normaldisj:
   DisjKey (map (fun x => (x, 1)) ("a" :: "b" :: "c" :: nil))%string
