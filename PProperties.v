@@ -618,7 +618,7 @@ Proof.
     + econstructor 2; eauto using FullLabel_perm_refl.
 Qed.
 
-Ltac FLInvAdd := repeat (match goal with
+Local Ltac FLInvAdd := repeat (match goal with
  | H: List.Add ?x _ (_ :: _) |- _ => inversion H; clear H; subst
                        end).
 

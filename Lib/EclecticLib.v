@@ -34,7 +34,6 @@ Proof.
 Defined.
 
 
-
 Section fold_left_right.
   Variable A B: Type.
   Variable f: A -> B -> A.
@@ -1449,6 +1448,21 @@ Proof.
       firstorder fail.
 Qed.
 
+Lemma InFilter A B (dec: forall a1 a2, {a1 = a2} + {a1 <> a2}):
+  forall (ls: list (A * B)),
+  forall x, In x ls <->
+            In x (filter (fun t => getBool (dec (fst x) (fst t))) ls).
+Proof.
+  induction ls; simpl; split; auto; intros.
+  - destruct H; [subst|]; auto.
+    + destruct (dec (fst x) (fst x)) ; simpl in *; tauto.
+    + apply IHls in H.
+      destruct (dec (fst x) (fst a)) ; simpl in *; auto.
+  - destruct (dec (fst x) (fst a)) ; simpl in *.
+    + destruct H; auto.
+      apply IHls in H; auto.
+    + eapply IHls in H; eauto.
+Qed.
 
 (* Useful Ltacs *)
 Ltac EqDep_subst :=
@@ -1467,47 +1481,4 @@ Ltac dest :=
           | H: _ /\ _ |- _ => destruct H
           | H: exists _, _ |- _ => destruct H
           end).
-Ltac discharge_appendage :=
-  repeat match goal with
-         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
-           rewrite append_remove_prefix in H; subst
-         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
-           rewrite append_remove_suffix in H; subst
-         | H: _ \/ _ |- _ => destruct H; subst
-         end.
-
-Ltac discharge_DisjKey :=
-  try match goal with
-      | |- DisjKey ?P ?Q => rewrite DisjKeyWeak_same by apply string_dec;
-                            unfold DisjKeyWeak; simpl; intros
-      end;
-  discharge_appendage;
-  subst;
-  auto;
-  try discriminate.
-
-Local Example test_normaldisj:
-  DisjKey (map (fun x => (x, 1)) ("a" :: "b" :: "c" :: nil))%string
-          (map (fun x => (x, 2)) ("d" :: "e" :: nil))%string.
-Proof.
-  simpl.
-  discharge_DisjKey.
-Qed.
-
-Local Example test_prefix_disj a:
-  DisjKey (map (fun x => ((a ++ x)%string, 1)) ("ab" :: "be" :: "cs" :: nil))%string
-          (map (fun x => ((a ++ x)%string, 2)) ("de" :: "et" :: nil))%string.
-Proof.
-  simpl.
-  discharge_DisjKey.
-Qed.
-
-Local Example test_suffix_disj a:
-  DisjKey (map (fun x => ((x ++ a)%string, 1)) ("ab" :: "be" :: "cs" :: nil))%string
-          (map (fun x => ((x ++ a)%string, 2)) ("de" :: "et" :: nil))%string.
-Proof.
-  simpl.
-  discharge_DisjKey.
-Qed.
-
 
