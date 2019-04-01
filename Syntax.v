@@ -148,10 +148,6 @@ Section Phoas.
                                  | right _ => ReadStruct e i'
                                  end).
 
-  Inductive LetExprSyntax k :=
-  | NormExpr (e: Expr (SyntaxKind k)): LetExprSyntax k
-  | LetE k' (e: LetExprSyntax k') (cont: ty k' -> LetExprSyntax k): LetExprSyntax k.
-
   Section BitOps.
     Definition castBits ni no (pf: ni = no) (e: Expr (SyntaxKind (Bit ni))) :=
       nat_cast (fun n => Expr (SyntaxKind (Bit n))) pf e.
@@ -349,6 +345,11 @@ Section Phoas.
   | DispStruct: forall n fk fs, Expr (SyntaxKind (@Struct n fk fs)) -> (Fin.t n -> FullBitFormat) -> SysT
   | DispArray: forall n k, Expr (SyntaxKind (Array n k)) -> FullBitFormat -> SysT
   | Finish: SysT.
+
+  Inductive LetExprSyntax k :=
+  | NormExpr (e: Expr (SyntaxKind k)): LetExprSyntax k
+  | SysE (ls: list SysT) (e: LetExprSyntax k): LetExprSyntax k
+  | LetE k' (e: LetExprSyntax k') (cont: ty k' -> LetExprSyntax k): LetExprSyntax k.
   
   Inductive ActionT (lretT: Kind) : Type :=
   | MCall (meth: string) s:
@@ -374,6 +375,7 @@ Section Phoas.
     match e in LetExprSyntax _ return ActionT k with
     | NormExpr e' => Return e'
     | LetE _ e' cont => LetAction (convertLetExprSyntax_ActionT e') (fun v => convertLetExprSyntax_ActionT (cont v))
+    | SysE ls cont => Sys ls (convertLetExprSyntax_ActionT cont)
     end.
 End Phoas.
 
@@ -995,6 +997,7 @@ Section Semantics.
   Fixpoint evalLetExpr k (e: LetExprSyntax type k) :=
     match e in LetExprSyntax _ _ return type k with
     | NormExpr e' => evalExpr e'
+    | SysE ls cont => evalLetExpr cont
     | LetE _ e' cont => evalLetExpr (cont (evalLetExpr e'))
     end.
 
@@ -1861,6 +1864,8 @@ Notation "'LETC' name <- v ; c " :=
 Notation "'LETC' name : t <- v ; c " :=
   (LETE name : t <- RetE v ; c)%kami_expr
                                (at level 12, right associativity, name at level 99) : kami_expr_scope.
+Notation "'SystemE' ls ; c " :=
+  (SysE ls c)%kami_expr (at level 12, right associativity, ls at level 99): kami_expr_scope.
 
 Notation "k ## ty" := (LetExprSyntax ty k) (no associativity, at level 98, only parsing).
 

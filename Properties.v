@@ -5350,6 +5350,9 @@ Proof.
   - inv H; dest.
     EqDep_subst.
     repeat split; auto.
+  - inv H; dest.
+    EqDep_subst.
+    eapply IHe; eauto.
   - inv H0.
     EqDep_subst.
     apply H in HSemActionCont; dest; subst.
