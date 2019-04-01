@@ -158,6 +158,9 @@ Section Phoas.
     Definition ConstExtract lsb n msb (e: Expr (SyntaxKind (Bit (lsb + n + msb)))): Expr (SyntaxKind (Bit n)) :=
       UniBit (TruncMsb lsb n) (UniBit (TruncLsb (lsb + n) msb) e).
 
+    Definition OneExtend msb lsb (e: Expr (SyntaxKind (Bit lsb))): Expr (SyntaxKind (Bit (lsb + msb))) :=
+      (BinBit (Concat msb lsb) (Const (wones msb))) e.
+
     Definition ZeroExtend msb lsb (e: Expr (SyntaxKind (Bit lsb))): Expr (SyntaxKind (Bit (lsb + msb))) :=
       (BinBit (Concat msb lsb) (Const (wzero msb))) e.
 
@@ -179,6 +182,15 @@ Section Phoas.
       | S m => BinBit (Concat (m * sz) sz) (replicate e m) e
       end.
     
+    Definition OneExtendTruncLsb ni no (e: Expr (SyntaxKind (Bit ni))):
+      Expr (SyntaxKind (Bit no)).
+      refine
+        match Compare_dec.lt_dec ni no with
+        | left isLt => castBits _ (@OneExtend (no - ni) ni e)
+        | right isGe => UniBit (TruncLsb no (ni - no)) (castBits _ e)
+        end; abstract lia.
+    Defined.
+
     Definition ZeroExtendTruncLsb ni no (e: Expr (SyntaxKind (Bit ni))):
       Expr (SyntaxKind (Bit no)).
       refine
