@@ -5,6 +5,35 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+Definition fromOption (A : Type) (mx : option A) (default : A) : A
+  := match mx with
+       | Some x => x
+       | _      => default
+       end.
+
+Definition strings_in (xs : list string) (x : string)
+  :  bool
+  := existsb (String.eqb x) xs.
+
+Definition strings_any_in (xs : list string)
+  :  list string -> bool
+  := existsb (strings_in xs).
+
+Definition strings_all_in (xs : list string)
+  :  list string -> bool
+  := forallb (strings_in xs).
+
+Definition emptyb (A : Type) (xs : list A)
+  :  bool
+  := match xs with
+       | nil => true
+       | _   => false
+       end.
+
+Definition list_max
+  :  nat -> list (option nat) -> nat
+  := fold_right (fun x acc => fromOption (option_map (Nat.max acc) x) acc).
+
 Ltac existT_destruct dec :=
   match goal with
   | H: existT _ _ _ = existT _ _ _ |- _ =>
