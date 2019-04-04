@@ -253,6 +253,8 @@ End Compile.
 Section PerRule.
   Variable rule: Attribute (Action Void).
 
+  Local Definition calls := getCallsWithSignPerRule rule.
+
   Record RuleOutput :=
     { ruleTemps: list (string * VarType * sigT RtlExpr) ;
       ruleSysCs: list (RtlExpr Bool * list RtlSysT) }.
@@ -261,8 +263,7 @@ Section PerRule.
     fst (run (convertActionToRtl (fst rule) (snd rule (fun _ => VarType)) InitVal)
              (inc InitVal)).
 
-  Definition getTempWiresForRule (regs: list (Attribute Kind))
-             (calls: list (Attribute (Kind * Kind))) :=
+  Definition getTempWiresForRule (regs: list (Attribute Kind)) :=
     let '(Build_RtlExprs tw rw mc sc g) := getRtlExprsForRule in
     {| ruleTemps := (getActionGuard (fst rule), existT _ Bool match g with
                                                               | Some g' => g'
@@ -300,11 +301,10 @@ End PerRule.
 Section AllRules.
   Variable rules: list (Attribute (Action Void)).
   Variable regs: list (Attribute Kind).
-  Variable calls: list (Attribute (Kind * Kind)).
 
   Definition combineRules :=
-    fold_left (fun acc rule => {| ruleTemps := ruleTemps acc ++ ruleTemps (getTempWiresForRule rule regs calls) ;
-                                  ruleSysCs := ruleSysCs acc ++ ruleSysCs (getTempWiresForRule rule regs calls) |})
+    fold_left (fun acc rule => {| ruleTemps := ruleTemps acc ++ ruleTemps (getTempWiresForRule rule regs) ;
+                                  ruleSysCs := ruleSysCs acc ++ ruleSysCs (getTempWiresForRule rule regs) |})
               rules {| ruleTemps := nil ;
                        ruleSysCs := nil |}.
 End AllRules.
@@ -312,7 +312,6 @@ End AllRules.
 Section ThreadRules.
   Variable rules: list (Attribute (Action Void)).
   Variable regs: list (Attribute Kind).
-  Variable calls: list (Attribute (Kind * Kind)).
 
   Definition getRuleWrite rule (x: Attribute Kind) :=
     existT _ (snd x) (RtlITE (RtlReadWire Bool (getRegActionEn rule (fst x)))
@@ -338,8 +337,8 @@ Section ThreadRules.
     map (fun x => (getRegActionRead (hd ""%string order) (fst x), existT _ _ (RtlReadReg (snd x) (fst x)))) regs.
 
   Definition allWires order :=
-    ({| ruleTemps := threadAllTemps order ++ initialRead order ++ ruleTemps (combineRules rules regs calls) ;
-        ruleSysCs := ruleSysCs (combineRules rules regs calls) |},
+    ({| ruleTemps := threadAllTemps order ++ initialRead order ++ ruleTemps (combineRules rules regs) ;
+        ruleSysCs := ruleSysCs (combineRules rules regs) |},
      finalWrite order).
 End ThreadRules.
 
@@ -414,7 +413,7 @@ Definition rtlModCreate (bm: list string * (list RegFileBase * BaseModule))
                                 | _ => Bit 0
                                 end)) (getKindAttr (getRegisters m)) in
   let calls := getCallsWithSignPerMod m in
-  let '(Build_RuleOutput temps syss, regWr) := allWires rules regs calls order in
+  let '(Build_RuleOutput temps syss, regWr) := allWires rules regs order in
   let ins := map (fun x => (getMethRet (fst x), (snd (snd x)))) calls in
   let outs := map (fun x => (getMethArg (fst x), (fst (snd x)))) calls ++ map (fun x => (getMethEn (fst x), Bool)) calls in
   {| hiddenWires := map (fun x => getMethArg x) hides ++
