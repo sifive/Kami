@@ -76,6 +76,39 @@ ppConst (T.ConstBit sz w) = show sz ++ "\'b" ++ ppWord (reverse $ wordToList w)
 ppConst (T.ConstArray n k fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (T.getFins n))) ++ "}"
 ppConst (T.ConstStruct n fk fs fv) = '{' : intercalate ", " (snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins n)) (Data.List.map ppConst (Data.List.map fv (T.getFins n))))))) ++ "}"
 
+optionAddToTrunc :: String -> T.Kind -> T.RtlExpr -> State (H.Map String (Int, T.Kind)) String
+optionAddToTrunc who k e =
+  case e of
+    T.RtlReadReg k s -> return $ case k of
+                                 T.Bit 0 -> "0"
+                                 _ -> ppName s
+    T.RtlReadWire k var -> return $ case k of
+                                    T.Bit 0 -> "0"
+                                    _ -> ppPrintVar var
+    _ -> do
+      x <- ppRtlExpr who e
+      new <- addToTrunc who k x
+      return new
+
+createTrunc :: String -> T.Kind -> T.RtlExpr -> Int -> Int -> State (H.Map String (Int, T.Kind)) String
+createTrunc who k e msb lsb =
+  if msb < lsb
+  then return "0"
+  else do
+    new <- optionAddToTrunc who k e
+    return $ new ++ '[' : show msb ++ ':' : show lsb ++ "]"
+
+addToTrunc :: String -> T.Kind -> String -> State (H.Map String (Int, T.Kind)) String
+addToTrunc who kind s =
+  do
+    x <- get
+    case H.lookup s x of
+      Just (pos, _) -> return $ "_trunc$" ++ who ++ "$" ++ show pos
+      Nothing ->
+        do
+          put (H.insert s (H.size x, kind) x)
+          return $ "_trunc$" ++ who ++ "$" ++ show (H.size x)
+
 
 ppRtlExpr :: String -> T.RtlExpr -> State (H.Map String (Int, T.Kind)) String
 ppRtlExpr who e =
@@ -91,8 +124,8 @@ ppRtlExpr who e =
     T.RtlUniBit _ _ (T.UAnd _) e -> uniExpr "&" e
     T.RtlUniBit _ _ (T.UOr _) e -> uniExpr "|" e
     T.RtlUniBit _ _ (T.UXor _) e -> uniExpr "^" e
-    T.RtlUniBit sz retSz (T.TruncLsb lsb msb) e -> createTrunc (T.Bit sz) e (retSz - 1) 0
-    T.RtlUniBit sz retSz (T.TruncMsb lsb msb) e -> createTrunc (T.Bit sz) e (sz - 1) lsb
+    T.RtlUniBit sz retSz (T.TruncLsb lsb msb) e -> createTrunc who (T.Bit sz) e (retSz - 1) 0
+    T.RtlUniBit sz retSz (T.TruncMsb lsb msb) e -> createTrunc who (T.Bit sz) e (sz - 1) lsb
     T.RtlCABit n T.Add es -> listExpr "+" es (show n ++ "'b0")
     T.RtlCABit n T.Mul es -> listExpr "*" es (show n ++ "'b1")
     T.RtlCABit n T.Band es -> listExpr "&" es (show n ++ "'b" ++ Data.List.replicate n '1')
@@ -107,7 +140,7 @@ ppRtlExpr who e =
       do
         x1 <- ppRtlExpr who e1
         x2 <- ppRtlExpr who e2
-        new <- addToTrunc (T.Bit n) ("($signed(" ++ x1 ++ ") >>> " ++ x2 ++ ")")
+        new <- addToTrunc who (T.Bit n) ("($signed(" ++ x1 ++ ") >>> " ++ x2 ++ ")")
         return $ new
         -- return $ "($signed(" ++ x1 ++ ") >>> " ++ x2 ++ ")"
     T.RtlBinBit _ _ _ (T.Concat m n) e1 e2 ->
@@ -128,7 +161,7 @@ ppRtlExpr who e =
     T.RtlEq _ e1 e2 -> binExpr e1 "==" e2
     T.RtlReadStruct num fk fs e i ->
       do
-        new <- optionAddToTrunc (T.Struct num fk fs) e
+        new <- optionAddToTrunc who (T.Struct num fk fs) e
         return $ new ++ '.' : ppName (fs i)
     T.RtlBuildStruct num fk fs es ->
       do
@@ -138,13 +171,13 @@ ppRtlExpr who e =
       do
         xidx <- ppRtlExpr who idx
         xvec <- ppRtlExpr who vec
-        new <- optionAddToTrunc (T.Array n k) vec
+        new <- optionAddToTrunc who (T.Array n k) vec
         return $ new ++ '[' : xidx ++ "]"
     T.RtlReadArrayConst n k vec idx ->
       do
         let xidx = finToInt idx
         xvec <- ppRtlExpr who vec
-        new <- optionAddToTrunc (T.Array n k) vec
+        new <- optionAddToTrunc who (T.Array n k) vec
         return $ new ++ '[' : show xidx ++ "]"
     T.RtlBuildArray n k fv ->
       do
@@ -152,34 +185,6 @@ ppRtlExpr who e =
         return $ if T.size k == 0 || n == 0 then "0" else '{': intercalate ", " strs ++ "}"
   where
     filterKind0 num fk es = snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins num)) (Data.List.map es (T.getFins num)))))
-    optionAddToTrunc :: T.Kind -> T.RtlExpr -> State (H.Map String (Int, T.Kind)) String
-    optionAddToTrunc k e =
-      case e of
-        T.RtlReadReg k s -> return $ case k of
-                                     T.Bit 0 -> "0"
-                                     _ -> ppName s
-        T.RtlReadWire k var -> return $ case k of
-                                        T.Bit 0 -> "0"
-                                        _ -> ppPrintVar var
-        _ -> do
-          x <- ppRtlExpr who e
-          new <- addToTrunc k x
-          return new
-    createTrunc :: T.Kind -> T.RtlExpr -> Int -> Int -> State (H.Map String (Int, T.Kind)) String
-    createTrunc k e msb lsb =
-      do
-        new <- optionAddToTrunc k e
-        return $ new ++ '[' : show msb ++ ':' : show lsb ++ "]"
-    addToTrunc :: T.Kind -> String -> State (H.Map String (Int, T.Kind)) String
-    addToTrunc kind s =
-      do
-        x <- get
-        case H.lookup s x of
-          Just (pos, _) -> return $ "_trunc$" ++ who ++ "$" ++ show pos
-          Nothing ->
-            do
-              put (H.insert s (H.size x, kind) x)
-              return $ "_trunc$" ++ who ++ "$" ++ show (H.size x)
     uniExpr op e =
       do
         x <- ppRtlExpr who e
