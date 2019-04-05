@@ -729,24 +729,6 @@ Section utila.
                          [])
                       (fun y => munit (unpack k (Var type (SyntaxKind (Bit (size k))) y))).
 
-    Lemma utila_mfind_simpl
-      :  forall (k : Kind)
-           (f : k @# type -> Bool @# type)
-           (xs : list (m k)),
-           [[utila_mfind f xs]] =
-           {{unpack k
-               #[[utila_mfoldr
-                    (fun x acc => (ITE (f x) (pack x) ($0) | acc))
-                    ($0)
-                    xs]]}}.
-    Proof
-      fun k f xs
-        => eq_refl [[utila_mfind f xs]]
-           || [[utila_mfind f xs]] = X
-              @X by <- utila_sem_bind_correct _ _
-           || [[utila_mfind f xs]] = X
-              @X by <- utila_sem_unit_correct _.
-
     Lemma utila_mfind_tl
       :  forall (k : Kind)
            (f : k @# type -> Bool @# type)
@@ -763,19 +745,8 @@ Section utila.
       simpl.
       repeat (rewrite wor_wzero).
       reflexivity.
+
     Qed.
-(*
-    Lemma utila_mfind_none
-      :  forall (k : Kind)
-           (f : k @# type -> Bool @# type)
-           (xs : list (m k)),
-           Forall (fun x => In x xs /\ {{f #[[x]]}} = false) xs ->
-           [[utila_mfind f xs]] = {{utila_null k}}.
-    Proof. 
-      intros.
-      induction xs.
-      apply utila_mfind_nil.
-*)
   End monad_ver.
 
   Section expr_ver.
