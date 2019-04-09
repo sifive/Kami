@@ -1,9 +1,24 @@
-Require Import String Coq.Lists.List Omega Fin Eqdep.
+Require Import String Coq.Lists.List Omega Fin Eqdep Bool.
 
 Import ListNotations.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
+
+Lemma inversionExistT A B (f: B -> Type) (a1 a2: A) (b1 b2: B) (f1: f b1) (f2: f b2):
+  (a1, existT f b1 f1) = (a2, existT f b2 f2) ->
+  a1 = a2 /\ existT f b1 f1 = existT f b2 f2.
+Proof.
+  intros.
+  inversion H.
+  repeat split; auto.
+Qed.
+
+Lemma InSingleton_impl A (x y: A): In x [y] -> x = y.
+Proof.
+  intros; simpl in *.
+  destruct H; auto; tauto.
+Qed.
 
 Definition fromOption (A : Type) (mx : option A) (default : A) : A
   := match mx with
@@ -660,12 +675,12 @@ Definition key_not_In A B key (ls: list (A * B)) := forall v, ~ In (key, v) ls.
 Section DisjKey.
   Variable A B: Type.
   Section l1_l2.
+    Variable Adec: forall a1 a2: A, {a1 = a2} + {a1 <> a2}.
+    
     Variable l1 l2: list (A * B).
 
     Definition DisjKey :=
       forall k, ~ In k (map fst l1) \/ ~ In k (map fst l2).
-    
-    Variable Adec: forall a1 a2: A, {a1 = a2} + {a1 <> a2}.
     
     Definition DisjKeyWeak :=
       forall k, In k (map fst l1) -> In k (map fst l2) -> False.
@@ -1094,6 +1109,35 @@ Proof.
   firstorder fail.
 Qed.
 
+Section DisjKey_filter.
+  Variable A B: Type.
+  Variable decA: forall (a1 a2: A), {a1 = a2} + {a1 <> a2}.
+  
+  Lemma DisjKey_filter: forall (l1 l2: list (A * B)),
+      DisjKey l1 l2 <->
+      filter (fun x => (getBool (in_dec decA (fst x) (map fst l1)))) l2 = [].
+  Proof.
+    intros.
+    split; intros.
+    - eapply filter_false_list; intros.
+      pose proof (in_map fst _ _ H0) as sth.
+      destruct (in_dec decA (fst a) (map fst l1)); simpl; auto.
+      firstorder fail.
+    - pose proof (filter_nil1 _ _ H) as sth.
+      rewrite DisjKeyWeak_same by auto.
+      unfold DisjKeyWeak; intros.
+      rewrite in_map_iff in *.
+      destruct H0 as [x1 [sth1 in1]].
+      destruct H1 as [x2 [sth2 in2]].
+      subst.
+      specialize (sth _ in2); simpl in *.
+      destruct (in_dec decA (fst x2) (map fst l1)); [discriminate|].
+      clear sth.
+      erewrite in_map_iff in n.
+      firstorder auto.
+  Qed.
+End DisjKey_filter.  
+
 Lemma SameList_map A B (f: A -> B):
   forall l1 l2, SameList l1 l2 -> SameList (map f l1) (map f l2).
 Proof.
@@ -1477,7 +1521,7 @@ Proof.
       firstorder fail.
 Qed.
 
-Lemma InFilter A B (dec: forall a1 a2, {a1 = a2} + {a1 <> a2}):
+Lemma InFilterPair A B (dec: forall a1 a2, {a1 = a2} + {a1 <> a2}):
   forall (ls: list (A * B)),
   forall x, In x ls <->
             In x (filter (fun t => getBool (dec (fst x) (fst t))) ls).
@@ -1493,14 +1537,31 @@ Proof.
     + eapply IHls in H; eauto.
 Qed.
 
+Lemma InFilter A (dec: forall a1 a2, {a1 = a2} + {a1 <> a2}):
+  forall (ls: list A),
+  forall x, In x ls <->
+            In x (filter (fun t => getBool (dec x t)) ls).
+Proof.
+  induction ls; simpl; split; auto; intros.
+  - destruct H; [subst|]; auto.
+    + destruct (dec x x) ; simpl in *; tauto.
+    + apply IHls in H.
+      destruct (dec x a) ; simpl in *; auto.
+  - destruct (dec x a) ; simpl in *.
+    + destruct H; auto.
+    + eapply IHls in H; eauto.
+Qed.
+
+Lemma InSingleton A (x: A): In x [x].
+Proof.
+  simpl; auto.
+Qed.
+
 (* Useful Ltacs *)
 Ltac EqDep_subst :=
   repeat match goal with
          |[H : existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _] => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
          end.
-
-Ltac constructor_simpl :=
-  econstructor; eauto; simpl; unfold not; intros.
 
 Ltac inv H :=
   inversion H; subst; clear H.
@@ -1510,4 +1571,29 @@ Ltac dest :=
           | H: _ /\ _ |- _ => destruct H
           | H: exists _, _ |- _ => destruct H
           end).
+
+Section NoDup.
+  Variable A: Type.
+  Variable decA: forall a1 a2: A, {a1 = a2} + {a1 <> a2}.
+  Fixpoint NoDup_fn (ls: list A) :=
+    match ls with
+    | nil => true
+    | x :: xs => andb (negb (getBool (in_dec decA x xs))) (NoDup_fn xs)
+    end.
+
+  Lemma NoDup_dec l:
+    NoDup l <-> NoDup_fn l = true.
+  Proof.
+    intros.
+    induction l; simpl; split; auto; intros; try solve [econstructor; eauto].
+    - inv H.
+      rewrite IHl in *.
+      destruct (in_dec decA a l); simpl; auto.
+    - rewrite andb_true_iff in *; dest.
+      rewrite negb_true_iff in *.
+      rewrite <- IHl in *.
+      econstructor; eauto.
+      destruct (in_dec decA a l); simpl; auto; discriminate.
+  Qed.
+End NoDup.
 

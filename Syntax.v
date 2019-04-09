@@ -1441,6 +1441,44 @@ Definition getCallsPerMod (m: Mod) := map fst (getCallsWithSignPerMod m).
 
 
 
+Fixpoint getRegWrites k (a: ActionT (fun _ => unit) k) :=
+  match a in ActionT _ _ with
+  | MCall meth k argExpr cont =>
+    getRegWrites (cont tt)
+  | Return x => nil
+  | LetExpr k' expr cont =>
+    match k' return (fullType (fun _ => unit) k' -> ActionT (fun _ => unit) k) ->
+                    list (string * FullKind) with
+    | SyntaxKind k => fun cont => getRegWrites (cont tt)
+    | _ => fun _ => nil
+    end cont
+  | LetAction k' a' cont =>
+    getRegWrites a' ++ getRegWrites (cont tt)
+  | ReadNondet k' cont =>
+    match k' return (fullType (fun _ => unit) k' -> ActionT (fun _ => unit) k) ->
+                    list (string * FullKind) with
+    | SyntaxKind k => fun cont =>
+                        getRegWrites (cont tt)
+    | _ => fun _ => nil
+    end cont
+  | ReadReg r k' cont =>
+    match k' return (fullType (fun _ => unit) k' -> ActionT (fun _ => unit) k) ->
+                    list (string * FullKind) with
+    | SyntaxKind k => fun cont =>
+                        getRegWrites (cont tt)
+    | _ => fun _ => nil
+    end cont
+  | WriteReg r k' expr cont =>
+    (r, k') :: getRegWrites cont
+  | Assertion pred cont => getRegWrites cont
+  | Sys ls cont => getRegWrites cont
+  | IfElse pred ktf t f cont =>
+    getRegWrites t ++ getRegWrites f ++ getRegWrites (cont tt)
+  end.
+
+
+
+
 
 
 (* Utility functions *)
@@ -1689,11 +1727,15 @@ Definition baseNoSelfCalls (m : Mod) :=
 
 
 
+
+
+
+
 (** Notations for expressions *)
 
-Notation Default := (getDefaultConst _).
-
 Notation "k @# ty" := (Expr ty (SyntaxKind k)) (no associativity, at level 98, only parsing).
+
+Notation Default := (getDefaultConst _).
 
 Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (only parsing) : kami_expr_scope.
 Notation "$ n" := (Const _ (natToWord _ n)): kami_expr_scope.
@@ -2089,6 +2131,9 @@ Fixpoint getOrder (im : InModule) :=
     end
   end.
 
+Local Ltac constructor_simpl :=
+  econstructor; eauto; simpl; unfold not; intros.
+
 Ltac discharge_appendage :=
   repeat match goal with
          | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
@@ -2122,6 +2167,50 @@ Ltac discharge_wf :=
          end; repeat (discharge_DisjKey || tauto || congruence);
   try (discharge_DisjKey || tauto || congruence).
 
+
+(* Ltac process_append := *)
+(*   repeat match goal with *)
+(*          | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ => *)
+(*            rewrite append_remove_prefix in H; subst *)
+(*          | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ => *)
+(*            rewrite append_remove_suffix in H; subst *)
+(*          | H: context[string_dec ?P%string ?Q%string] |- _ => *)
+(*            destruct (string_dec P Q) *)
+(*          | |- (?a ++ ?b)%string = (?a ++ ?c)%string => *)
+(*            rewrite append_remove_prefix *)
+(*          | |- (?a ++ ?b)%string = (?c ++ ?b)%string => *)
+(*            rewrite append_remove_suffix *)
+(*          | |- context[string_dec ?P%string ?Q%string] => *)
+(*            destruct (string_dec P Q) *)
+(*          end. *)
+
+(* Ltac finish_append := *)
+(*   auto; try (apply InSingleton || discriminate || tauto || congruence). *)
+
+(* Ltac discharge_append := *)
+(*   simpl; unfold getBool in *; process_append; finish_append. *)
+
+(* Local Ltac discharge_DisjKey := *)
+(*   try match goal with *)
+(*       | |- DisjKey _ _ => rewrite (DisjKey_filter string_dec); discharge_append *)
+(*       end. *)
+
+(* Ltac discharge_wf := *)
+(*   repeat match goal with *)
+(*          | |- @WfMod _ => constructor_simpl *)
+(*          | |- @WfConcat _ _ => constructor_simpl *)
+(*          | |- @WfBaseModule _ => constructor_simpl *)
+(*          | |- @WfActionT _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax *)
+(*          | |- @WfActionT _ _ _ => econstructor; eauto; intros; *)
+(*                                   try (rewrite (InFilterPair string_dec)); discharge_append *)
+(*          | |- @WfConcatActionT _ _ _ => constructor_simpl *)
+(*          | H: _ \/ _ |- _ => destruct H; subst; simpl *)
+(*          | H: False |- _ => exfalso; apply H *)
+(*          | |- NoDup ?l => rewrite (@NoDup_dec _ string_dec l); discharge_append *)
+(*          | |- _ /\ _ => split; intros *)
+(*          | |- DisjKey _ _ => rewrite (DisjKey_filter string_dec); discharge_append *)
+(*          end. *)
+
 Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
   {| baseModuleWf := {| baseModule := makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) ;
                         wfBaseModule := ltac:(discharge_wf) |} ;
@@ -2133,6 +2222,8 @@ Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
                  wfMod := ltac:(discharge_wf) |} ;
      modOrd := getOrder (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) |}
     (only parsing).
+
+
 
 
 
@@ -2324,6 +2415,57 @@ Definition struct_set_field
 
 
 
+Section mod_test.
+  Variable a: string.
+  Local Notation "^ x" := (a ++ "." ++ x)%string (at level 0).
+  Local Example test := MOD_WF{
+                              Register (^"x") : Bool <- true
+                                with Register (^"y") : Bool <- false
+                                with Rule (^"r1") := ( Read y: Bool <- ^"y";
+                                                         Write (^"x"): Bool <- #y;
+                                                         Retv )
+                          }.
+
+  Local Example test1 := MODULE_WF{
+                             Register (^"x") : Bool <- true
+                               with Register (^"y") : Bool <- false
+                               with Rule (^"r1") := ( Read y: Bool <- ^"y";
+                                                        Write (^"x"): Bool <- #y;
+                                                        Retv )
+                           }.
+End mod_test.
+
+
+
+
+
+Local Example test_normaldisj:
+  DisjKey (map (fun x => (x, 1)) ("a" :: "b" :: "c" :: nil))%string
+          (map (fun x => (x, 2)) ("d" :: "e" :: nil))%string.
+Proof.
+  simpl.
+  (* rewrite (DisjKey_filter string_dec); discharge_appendage. *)
+  discharge_DisjKey.
+Qed.
+
+Local Example test_prefix_disj a:
+  DisjKey (map (fun x => ((a ++ x)%string, 1)) ("ab" :: "be" :: "cs" :: nil))%string
+          (map (fun x => ((a ++ x)%string, 2)) ("de" :: "et" :: nil))%string.
+Proof.
+  simpl.
+  (* rewrite (DisjKey_filter string_dec); discharge_appendage. *)
+  discharge_DisjKey.
+Qed.
+
+Local Example test_suffix_disj a:
+  DisjKey (map (fun x => ((x ++ a)%string, 1)) ("ab" :: "be" :: "cs" :: nil))%string
+          (map (fun x => ((x ++ a)%string, 2)) ("de" :: "et" :: nil))%string.
+Proof.
+  simpl.
+  (* rewrite (DisjKey_filter string_dec); discharge_appendage. *)
+  discharge_DisjKey.
+Qed.
+
 
 
 
@@ -2347,14 +2489,6 @@ Local Example testSwitch2 ty (val: Bit 5 @# ty) (a b: Bool @# ty) : Bool @# ty :
             $$ (natToWord 5 6) ::= $$ false
           })%kami_expr.
 
-
-Local Example test a := MOD_WF{
-                            Register (a ++ "x") : Bool <- true
-                              with Register (a ++ "y") : Bool <- false
-                              with Rule (a ++ "r1") := ( Read y: Bool <- a++"y";
-                                                           Write (a++"x"): Bool <- #y;
-                                                           Retv )
-                          }.
 
 Local Example test2 a b := (ConcatMod (test a) (test b))%kami.
 
