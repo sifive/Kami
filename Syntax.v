@@ -2134,24 +2134,38 @@ Fixpoint getOrder (im : InModule) :=
 Local Ltac constructor_simpl :=
   econstructor; eauto; simpl; unfold not; intros.
 
-Ltac discharge_appendage :=
+Ltac destruct_string_dec :=
   repeat match goal with
-         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
-           rewrite append_remove_prefix in H; subst
-         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
-           rewrite append_remove_suffix in H; subst
-         | H: _ \/ _ |- _ => destruct H; subst
+         | H: context[string_dec ?P%string ?Q%string] |- _ =>
+           destruct (string_dec P Q)
+         | |- context[string_dec ?P%string ?Q%string] =>
+           destruct (string_dec P Q)
          end.
 
+Local Ltac process_append :=
+  repeat match goal with
+         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
+           apply append_remove_prefix in H; subst
+         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
+           apply append_remove_suffix in H; subst
+         | |- (?a ++ ?b)%string = (?a ++ ?c)%string =>
+           apply append_remove_prefix
+         | |- (?a ++ ?b)%string = (?c ++ ?b)%string =>
+           apply append_remove_suffix
+         end.
+
+Local Ltac finish_append :=
+  auto; try (apply InSingleton || discriminate || tauto || congruence).
+
+Ltac discharge_append :=
+  simpl; unfold getBool in *; process_append; finish_append.
+
 Ltac discharge_DisjKey :=
-  try match goal with
-      | |- DisjKey ?P ?Q => rewrite DisjKeyWeak_same by apply string_dec;
-                            unfold DisjKeyWeak; simpl; intros
-      end;
-  discharge_appendage;
-  subst;
-  auto;
-  try discriminate.
+  repeat match goal with
+         | |- DisjKey _ _ =>
+           rewrite (DisjKeyWeak_same string_dec); unfold DisjKeyWeak; simpl; intros
+         | H: _ \/ _ |- _ => destruct H; subst
+         end; discharge_append.
 
 Ltac discharge_wf :=
   repeat match goal with
@@ -2164,52 +2178,8 @@ Ltac discharge_wf :=
          | |- @WfActionT _ _ _ => constructor_simpl
          | |- NoDup _ => constructor_simpl
          | H: _ \/ _ |- _ => destruct H; subst; simpl
-         end; repeat (discharge_DisjKey || tauto || congruence);
-  try (discharge_DisjKey || tauto || congruence).
-
-
-(* Ltac process_append := *)
-(*   repeat match goal with *)
-(*          | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ => *)
-(*            rewrite append_remove_prefix in H; subst *)
-(*          | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ => *)
-(*            rewrite append_remove_suffix in H; subst *)
-(*          | H: context[string_dec ?P%string ?Q%string] |- _ => *)
-(*            destruct (string_dec P Q) *)
-(*          | |- (?a ++ ?b)%string = (?a ++ ?c)%string => *)
-(*            rewrite append_remove_prefix *)
-(*          | |- (?a ++ ?b)%string = (?c ++ ?b)%string => *)
-(*            rewrite append_remove_suffix *)
-(*          | |- context[string_dec ?P%string ?Q%string] => *)
-(*            destruct (string_dec P Q) *)
-(*          end. *)
-
-(* Ltac finish_append := *)
-(*   auto; try (apply InSingleton || discriminate || tauto || congruence). *)
-
-(* Ltac discharge_append := *)
-(*   simpl; unfold getBool in *; process_append; finish_append. *)
-
-(* Local Ltac discharge_DisjKey := *)
-(*   try match goal with *)
-(*       | |- DisjKey _ _ => rewrite (DisjKey_filter string_dec); discharge_append *)
-(*       end. *)
-
-(* Ltac discharge_wf := *)
-(*   repeat match goal with *)
-(*          | |- @WfMod _ => constructor_simpl *)
-(*          | |- @WfConcat _ _ => constructor_simpl *)
-(*          | |- @WfBaseModule _ => constructor_simpl *)
-(*          | |- @WfActionT _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax *)
-(*          | |- @WfActionT _ _ _ => econstructor; eauto; intros; *)
-(*                                   try (rewrite (InFilterPair string_dec)); discharge_append *)
-(*          | |- @WfConcatActionT _ _ _ => constructor_simpl *)
-(*          | H: _ \/ _ |- _ => destruct H; subst; simpl *)
-(*          | H: False |- _ => exfalso; apply H *)
-(*          | |- NoDup ?l => rewrite (@NoDup_dec _ string_dec l); discharge_append *)
-(*          | |- _ /\ _ => split; intros *)
-(*          | |- DisjKey _ _ => rewrite (DisjKey_filter string_dec); discharge_append *)
-(*          end. *)
+         end;
+  discharge_DisjKey.
 
 Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
   {| baseModuleWf := {| baseModule := makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..) ;
@@ -2444,7 +2414,6 @@ Local Example test_normaldisj:
           (map (fun x => (x, 2)) ("d" :: "e" :: nil))%string.
 Proof.
   simpl.
-  (* rewrite (DisjKey_filter string_dec); discharge_appendage. *)
   discharge_DisjKey.
 Qed.
 
@@ -2453,7 +2422,6 @@ Local Example test_prefix_disj a:
           (map (fun x => ((a ++ x)%string, 2)) ("de" :: "et" :: nil))%string.
 Proof.
   simpl.
-  (* rewrite (DisjKey_filter string_dec); discharge_appendage. *)
   discharge_DisjKey.
 Qed.
 
@@ -2462,7 +2430,6 @@ Local Example test_suffix_disj a:
           (map (fun x => ((x ++ a)%string, 2)) ("de" :: "et" :: nil))%string.
 Proof.
   simpl.
-  (* rewrite (DisjKey_filter string_dec); discharge_appendage. *)
   discharge_DisjKey.
 Qed.
 

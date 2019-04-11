@@ -5,7 +5,29 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
-Lemma inversionExistT A B (f: B -> Type) (a1 a2: A) (b1 b2: B) (f1: f b1) (f2: f b2):
+Lemma inversionPair A B (a1 a2: A) (b1 b2: B):
+  (a1, b1) = (a2, b2) ->
+  a1 = a2 /\ b1 = b2.
+Proof.
+  intros H.
+  inversion H.
+  subst; auto.
+Qed.
+
+Lemma inversionExistT A (P: A -> Type) (x1 x2: A) (y1: P x1) (y2: P x2):
+  existT P x1 y1 = existT P x2 y2 -> exists pf: x1 = x2, match pf in _ = Y return _ Y with
+                                                         | eq_refl => y1
+                                                         end = y2.
+Proof.
+  intros H.
+  pose proof (EqdepFacts.eq_sigT_fst H) as sth.
+  exists sth.
+  subst.
+  apply Eqdep.EqdepTheory.inj_pair2 in H; subst.
+  auto.
+Qed.
+
+Lemma inversionPairExistT A B (f: B -> Type) (a1 a2: A) (b1 b2: B) (f1: f b1) (f2: f b2):
   (a1, existT f b1 f1) = (a2, existT f b2 f2) ->
   a1 = a2 /\ existT f b1 f1 = existT f b2 f2.
 Proof.
