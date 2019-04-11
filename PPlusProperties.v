@@ -3833,7 +3833,7 @@ Section flatten_and_inline_all.
     apply SameKeys_inlineSome_Rules.
   Qed.
   
-  Theorem WfCreateHide_Mod (m : ModWf) :
+  Theorem flatten_inline_everything_Wf (m : ModWf) :
     WfMod (flatten_inline_everything m).
   Proof.
     unfold flatten_inline_everything, inlineAll_All_mod.
@@ -3848,8 +3848,8 @@ Section flatten_and_inline_all.
       unfold inlineAll_All in *; auto.
   Qed.
 
-  Definition inlined_ModWf (m : ModWf) : ModWf :=
-    (Build_ModWf (WfCreateHide_Mod m)).
+  Definition flatten_inline_everything_ModWf (m : ModWf) : ModWf :=
+    (Build_ModWf (flatten_inline_everything_Wf m)).
   
   Lemma TraceHide_Trace m o s ls:
     Trace (HideMeth m s) o ls -> Trace m o ls.
@@ -4068,9 +4068,9 @@ Section flatten_and_inline_all.
   Qed.
   
   Theorem TraceInclusion_flatten_inline_everything_r (m : ModWf) :
-    TraceInclusion m (inlined_ModWf m).
+    TraceInclusion m (flatten_inline_everything_ModWf m).
   Proof.
-    specialize (wfMod (inlined_ModWf m)) as Wf1.
+    specialize (wfMod (flatten_inline_everything_ModWf m)) as Wf1.
     simpl.
     specialize (TraceInclusion_flatten_r m) as P1.
     unfold flatten, getFlat in *.
@@ -4946,7 +4946,7 @@ Proof.
     eauto using TraceInclusion_trans.
 Qed.
 
-Theorem flatten_inline_remove_TraceInclusion (m : ModWf) :
+Theorem flatten_inline_remove_TraceInclusion_r_lemma (m : ModWf) :
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_everything m) (flatten_inline_remove_ModWf m).
 Proof.
@@ -6363,9 +6363,9 @@ Section inline_all_all_l.
 End inline_all_all_l.
 
 Theorem TraceInclusion_flatten_inline_everything_l (m : ModWf) :
-  TraceInclusion (inlined_ModWf m) m.
+  TraceInclusion (flatten_inline_everything_ModWf m) m.
 Proof.
-  specialize (wfMod (inlined_ModWf m)) as Wf1.
+  specialize (wfMod (flatten_inline_everything_ModWf m)) as Wf1.
   simpl.
   specialize (TraceInclusion_flatten_l m) as P1.
   unfold flatten, getFlat in *.
@@ -6462,7 +6462,7 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem flatten_inline_remove_TraceInclusion_l (m : ModWf) :
+Theorem flatten_inline_remove_TraceInclusion_l_lemma (m : ModWf) :
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_remove_ModWf m) (flatten_inline_everything m).
 Proof.
@@ -6477,22 +6477,60 @@ Proof.
   apply (removeHides_createHide_TraceInclusion P2 H).
 Qed.
 
-Theorem TraceInclusion_flatten_inline_remove_ModWf_l (m : ModWf):
+Theorem TraceInclusion_flatten_inline_remove_ModWf_l_lemma (m : ModWf):
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
-  TraceInclusion (flatten_inline_remove_ModWf m) (inlined_ModWf m).
+  TraceInclusion (flatten_inline_remove_ModWf m) (flatten_inline_everything_ModWf m).
 Proof.
   intros.
-  unfold inlined_ModWf.
+  unfold flatten_inline_everything_ModWf.
+  eauto using flatten_inline_remove_TraceInclusion_l_lemma.
+Qed.
+
+Theorem TraceInclusion_flatten_inline_remove_ModWf_r_lemma (m : ModWf):
+  NoSelfCallBaseModule (inlineAll_All_mod m) ->
+  TraceInclusion (flatten_inline_everything_ModWf m) (flatten_inline_remove_ModWf m).
+Proof.
+  intros.
+  unfold flatten_inline_everything_ModWf.
+  eauto using flatten_inline_remove_TraceInclusion_r_lemma.
+Qed.
+
+Theorem flatten_inline_remove_TraceInclusion_l (m : ModWf) :
+  NoSelfCallBaseModule (inlineAll_All_mod m) ->
+  TraceInclusion (flatten_inline_remove_ModWf m) m.
+Proof.
+  intros H.
+  eapply TraceInclusion_trans.
+  - eapply TraceInclusion_flatten_inline_remove_ModWf_l_lemma; eauto.
+  - eapply TraceInclusion_flatten_inline_everything_l.
+Qed.
+  
+Theorem flatten_inline_remove_TraceInclusion_r (m : ModWf) :
+  NoSelfCallBaseModule (inlineAll_All_mod m) ->
+  TraceInclusion m (flatten_inline_remove_ModWf m).
+Proof.
+  intros H.
+  eapply TraceInclusion_trans.
+  - eapply TraceInclusion_flatten_inline_everything_r.
+  - eapply TraceInclusion_flatten_inline_remove_ModWf_r_lemma; eauto.
+Qed.
+  
+Theorem TraceInclusion_flatten_inline_remove_ModWf_l (m : ModWf):
+  NoSelfCallBaseModule (inlineAll_All_mod m) ->
+  TraceInclusion (flatten_inline_remove_ModWf m) m.
+Proof.
+  intros.
+  unfold flatten_inline_remove_ModWf.
   eauto using flatten_inline_remove_TraceInclusion_l.
 Qed.
 
-Theorem TraceInclusion_flatten_inline_remove_ModWf (m : ModWf):
+Theorem TraceInclusion_flatten_inline_remove_ModWf_r (m : ModWf):
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
-  TraceInclusion (inlined_ModWf m) (flatten_inline_remove_ModWf m).
+  TraceInclusion m (flatten_inline_remove_ModWf m).
 Proof.
   intros.
-  unfold inlined_ModWf.
-  eauto using flatten_inline_remove_TraceInclusion.
+  unfold flatten_inline_remove_ModWf.
+  eauto using flatten_inline_remove_TraceInclusion_r.
 Qed.
 
 Lemma distributeHideWf (m1 m2 : Mod) (h : string) (HNeverCall : NeverCallMod m1):
