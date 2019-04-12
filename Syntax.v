@@ -1906,20 +1906,20 @@ Notation "'Switch' val 'Of' inK 'Retn' retK 'With' { s1 ; .. ; sN }" :=
 (* Notations for Let Expressions *)
 Notation "'LETE' name <- expr ; cont " :=
   (LetE expr%kami_expr (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_expr_scope.
+    (at level 13, right associativity, name at level 99) : kami_expr_scope.
 Notation "'LETE' name : t <- expr ; cont " :=
   (LetE (k' := t) expr%kami_expr (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_expr_scope.
+    (at level 13, right associativity, name at level 99) : kami_expr_scope.
 Notation "'RetE' expr" :=
-  (NormExpr expr%kami_expr) (at level 12) : kami_expr_scope.
+  (NormExpr expr%kami_expr) (at level 13) : kami_expr_scope.
 Notation "'LETC' name <- v ; c " :=
   (LETE name <- RetE v ; c)%kami_expr
-                           (at level 12, right associativity, name at level 99) : kami_expr_scope.
+                           (at level 13, right associativity, name at level 99) : kami_expr_scope.
 Notation "'LETC' name : t <- v ; c " :=
   (LETE name : t <- RetE v ; c)%kami_expr
-                               (at level 12, right associativity, name at level 99) : kami_expr_scope.
+                               (at level 13, right associativity, name at level 99) : kami_expr_scope.
 Notation "'SystemE' ls ; c " :=
-  (SysE ls c)%kami_expr (at level 12, right associativity, ls at level 99): kami_expr_scope.
+  (SysE ls c)%kami_expr (at level 13, right associativity, ls at level 99): kami_expr_scope.
 
 Notation "k ## ty" := (LetExprSyntax ty k) (no associativity, at level 98, only parsing).
 
@@ -1927,72 +1927,72 @@ Notation "k ## ty" := (LetExprSyntax ty k) (no associativity, at level 98, only 
 
 Notation "'Call' meth ( a : argT ) ; cont " :=
   (MCall meth%string (argT, Void) a%kami_expr (fun _ => cont))
-    (at level 12, right associativity, meth at level 0, a at level 99) : kami_action_scope.
+    (at level 13, right associativity, meth at level 0, a at level 99) : kami_action_scope.
 Notation "'Call' name : retT <- meth ( a : argT ) ; cont " :=
   (MCall meth%string (argT, retT) a%kami_expr (fun name => cont))
-    (at level 12, right associativity, name at level 0, meth at level 0, a at level 99) : kami_action_scope.
+    (at level 13, right associativity, name at level 0, meth at level 0, a at level 99) : kami_action_scope.
 Notation "'Call' meth () ; cont " :=
   (MCall meth%string (Void, Void) (Const _ Default) (fun _ => cont))
-    (at level 12, right associativity, meth at level 0) : kami_action_scope.
+    (at level 13, right associativity, meth at level 0) : kami_action_scope.
 Notation "'Call' name : retT <- meth () ; cont " :=
   (MCall meth%string (Void, retT) (Const _ Default) (fun name => cont))
-    (at level 12, right associativity, name at level 0, meth at level 0) : kami_action_scope.
+    (at level 13, right associativity, name at level 0, meth at level 0) : kami_action_scope.
 Notation "'LETN' name : fullkind <- expr ; cont " :=
   (LetExpr (k := fullkind) expr%kami_expr (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
+    (at level 13, right associativity, name at level 99) : kami_action_scope.
 Notation "'LET' name <- expr ; cont " :=
   (LetExpr expr%kami_expr (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
+    (at level 13, right associativity, name at level 99) : kami_action_scope.
 Notation "'LET' name : t <- expr ; cont " :=
   (LetExpr (k := SyntaxKind t) expr%kami_expr (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
+    (at level 13, right associativity, name at level 99) : kami_action_scope.
 Notation "'LETA' name <- act ; cont " :=
   (LetAction act (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
+    (at level 13, right associativity, name at level 99) : kami_action_scope.
 Notation "'LETA' name : t <- act ; cont " :=
   (LetAction (k := t) act (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
+    (at level 13, right associativity, name at level 99) : kami_action_scope.
 Notation "'NondetN' name : fullkind ; cont" :=
   (ReadNondet fullkind (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
+    (at level 13, right associativity, name at level 99) : kami_action_scope.
 Notation "'Nondet' name : kind ; cont" :=
   (ReadNondet (SyntaxKind kind) (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
+    (at level 13, right associativity, name at level 99) : kami_action_scope.
 Notation "'ReadN' name : fullkind <- reg ; cont " :=
   (ReadReg reg fullkind (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
+    (at level 13, right associativity, name at level 99) : kami_action_scope.
 Notation "'Read' name <- reg ; cont" :=
   (ReadReg reg _ (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
+    (at level 13, right associativity, name at level 99) : kami_action_scope.
 Notation "'Read' name : kind <- reg ; cont " :=
   (ReadReg reg (SyntaxKind kind) (fun name => cont))
-    (at level 12, right associativity, name at level 99) : kami_action_scope.
+    (at level 13, right associativity, name at level 99) : kami_action_scope.
 Notation "'WriteN' reg : fullkind <- expr ; cont " :=
   (@WriteReg _ _ reg fullkind expr%kami_expr cont)
-    (at level 12, right associativity, reg at level 99) : kami_action_scope.
+    (at level 13, right associativity, reg at level 99) : kami_action_scope.
 Notation "'Write' reg <- expr ; cont " :=
   (WriteReg reg expr%kami_expr cont)
-    (at level 12, right associativity, reg at level 99) : kami_action_scope.
+    (at level 13, right associativity, reg at level 99) : kami_action_scope.
 Notation "'Write' reg : kind <- expr ; cont " :=
   (@WriteReg _ _ reg (SyntaxKind kind) expr%kami_expr cont)
-    (at level 12, right associativity, reg at level 99) : kami_action_scope.
+    (at level 13, right associativity, reg at level 99) : kami_action_scope.
 Notation "'If' cexpr 'then' tact 'else' fact 'as' name ; cont " :=
   (IfElse cexpr%kami_expr tact fact (fun name => cont))
-    (at level 13, right associativity) : kami_action_scope.
+    (at level 14, right associativity) : kami_action_scope.
 Notation "'If' cexpr 'then' tact 'else' fact ; cont " :=
   (IfElse cexpr%kami_expr tact fact (fun _ => cont))
-    (at level 13, right associativity) : kami_action_scope.
+    (at level 14, right associativity) : kami_action_scope.
 Notation "'If' cexpr 'then' tact ; cont" :=
   (IfElse cexpr%kami_expr tact (Return (Const _ Default)) (fun _ => cont))
-    (at level 13, right associativity) : kami_action_scope.
+    (at level 14, right associativity) : kami_action_scope.
 Notation "'Assert' expr ; cont " :=
   (Assertion expr%kami_expr cont)
-    (at level 12, right associativity) : kami_action_scope.
+    (at level 13, right associativity) : kami_action_scope.
 Notation "'System' sysexpr ; cont " :=
   (Sys sysexpr%kami_expr cont)
-    (at level 12, right associativity) : kami_action_scope.
+    (at level 13, right associativity) : kami_action_scope.
 Notation "'Ret' expr" :=
-  (Return expr%kami_expr)%kami_expr (at level 12) : kami_action_scope.
+  (Return expr%kami_expr)%kami_expr (at level 13) : kami_action_scope.
 Notation "'Retv'" := (Return (Const _ (k := Void) Default)) : kami_action_scope.
 
 
@@ -2010,26 +2010,26 @@ Fixpoint gatherActions (ty: Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_
 
 Notation "'GatherActions' actionList 'as' val ; cont" :=
   (gatherActions actionList (fun val => cont))
-    (at level 12, right associativity, val at level 99) : kami_action_scope.
+    (at level 13, right associativity, val at level 99) : kami_action_scope.
 
 Definition readNames (ty: Kind -> Type) k names := map (fun r => Read tmp: k <- r; Ret #tmp)%kami_action names.
 
 Notation "'ReadToList' names 'of' k 'as' val ; cont" :=
   (gatherActions (readNames _ k names) (fun val => cont))
-    (at level 12, right associativity, val at level 99) : kami_action_scope.
+    (at level 13, right associativity, val at level 99) : kami_action_scope.
 
 Definition callNames (ty: Kind -> Type) k names := map (fun r => Call tmp : k <- r(); Ret #tmp)%kami_action names.
 
 Notation "'CallToList' names 'of' k 'as' val ; cont" :=
   (gatherActions (callNames _ k names) (fun val => cont))
-    (at level 12, right associativity, val at level 99): kami_action_scope.
+    (at level 13, right associativity, val at level 99): kami_action_scope.
 
 Definition writeNames (ty: Kind -> Type) k namesVals :=
   map (fun r => Write (fst r) : k <- snd r; Ret (Const ty WO))%kami_action namesVals.
 
 Notation "'WriteToList' names 'of' k 'using' vals ; cont" :=
   (gatherActions (@writeNames _ k (List.combine names vals)) (fun _ => cont))
-    (at level 12, right associativity, vals at level 99) : kami_action_scope.
+    (at level 13, right associativity, vals at level 99) : kami_action_scope.
 
 (* Notation for normal mods *)
 
@@ -2091,29 +2091,29 @@ Delimit Scope kami_scope with kami.
 
 Notation "'RegisterN' name : type <- init" :=
   (MERegister (name%string, existT RegInitValT type (Some (init)%kami_init)))
-    (at level 12, name at level 99) : kami_scope.
+    (at level 13, name at level 99) : kami_scope.
 
 Notation "'Register' name : type <- init" :=
   (MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst (init)%kami_init))))
-    (at level 12, name at level 99) : kami_scope.
+    (at level 13, name at level 99) : kami_scope.
 
 Notation "'RegisterU' name : type" :=
   (MERegister (name%string, existT RegInitValT (SyntaxKind type) None))
-    (at level 12, name at level 99) : kami_scope.
+    (at level 13, name at level 99) : kami_scope.
 
 Notation "'Method' name () : retT := c" :=
   (MEMeth (name%string, existT MethodT (Void, retT)
                                (fun ty (_: ty Void) => c%kami_action : ActionT ty retT)))
-    (at level 12, name at level 9) : kami_scope.
+    (at level 13, name at level 9) : kami_scope.
 
 Notation "'Method' name ( param : dom ) : retT := c" :=
   (MEMeth (name%string, existT MethodT (dom, retT)
                                (fun ty (param : ty dom) => c%kami_action : ActionT ty retT)))
-    (at level 12, name at level 9, param at level 99) : kami_scope.
+    (at level 13, name at level 9, param at level 99) : kami_scope.
 
 Notation "'Rule' name := c" :=
   (MERule (name%string, fun ty => (c)%kami_action : ActionT ty Void))
-    (at level 12) : kami_scope.
+    (at level 13) : kami_scope.
 
 Notation "'MODULE' { m1 'with' .. 'with' mN }" :=
   (makeModule (ConsInModule m1%kami .. (ConsInModule mN%kami NilInModule) ..))
@@ -2253,15 +2253,15 @@ Notation "'RegisterVec' name 'using' nums : type <- init" :=
       (AddIndexToName name idx, existT RegInitValT (SyntaxKind type) (Some (makeConst (init)%kami_init)))
     ) nums
   ))
-    (at level 12, name at level 9, nums at level 9) : kami_scope.
+    (at level 13, name at level 9, nums at level 9) : kami_scope.
 
 
 
 (* Gallina Record Notations *)
 Notation "x <| proj  :=  v |>" := (set proj (constructor v) x)
-                                    (at level 14, left associativity).
+                                    (at level 12, left associativity).
 Notation "x <| proj  ::==  f |>" := (set proj f x)
-                                      (at level 14, f at next level, left associativity).
+                                      (at level 12, f at next level, left associativity).
 
 
 
