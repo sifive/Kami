@@ -1952,11 +1952,38 @@ Proof.
     + pose proof (nth_error_len _ _ _ H7 H6 H4); contradiction.
 Qed.
 
+Global Instance TraceEquiv_rewrite_l:
+  Proper (eq ==> TraceEquiv ==> iff) TraceInclusion.
+Proof.
+   unfold Proper, iff, Basics.flip, Basics.impl, TraceEquiv, respectful; intros; dest; try split; intros; auto; subst;
+    repeat (eapply TraceInclusion_trans; eauto).
+Qed.
 
+Global Instance TraceEquiv_rewrite_r:
+  Proper (TraceEquiv ==> eq ==> iff) TraceInclusion.
+Proof.
+   unfold Proper, iff, Basics.flip, Basics.impl, TraceEquiv, respectful; intros; dest; try split; intros; auto; subst;
+    repeat (eapply TraceInclusion_trans; eauto).
+Qed.
 
+Section Test.
+  Variable m1 m2 m3 m4: Mod.
+  Variable H1: TraceEquiv m1 m2.
+  Variable H2: TraceEquiv m3 m4.
 
+  Goal TraceInclusion m2 m4 <-> TraceInclusion m1 m3.
+  Proof.
+    rewrite H1.
+    rewrite H2.
+    tauto.
+  Qed.
 
-
+  Goal TraceInclusion m1 m4 <-> TraceInclusion m2 m3.
+    rewrite H1.
+    rewrite H2.
+    tauto.
+  Qed.
+End Test.
 
 
 Lemma UpdRegs_nil_upd: forall o, NoDup (map fst o) -> forall o', UpdRegs [] o o' -> o = o'.

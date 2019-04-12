@@ -6533,6 +6533,17 @@ Proof.
   eauto using flatten_inline_remove_TraceInclusion_r.
 Qed.
 
+Theorem TraceEquiv_flatten_inline_remove_ModWf (m: ModWf):
+  NoSelfCallBaseModule (inlineAll_All_mod m) ->
+  TraceEquiv m (flatten_inline_remove_ModWf m).
+Proof.
+  unfold TraceEquiv.
+  intros.
+  split.
+  - eapply TraceInclusion_flatten_inline_remove_ModWf_r; auto.
+  - eapply TraceInclusion_flatten_inline_remove_ModWf_l; auto.
+Qed.
+
 Lemma distributeHideWf (m1 m2 : Mod) (h : string) (HNeverCall : NeverCallMod m1):
   WfMod (HideMeth (ConcatMod m1 m2) h) ->
   ~ In h (map fst (getAllMethods m1)) ->

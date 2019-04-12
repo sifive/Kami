@@ -1379,7 +1379,7 @@ Definition TraceInclusion m1 m2 :=
      length ls1 = length ls2 /\
      (nthProp2 WeakInclusion ls1 ls2).
 
-
+Definition TraceEquiv m1 m2 := TraceInclusion m1 m2 /\ TraceInclusion m2 m1.
 
 
 
@@ -2258,9 +2258,9 @@ Notation "'RegisterVec' name 'using' nums : type <- init" :=
 
 
 (* Gallina Record Notations *)
-Notation "x {* proj  :=  v *}" := (set proj (constructor v) x)
+Notation "x <| proj  :=  v |>" := (set proj (constructor v) x)
                                     (at level 14, left associativity).
-Notation "x {* proj  ::==  f *}" := (set proj f x)
+Notation "x <| proj  ::==  f |>" := (set proj f x)
                                       (at level 14, f at next level, left associativity).
 
 

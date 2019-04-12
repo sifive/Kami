@@ -143,7 +143,7 @@ Section Compile.
       Build_RtlExprs
                    <tempWires ; regsWrite ; methCalls ; systCalls ; guard>.
 
-  Local Notation add proj rec val := (rec {* proj ::== (cons val) *}).
+  Local Notation add proj rec val := (rec <| proj ::== (cons val) |>).
 
   Fixpoint convertActionToRtl k (a: ActionT (fun _ => VarType) k) (retVar: VarType) : State VarType RtlExprs :=
     match a in ActionT _ _ with
@@ -151,8 +151,8 @@ Section Compile.
       (do curr <- get ;
          do _ <- put (inc curr) ;
          do final <- convertActionToRtl (cont curr) retVar ;
-         ret (final{* tempWires := (name, curr, existT _ _ (RtlReadWire (snd argRetK) (getMethRet meth))) :: tempWires final *}
-                   {* methCalls := fun s k' => match string_dec meth s with
+         ret (final<| tempWires := (name, curr, existT _ _ (RtlReadWire (snd argRetK) (getMethRet meth))) :: tempWires final |>
+                   <| methCalls := fun s k' => match string_dec meth s with
                                                | left _ => match Kind_dec (fst argRetK) k' with
                                                            | left pf_k => Some (RtlReadWire Bool (getActionGuard name),
                                                                                 match pf_k in _ = Y return _ Y with
@@ -161,7 +161,7 @@ Section Compile.
                                                            | _ => methCalls final s k'
                                                            end
                                                | _ => methCalls final s k'
-                                               end *}))
+                                               end |>))
     | Return x => ret (add tempWires defRtlExprs (name, retVar, existT _ k (convertExprToRtl x)))
     | LetExpr k' expr cont =>
       match k' return Expr (fun _ => VarType) k' ->
@@ -205,7 +205,7 @@ Section Compile.
       | SyntaxKind k =>
         fun expr =>
           (do final <- convertActionToRtl cont retVar ;
-             ret (final{* regsWrite :=
+             ret (final<| regsWrite :=
                            fun s k'' =>
                              match string_dec r s with
                              | left _ => match Kind_dec k k'' with
@@ -215,16 +215,16 @@ Section Compile.
                                          | _ => regsWrite final s k''
                                          end
                              | _ => regsWrite final s k''
-                             end *}))
+                             end |>))
       | _ => fun _ => ret defRtlExprs
       end expr
     | Assertion pred cont =>
       (do final <- convertActionToRtl cont retVar ;
          let p := convertExprToRtl pred in
-         ret (final{* guard := (match guard final with
+         ret (final<| guard := (match guard final with
                                 | None => Some p
                                 | Some v => Some (p && v)%rtl_expr
-                                end) *}))
+                                end) |>))
     | Sys ls cont =>
       (do final <- convertActionToRtl cont retVar ;
          ret (add systCalls final (RtlReadWire Bool (getActionGuard name), map getRtlDisp ls)))
