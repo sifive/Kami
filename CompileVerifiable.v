@@ -34,7 +34,7 @@ Section Compile.
            (writes: forall sk: (string * Kind), SynExpr ty (snd sk))
            (regMap: regMapTy)
            {struct a}:
-    CompActionT k. refine
+    CompActionT k :=
     match a in ActionT _ _ with
     | MCall meth k argExpr cont =>
       CompCall meth k pred argExpr (fun ret => @compile _ (cont ret) pred writes regMap)
@@ -84,5 +84,4 @@ Section Compile.
     (* | Sys ls cont => getCallsWithSign cont *)
     (* | IfElse predNew ktf t f cont => *)
     (*   getCallsWithSign t ++ getCallsWithSign f ++ getCallsWithSign (cont tt) *)
-
 End Compile.
