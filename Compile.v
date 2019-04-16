@@ -430,6 +430,11 @@ Definition rtlModCreate (bm: list string * (list RegFileBase * BaseModule))
 Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) :=
   rtlModCreate bm (map fst (getRules (snd (snd bm)))).
 
+Definition getRtlSafe
+           (module : Mod)
+  :  RtlModule
+  := getRtl (separateModRemove module).
+
 Definition rtlGet m :=
   getRtl (getHidden m, (fst (separateBaseMod m), inlineAll_All_mod (mergeSeparatedBaseMod (snd (separateBaseMod m))))).
 

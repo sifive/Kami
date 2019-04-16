@@ -307,6 +307,15 @@ Fixpoint getFins n :=
   | S m => Fin.F1 :: map Fin.FS (getFins m)
   end.
 
+Fixpoint getFinsBound m n: list (Fin.t n) :=
+  match m return (list (Fin.t n)) with
+  | 0 => nil
+  | S k => match n with
+           | 0 => nil
+           | S n' => Fin.F1 :: map Fin.FS (getFinsBound k n')
+           end
+  end.
+
 Definition mapOrFins n (x: Fin.t n) := fold_left (fun a b => x = b \/ a) (getFins n) False.
 
 Lemma fold_left_or_init: forall A (f: A -> Prop) ls (P: Prop), P -> fold_left (fun a b => f b \/ a) ls P.
