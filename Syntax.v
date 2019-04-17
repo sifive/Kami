@@ -1107,7 +1107,7 @@ Section Semantics.
       (HTrue: evalExpr p = true)
       (HSemAction: SemAction cont readRegs2 newRegs2 calls2 r2):
       SemAction (Assertion p cont) readRegs2 newRegs2 calls2 r2
-  | SemDisplay
+  | SemSys
       (ls: list (SysT type)) k (cont: ActionT type k)
       r readRegs newRegs calls
       (HSemAction: SemAction cont readRegs newRegs calls r):

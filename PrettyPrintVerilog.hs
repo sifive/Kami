@@ -73,7 +73,7 @@ ppWord (b : bs) = (if b then '1' else '0') : ppWord bs
 ppConst :: T.ConstT -> String
 ppConst (T.ConstBool b) = if b then "1'b1" else "1'b0"
 ppConst (T.ConstBit sz w) = show sz ++ "\'b" ++ ppWord (reverse $ wordToList w)
-ppConst (T.ConstArray n k fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (T.getFins n))) ++ "}"
+ppConst (T.ConstArray n k fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (reverse $ T.getFins n))) ++ "}"
 ppConst (T.ConstStruct n fk fs fv) = '{' : intercalate ", " (snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins n)) (Data.List.map ppConst (Data.List.map fv (T.getFins n))))))) ++ "}"
 
 optionAddToTrunc :: String -> T.Kind -> T.RtlExpr -> State (H.Map String (Int, T.Kind)) String
@@ -181,7 +181,7 @@ ppRtlExpr who e =
         return $ new ++ '[' : show xidx ++ "]"
     T.RtlBuildArray n k fv ->
       do
-        strs <- mapM (ppRtlExpr who) (reverse $ Data.List.map fv (T.getFins n))
+        strs <- mapM (ppRtlExpr who) (Data.List.map fv (reverse $ T.getFins n))
         return $ if T.size k == 0 || n == 0 then "0" else '{': intercalate ", " strs ++ "}"
   where
     filterKind0 num fk es = snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins num)) (Data.List.map es (T.getFins num)))))
@@ -490,11 +490,11 @@ ppConstMem :: T.ConstT -> String
 ppConstMem (T.ConstBool b) = if b then "1" else "0"
 ppConstMem (T.ConstBit sz w) = if sz == 0 then "0" else ppWord (reverse $ wordToList w)
 ppConstMem (T.ConstStruct num fk fs fv) = Data.List.concatMap ppConstMem (Data.List.map fv (T.getFins num))
-ppConstMem (T.ConstArray num k fv) = Data.List.concatMap ppConstMem (reverse $ Data.List.map fv (T.getFins num))
+ppConstMem (T.ConstArray num k fv) = Data.List.concatMap ppConstMem (Data.List.map fv (reverse $ T.getFins num))
 
 ppRfFile :: (((String, [(String, Bool)]), String), ((Int, T.Kind), T.ConstT)) -> String
 ppRfFile (((name, reads), write), ((idxType, dataType), T.ConstArray num k fv)) =
-  concatMap (\v -> ppConstMem v ++ "\n") (reverse $ Data.List.map fv (T.getFins num)) ++ "\n"
+  concatMap (\v -> ppConstMem v ++ "\n") (Data.List.map fv (reverse $ T.getFins num)) ++ "\n"
 
 ppRfName :: (((String, [(String, Bool)]), String), ((Int, T.Kind), T.ConstT)) -> String
 ppRfName (((name, reads), write), ((idxType, dataType), T.ConstArray num k fv)) = ppName name ++ ".mem"
