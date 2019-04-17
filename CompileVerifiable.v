@@ -34,7 +34,7 @@ Section Compile.
            (writes: forall sk: (string * Kind), SynExpr ty (snd sk))
            (regMap: regMapTy)
            {struct a}:
-    CompActionT k. refine
+    CompActionT k :=
     match a in ActionT _ _ with
     | MCall meth k argExpr cont =>
       CompCall meth k pred argExpr (fun ret => @compile _ (cont ret) pred writes regMap)
@@ -95,9 +95,34 @@ Section Compile.
             end))
       end cont
     | Assertion pred' cont =>
-      compile _ cont (pred && pred')%kami_expr writes regMap
-    | Sys ls cont => compile _ cont pred writes regMap
+      compile cont (pred && pred')%kami_expr writes regMap
+    | Sys ls cont => compile cont pred writes regMap
     | IfElse pred' k' aT aF cont => cheat _
     end.
-  Defined.
+    (* | LetExpr k' expr cont => *)
+    (*   match k' return (fullType (fun _ => unit) k' -> ActionT (fun _ => unit) k) -> *)
+    (*                   list (string * (Kind * Kind)) with *)
+    (*   | SyntaxKind k => fun cont => getCallsWithSign (cont tt) *)
+    (*   | _ => fun _ => nil *)
+    (*   end cont *)
+    (* | LetAction k' a' cont => *)
+    (*   getCallsWithSign a' ++ getCallsWithSign (cont tt) *)
+    (* | ReadNondet k' cont => *)
+    (*   match k' return (fullType (fun _ => unit) k' -> ActionT (fun _ => unit) k) -> *)
+    (*                   list (string * (Kind * Kind)) with *)
+    (*   | SyntaxKind k => fun cont => *)
+    (*                       getCallsWithSign (cont tt) *)
+    (*   | _ => fun _ => nil *)
+    (*   end cont *)
+    (* | ReadReg r k' cont => *)
+    (*   match k' return (fullType (fun _ => unit) k' -> ActionT (fun _ => unit) k) -> *)
+    (*                   list (string * (Kind * Kind)) with *)
+    (*   | SyntaxKind k => fun cont => *)
+    (*                       getCallsWithSign (cont tt) *)
+    (*   | _ => fun _ => nil *)
+    (*   end cont *)
+    (* | Assertion pred cont => getCallsWithSign cont *)
+    (* | Sys ls cont => getCallsWithSign cont *)
+    (* | IfElse predNew ktf t f cont => *)
+    (*   getCallsWithSign t ++ getCallsWithSign f ++ getCallsWithSign (cont tt) *)
 End Compile.

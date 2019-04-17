@@ -488,12 +488,12 @@ Notation getStruct ls :=
 Notation "'STRUCT' { s1 ; .. ; sN }" :=
   (getStruct (Vector.cons _ s1%kami_struct _ .. (Vector.cons _ sN%kami_struct _ (Vector.nil _)) ..)).
 
-Definition WriteRq IdxNum Data := STRUCT { "addr" :: Bit (Nat.log2_up IdxNum) ;
-                                           "data" :: Data }.
+Definition WriteRq lgIdxNum Data := STRUCT { "addr" :: Bit lgIdxNum ;
+                                             "data" :: Data }.
 
-Definition WriteRqMask IdxNum num Data := STRUCT { "addr" :: Bit (Nat.log2_up IdxNum) ;
-                                                   "data" :: Array num Data ;
-                                                   "mask" :: Array num Bool }.
+Definition WriteRqMask lgIdxNum num Data := STRUCT { "addr" :: Bit lgIdxNum ;
+                                                     "data" :: Array num Data ;
+                                                     "mask" :: Array num Bool }.
 
 Definition buildNumDataArray num dataArray IdxNum Data ty (idx: ty (Bit (Nat.log2_up IdxNum))) :=
   ReadReg dataArray (SyntaxKind (Array IdxNum Data))
@@ -504,7 +504,8 @@ Definition buildNumDataArray num dataArray IdxNum Data ty (idx: ty (Bit (Nat.log
                                      (CABit Add (Var ty (SyntaxKind _) idx ::
                                                      Const ty (natToWord _ (proj1_sig (Fin.to_nat i))) :: nil))))).
                                                                                                                    
-Definition updateNumDataArray num dataArray IdxNum Data ty (idxData: ty (WriteRq IdxNum (Array num Data))):
+Definition updateNumDataArray num dataArray IdxNum Data ty (idxData: ty (WriteRq (Nat.log2_up IdxNum)
+                                                                                 (Array num Data))):
   ActionT ty Void :=
   ReadReg dataArray (SyntaxKind (Array IdxNum Data))
           (fun val =>
@@ -520,7 +521,8 @@ Definition updateNumDataArray num dataArray IdxNum Data ty (idxData: ty (WriteRq
                                  (Var ty (SyntaxKind (Array IdxNum Data)) val))
                       (Return (Const _ WO))).
 
-Definition updateNumDataArrayMask num dataArray IdxNum Data ty (idxData: ty (WriteRqMask IdxNum num Data)):
+Definition updateNumDataArrayMask num dataArray IdxNum Data ty (idxData: ty (WriteRqMask
+                                                                               (Nat.log2_up IdxNum) num Data)):
   ActionT ty Void :=
   ReadReg dataArray (SyntaxKind (Array IdxNum Data))
           (fun val =>
@@ -547,9 +549,9 @@ Definition readRegFile num dataArray (read: list string) IdxNum Data :=
 Definition writeRegFileFn (isWrMask: bool) num dataArray (write: string) IdxNum Data :=
   (write,
    if isWrMask
-   then existT MethodT (WriteRqMask IdxNum num Data, Void)
+   then existT MethodT (WriteRqMask (Nat.log2_up IdxNum) num Data, Void)
                (updateNumDataArrayMask num dataArray IdxNum Data)
-   else existT MethodT (WriteRq IdxNum (Array num Data), Void)
+   else existT MethodT (WriteRq (Nat.log2_up IdxNum) (Array num Data), Void)
                (updateNumDataArray num dataArray IdxNum Data)).
 
 Definition readSyncRegFile (isAddr: bool) num dataArray (read: list SyncRead) IdxNum Data :=
