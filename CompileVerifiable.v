@@ -29,7 +29,7 @@ Section Compile.
   End lret.
 
   Axiom cheat: forall t, t.
-
+  
   Fixpoint compile k (a: ActionT ty k) (pred: SynExpr ty Bool)
            (writes: forall sk: (string * Kind), SynExpr ty (snd sk))
            (regMap: regMapTy)
@@ -56,7 +56,48 @@ Section Compile.
                                 | _, _ => writes rk
                                 end) regMap
       end expr
-    | _ => cheat _
+    | LetExpr k' expr cont =>
+      match k' return (Expr ty k' -> (fullType ty k' -> ActionT ty k) -> CompActionT k) with
+      | NativeKind _ => fun _ _ => CompRet writes (@Const _ _ (getDefaultConst k))
+      | SyntaxKind k0 =>
+        (fun (e0 : Expr ty (SyntaxKind k0))
+            (cont0 : fullType ty (SyntaxKind k0) -> ActionT ty k) =>
+          (match Kind_dec k k0 with
+           | left e1 =>
+             match e1 in _ = Y return (Expr ty (SyntaxKind Y) ->
+                                       (fullType ty (SyntaxKind Y) -> ActionT ty k) ->
+                                       CompActionT k) with
+             | eq_refl =>
+               (fun (e2 : Expr ty (SyntaxKind k))
+                    (cont1 : fullType ty (SyntaxKind k) -> ActionT ty k) =>
+                  CompLetExpr e2 (fun ret => @compile _ (cont1 ret) pred writes regMap)
+               ) end e0 cont0
+           | right _ => CompRet writes (@Const _ _ (getDefaultConst k))
+           end))
+      end expr cont
+    | LetAction k' a' cont =>
+      cheat _ 
+    | ReadNondet k' cont => CompRet writes (@Const _ _ (getDefaultConst k))
+    | ReadReg r k' cont =>
+      match k' return ((fullType ty k' -> ActionT ty k)-> CompActionT k) with
+      | NativeKind _ => fun _ => CompRet writes (@Const _ _ (getDefaultConst k))
+      | SyntaxKind k0 =>
+        (fun (cont0 : fullType ty (SyntaxKind k0) -> ActionT ty k) =>
+           (match Kind_dec k k0 with
+            | left e1 =>
+              match e1 in _ = Y return ((fullType ty (SyntaxKind Y) -> ActionT ty k) ->
+                                        CompActionT k) with
+              | eq_refl =>
+                (fun (cont1 : fullType ty (SyntaxKind k) -> ActionT ty k) =>
+                   CompReadCtxt r regMap (fun ret => @compile _ (cont1 ret) pred writes regMap)
+                ) end cont0
+            | right _ => CompRet writes (@Const _ _ (getDefaultConst k))
+            end))
+      end cont
+    | Assertion pred' cont =>
+      compile cont (pred && pred')%kami_expr writes regMap
+    | Sys ls cont => compile cont pred writes regMap
+    | IfElse pred' k' aT aF cont => cheat _
     end.
     (* | LetExpr k' expr cont => *)
     (*   match k' return (fullType (fun _ => unit) k' -> ActionT (fun _ => unit) k) -> *)
