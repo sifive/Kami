@@ -385,13 +385,13 @@ Section Phoas.
   | DispExpr k (e: Expr (SyntaxKind k)) (ff: FullFormat k): SysT
   | Finish: SysT.
 
-  Definition dispHex k (e: Expr (SyntaxKind k)) :=
+  Definition DispHex k (e: Expr (SyntaxKind k)) :=
     DispExpr e (fullFormatHex k).
   
-  Definition dispBinary k (e: Expr (SyntaxKind k)) :=
+  Definition DispBinary k (e: Expr (SyntaxKind k)) :=
     DispExpr e (fullFormatBinary k).
     
-  Definition dispDecimal k (e: Expr (SyntaxKind k)) :=
+  Definition DispDecimal k (e: Expr (SyntaxKind k)) :=
     DispExpr e (fullFormatDecimal k).
 
   Inductive LetExprSyntax k :=
