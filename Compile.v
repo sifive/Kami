@@ -74,10 +74,7 @@ Section Compile.
   Definition getRtlDisp (d: SysT (fun _ => VarType)) :=
     match d with
     | DispString s => RtlDispString s
-    | DispBool e f => RtlDispBool (@convertExprToRtl _ e) f
-    | DispBit n e f => RtlDispBit (@convertExprToRtl _ e) f
-    | DispStruct n fk fs e f => RtlDispStruct (@convertExprToRtl _ e) f
-    | DispArray n k e f => RtlDispArray (@convertExprToRtl _ e) f
+    | DispExpr _ e f => RtlDispExpr (@convertExprToRtl _ e) f
     | Finish => RtlFinish
     end.
 

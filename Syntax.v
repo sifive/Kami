@@ -350,19 +350,55 @@ Section Phoas.
 
   Definition FullBitFormat := (nat * BitFormat)%type.
 
+  Inductive FullFormat: Kind -> Type :=
+  | FBool: nat -> BitFormat -> FullFormat Bool
+  | FBit n: nat -> BitFormat -> FullFormat (Bit n)
+  | FStruct n fk fs: (forall i, FullFormat (fk i)) -> FullFormat (@Struct n fk fs)
+  | FArray n k: FullFormat k -> FullFormat (@Array n k).
+
+  Fixpoint fullFormatHex k : FullFormat k :=
+    match k return FullFormat k with
+    | Bool => FBool 1 Hex
+    | Bit n => FBit n (n/4) Hex
+    | Struct n fk fs => FStruct fk fs (fun i => fullFormatHex (fk i))
+    | Array n k => FArray n (fullFormatHex k)
+    end.
+
+  Fixpoint fullFormatBinary k : FullFormat k :=
+    match k return FullFormat k with
+    | Bool => FBool 1 Binary
+    | Bit n => FBit n n Binary
+    | Struct n fk fs => FStruct fk fs (fun i => fullFormatBinary (fk i))
+    | Array n k => FArray n (fullFormatBinary k)
+    end.
+
+  Fixpoint fullFormatDecimal k : FullFormat k :=
+    match k return FullFormat k with
+    | Bool => FBool 1 Decimal
+    | Bit n => FBit n 0 Decimal
+    | Struct n fk fs => FStruct fk fs (fun i => fullFormatDecimal (fk i))
+    | Array n k => FArray n (fullFormatDecimal k)
+    end.
+
   Inductive SysT: Type :=
-  | DispString: string -> SysT
-  | DispBool: Expr (SyntaxKind Bool) -> FullBitFormat -> SysT
-  | DispBit: forall n, Expr (SyntaxKind (Bit n)) -> FullBitFormat -> SysT
-  | DispStruct: forall n fk fs, Expr (SyntaxKind (@Struct n fk fs)) -> (Fin.t n -> FullBitFormat) -> SysT
-  | DispArray: forall n k, Expr (SyntaxKind (Array n k)) -> FullBitFormat -> SysT
+  | DispString (s: string): SysT
+  | DispExpr k (e: Expr (SyntaxKind k)) (ff: FullFormat k): SysT
   | Finish: SysT.
+
+  Definition dispHex k (e: Expr (SyntaxKind k)) :=
+    DispExpr e (fullFormatHex k).
+  
+  Definition dispBinary k (e: Expr (SyntaxKind k)) :=
+    DispExpr e (fullFormatBinary k).
+    
+  Definition dispDecimal k (e: Expr (SyntaxKind k)) :=
+    DispExpr e (fullFormatDecimal k).
 
   Inductive LetExprSyntax k :=
   | NormExpr (e: Expr (SyntaxKind k)): LetExprSyntax k
   | SysE (ls: list SysT) (e: LetExprSyntax k): LetExprSyntax k
   | LetE k' (e: LetExprSyntax k') (cont: ty k' -> LetExprSyntax k): LetExprSyntax k.
-  
+    
   Inductive ActionT (lretT: Kind) : Type :=
   | MCall (meth: string) s:
       Expr (SyntaxKind (fst s)) ->

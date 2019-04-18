@@ -37,14 +37,9 @@ Inductive RtlExpr: Kind -> Type :=
                          RtlExpr k
 | RtlBuildArray n k: (Fin.t n -> RtlExpr k) -> RtlExpr (Array n k).
 
-Inductive RtlSysT : Type :=
-| RtlDispString : string -> RtlSysT
-| RtlDispBool : RtlExpr Bool -> FullBitFormat -> RtlSysT
-| RtlDispBit : forall n, RtlExpr (Bit n) -> FullBitFormat -> RtlSysT
-| RtlDispStruct : forall n (fk : Fin.t n -> Kind) (fs : Fin.t n -> string),
-    RtlExpr (Struct fk fs) -> (Fin.t n -> FullBitFormat) -> RtlSysT
-| RtlDispArray : forall n k,
-    RtlExpr (Array n k) -> FullBitFormat -> RtlSysT
+Inductive RtlSysT: Type :=
+| RtlDispString (s: string): RtlSysT
+| RtlDispExpr k (e: RtlExpr k) (ff: FullFormat k): RtlSysT
 | RtlFinish: RtlSysT.
 
 Record RtlSyncRead :=

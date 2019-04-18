@@ -356,23 +356,26 @@ ppBitFormat T.Binary = "b"
 ppBitFormat T.Decimal = "d"
 ppBitFormat T.Hex = "x"
 
-ppFullBitFormat :: T.FullBitFormat -> String
-ppFullBitFormat (sz, f) = "%" ++ show sz ++ ppBitFormat f
+-- ppFullBitFormat :: T.FullBitFormat -> String
+-- ppFullBitFormat (sz, f) = "%" ++ show sz ++ ppBitFormat f
+
+ppFullFormat :: T.FullFormat -> String
+ppFullFormat (T.FBool sz bf) = "%" ++ show sz ++ ppBitFormat bf
+ppFullFormat (T.FBit n sz bf) = "%" ++ show sz ++ ppBitFormat bf
+ppFullFormat (T.FStruct n fk fs ff) = "{ " ++ concatMap (\i -> fs i ++ " := " ++ ppFullFormat (ff i) ++ "; ") (T.getFins n) ++ "}"
+ppFullFormat (T.FArray n k f) = "[ " ++ concatMap (\i -> show i ++ " |-> " ++ ppFullFormat f ++ "; ") [0 .. (n-1)] ++ "]"
+
+ppExprList :: T.Kind -> T.RtlExpr -> [T.RtlExpr]
+ppExprList T.Bool e = [e]
+ppExprList (T.Bit n) e = [e]
+ppExprList (T.Struct n fk fs) e = concatMap (\i -> ppExprList (fk i) (T.RtlReadStruct n fk fs e i)) (T.getFins n)
+ppExprList (T.Array n k) e = concatMap (\i -> ppExprList k (T.RtlReadArrayConst n k e i)) (T.getFins n)
 
 ppRtlSys :: T.RtlSysT -> State (H.Map String (Int, T.Kind)) String
 ppRtlSys (T.RtlDispString s) = return $ "        $write(\"" ++ s ++ "\");\n"
-ppRtlSys (T.RtlDispBool e f) = do
-  s <- ppRtlExpr "sys" e
-  return $ "        $write(\"" ++ ppFullBitFormat f ++ "\", " ++ s ++ ");\n"
-ppRtlSys (T.RtlDispBit _ e f) = do
-  s <- ppRtlExpr "sys" e
-  return $ "        $write(\"" ++ ppFullBitFormat f ++ "\", " ++ s ++ ");\n"
-ppRtlSys (T.RtlDispStruct n fk fs fv ff) = do
-  rest <- mapM (\i -> ppRtlExpr "sys" (T.RtlReadStruct n fk fs fv i)) (T.getFins n)
-  return $ "        $write(\"{" ++ Data.List.concat (Data.List.map (\i -> fs i ++ ":=" ++ ppFullBitFormat (ff i) ++ "; ") (T.getFins n)) ++ "}\", " ++ intercalate ", " rest ++ ");\n"
-ppRtlSys (T.RtlDispArray n k v f) = do
-  rest <- mapM (\i -> ppRtlExpr "sys" (T.RtlReadArray n k v (T.RtlConst k (T.ConstBit (T._Nat__log2_up n) (T.natToWord (T._Nat__log2_up n) i))))) [0 .. (n-1)]
-  return $ "        $write(\"[" ++ Data.List.concat (Data.List.map (\i -> show i ++ ":=" ++ ppFullBitFormat f ++ "; ") [0 .. (n-1)]) ++ "]\", " ++ intercalate ", " rest ++ ");\n"
+ppRtlSys (T.RtlDispExpr k e f) = do
+  printExprs <- mapM (\i -> ppRtlExpr "sys" i) (ppExprList k e)
+  return $ "        $write(\"" ++ ppFullFormat f ++ "\"" ++ concatMap (\x -> ", " ++ x) printExprs ++ ");\n"
 ppRtlSys (T.RtlFinish) = return $ "        $finish();\n"
 
 ppRtlModule :: T.RtlModule -> String
