@@ -356,14 +356,11 @@ ppBitFormat T.Binary = "b"
 ppBitFormat T.Decimal = "d"
 ppBitFormat T.Hex = "x"
 
--- ppFullBitFormat :: T.FullBitFormat -> String
--- ppFullBitFormat (sz, f) = "%" ++ show sz ++ ppBitFormat f
-
 ppFullFormat :: T.FullFormat -> String
 ppFullFormat (T.FBool sz bf) = "%" ++ show sz ++ ppBitFormat bf
 ppFullFormat (T.FBit n sz bf) = "%" ++ show sz ++ ppBitFormat bf
-ppFullFormat (T.FStruct n fk fs ff) = "{ " ++ concatMap (\i -> fs i ++ " := " ++ ppFullFormat (ff i) ++ "; ") (T.getFins n) ++ "}"
-ppFullFormat (T.FArray n k f) = "[ " ++ concatMap (\i -> show i ++ " |-> " ++ ppFullFormat f ++ "; ") [0 .. (n-1)] ++ "]"
+ppFullFormat (T.FStruct n fk fs ff) = "{ " ++ concatMap (\i -> fs i ++ ": " ++ ppFullFormat (ff i) ++ "; ") (T.getFins n) ++ "}"
+ppFullFormat (T.FArray n k f) = "[ " ++ concatMap (\i -> show i ++ ": " ++ ppFullFormat f ++ "; ") [0 .. (n-1)] ++ "]"
 
 ppExprList :: T.Kind -> T.RtlExpr -> [T.RtlExpr]
 ppExprList T.Bool e = [e]
