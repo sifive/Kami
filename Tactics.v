@@ -86,9 +86,17 @@ Ltac discharge_CommonRegisterAuto :=
   | _ => idtac
   end.
 
-Ltac discharge_simulationGeneral mySimRel :=
+Ltac discharge_simulationWf mySimRel :=
   apply simulationGeneral with (simRel := mySimRel); auto; simpl; intros;
   try match goal with
+      | H: mySimRel _ _ |- _ => inv H
+      end;
+  clean_hyp; auto; clean_hyp.
+
+Ltac discharge_simulation mySimRel :=
+  apply simulation with (simRel := mySimRel); auto; simpl; intros;
+  try match goal with
+      | |- WfBaseModule _ => discharge_wf
       | H: mySimRel _ _ |- _ => inv H
       end;
   clean_hyp; auto; clean_hyp.

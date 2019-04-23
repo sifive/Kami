@@ -5398,3 +5398,70 @@ Proof.
   - econstructor 8; eauto.
 Qed.
 
+Section Simulation.
+  Variable imp spec: BaseModule.
+  Variable impWf: WfBaseModule imp.
+  Variable specWf: WfBaseModule spec.
+  Variable NoSelfCalls: NoSelfCallBaseModule spec.
+  
+  Variable simRel: RegsT -> RegsT -> Prop.
+  Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
+  Variable simRelImpGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oImp = getKindAttr (getRegisters imp).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
+                                 exists rspec, Forall2 regInit rspec (getRegisters spec) /\ simRel rimp rspec.
+
+  Variable simulationRule:
+    forall oImp rImp uImp rleImp csImp aImp,
+      In (rleImp, aImp) (getRules imp) ->
+      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      forall oSpec,
+        simRel oImp oSpec ->
+        ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = nil) \/
+         (exists rleSpec aSpec,
+             In (rleSpec, aSpec) (getRules spec) /\
+             exists rSpec uSpec,
+               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+                 simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec))).
+
+  Variable simulationMeth:
+    forall oImp rImp uImp meth csImp sign aImp arg ret,
+      In (meth, existT _ sign aImp) (getMethods imp) ->
+      SemAction oImp (aImp type arg) rImp uImp csImp ret ->
+      forall oSpec,
+        simRel oImp oSpec ->
+          exists aSpec rSpec uSpec,
+            In (meth, existT _ sign aSpec) (getMethods spec) /\
+            SemAction oSpec (aSpec type arg) rSpec uSpec csImp ret /\
+                simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec).
+
+  Variable notMethMeth:
+    forall oImp rImpl1 uImpl1 meth1 sign1 aImp1 arg1 ret1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (meth1, existT _ sign1 aImp1) (getMethods imp) ->
+      SemAction oImp (aImp1 type arg1) rImpl1 uImpl1 csImp1 ret1 ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+          
+  Variable notRuleMeth:
+    forall oImp rImpl1 uImpl1 rleImpl1 aImp1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (rleImpl1, aImp1) (getRules imp) ->
+      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 WO ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+
+  Theorem simulation:
+    TraceInclusion (Base imp) (Base spec).
+  Proof.
+    remember {| baseModule := imp ;
+                wfBaseModule := impWf |} as impMod.
+    remember {| baseModule := spec ;
+                wfBaseModule := specWf |} as specMod.
+    assert (Imp: imp = baseModule impMod) by (rewrite HeqimpMod; auto).
+    assert (Spec: spec = baseModule specMod) by (rewrite HeqspecMod; auto).
+    rewrite Imp, Spec in *.
+    eapply simulationGeneral; eauto; intros.
+  Qed.
+End Simulation.
