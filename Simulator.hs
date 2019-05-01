@@ -18,7 +18,7 @@ import System.Exit (exitSuccess)
 import Data.List (intersperse)
 import Data.Foldable (foldrM)
 import Data.Maybe (isJust)
-import Control.Monad (mapM, when)ß
+import Control.Monad (mapM, when)
 import System.Random (mkStdGen, setStdGen, randomRIO)
 import GHC.Base (unsafeCoerce#)
 
