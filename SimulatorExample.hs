@@ -6,7 +6,7 @@
 module Main where
 
 import Target as T
-import Simulator.Sim
+import Simulator
 import Extract
 
 ruleNames :: [String]
