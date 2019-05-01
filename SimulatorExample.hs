@@ -24,5 +24,5 @@ meths = [("counterVal", \v -> do
 
 main :: IO()
 main = do
-    simulate_module rand_rules ruleNames meths coq_IncrMod
+    simulate_module 0 rand_rules ruleNames meths coq_IncrMod
     return ()
