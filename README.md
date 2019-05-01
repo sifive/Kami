@@ -22,18 +22,22 @@ Before you can use the Kami library, you must perform the
 following steps:
 
 1.  Create a "Projects" directory where all the repositories are going to reside
-2.  Download and Compile the MIT Bedrock Bit Vectors library from
+2.  Download and compile the MIT Bedrock Bit Vectors library from
     <https://github.com/mit-plv/bbv>.
     1.  In the “Projects” directory use
         `git clone `[`https://github.com/mit-plv/bbv.git`](https://github.com/mit-plv/bbv.git)
         to clone the repo.
     2.  cd into bbv and run `make` to compile the files.
-3.  Download and compile the Kami library
+3.  Download and compile the Coq record update library from <https://github.com/tchajed/coq-record-update>.
+    1.  In the "Projects" directory use
+        `git clone `[`https://github.com/tchajed/coq-record-update.git`](https://github.com/tchajed/coq-record-update.git)          to clone the repo.
+    2.  cd into coq-record-update and run `make` to compile the files.
+4.  Download and compile the Kami library
     1.  In the “Projects” directory use
         `git clone `[`https://github.com/sifive/Kami.git`](https://github.com/sifive/Kami.git)
         to clone the Kami repo.
     2.  cd into kami and run `make` to compile the files.
-4.  Open proofgeneral or your favorite IDE for Coq.
+5.  Open proofgeneral or your favorite IDE for Coq.
     1.  In the Vernacular, execute `Require Import Kami.All.` to load all of the Kami library.
     2.  Write a Kami module and its specification based on what is described below and prove it!
 
