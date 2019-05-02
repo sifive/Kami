@@ -12,13 +12,15 @@ module Simulator where
 import qualified Target as T
 
 import qualified Data.Vector as V
+import qualified Data.Map as M
+
 import System.IO (isEOF)
 import Numeric (showHex)
 import System.Exit (exitSuccess)
 import Data.List (intersperse)
 import Data.Foldable (foldrM)
 import Data.Maybe (isJust)
-import Control.Monad (mapM, when)ß
+import Control.Monad (mapM, when)
 import System.Random (mkStdGen, setStdGen, randomRIO)
 import GHC.Base (unsafeCoerce#)
 
@@ -52,14 +54,11 @@ list_of_int :: Int {- length -} -> Int {- value -} -> [Bool]
 list_of_int 0 _ = []
 list_of_int n x = (not $ even x) : list_of_int (n-1) (x `div` 2)
 
-update :: Eq a => (a,b) -> [(a,b)] -> Either a [(a,b)]
-update (a,_) [] = Left a
-update (a,b) ((a',b'):ps) = if a == a' then Right $ (a,b):ps else do
-    ps' <- update (a,b) ps
-    return $ (a',b'):ps'
+pair_update :: Ord a => (a,b) -> M.Map a b -> M.Map a b
+pair_update (a,b) m = M.adjust (const b) a m
 
-updates :: Eq a => [(a,b)]  {- original pair list -} -> [(a,b)] {- list of updates -} -> Either a [(a,b)]
-updates = foldrM update 
+updates :: Ord a => M.Map a b -> [(a,b)] -> M.Map a b
+updates = foldr pair_update 
 
 execIOs :: [IO ()] -> IO ()
 execIOs = foldr (>>) (return ())
@@ -84,12 +83,6 @@ arrayCoerce _ = error "Encountered a non-array value when an array was expected.
 
 defVal :: T.Kind -> Val
 defVal k = eval (T.getDefaultConst k)
-
--- defVal :: T.Kind -> Val
--- defVal T.Bool = BoolVal False
--- defVal (T.Bit n) = BitvectorVal $ replicate n False
--- defVal (T.Struct n kinds names) = StructVal $ map (\i -> (names $ of_nat_lt n i, defVal $ kinds $ of_nat_lt n i)) [0..(n-1)]
--- defVal (T.Array n k) = ArrayVal $ (replicate n $ defVal k)
 
 defVal_FK :: T.FullKind -> Val
 defVal_FK T.NativeKind = error "Encountered a NativeKind."
@@ -173,7 +166,7 @@ printVal _ _ = "Cannot print expression, mismatch between FullFormat and Kami Ty
 printNum :: T.BitFormat -> [Bool] -> String
 printNum T.Binary bs = "0b" ++ map (\b -> if b then '1' else '0') (reverse bs)
 printNum T.Decimal bs = show $ int_of_list bs
-printNum T.Hex bs = "0x" ++showHex (int_of_list bs) ""
+printNum T.Hex bs = "0x" ++ showHex (int_of_list bs) ""
 
 sysIO :: T.SysT Val -> IO ()
 sysIO T.Finish = do
@@ -182,7 +175,7 @@ sysIO T.Finish = do
 sysIO (T.DispString msg) = putStrLn msg
 sysIO (T.DispExpr _ e ff) = putStrLn $ printVal ff $ eval e
 
-check_assertions :: T.ActionT Val -> [(String, Val)] -> Bool
+check_assertions :: T.ActionT Val -> M.Map String Val -> Bool
 check_assertions act regs = isJust $ tryEval act where
 
     tryEval :: T.ActionT Val -> Maybe Val
@@ -192,7 +185,7 @@ check_assertions act regs = isJust $ tryEval act where
         v <- tryEval a
         tryEval (cont v)
     tryEval (T.ReadNondet k cont) = tryEval $ cont $ unsafeCoerce $ defVal_FK k
-    tryEval (T.ReadReg regName _ cont) = case lookup regName regs of
+    tryEval (T.ReadReg regName _ cont) = case M.lookup regName regs of
         Nothing -> error ("Register " ++ regName ++ " not found.")
         Just v -> tryEval $ cont $ unsafeCoerce v
     tryEval (T.WriteReg regName _ e a) = tryEval a
@@ -204,7 +197,7 @@ check_assertions act regs = isJust $ tryEval act where
     tryEval (T.Sys _ a) = tryEval a
     tryEval (T.Return e) = Just $ eval e
 
-simulate_action :: [(String, Val -> IO Val)] -> T.ActionT Val -> [(String, Val)] -> IO ([(String, Val)] , Val)
+simulate_action :: [(String, Val -> IO Val)] -> T.ActionT Val -> M.Map String Val -> IO ([(String,Val)], Val)
 simulate_action meths act regs = sim act where
 
     sim (T.MCall methName _ arg cont) = case lookup methName meths of
@@ -223,11 +216,11 @@ simulate_action meths act regs = sim act where
     --using a default val for now
     sim (T.ReadNondet k cont) = sim $ cont $ unsafeCoerce $ defVal_FK k
 
-    sim (T.ReadReg regName _ cont) = case lookup regName regs of
+    sim (T.ReadReg regName _ cont) = case M.lookup regName regs of
         Nothing -> error ("Register " ++ regName ++ " not found.")
         Just v -> sim $ cont $ unsafeCoerce v 
 
-    sim (T.WriteReg regName _ e a) = case lookup regName regs of
+    sim (T.WriteReg regName _ e a) = case M.lookup regName regs of
         Nothing -> error ("Register " ++ regName ++ " not found.")
         Just _ -> do
             (upd,v) <- sim a
@@ -318,7 +311,7 @@ initialize (regName, (k, Nothing)) = do
     v <- randVal_FK k
     return (regName,v)
 
-simulate_module :: Int -> ([T.RuleT] -> IOStr T.RuleT) -> [String] -> [(String, Val -> IO Val)] -> T.BaseModule -> IO ([(String, Val)])
+simulate_module :: Int -> ([T.RuleT] -> IOStr T.RuleT) -> [String] -> [(String, Val -> IO Val)] -> T.BaseModule -> IO (M.Map String Val)
 simulate_module _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
 simulate_module seed strategy rulenames meths (T.BaseMod init_regs rules defmeths) = 
 
@@ -331,15 +324,13 @@ simulate_module seed strategy rulenames meths (T.BaseMod init_regs rules defmeth
         Left regName -> error ("Register " ++ regName ++ " not found.")
         Right rules' -> do
             regs <- mapM initialize init_regs
-            sim (strategy rules') regs where
+            sim (strategy rules') (M.fromList regs) where
                 sim (r :+ rs) regs = do
                     (ruleName,a) <- r
                     let b = check_assertions (unsafeCoerce $ a ()) regs
                     if b then do
                         (upd,_) <- simulate_action meths (unsafeCoerce $ a ()) regs
-                        case updates regs upd of
-                            Left regName -> error ("Register " ++ regName ++ " not found.")
-                            Right regs' -> sim rs regs'
+                        sim rs (updates regs upd)
 
                         else do
                             putStrLn $ "Guard for " ++ ruleName ++ " failed."
