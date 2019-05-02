@@ -7,7 +7,7 @@ module Main where
 
 import Target as T
 import Simulator
-import Extract
+import ExampleExtract
 
 ruleNames :: [String]
 ruleNames = 
@@ -24,5 +24,5 @@ meths = [("counterVal", \v -> do
 
 main :: IO()
 main = do
-    simulate_module 0 rand_rules ruleNames meths coq_IncrMod
+    simulate_module 0 user_rules ruleNames meths coq_IncrMod
     return ()
