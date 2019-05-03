@@ -12,14 +12,32 @@ Ltac discharge_NoSelfCall :=
          end.
 
 Ltac discharge_SemAction :=
-  repeat match goal with
-         | |- SemAction _ (If ?p then _ else _ as _; _)%kami_action _ _ _ _ => eapply SemAction_if
-         | |- if ?P then SemAction _ _ _ _ _ _ else SemAction _ _ _ _ _ _ =>
-           case_eq P; let H := fresh in intros H; rewrite ?H in *; try discriminate
-         | |- SemAction _ (convertLetExprSyntax_ActionT _) _ _ _ _ => eapply convertLetExprSyntax_ActionT_same
-         | |- SemAction _ _ _ _ _ _ => econstructor
-         end;
-  rewrite ?key_not_In_fst; unfold not; simpl; try tauto; simpl; intros; discharge_DisjKey.
+  unshelve (match goal with
+            | |- SemAction _ _ _ _ ?meths _ =>
+              repeat match goal with
+                     | |- SemAction _ (If ?p then _ else _ as _; _)%kami_action _ _ _ _ => eapply SemAction_if
+                     | |- if ?P then SemAction _ _ _ _ _ _ else SemAction _ _ _ _ _ _ =>
+                       case_eq P; let H := fresh in intros H; rewrite ?H in *; unfold evalExpr in *; try discriminate
+                     | |- SemAction _ (convertLetExprSyntax_ActionT _) _ _ _ _ => eapply convertLetExprSyntax_ActionT_same
+                     | |- SemAction _ _ _ _ _ _ => econstructor
+                     end;
+              rewrite ?key_not_In_fst; unfold not; intros; unfold evalExpr, evalConstT in *;
+              repeat match goal with
+                     | |- In _ _ => simpl; auto
+                     | |- ?a = ?a => reflexivity
+                     | |- meths = _ => eauto
+                     end; simpl in *; try (discriminate || congruence); eauto; simpl in *; discharge_DisjKey
+            end); try (solve [repeat constructor]).
+
+Ltac simplify_simulatingRule name :=
+  right;
+  exists name;
+  eexists; split; [eauto| do 2 eexists; split; [discharge_SemAction|]].
+
+Ltac simplify_nilStep :=
+  left; split; auto; simpl in *;
+  discharge_string_dec.
+
 
 
 
