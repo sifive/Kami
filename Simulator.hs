@@ -17,9 +17,9 @@ import qualified Data.Map as M
 import System.IO (isEOF)
 import Numeric (showHex)
 import System.Exit (exitSuccess)
-import Data.List (intersperse)
+import Data.List (intersperse, find)
 import Data.Foldable (foldrM)
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromJust)
 import Control.Monad (mapM, when)
 import System.Random (mkStdGen, setStdGen, randomRIO)
 import GHC.Base (unsafeCoerce#)
@@ -63,7 +63,185 @@ updates = foldr pair_update
 execIOs :: [IO ()] -> IO ()
 execIOs = foldr (>>) (return ())
 
+log2 :: Int -> Int
+log2 = ceiling . (logBase 2) . fromIntegral
+
 data Val = BoolVal Bool | BitvectorVal [Bool] | StructVal [(String,Val)] | ArrayVal (V.Vector Val) deriving (Eq)
+
+-- unit val
+tt :: Val
+tt = BitvectorVal []
+
+data RegFile = RegFile {
+      fileName :: String
+    , offset :: Int
+    , isWrMask :: Bool
+    , chunkSize :: Int
+    , readers :: T.RegFileReaders
+    , write :: String
+    , size :: Int
+    , kind :: T.Kind
+}
+
+data FileState = FileState {
+      methods :: M.Map String (FileCall,String) -- map between method names and method type + filename
+    , reg_names :: M.Map String String -- map between method name and intermediate register name
+    , int_regs :: M.Map String Val -- map between intermediate registers and their values
+    , arrs :: M.Map String (V.Vector Val) -- map between filenames and arrays
+    , files :: M.Map String RegFile -- map between filenames and files
+}
+
+data FileCall = AsyncRead | ReadReq String | ReadResp String | Write
+
+array_of_file :: FileState -> RegFile -> V.Vector Val
+array_of_file state file =
+    case M.lookup (fileName file) (arrs state) of
+        Just arr -> arr
+        Nothing -> error $ "File " ++ fileName file ++ " not found in current state."
+
+-- lookup_meth_call :: String -> RegFile -> Maybe FileCall 
+-- lookup_meth_call name file
+--     | write file == name = Just Write
+--     | otherwise = case readers file of
+--         T.Async rs -> if name `elem` rs then Just AsyncRead else Nothing
+--         T.Sync _ rs -> case find (\sr -> T.readReqName sr == name || T.readResName sr == name) rs of
+--             Just sr -> Just $ (if T.readReqName sr == name then ReadReq else ReadResp) (T.readRegName sr)
+--             Nothing -> Nothing
+
+-- lookup_meth_file :: String -> [RegFile] -> Maybe (String, FileCall)
+-- lookup_meth_file methName [] = Nothing
+-- lookup_meth_file methName (f:fs) = case lookup_meth_call methName f of
+--     Just fc -> Just (fileName f, fc)
+--     Nothing -> lookup_meth_file methName fs
+
+file_async_read :: FileState -> RegFile -> Int -> V.Vector Val
+file_async_read state file i 
+    | i < offset file = error "Read out of bounds."
+    | otherwise = V.slice (i - offset file) (chunkSize file) (array_of_file state file)
+
+-- file_sync_readreq :: RegFile -> String -> Int -> RegFile
+-- file_sync_readreq file regName i 
+--     | i < offset file = error "Read out of bounds."
+--     | otherwise = case readers file of
+--         T.Async _ -> error "Async encountered when Sync was expected."
+--         T.Sync b rs -> if b
+
+--             then
+
+--                 --isAddr = True
+--                 file { intregs = M.insert regName (BitvectorVal $ list_of_int (log2 $ size file) i) (intregs file) }
+
+--             else
+
+--                 --isAddr = False
+--                 file { intregs = M.insert regName (ArrayVal $ V.slice (i - offset file) (chunkSize file) (arr file)) (intregs file) }
+
+file_sync_readresp :: FileState -> RegFile -> String -> Val
+file_sync_readresp state file regName = case readers file of
+    T.Async _ -> error "Async encountered when Sync was expected."
+    T.Sync b rs -> if b
+
+        then
+
+            --isAddr = True
+            case M.lookup regName $ int_regs state of
+                Just v -> ArrayVal $ V.slice (i - offset file) (chunkSize file) (array_of_file state file)
+
+                    where i = int_of_list $ bvCoerce v
+
+                Nothing -> error $ "Register " ++ regName ++ " not found."
+
+        else
+
+            --isAddr = False
+            case M.lookup regName $ int_regs state of
+                Just v -> v
+                Nothing -> error $ "Register " ++ regName ++ " not found."
+
+-- file_write_mask :: RegFile -> Int -> V.Vector Bool -> V.Vector Val -> RegFile
+-- file_write_mask file i mask vals =
+
+--     file { arr = arr file V.// changes }
+
+--     where
+
+--         changes = map (\j -> (i - offset file + j, vals V.! j)) $ filter (mask V.!) [0..(chunkSize file - 1)]
+
+-- file_write_no_mask :: RegFile -> Int -> V.Vector Val -> RegFile
+-- file_write_no_mask file i vals =
+
+--     file { arr = arr file V.// changes }
+
+--     where
+
+--         changes = map (\j -> (i - offset file + j, vals V.! j)) [0 .. (chunkSize file - 1)]
+
+file_writes_mask :: RegFile -> Int -> V.Vector Bool -> V.Vector Val -> [(Int,Val)]
+file_writes_mask file i mask vals =
+    map (\j -> (i - offset file + j, vals V.! j)) $ filter (mask V.!) [0..(chunkSize file - 1)]
+
+file_writes_no_mask :: RegFile -> Int -> V.Vector Val -> [(Int,Val)]
+file_writes_no_mask file i vals =
+    map (\j -> (i - offset file + j, vals V.! j)) [0 .. (chunkSize file - 1)]
+
+
+rf_methcall :: FileState -> String -> Val -> Maybe (Maybe FileUpd,Val)
+rf_methcall state methName val =
+    case M.lookup methName $ methods state of --maybe use do notation here
+        Just (fc, fileName) -> 
+            case fc of
+                AsyncRead -> Just (Nothing, ArrayVal $ file_async_read state (file_of_fname fileName) arg_index)
+                ReadReq regName -> Just (Just $ IntRegWrite regName val, tt)
+                ReadResp regName -> Just (Nothing, file_sync_readresp state (file_of_fname fileName) regName)
+                Write -> Just (Just $ ArrWrite fileName (writes fileName) , tt)
+        Nothing -> Nothing
+
+    where 
+
+        file_of_fname fn = fromJust $ M.lookup fn $ files state
+
+        intreg = fromJust $ M.lookup methName $ reg_names state
+
+        writes fn = let file = file_of_fname fn in
+            if isWrMask file 
+                then file_writes_mask file arg_addr arg_mask arg_data
+                else file_writes_no_mask file arg_addr arg_data 
+
+        arg_index = int_of_list $ bvCoerce val
+
+        arg_addr = int_of_list $ bvCoerce $ struct_field_access "addr" val
+
+        arg_data = arrayCoerce $ struct_field_access "data" val
+
+        arg_mask = V.map boolCoerce $ arrayCoerce $ struct_field_access "mask" val
+
+-- update_files :: [RegFile] -> String -> Val -> Maybe ([RegFile], Val)
+-- update_files files methName arg = do
+--     (file, fc, otherfiles) <- lookup_meth_file methName files
+--     return $ case fc of
+--         AsyncRead -> (files, ArrayVal $ file_async_read file (int_of_list $ bvCoerce arg))
+--         ReadReq regName -> (file_sync_readreq file regName (int_of_list $ bvCoerce arg) : otherfiles, BitvectorVal [])
+--         ReadResp regName -> (files, file_sync_readresp file regName)
+--         Write -> (file':otherfiles, BitvectorVal [])
+
+--             where
+
+--                 file' = if isWrMask file then file_write_mask file addr mask vdata else file_write_no_mask file addr vdata
+
+--                 addr = int_of_list $ bvCoerce $ struct_field_access "addr" arg
+--                 mask = V.map boolCoerce $ arrayCoerce $ struct_field_access "mask" arg
+--                 vdata = arrayCoerce $ struct_field_access "data" arg
+
+data FileUpd = IntRegWrite String Val | ArrWrite String [(Int, Val)]
+
+exec_file_update :: FileUpd -> FileState -> FileState
+exec_file_update (IntRegWrite regName v) state =
+    state { int_regs = M.adjust (const v) regName $ int_regs state }
+exec_file_update (ArrWrite fileName changes) state =
+    state { arrs = M.adjust (flip (V.//) changes) fileName $ arrs state }
+
+exec_file_updates :: FileState -> [FileUpd] -> FileState
+exec_file_updates = foldr exec_file_update 
 
 boolCoerce :: Val -> Bool
 boolCoerce (BoolVal b) = b
@@ -80,6 +258,12 @@ structCoerce _ = error "Encountered a non-struct value when a struct was expecte
 arrayCoerce :: Val -> V.Vector Val
 arrayCoerce (ArrayVal vs) = vs
 arrayCoerce _ = error "Encountered a non-array value when an array was expected."
+
+struct_field_access :: String -> Val -> Val
+struct_field_access fieldName v =
+    case lookup fieldName $ structCoerce v of
+        Just v' -> v'
+        _ -> error $ "Field " ++ fieldName ++ " not found."
 
 defVal :: T.Kind -> Val
 defVal k = eval (T.getDefaultConst k)
@@ -197,21 +381,42 @@ check_assertions act regs = isJust $ tryEval act where
     tryEval (T.Sys _ a) = tryEval a
     tryEval (T.Return e) = Just $ eval e
 
-simulate_action :: [(String, Val -> IO Val)] -> T.ActionT Val -> M.Map String Val -> IO ([(String,Val)], Val)
-simulate_action meths act regs = sim act where
+simulate_action :: FileState -> [(String, Val -> IO Val)] -> T.ActionT Val -> M.Map String Val -> IO ([(String,Val)], [FileUpd] ,Val)
+simulate_action state meths act regs = sim act where
 
-    sim (T.MCall methName _ arg cont) = case lookup methName meths of
-        Nothing -> error ("Method " ++ methName ++ " not found.")
-        Just f -> do
-            v <- f $ eval arg
-            sim $ cont v 
+    -- sim (T.MCall methName _ arg cont) = case lookup_meth_file methName files of
+    --     Just (name, fc) -> case fc of
+    --         AsyncRead -> do
+    --             case find (\f -> fileName f == name) files of
+    --                 Just f -> do
+    --                     let vs = file_async_read f $ int_of_list $ bvCoerce $ (eval arg)
+    --                     sim $ cont $ ArrayVal $ vs
+    --                 Nothing -> error "File not found"
+    --         ReadReq r -> do
+    --             (upd,fupd,v) <- sim $ cont $ BitvectorVal []
+    --             return (upd,(IntRegWrite r $ undefined):fupd,v)
+    --         ReadResp r -> undefined --FIXME
+    --         Write -> undefined --FIXME
+    --     Nothing -> 
+
+
+    sim (T.MCall methName _ arg cont) = case rf_methcall state methName (eval arg) of
+        Just (Nothing,v) -> sim $ cont v
+        Just (Just u,v) -> do
+            (upd,fupd, v') <- sim $ cont v
+            return (upd, u:fupd, v')
+        Nothing -> case lookup methName meths of
+            Nothing -> error ("Method " ++ methName ++ " not found.")
+            Just f -> do
+                v <- f $ eval arg
+                sim $ cont v
 
     sim (T.LetExpr _ e cont) = sim (cont $ unsafeCoerce $ (eval e :: Val))
 
     sim (T.LetAction _ a cont) = do
-        (upd, v) <- sim a
-        (upd',v') <- sim $ cont v
-        return (upd ++ upd', v')
+        (upd, fupd, v) <- sim a
+        (upd', fupd', v') <- sim $ cont v
+        return (upd ++ upd', fupd ++ fupd', v')
 
     --using a default val for now
     sim (T.ReadNondet k cont) = sim $ cont $ unsafeCoerce $ defVal_FK k
@@ -223,14 +428,14 @@ simulate_action meths act regs = sim act where
     sim (T.WriteReg regName _ e a) = case M.lookup regName regs of
         Nothing -> error ("Register " ++ regName ++ " not found.")
         Just _ -> do
-            (upd,v) <- sim a
-            return ((regName,eval e):upd,v)
+            (upd,fupd,v) <- sim a
+            return ((regName,eval e):upd,fupd,v)
 
     sim (T.IfElse e _ a1 a2 cont) = let a = if (boolCoerce $ eval e) then a1 else a2 in
         do
-            (upd,v) <- sim a
-            (upd',v') <- sim $ cont v
-            return (upd ++ upd', v')
+            (upd,fupd,v) <- sim a
+            (upd',fupd',v') <- sim $ cont v
+            return (upd ++ upd', fupd ++ fupd', v')
 
     sim (T.Assertion e a) = if (boolCoerce $ eval e) then sim a else error "Assertion depends upon method return values."
 
@@ -238,7 +443,7 @@ simulate_action meths act regs = sim act where
         execIOs $ map sysIO syss
         sim a
 
-    sim (T.Return e) = return ([], eval e)
+    sim (T.Return e) = return ([],[], eval e)
 
 data IOStr a = (:+) (IO a) (IOStr a)
 
@@ -311,9 +516,9 @@ initialize (regName, (k, Nothing)) = do
     v <- randVal_FK k
     return (regName,v)
 
-simulate_module :: Int -> ([T.RuleT] -> IOStr T.RuleT) -> [String] -> [(String, Val -> IO Val)] -> T.BaseModule -> IO (M.Map String Val)
-simulate_module _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
-simulate_module seed strategy rulenames meths (T.BaseMod init_regs rules defmeths) = 
+simulate_module :: Int -> ([T.RuleT] -> IOStr T.RuleT) -> [String] -> [(String, Val -> IO Val)] -> FileState -> T.BaseModule -> IO (M.Map String Val)
+simulate_module _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
+simulate_module seed strategy rulenames meths state (T.BaseMod init_regs rules defmeths) = 
 
     -- passes the seed to the global rng
     (setStdGen $ mkStdGen seed) >>
@@ -324,15 +529,15 @@ simulate_module seed strategy rulenames meths (T.BaseMod init_regs rules defmeth
         Left regName -> error ("Register " ++ regName ++ " not found.")
         Right rules' -> do
             regs <- mapM initialize init_regs
-            sim (strategy rules') (M.fromList regs) where
-                sim (r :+ rs) regs = do
+            sim (strategy rules') (M.fromList regs) state  where
+                sim (r :+ rs) regs filestate = do
                     (ruleName,a) <- r
                     let b = check_assertions (unsafeCoerce $ a ()) regs
                     if b then do
-                        (upd,_) <- simulate_action meths (unsafeCoerce $ a ()) regs
-                        sim rs (updates regs upd)
+                        (upd,fupd,_) <- simulate_action filestate meths (unsafeCoerce $ a ()) regs
+                        sim rs (updates regs upd) (exec_file_updates filestate fupd)
 
                         else do
                             putStrLn $ "Guard for " ++ ruleName ++ " failed."
-                            sim rs regs
+                            sim rs regs filestate
 
