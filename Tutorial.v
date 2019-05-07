@@ -8,39 +8,39 @@ Section Named.
 
     Definition IncrementerImpl :=
       MODULE {
-          Register ^"counter" : Bit sz <- Default
-            with Register ^"counter1" : Bit sz <- Default
-            with Register ^"isSending" : Bool <- true
-                                             
-            with Rule ^"send" :=
-            ( Read isSending: Bool <- ^"isSending" ;
-                Assert #isSending ;
-                Read counter: Bit sz <- ^"counter" ;
-                Call "counterVal"(#counter: _);
-                Write ^"isSending" <- !#isSending ;
-                Retv )
-
-            with Rule ^"inc" :=
-              ( Read isSending: Bool <- ^"isSending" ;
-                  Assert !#isSending ;
-                  Read counter: Bit sz <- ^"counter" ;
-                  Write ^"counter" <- #counter + $1;
-                  Write ^"isSending" <- !#isSending ;
-                  Retv )
+        Register ^"counter" : Bit sz <- Default
+        with Register ^"counter1" : Bit sz <- Default
+        with Register ^"isSending" : Bool <- true
+        
+        with Rule ^"send" :=
+        ( Read isSending: Bool <- ^"isSending" ;
+          Assert #isSending ;
+          Read counter: Bit sz <- ^"counter" ;
+          Call "counterVal"(#counter: _);
+          Write ^"isSending" <- !#isSending ;
+          Retv )
+        
+        with Rule ^"inc" :=
+        ( Read isSending: Bool <- ^"isSending" ;
+           Assert !#isSending ;
+          Read counter: Bit sz <- ^"counter" ;
+          Write ^"counter" <- #counter + $1;
+          Write ^"isSending" <- !#isSending ;
+          Retv )
         }.
 
   Definition IncrementerSpec :=
     MODULE {
-        Register ^"counter" : Bit sz <- Default
-          with Register ^"counter1" : Bit sz <- Default
-                                         
-          with Rule ^"send_and_inc" :=
-          ( Read counter: Bit sz <- ^"counter" ;
-              Call "counterVal"(#counter: _);
-              Write ^"counter" <- #counter + $1;
-              Retv)
-      }.
-
+       Register ^"counter" : Bit sz <- Default
+       with Register ^"counter1" : Bit sz <- Default
+       
+       with Rule ^"send_and_inc" :=
+       ( Read counter: Bit sz <- ^"counter" ;
+         Call "counterVal"(#counter: _);
+         Write ^"counter" <- #counter + $1;
+         Retv )
+       }.
+     
   Record Incrementer_invariant (impl spec: RegsT) : Prop :=
     { counterImpl: word sz ;
       isSending: bool ;

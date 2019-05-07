@@ -65,9 +65,8 @@
 	(beginning-of-line)
 	(max (+ (* 2 (- (how-many "[[({]" init curr)
 			(how-many "[])}]" init curr)
-			)
-		   (- init (- (point) 1))
-		   )
+			))
+		(- init (point))
 		0
 		)
 	     )
