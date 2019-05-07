@@ -1,6 +1,8 @@
 
 module Simulator.RegisterFile where
 
+import Simulator.Evaluate
+import Simulator.Parse
 import Simulator.Util
 import Simulator.Value
 
@@ -129,62 +131,78 @@ exec_file_updates = foldr exec_file_update
 process_args :: [String] -> [(String,String)]
 process_args = catMaybes . map (binary_split '=')
 
-parseHex :: Bool -> FilePath -> IO (V.Vector Val, Int)
-parseHex = undefined --TODO
-
 initialize_file :: [(String,FilePath)] -> T.RegFileBase -> FileState -> IO FileState
-initialize_file args rfb state = case T.rfInit rfb of
-    T.RFNonFile _ -> undefined --TODO
-    T.RFFile isAscii isArg file _ -> do
-        (arr,off) <- parseHex isAscii filepath
+initialize_file args rfb state = do
 
-        let fn = T.rfDataArray rfb
+    (arr,off) <- arr_and_off
 
-        let rf = RegFile {
-            fileName = fn
-            , offset = off
-            , isWrMask = T.rfIsWrMask rfb
-            , chunkSize = T.rfNum rfb
-            , readers = T.rfRead rfb
-            , write = T.rfWrite rfb
-            , size = T.rfIdxNum rfb
-            , kind = T.rfData rfb
-        }
+    let fn = T.rfDataArray rfb
 
-        let reads = case T.rfRead rfb of
-                        T.Async rs -> map (\r -> (r,(AsyncRead, fn))) rs
-                        T.Sync _ rs -> map (\r -> (T.readReqName r,(ReadReq $ T.readRegName r, fn))) rs ++
-                                     map (\r -> (T.readResName r, (ReadResp $ T.readRegName r, fn))) rs
+    let rf = RegFile {
+        fileName = fn
+        , offset = off
+        , isWrMask = T.rfIsWrMask rfb
+        , chunkSize = T.rfNum rfb
+        , readers = T.rfRead rfb
+        , write = T.rfWrite rfb
+        , size = T.rfIdxNum rfb
+        , kind = T.rfData rfb
+    }
 
-        let newmeths = (T.rfWrite rfb, (Write, T.rfDataArray rfb)) : reads
+    let reads = case T.rfRead rfb of
+                    T.Async rs -> map (\r -> (r,(AsyncRead, fn))) rs
+                    T.Sync _ rs -> map (\r -> (T.readReqName r,(ReadReq $ T.readRegName r, fn))) rs ++
+                                 map (\r -> (T.readResName r, (ReadResp $ T.readRegName r, fn))) rs
 
-        let newregs = case T.rfRead rfb of
-                        T.Async _ -> []
-                        T.Sync _ rs -> map (\r -> (T.readReqName r, T.readRegName r)) rs ++
-                                       map (\r -> (T.readResName r, T.readRegName r)) rs
+    let newmeths = (T.rfWrite rfb, (Write, T.rfDataArray rfb)) : reads
 
-        newvals <- case T.rfRead rfb of
-                        T.Async _ -> return []
-                        T.Sync b rs -> mapM (\r -> do
-                                                    v <- randVal (if b then T.Bit (log2 $ T.rfIdxNum rfb) else T.rfData rfb)
-                                                    return (T.readRegName r, v)) rs
+    let newregs = case T.rfRead rfb of
+                    T.Async _ -> []
+                    T.Sync _ rs -> map (\r -> (T.readReqName r, T.readRegName r)) rs ++
+                                   map (\r -> (T.readResName r, T.readRegName r)) rs
 
-        return $ state {
-                          methods = inserts (methods state) newmeths
-                        , reg_names = inserts (reg_names state) newregs
-                        , int_regs = inserts (int_regs state) newvals
-                        , arrs = M.insert fn arr $ arrs state
-                        , files = M.insert fn rf $ files state
-                    }
+    newvals <- case T.rfRead rfb of
+                    T.Async _ -> return []
+                    T.Sync b rs -> mapM (\r -> do
+                                                v <- randVal (if b then T.Bit (log2 $ T.rfIdxNum rfb) else T.rfData rfb)
+                                                return (T.readRegName r, v)) rs
 
-        where
+    return $ state {
+                      methods = inserts (methods state) newmeths
+                    , reg_names = inserts (reg_names state) newregs
+                    , int_regs = inserts (int_regs state) newvals
+                    , arrs = M.insert fn arr $ arrs state
+                    , files = M.insert fn rf $ files state
+                }
 
-            filepath = if isArg then
-                case lookup file args of
-                    Nothing -> error $ "Argument " ++ file ++ " not found."
-                    Just fp -> fp
+     where
 
-                else file
+        arr_and_off = case T.rfInit rfb of
+            T.RFNonFile Nothing -> do
+                vs <- mapM randVal $ V.replicate (T.rfIdxNum rfb) (T.rfData rfb)
+                return (vs,0)
+            T.RFNonFile (Just c) -> return (V.replicate (T.rfIdxNum rfb) (eval c),0)
+            T.RFFile isAscii isArg file _ -> parseHex isAscii (T.rfData rfb) (T.rfIdxNum rfb) filepath
+
+                where
+
+                    filepath = if isArg then
+                        case lookup file args of
+                            Nothing -> error $ "Argument " ++ file ++ " not found."
+                            Just fp -> fp
+
+                        else file
+
+{-
+
+    case T.rfInit rfb of
+    T.RFNonFile Nothing -> undefined --TODO
+
+        (arr,off) <- parseHex isAscii (T.rfData rfb) (T.rfIdxNum rfb) filepath
+
+
+    T.RFFile isAscii isArg file _ -> 
+-}
 
 initialize_files :: [T.RegFileBase] -> IO FileState
 initialize_files rfbs = do

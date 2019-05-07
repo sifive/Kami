@@ -23,5 +23,7 @@ Separate Extraction
   rfIdxNum
   rfData
   rfInit
+  pack
+  unpack
 
   IncrMod.
