@@ -15,11 +15,12 @@ import qualified Data.Vector as V
 import qualified Data.Map as M
 
 import System.IO (isEOF)
+import System.Environment (getArgs)
 import Numeric (showHex)
 import System.Exit (exitSuccess)
 import Data.List (intersperse, find)
 import Data.Foldable (foldrM)
-import Data.Maybe (isJust, fromJust)
+import Data.Maybe (isJust, fromJust, catMaybes)
 import Control.Monad (mapM, when)
 import System.Random (mkStdGen, setStdGen, randomRIO)
 import GHC.Base (unsafeCoerce#)
@@ -89,6 +90,15 @@ data FileState = FileState {
     , int_regs :: M.Map String Val -- map between intermediate registers and their values
     , arrs :: M.Map String (V.Vector Val) -- map between filenames and arrays
     , files :: M.Map String RegFile -- map between filenames and files
+}
+
+empty_state :: FileState
+empty_state = FileState {
+      methods = M.empty
+    , reg_names = M.empty
+    , int_regs = M.empty
+    , arrs = M.empty 
+    , files = M.empty
 }
 
 data FileCall = AsyncRead | ReadReq String | ReadResp String | Write
@@ -516,9 +526,79 @@ initialize (regName, (k, Nothing)) = do
     v <- randVal_FK k
     return (regName,v)
 
-simulate_module :: Int -> ([T.RuleT] -> IOStr T.RuleT) -> [String] -> [(String, Val -> IO Val)] -> FileState -> T.BaseModule -> IO (M.Map String Val)
+binary_split :: Eq a => a -> [a] -> Maybe ([a],[a])
+binary_split x xs = go xs [] where
+    go [] _ = Nothing
+    go (y:ys) acc = if x == y then Just (reverse acc, ys) else go ys (y:acc)
+
+process_args :: [String] -> [(String,String)]
+process_args = catMaybes . map (binary_split '=')
+
+parseHex :: Bool -> FilePath -> IO (V.Vector Val, Int)
+parseHex = undefined --TODO
+
+initialize_file :: [(String,FilePath)] -> T.RegFileBase -> FileState -> IO FileState
+initialize_file args rfb state = case T.rfInit rfb of
+    T.RFNonFile _ -> undefined --TODO
+    T.RFFile isAscii isArg file _ -> do
+        (arr,off) <- parseHex isAscii filepath
+
+        let fn = T.rfDataArray rfb
+
+        let rf = RegFile {
+            fileName = fn
+            , offset = off
+            , isWrMask = T.rfIsWrMask rfb
+            , chunkSize = T.rfNum rfb
+            , readers = T.rfRead rfb
+            , write = T.rfWrite rfb
+            , size = T.rfIdxNum rfb
+            , kind = T.rfData rfb
+        }
+
+        let reads = case T.rfRead rfb of
+                        T.Async rs -> map (\r -> (r,(AsyncRead, fn))) rs
+                        T.Sync _ rs -> map (\r -> (T.readReqName r,(ReadReq $ T.readRegName r, fn))) rs ++
+                                     map (\r -> (T.readResName r, (ReadResp $ T.readRegName r, fn))) rs
+
+        let newmeths = (T.rfWrite rfb, (Write, T.rfDataArray rfb)) : reads
+
+        let newregs = case T.rfRead rfb of
+                        T.Async _ -> []
+                        T.Sync _ rs -> map (\r -> (T.readReqName r, T.readRegName r)) rs ++
+                                       map (\r -> (T.readResName r, T.readRegName r)) rs
+
+        newvals <- case T.rfRead rfb of
+                        T.Async _ -> return []
+                        T.Sync b rs -> mapM (\r -> do
+                                                    v <- randVal (if b then T.Bit (log2 $ T.rfIdxNum rfb) else T.rfData rfb)
+                                                    return (T.readRegName r, v)) rs
+
+        return $ state {
+                          methods = foldr (uncurry M.insert) (methods state) newmeths
+                        , reg_names = foldr (uncurry M.insert) (reg_names state) newregs
+                        , int_regs = foldr (uncurry M.insert) (int_regs state) newvals
+                        , arrs = M.insert fn arr $ arrs state
+                        , files = M.insert fn rf $ files state
+                    }
+
+        where
+
+            filepath = if isArg then
+                case lookup file args of
+                    Nothing -> error $ "Argument " ++ file ++ " not found."
+                    Just fp -> fp
+
+                else file
+
+initialize_files :: [T.RegFileBase] -> IO FileState
+initialize_files rfbs = do
+    args <- getArgs
+    foldrM (initialize_file $ process_args args) empty_state rfbs
+
+simulate_module :: Int -> ([T.RuleT] -> IOStr T.RuleT) -> [String] -> [(String, Val -> IO Val)] -> [T.RegFileBase] -> T.BaseModule -> IO (M.Map String Val)
 simulate_module _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
-simulate_module seed strategy rulenames meths state (T.BaseMod init_regs rules defmeths) = 
+simulate_module seed strategy rulenames meths rfbs (T.BaseMod init_regs rules defmeths) = 
 
     -- passes the seed to the global rng
     (setStdGen $ mkStdGen seed) >>
@@ -528,6 +608,7 @@ simulate_module seed strategy rulenames meths state (T.BaseMod init_regs rules d
     case get_rules rulenames rules of
         Left regName -> error ("Register " ++ regName ++ " not found.")
         Right rules' -> do
+            state <- initialize_files rfbs
             regs <- mapM initialize init_regs
             sim (strategy rules') (M.fromList regs) state  where
                 sim (r :+ rs) regs filestate = do
