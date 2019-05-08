@@ -2,7 +2,7 @@
 ;; Author : Murali Vijayaraghavan
 ;; Organization : SiFive
 
-(defvar kami-keywords
+(setq kami-keywords
   '(
     "MODULE"
     "MOD"
@@ -31,7 +31,7 @@
     )
   )
 
-(defvar kami-types-and-vals
+(setq kami-types-and-vals
   '(
     "Bool"
     "Bit"
@@ -42,15 +42,8 @@
     )
   )
 
-(defvar kami-keywords-regex (regexp-opt kami-keywords 'words))
-(defvar kami-types-and-vals-regex (regexp-opt kami-types-and-vals 'words))
-
-(defvar kami-font-lock-keywords
-  `(
-    (,kami-keywords-regex . font-lock-keyword-face)
-    (,kami-types-and-vals-regex . font-lock-builtin-face)
-    )
-  )
+(setq kami-keywords-regex (regexp-opt kami-keywords 'words))
+(setq kami-types-and-vals-regex (regexp-opt kami-types-and-vals 'words))
 
 (defun diffParensPlusInit ()
   "Searches backwards for the first occurence of MODULE {.
@@ -76,14 +69,32 @@
   )
 
 (defun kami-indent-column ()
+  (interactive)
   (indent-line-to (diffParensPlusInit)))
 
-(define-derived-mode kami-mode coq-mode "kami mode"
+(defun kami-indent-region (start end)
+  (interactive "r")
+  (save-excursion
+    (goto-char start)
+    (while (< (point) end)
+      (indent-line-to (diffParensPlusInit))
+      (forward-line 1))))
+
+(global-set-key (kbd "<C-tab>") 'kami-indent-region)
+
+;;;###autoload
+(define-derived-mode kami-mode coq-mode "Kami"
   "Major mode for editing Kami code"
 
-  (setq font-lock-defaults '(kami-font-lock-keywords))
-  (setq indent-line-function 'kami-indent-column)
-
+  (font-lock-add-keywords nil
+			  `(
+			    (,kami-keywords-regex . font-lock-keyword-face)
+			    (,kami-types-and-vals-regex . font-lock-builtin-face)
+			    )
+			  'tt)
   )
+
+;;;###autoload
+(add-to-list 'auto-mode-alist '("\\.v\\" . kami-mode))
 
 (provide 'kami-mode)
