@@ -45,42 +45,64 @@
 (setq kami-keywords-regex (regexp-opt kami-keywords 'words))
 (setq kami-types-and-vals-regex (regexp-opt kami-types-and-vals 'words))
 
-(defun diffParensPlusInit ()
-  "Searches backwards for the first occurence of MODULE {.
-   Calculates the number of open parentheses minus closed parentheses,
-   and adds that to the starting point of
-   MODULE {"
+;; (defun diffParensPlusInit ()
+;;   "Searches backwards for the first occurence of MODULE {.
+;;    Calculates the number of open parentheses minus closed parentheses,
+;;    and adds that to the starting point of
+;;    MODULE {"
+;;   (save-excursion
+;;     (beginning-of-line)
+;;     (let ((curr (point)))
+;;       (re-search-backward "MODULE[ \t\r\n\v\f]*{")
+;;       (let ((init (point)))
+;; 	(beginning-of-line)
+;; 	(max (+ (* 2 (- (how-many "[[({]" init curr)
+;; 			(how-many "[])}]" init curr)
+;; 			))
+;; 		(- init (point))
+;; 		0
+;; 		)
+;; 	     )
+;; 	)
+;;       )
+;;     )
+;;   )
+
+(defun diff-parens-times-space (space)
+  "Calculates the number of open parentheses minus closed parentheses in previous line,
+   multiplies by space"
   (save-excursion
     (beginning-of-line)
-    (let ((curr (point)))
-      (re-search-backward "MODULE[ \t\r\n\v\f]*{")
-      (let ((init (point)))
-	(beginning-of-line)
-	(max (+ (* 2 (- (how-many "[[({]" init curr)
-			(how-many "[])}]" init curr)
-			))
-		(- init (point))
-		0
-		)
-	     )
+    (let ((end (point)))
+      (previous-line)
+      (beginning-of-line)
+      (let ((start (point))
+	    (currind (current-indentation)))
+	(+ (* space (- (how-many "[[({]" start end)
+		       (how-many "[])}]" start end)
+		       ))
+	   currind)
 	)
       )
     )
   )
 
-(defun kami-indent-column ()
-  (interactive)
-  (indent-line-to (diffParensPlusInit)))
-
-(defun kami-indent-region (start end)
-  (interactive "r")
+(defun indent-region-parens-times-space (space start end)
   (save-excursion
     (goto-char start)
     (while (< (point) end)
-      (indent-line-to (diffParensPlusInit))
+      (indent-line-to (diff-parens-times-space space))
       (forward-line 1))))
 
-(global-set-key (kbd "<C-tab>") 'kami-indent-region)
+(defun indent-region-parens-times-2 (start end)
+  (interactive "r")
+  (let ((space 2))
+    (if (use-region-p)
+	(indent-region-parens-times-space space start end)
+      (indent-line-to (diff-parens-times-space space))
+    )))
+
+(global-set-key (kbd "<C-tab>") 'indent-region-parens-times-2)
 
 (font-lock-add-keywords nil
 			`(
