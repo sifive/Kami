@@ -82,19 +82,9 @@
 
 (global-set-key (kbd "<C-tab>") 'kami-indent-region)
 
-;;;###autoload
-(define-derived-mode kami-mode coq-mode "Kami"
-  "Major mode for editing Kami code"
-
-  (font-lock-add-keywords nil
-			  `(
-			    (,kami-keywords-regex . font-lock-keyword-face)
-			    (,kami-types-and-vals-regex . font-lock-builtin-face)
-			    )
-			  'tt)
-  )
-
-;;;###autoload
-(add-to-list 'auto-mode-alist '("\\.v\\" . kami-mode))
-
-(provide 'kami-mode)
+(font-lock-add-keywords nil
+			`(
+			  (,kami-keywords-regex . font-lock-keyword-face)
+			  (,kami-types-and-vals-regex . font-lock-builtin-face)
+			  )
+			't)
