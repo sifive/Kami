@@ -19,3 +19,4 @@ top.sv
 Makefile.coq.*
 Makefile.coq
 .coqdeps.d
+*~

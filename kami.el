@@ -2,7 +2,7 @@
 ;; Author : Murali Vijayaraghavan
 ;; Organization : SiFive
 
-(defvar kami-keywords
+(setq kami-keywords
   '(
     "MODULE"
     "MOD"
@@ -31,7 +31,7 @@
     )
   )
 
-(defvar kami-types-and-vals
+(setq kami-types-and-vals
   '(
     "Bool"
     "Bit"
@@ -42,48 +42,71 @@
     )
   )
 
-(defvar kami-keywords-regex (regexp-opt kami-keywords 'words))
-(defvar kami-types-and-vals-regex (regexp-opt kami-types-and-vals 'words))
+(setq kami-keywords-regex (regexp-opt kami-keywords 'words))
+(setq kami-types-and-vals-regex (regexp-opt kami-types-and-vals 'words))
 
-(defvar kami-font-lock-keywords
-  `(
-    (,kami-keywords-regex . font-lock-keyword-face)
-    (,kami-types-and-vals-regex . font-lock-builtin-face)
-    )
-  )
+;; (defun diffParensPlusInit ()
+;;   "Searches backwards for the first occurence of MODULE {.
+;;    Calculates the number of open parentheses minus closed parentheses,
+;;    and adds that to the starting point of
+;;    MODULE {"
+;;   (save-excursion
+;;     (beginning-of-line)
+;;     (let ((curr (point)))
+;;       (re-search-backward "MODULE[ \t\r\n\v\f]*{")
+;;       (let ((init (point)))
+;; 	(beginning-of-line)
+;; 	(max (+ (* 2 (- (how-many "[[({]" init curr)
+;; 			(how-many "[])}]" init curr)
+;; 			))
+;; 		(- init (point))
+;; 		0
+;; 		)
+;; 	     )
+;; 	)
+;;       )
+;;     )
+;;   )
 
-(defun diffParensPlusInit ()
-  "Searches backwards for the first occurence of MODULE {.
-   Calculates the number of open parentheses minus closed parentheses,
-   and adds that to the starting point of
-   MODULE {"
+(defun diff-parens-times-space (space)
+  "Calculates the number of open parentheses minus closed parentheses in previous line,
+   multiplies by space"
   (save-excursion
     (beginning-of-line)
-    (let ((curr (point)))
-      (re-search-backward "MODULE[ \t\r\n\v\f]*{")
-      (let ((init (point)))
-	(beginning-of-line)
-	(max (+ (* 2 (- (how-many "[[({]" init curr)
-			(how-many "[])}]" init curr)
-			))
-		(- init (point))
-		0
-		)
-	     )
+    (let ((end (point)))
+      (previous-line)
+      (beginning-of-line)
+      (let ((start (point))
+	    (currind (current-indentation)))
+	(+ (* space (- (how-many "[[({]" start end)
+		       (how-many "[])}]" start end)
+		       ))
+	   currind)
 	)
       )
     )
   )
 
-(defun kami-indent-column ()
-  (indent-line-to (diffParensPlusInit)))
+(defun indent-region-parens-times-space (space start end)
+  (save-excursion
+    (goto-char start)
+    (while (< (point) end)
+      (indent-line-to (diff-parens-times-space space))
+      (forward-line 1))))
 
-(define-derived-mode kami-mode coq-mode "kami mode"
-  "Major mode for editing Kami code"
+(defun indent-region-parens-times-2 (start end)
+  (interactive "r")
+  (let ((space 2))
+    (if (use-region-p)
+	(indent-region-parens-times-space space start end)
+      (indent-line-to (diff-parens-times-space space))
+    )))
 
-  (setq font-lock-defaults '(kami-font-lock-keywords))
-  (setq indent-line-function 'kami-indent-column)
+(global-set-key (kbd "<C-tab>") 'indent-region-parens-times-2)
 
-  )
-
-(provide 'kami-mode)
+(font-lock-add-keywords nil
+			`(
+			  (,kami-keywords-regex . font-lock-keyword-face)
+			  (,kami-types-and-vals-regex . font-lock-builtin-face)
+			  )
+			't)
