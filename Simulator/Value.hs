@@ -3,13 +3,13 @@ module Simulator.Value where
 
 import Simulator.Util
 
-import qualified Target as T
+import qualified HaskellTarget as T
 
 import qualified Data.Vector as V
 
 import System.Random (randomRIO)
 
-data Val = BoolVal Bool | BitvectorVal [Bool] | StructVal [(String,Val)] | ArrayVal (V.Vector Val) deriving (Eq)
+data Val = BoolVal Bool | BitvectorVal [Bool] | StructVal [(String,Val)] | ArrayVal (V.Vector Val) deriving (Eq,Show)
 
 -- unit val
 tt :: Val

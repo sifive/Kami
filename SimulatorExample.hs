@@ -5,7 +5,7 @@
 
 module Main where
 
-import Target as T
+import HaskellTarget as T
 import Simulator.All
 import ExampleExtract
 
@@ -24,5 +24,5 @@ meths = [("counterVal", \v -> do
 
 main :: IO()
 main = do
-    simulate_module 0 (with_breaks 5 round_robin_rules) ruleNames meths [] coq_IncrMod
+    simulate_module 0 (round_robin_rules) ruleNames meths [] coq_IncrMod
     return ()

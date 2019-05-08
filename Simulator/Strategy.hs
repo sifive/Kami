@@ -1,7 +1,7 @@
 
 module Simulator.Strategy where
 
-import qualified Target as T
+import qualified HaskellTarget as T
 
 import Simulator.Util
 import Simulator.Value

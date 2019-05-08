@@ -6,7 +6,7 @@ import Simulator.Parse
 import Simulator.Util
 import Simulator.Value
 
-import qualified Target as T
+import qualified HaskellTarget as T
 
 import qualified Data.Map as M
 import qualified Data.Vector as V

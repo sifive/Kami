@@ -7,8 +7,9 @@ module Simulator.Evaluate where
 import Simulator.Util
 import Simulator.Value
 
+--import Debug.Trace
 
-import qualified Target as T
+import qualified HaskellTarget as T
 
 import qualified Data.Vector as V
 
@@ -65,6 +66,7 @@ instance Eval T.CABitOp (Int -> [[Bool]] -> [Bool]) where
 
 instance Eval (T.Expr ty) Val where
     eval (T.Var (T.SyntaxKind _) x) = unsafeCoerce x
+    --eval (T.Var (T.SyntaxKind _) x) = trace ("||||" ++ show ((unsafeCoerce x) :: Val) ++ "||||") $ unsafeCoerce x
     eval (T.Var T.NativeKind _) = error "Encountered a NativeKind."
     eval (T.Const _ c) = eval c
     eval (T.UniBool o e) = BoolVal $ eval o $ boolCoerce $ eval e

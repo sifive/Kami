@@ -15,7 +15,7 @@ import Simulator.Print
 import Simulator.Util
 import Simulator.Value
 
-import qualified Target as T
+import qualified HaskellTarget as T
 
 import qualified Data.Map as M
 
@@ -118,7 +118,7 @@ simulate_module seed strategy rulenames meths rfbs (T.BaseMod init_regs rules de
     (when (not $ null defmeths) $ putStrLn "Warning: Encountered internal methods.") >>
  
     case get_rules rulenames rules of
-        Left regName -> error ("Register " ++ regName ++ " not found.")
+        Left ruleName -> error ("Rule " ++ ruleName ++ " not found.")
         Right rules' -> do
             state <- initialize_files rfbs
             regs <- mapM initialize init_regs

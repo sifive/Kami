@@ -1,7 +1,7 @@
 
 module Simulator.Parse where
 
-import qualified Target as T
+import qualified HaskellTarget as T
 
 import qualified Data.Vector as V
 
