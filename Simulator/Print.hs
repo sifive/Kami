@@ -8,6 +8,7 @@ import Simulator.Value
 
 import qualified HaskellTarget as T
 
+import qualified Data.BitVector as BV
 import qualified Data.Vector as V
 
 import Data.List (intersperse)
@@ -39,10 +40,10 @@ printVal (T.FStruct n _ names ffs) (StructVal fields) = "{" ++ (concat $ intersp
 printVal (T.FArray n k ff) (ArrayVal vals) = "[" ++ (concat $ intersperse "; " (zipWith (\i v -> show i ++ ":" ++ printVal ff v) [0..((length vals)-1)] (V.toList vals))) ++ "]"
 printVal ff v = error $ "Cannot print expression " ++ (show v) ++ " with FullFormat " ++ (show ff) ++ "."
 
-printNum :: T.BitFormat -> [Bool] -> String
-printNum T.Binary bs = map (\b -> if b then '1' else '0') (reverse bs)
-printNum T.Decimal bs = show $ int_of_list bs
-printNum T.Hex bs = "0x" ++ showHex (int_of_list bs) ""
+printNum :: T.BitFormat -> BV.BitVector -> String
+printNum T.Binary = BV.showBin
+printNum T.Decimal = \v -> show ((fromIntegral v) :: Integer)
+printNum T.Hex = BV.showHex
 
 sysIO :: T.SysT Val -> IO ()
 sysIO T.Finish = do

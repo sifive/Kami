@@ -8,6 +8,7 @@ import Simulator.Value
 
 import qualified HaskellTarget as T
 
+import qualified Data.BitVector as BV
 import qualified Data.Map as M
 import qualified Data.Vector as V
 
@@ -67,9 +68,9 @@ file_sync_readresp state file regName = case readers file of
 
             --isAddr = True
             case M.lookup regName $ int_regs state of
-                Just v -> ArrayVal $ V.slice (i - offset file) (chunkSize file) (array_of_file state file)
+                Just v -> ArrayVal $ V.slice (fromIntegral i - offset file) (chunkSize file) (array_of_file state file)
 
-                    where i = int_of_list $ bvCoerce v
+                    where i = BV.nat $ bvCoerce v
 
                 Nothing -> error $ "Register " ++ regName ++ " not found."
 
@@ -111,9 +112,9 @@ rf_methcall state methName val =
                 then file_writes_mask file arg_addr arg_mask arg_data
                 else file_writes_no_mask file arg_addr arg_data 
 
-        arg_index = int_of_list $ bvCoerce val
+        arg_index = fromIntegral $ BV.nat $ bvCoerce val
 
-        arg_addr = int_of_list $ bvCoerce $ struct_field_access "addr" val
+        arg_addr = fromIntegral $ BV.nat $ bvCoerce $ struct_field_access "addr" val
 
         arg_data = arrayCoerce $ struct_field_access "data" val
 

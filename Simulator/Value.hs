@@ -6,20 +6,21 @@ import Simulator.Util
 import qualified HaskellTarget as T
 
 import qualified Data.Vector as V
+import qualified Data.BitVector as BV
 
 import System.Random (randomRIO)
 
-data Val = BoolVal Bool | BitvectorVal [Bool] | StructVal [(String,Val)] | ArrayVal (V.Vector Val) deriving (Eq,Show)
+data Val = BoolVal Bool | BitvectorVal BV.BV | StructVal [(String,Val)] | ArrayVal (V.Vector Val) deriving (Eq,Show)
 
 -- unit val
 tt :: Val
-tt = BitvectorVal []
+tt = BitvectorVal BV.nil
 
 boolCoerce :: Val -> Bool
 boolCoerce (BoolVal b) = b
 boolCoerce _ = error "Encountered a non-boolean value when a boolean was expected."
 
-bvCoerce :: Val -> [Bool]
+bvCoerce :: Val -> BV.BitVector
 bvCoerce (BitvectorVal bs) = bs
 bvCoerce _ = error "Encountered a non-bitvector value when a bitvector was expected."
 
@@ -42,8 +43,8 @@ randVal T.Bool = do
     k <- randomRIO (0,1)
     return $ BoolVal $ k == (1 :: Int)
 randVal (T.Bit n) = do
-    k <- randomRIO (0, 2^n - 1)
-    return $ BitvectorVal $ list_of_int n k
+    k <- randomRIO ((0 :: Integer), 2^n - 1)
+    return $ BitvectorVal $ BV.bitVec n k
 randVal (T.Struct n ks names) = do
     let ks' = map ks (T.getFins n)
     let names' = map names (T.getFins n)
