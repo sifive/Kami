@@ -14,6 +14,7 @@ import qualified Data.Vector as V
 import Data.List (intersperse)
 import Numeric (showHex)
 import System.Exit (exitSuccess)
+import System.IO
 
 instance Show T.Kind where
     show T.Bool = "Bool"
@@ -34,23 +35,23 @@ instance Show T.FullFormat where
 printVal :: T.FullFormat -> Val -> String
 printVal (T.FBool n bf) (BoolVal b) = space_pad n (if b then "1" else "0")
 printVal (T.FBit n m bf) (BitvectorVal bs) = space_pad m $ printNum bf bs
-printVal (T.FStruct n _ names ffs) (StructVal fields) = "{" ++ (concat $ intersperse "; " $ 
-    zipWith (\(name,val) ff -> name ++ ":" ++ (printVal ff val)) fields (map ffs (T.getFins n))
+printVal (T.FStruct n _ names ffs) (StructVal fields) = "{ " ++ (concat $ 
+    zipWith (\(name,val) ff -> name ++ ": " ++ (printVal ff val) ++ "; ") fields (map ffs (T.getFins n))
     ) ++ "}"
-printVal (T.FArray n k ff) (ArrayVal vals) = "[" ++ (concat $ intersperse "; " (zipWith (\i v -> show i ++ ":" ++ printVal ff v) [0..((length vals)-1)] (V.toList vals))) ++ "]"
+printVal (T.FArray n k ff) (ArrayVal vals) = "[ " ++ (concat (zipWith (\i v -> show i ++ ": " ++ printVal ff v ++ "; ") [0..((length vals)-1)] (V.toList vals))) ++ "]"
 printVal ff v = error $ "Cannot print expression " ++ (show v) ++ " with FullFormat " ++ (show ff) ++ "."
 
 printNum :: T.BitFormat -> BV.BitVector -> String
-printNum T.Binary = BV.showBin
-printNum T.Decimal = \v -> show ((fromIntegral v) :: Integer)
-printNum T.Hex = BV.showHex
+printNum T.Binary v = tail $ tail $ BV.showBin v
+printNum T.Decimal v = show (BV.nat v)
+printNum T.Hex v = tail $ tail $ BV.showHex v
 
 sysIO :: T.SysT Val -> IO ()
 sysIO T.Finish = do
-    putStrLn "Exiting..."
+    hPutStrLn stdout "Exiting..."
     exitSuccess
-sysIO (T.DispString msg) = putStr $ format_string msg
-sysIO (T.DispExpr _ e ff) = putStr $ printVal ff $ eval e
+sysIO (T.DispString msg) = hPutStr stdout $ format_string msg
+sysIO (T.DispExpr _ e ff) = hPutStr stdout $ printVal ff $ eval e
 
 format_string :: String -> String
 format_string [] = []

@@ -62,7 +62,7 @@ file_async_read state file i
 file_sync_readresp :: FileState -> RegFile -> String -> Val
 file_sync_readresp state file regName = case readers file of
     T.Async _ -> error "Async encountered when Sync was expected."
-    T.Sync b rs -> if b
+    T.Sync isAddr rs -> if isAddr
 
         then
 

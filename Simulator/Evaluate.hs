@@ -44,8 +44,8 @@ instance Eval (T.CABoolOp) ([Bool] -> Bool) where
 
 instance Eval T.UniBitOp (BV.BV -> BV.BV) where
     eval (T.Inv _) = BV.not
-    eval (T.TruncLsb _ m) = BV.least m
-    eval (T.TruncMsb _ m) = BV.most m
+    eval (T.TruncLsb m _) = BV.least m
+    eval (T.TruncMsb _ n) = BV.most n
     eval (T.UAnd _) = \v -> BV.fromBool $ BV.foldr (&&) True v
     eval (T.UOr _) = \v -> BV.fromBool $ BV.foldr (||) False v
     eval (T.UXor _) = \v -> BV.fromBool $ BV.foldr (/=) False v

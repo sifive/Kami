@@ -10,6 +10,8 @@ import qualified Data.BitVector as BV
 
 import System.Random (randomRIO)
 
+import Debug.Trace
+
 data Val = BoolVal Bool | BitvectorVal BV.BV | StructVal [(String,Val)] | ArrayVal (V.Vector Val) deriving (Eq,Show)
 
 -- unit val
@@ -18,25 +20,25 @@ tt = BitvectorVal BV.nil
 
 boolCoerce :: Val -> Bool
 boolCoerce (BoolVal b) = b
-boolCoerce _ = error "Encountered a non-boolean value when a boolean was expected."
+boolCoerce v = error $ "Encountered a non-boolean value when a boolean was expected. " ++ show v
 
 bvCoerce :: Val -> BV.BitVector
 bvCoerce (BitvectorVal bs) = bs
-bvCoerce _ = error "Encountered a non-bitvector value when a bitvector was expected."
+bvCoerce v = error $ "Encountered a non-bitvector value when a bitvector was expected. " ++ show v
 
 structCoerce :: Val -> [(String,Val)]
 structCoerce (StructVal fields) = fields
-structCoerce _ = error "Encountered a non-struct value when a struct was expected."
+structCoerce v = error $ "Encountered a non-struct value when a struct was expected. " ++ show v
 
 arrayCoerce :: Val -> V.Vector Val
 arrayCoerce (ArrayVal vs) = vs
-arrayCoerce _ = error "Encountered a non-array value when an array was expected."
+arrayCoerce v = error $ "Encountered a non-array value when an array was expected. " ++ show v
 
 struct_field_access :: String -> Val -> Val
 struct_field_access fieldName v =
     case lookup fieldName $ structCoerce v of
         Just v' -> v'
-        _ -> error $ "Field " ++ fieldName ++ " not found."
+        _ -> error $ "Field " ++ fieldName ++ " not found." ++ show v
 
 randVal :: T.Kind -> IO Val
 randVal T.Bool = do
