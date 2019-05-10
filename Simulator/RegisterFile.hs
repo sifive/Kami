@@ -9,7 +9,7 @@ import Simulator.Value
 import qualified HaskellTarget as T
 
 import qualified Data.BitVector as BV
-import qualified Data.Map as M
+import qualified Data.HashMap as M
 import qualified Data.Vector as V
 
 import Data.Foldable (foldrM)
@@ -29,7 +29,7 @@ data RegFile = RegFile {
 
 data FileState = FileState {
       methods :: M.Map String (FileCall,String) -- map between method names and method type + filename
-    , reg_names :: M.Map String String -- map between method name and intermediate register name
+--    , reg_names :: M.Map String String -- map between method name and intermediate register name
     , int_regs :: M.Map String Val -- map between intermediate registers and their values
     , arrs :: M.Map String (V.Vector Val) -- map between filenames and arrays
     , files :: M.Map String RegFile -- map between filenames and files
@@ -38,7 +38,7 @@ data FileState = FileState {
 empty_state :: FileState
 empty_state = FileState {
       methods = M.empty
-    , reg_names = M.empty
+--    , reg_names = M.empty
     , int_regs = M.empty
     , arrs = M.empty 
     , files = M.empty
@@ -105,7 +105,7 @@ rf_methcall state methName val =
 
         file_of_fname fn = fromJust $ M.lookup fn $ files state
 
-        intreg = fromJust $ M.lookup methName $ reg_names state
+     --   intreg = fromJust $ M.lookup methName $ reg_names state
 
         writes fn = let file = file_of_fname fn in
             if isWrMask file 
@@ -170,7 +170,7 @@ initialize_file args rfb state = do
 
     return $ state {
                       methods = inserts (methods state) newmeths
-                    , reg_names = inserts (reg_names state) newregs
+                --    , reg_names = inserts (reg_names state) newregs
                     , int_regs = inserts (int_regs state) newvals
                     , arrs = M.insert fn arr $ arrs state
                     , files = M.insert fn rf $ files state

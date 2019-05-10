@@ -17,7 +17,7 @@ import Simulator.Value
 
 import qualified HaskellTarget as T
 
-import qualified Data.Map as M
+import qualified Data.HashMap as M
 
 import Data.Maybe (isJust)
 import Control.Monad (mapM, when)

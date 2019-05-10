@@ -56,6 +56,15 @@ randVal (T.Array n k) = do
     vs <- V.mapM randVal (V.replicate n k)
     return $ ArrayVal vs
 
+-- zeroVal :: T.Kind -> Val
+-- zeroVal T.Bool = BoolVal False
+-- zeroVal (T.Bit n) = BitvectorVal $ replicate n False
+-- zeroVal (T.Struct n kinds names) = StructVal $ map (\i -> (names $ of_nat_lt n i, defVal $ kinds $ of_nat_lt n i)) [0..(n-1)]
+-- zeroVal (T.Array n k) = ArrayVal $ (replicate n $ defVal k)
+
+--for debugging purposes
+randVal :: T.Kind -> IO Val
+
 randVal_FK :: T.FullKind -> IO Val
 randVal_FK (T.SyntaxKind k) = randVal k
 randVal_FK (T.NativeKind) = error "Encountered a NativeKind."

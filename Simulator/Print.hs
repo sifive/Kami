@@ -42,9 +42,9 @@ printVal (T.FArray n k ff) (ArrayVal vals) = "[ " ++ (concat (zipWith (\i v -> s
 printVal ff v = error $ "Cannot print expression " ++ (show v) ++ " with FullFormat " ++ (show ff) ++ "."
 
 printNum :: T.BitFormat -> BV.BitVector -> String
-printNum T.Binary v = tail $ tail $ BV.showBin v
+printNum T.Binary v = resize_num (BV.size v) $ tail $ tail $ BV.showBin v
 printNum T.Decimal v = show (BV.nat v)
-printNum T.Hex v = tail $ tail $ BV.showHex v
+printNum T.Hex v = resize_num (BV.size v `cdiv` 4) $ tail $ tail $ BV.showHex v
 
 sysIO :: T.SysT Val -> IO ()
 sysIO T.Finish = do

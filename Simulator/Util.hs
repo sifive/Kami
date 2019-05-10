@@ -1,43 +1,52 @@
 
 module Simulator.Util where
 
-import qualified Data.Map as M
+import qualified Data.HashMap as M
+import Data.Hashable
 
 space_pad :: Int -> String -> String
 space_pad n str = replicate (n - length str) ' ' ++ str
 
-dropLast :: Int -> [a] -> [a]
-dropLast n = reverse . (drop n) . reverse
+resize_num :: Int -> String -> String
+resize_num n num
+    | n > length num = replicate (n - length num) '0' ++ num
+    | otherwise = drop (length num - n) num
 
-list_lshift :: Int -> a -> [a] -> [a]
-list_lshift n x xs = replicate (min n (length xs)) x ++ dropLast n xs
+-- dropLast :: Int -> [a] -> [a]
+-- dropLast n = reverse . (drop n) . reverse
 
-list_rshift :: Int -> a -> [a] -> [a]
-list_rshift n x xs = drop n xs ++ replicate (min n (length xs)) x
+-- list_lshift :: Int -> a -> [a] -> [a]
+-- list_lshift n x xs = replicate (min n (length xs)) x ++ dropLast n xs
 
-list_rshift_a :: Int -> [a] -> [a]
-list_rshift_a _ [] = []
-list_rshift_a n xs = drop n xs ++ replicate (min n (length xs)) (last xs)
+-- list_rshift :: Int -> a -> [a] -> [a]
+-- list_rshift n x xs = drop n xs ++ replicate (min n (length xs)) x
 
-int_of_list :: [Bool] -> Int
-int_of_list [] = 0
-int_of_list (b:xs) = (if b then 1 else 0) + 2 * int_of_list xs
+-- list_rshift_a :: Int -> [a] -> [a]
+-- list_rshift_a _ [] = []
+-- list_rshift_a n xs = drop n xs ++ replicate (min n (length xs)) (last xs)
 
-list_of_int :: Int {- length -} -> Int {- value -} -> [Bool]
-list_of_int 0 _ = []
-list_of_int n x = (not $ even x) : list_of_int (n-1) (x `div` 2)
+-- int_of_list :: [Bool] -> Int
+-- int_of_list [] = 0
+-- int_of_list (b:xs) = (if b then 1 else 0) + 2 * int_of_list xs
 
-pair_update :: Ord a => (a,b) -> M.Map a b -> M.Map a b
+-- list_of_int :: Int {- length -} -> Int {- value -} -> [Bool]
+-- list_of_int 0 _ = []
+-- list_of_int n x = (not $ even x) : list_of_int (n-1) (x `div` 2)
+
+pair_update :: (Ord a, Hashable a) => (a,b) -> M.Map a b -> M.Map a b
 pair_update (a,b) m = M.adjust (const b) a m
 
-updates :: Ord a => M.Map a b -> [(a,b)] -> M.Map a b
+updates :: (Ord a, Hashable a) => M.Map a b -> [(a,b)] -> M.Map a b
 updates = foldr pair_update 
 
-inserts :: Ord a => M.Map a b -> [(a,b)] -> M.Map a b
+inserts :: (Ord a, Hashable a) => M.Map a b -> [(a,b)] -> M.Map a b
 inserts = foldr (uncurry M.insert)
 
 execIOs :: [IO ()] -> IO ()
 execIOs = foldr (>>) (return ())
+
+cdiv :: Int -> Int -> Int
+cdiv x y = ceiling $ (fromIntegral x / fromIntegral y)
 
 log2 :: Int -> Int
 log2 = ceiling . (logBase 2) . fromIntegral
