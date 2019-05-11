@@ -63,7 +63,7 @@ randVal (T.Array n k) = do
 -- zeroVal (T.Array n k) = ArrayVal $ (replicate n $ defVal k)
 
 --for debugging purposes
-randVal :: T.Kind -> IO Val
+--randVal :: T.Kind -> IO Val
 
 randVal_FK :: T.FullKind -> IO Val
 randVal_FK (T.SyntaxKind k) = randVal k
