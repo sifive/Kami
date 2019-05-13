@@ -36,7 +36,11 @@
     "Bool"
     "Bit"
     "STRUCT"
+    "STRUCT_TYPE"
+    "STRUCT_CONST"
     "Array"
+    "ARRAY"
+    "ARRAY_CONST"
     "Default"
     "WO"
     )
@@ -44,29 +48,6 @@
 
 (setq kami-keywords-regex (regexp-opt kami-keywords 'words))
 (setq kami-types-and-vals-regex (regexp-opt kami-types-and-vals 'words))
-
-;; (defun diffParensPlusInit ()
-;;   "Searches backwards for the first occurence of MODULE {.
-;;    Calculates the number of open parentheses minus closed parentheses,
-;;    and adds that to the starting point of
-;;    MODULE {"
-;;   (save-excursion
-;;     (beginning-of-line)
-;;     (let ((curr (point)))
-;;       (re-search-backward "MODULE[ \t\r\n\v\f]*{")
-;;       (let ((init (point)))
-;; 	(beginning-of-line)
-;; 	(max (+ (* 2 (- (how-many "[[({]" init curr)
-;; 			(how-many "[])}]" init curr)
-;; 			))
-;; 		(- init (point))
-;; 		0
-;; 		)
-;; 	     )
-;; 	)
-;;       )
-;;     )
-;;   )
 
 (defun diff-parens-times-space (space)
   "Calculates the number of open parentheses minus closed parentheses in previous line,
