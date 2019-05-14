@@ -521,15 +521,20 @@ Delimit Scope kami_struct_scope with kami_struct.
 Notation getStruct ls :=
   (Struct (fun i => snd (Vector.nth ls i)) (fun j => fst (Vector.nth ls j))) (only parsing).
 
-Notation "'STRUCT' { s1 ; .. ; sN }" :=
-  (getStruct (Vector.cons _ s1%kami_struct _ .. (Vector.cons _ sN%kami_struct _ (Vector.nil _)) ..)).
+Definition WriteRq lgIdxNum Data := (getStruct (Vector.cons _ ("addr", Bit lgIdxNum) _
+                                                            (Vector.cons _ ("data", Data) _ (Vector.nil _)))).
 
-Definition WriteRq lgIdxNum Data := STRUCT { "addr" :: Bit lgIdxNum ;
-                                             "data" :: Data }.
+  (* STRUCT_TYPE { "addr" :: Bit lgIdxNum ; *)
+  (*               "data" :: Data }. *)
 
-Definition WriteRqMask lgIdxNum num Data := STRUCT { "addr" :: Bit lgIdxNum ;
-                                                     "data" :: Array num Data ;
-                                                     "mask" :: Array num Bool }.
+Definition WriteRqMask lgIdxNum num Data := (getStruct (Vector.cons _ ("addr", Bit lgIdxNum) _
+                                                                    (Vector.cons _ ("data", Array num Data) _
+                                                                                 (Vector.cons _ ("mask", Array num Bool) _
+                                                                                              (Vector.nil _))))).
+
+(* Definition WriteRqMask lgIdxNum num Data := STRUCT_TYPE { "addr" :: Bit lgIdxNum ; *)
+(*                                                           "data" :: Array num Data ; *)
+(*                                                           "mask" :: Array num Bool }. *)
 
 Definition buildNumDataArray num dataArray IdxNum Data ty (idx: ty (Bit (Nat.log2_up IdxNum))) :=
   ReadReg dataArray (SyntaxKind (Array IdxNum Data))
@@ -2103,10 +2108,6 @@ Definition makeConst k (c: ConstT k): ConstFullT (SyntaxKind k) := SyntaxConst c
 Delimit Scope kami_init_scope with kami_init.
 
 Notation "'ARRAY' { x1 ; .. ; xn }" :=
-  (ConstArray (Vector.nth (Vector.cons _ x1%kami_init _ .. (Vector.cons _ xn%kami_init _ (Vector.nil _)) ..)))
-  : kami_init_scope.
-
-Notation "'ARRAY' { x1 ; .. ; xn }" :=
   (BuildArray (Vector.nth (Vector.cons _ x1%kami_init _ .. (Vector.cons _ xn%kami_init _ (Vector.nil _)) ..)))
   : kami_expr_scope.
 
@@ -2120,19 +2121,14 @@ Notation getStructConst ls :=
                (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j))
                (fun k => Vector_nth_map2_r (@projT1 _ _) (fun x => ConstT (snd x)) ls k (projT2 (Vector.nth ls k)))).
 
-Notation "'STRUCT' { s1 ; .. ; sN }" :=
-  (getStructConst (Vector.cons _ s1%struct_initial _ ..
-                               (Vector.cons _ sN%struct_initial _ (Vector.nil _)) ..))
-  : kami_init_scope.
-
 Delimit Scope kami_scope with kami.
 
 Notation "'RegisterN' name : type <- init" :=
-  (MERegister (name%string, existT RegInitValT type (Some (init)%kami_init)))
+  (MERegister (name%string, existT RegInitValT type (Some ((init)%kami_init)%word)))
     (at level 13, name at level 99) : kami_scope.
 
 Notation "'Register' name : type <- init" :=
-  (MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst (init)%kami_init))))
+  (MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst ((init)%kami_init)%word))))
     (at level 13, name at level 99) : kami_scope.
 
 Notation "'RegisterU' name : type" :=
@@ -2303,24 +2299,6 @@ Notation "x <| proj  ::==  f |>" := (set proj f x)
 
 
 
-
-(* Useful Struct *)
-Definition Maybe k :=  STRUCT {
-                           "valid" :: Bool;
-                           "data"  :: k }.
-
-Definition Pair (A B: Kind) := STRUCT {
-                                   "fst" :: A;
-                                   "snd" :: B }.
-
-
-Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_expr
-    (at level 100, only parsing) : kami_expr_scope.
-
-Definition Invalid {ty: Kind -> Type} {k} := (STRUCT { "valid" ::= $$ false ; "data" ::= $$ (getDefaultConst k) })%kami_expr.
-
-Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_expr
-    (at level 100, only parsing) : kami_expr_scope.
 
 
 
@@ -2504,31 +2482,6 @@ Definition extractArbitraryRange ty sz (inst: Bit sz ## ty) (range: nat * nat):
                         (ZeroExtendTruncLsb _ #i)))%kami_expr.
    
 
-Local Definition testStruct :=
-  (STRUCT {
-       "hello" :: Bit 10 ;
-       "a" :: Bit 3 ;
-       "b" :: Bit 5 ;
-       "test" :: Bool }).
-
-Local Definition testStructVal {ty}: testStruct @# ty :=
-  (STRUCT {
-       "hello" ::= $ 4 ;
-       "a" ::= $ 23 ;
-       "b" ::= $ 5 ;
-       "test" ::= $$ true })%kami_expr.
-
-
-
-Local Open Scope kami_action.
-Local Open Scope kami_expr.
-Local Definition testFieldAccess (ty: Kind -> Type): ActionT ty (Bit 10) :=
-  (LET val: testStruct <- testStructVal;
-     Ret (#val @% "hello"))%kami_action.
-Local Close Scope kami_expr.
-Local Close Scope kami_action.
-
-
 Section unittests.
 
   Open Scope kami_expr.
@@ -2587,9 +2540,6 @@ Local Definition testArrayAccess ty (v: Array 4 (Bit 10) @# ty) (idx : Bit 2 @# 
 
 Local Definition testConstNat ty (w1 w2: Bit 10 @# ty): Bit 10 @# ty := (w1 + w2 + $4 + $6)%kami_expr.
 
-Local Definition testFieldUpd (ty: Kind -> Type) := 
-  ((testStructVal (ty := ty)) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
-
 Local Definition testExtract ty n n1 n2 (pf1: n > n1) (pf2: n1 > n2) (a: Bit n @# ty) := (a $#[n1 : n2])%kami_expr.
 
 
@@ -2607,6 +2557,62 @@ Local Definition testExtract ty n n1 n2 (pf1: n > n1) (pf2: n1 > n2) (a: Bit n @
 
 
 
+Notation "'STRUCT_TYPE' { s1 ; .. ; sN }" :=
+  (getStruct (Vector.cons _ s1%kami_struct _ .. (Vector.cons _ sN%kami_struct _ (Vector.nil _)) ..)).
+
+Notation "'ARRAY_CONST' { x1 ; .. ; xn }" :=
+  (ConstArray (Vector.nth (Vector.cons _ (x1%kami_init)%word _ .. (Vector.cons _ (xn%kami_init)%word _ (Vector.nil _)) ..))).
+
+Notation "'STRUCT_CONST' { s1 ; .. ; sN }" :=
+  (getStructConst (Vector.cons _ (s1%struct_initial)%word _ ..
+                               (Vector.cons _ (sN%struct_initial)%word _ (Vector.nil _)) ..)).
+
+
+(* Useful Struct *)
+Definition Maybe k :=  STRUCT_TYPE {
+                           "valid" :: Bool;
+                           "data"  :: k }.
+
+Definition Pair (A B: Kind) := STRUCT_TYPE {
+                                   "fst" :: A;
+                                   "snd" :: B }.
+
+
+Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_expr
+    (at level 100, only parsing) : kami_expr_scope.
+
+Definition Invalid {ty: Kind -> Type} {k} := (STRUCT { "valid" ::= $$ false ; "data" ::= $$ (getDefaultConst k) })%kami_expr.
+
+Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_expr
+    (at level 100, only parsing) : kami_expr_scope.
+
+
+Local Definition testStruct :=
+  (STRUCT_TYPE {
+       "hello" :: Bit 10 ;
+       "a" :: Bit 3 ;
+       "b" :: Bit 5 ;
+       "test" :: Bool }).
+
+Local Definition testStructVal {ty}: testStruct @# ty :=
+  (STRUCT {
+       "hello" ::= $ 4 ;
+       "a" ::= $ 23 ;
+       "b" ::= $ 5 ;
+       "test" ::= $$ true })%kami_expr.
+
+
+
+Local Open Scope kami_action.
+Local Open Scope kami_expr.
+Local Definition testFieldAccess (ty: Kind -> Type): ActionT ty (Bit 10) :=
+  (LET val: testStruct <- testStructVal;
+     Ret (#val @% "hello"))%kami_action.
+Local Close Scope kami_expr.
+Local Close Scope kami_action.
+
+Local Definition testFieldUpd (ty: Kind -> Type) := 
+  ((testStructVal (ty := ty)) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
 
 
 

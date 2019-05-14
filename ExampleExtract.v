@@ -3,7 +3,7 @@ Require Import Kami.Tutorial.
 
 (* Example of how to extract a module to be used by the Haskell simulator *)
 
-Definition IncrMod : BaseModule := IncrementerImpl "test".
+Definition IncrMod : BaseModule := IncrementerImpl 5 "test".
 
 Separate Extraction
 

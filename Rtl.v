@@ -190,7 +190,7 @@ Notation "e1 || e2" := (RtlCABool Or (e1 :: e2 :: nil)) : rtl_expr_scope.
 (*                      : rtl_expr_scope. *)
 
 (* Local Definition testStruct := *)
-(*   (STRUCT { *)
+(*   (STRUCT_TYPE { *)
 (*        "hello" :: Bit 10 ; *)
 (*        "a" :: Bit 3 ; *)
 (*        "b" :: Bit 5 ; *)

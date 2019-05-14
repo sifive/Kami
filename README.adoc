@@ -1,0 +1,77 @@
+:sectnums:
+:toc:
+
+= Kami -- A Coq-based DSL for specifying and proving hardware designs
+
+== What is Kami?
+Kami is an umbrella term used to denote the following:
+. A https://en.wikipedia.org/wiki/Coq[Coq]-based DSL for writing hardware designs
+. A compiler for translating said hardware designs into Verilog
+. A simulator for said hardware designs, by generating an executable
+in Haskell, using user-defined functions to drive inputs and examine
+outputs for the hardware design
+. A formal definition of the smeantics of the DSL in Coq, including a
+definition of whether one design _implements_ another simpler design,
+i.e. whether an _implementation adheres to its specification_
+. A set of theorems or properties about said semantics, formally
+proven in Coq
+. A set of tactics for formally proving that an implementation adhere
+to its specification
+
+In Kami, one can write generators, i.e. functions that
+generatehardware when its parameters are specified, and can prove that
+the generators are correct with respect to their specification. Unlike
+traditional model-checking based approaches, the ability to prove
+theorems involving higher-order logic in Coq enables one to easily
+prove equivalence between a generator and its specification.
+
+The semantics of Kami was inspired by
+http://wiki.bluespec.com/[Bluespec SystemVerilog]. The original
+version of http://plv.csail.mit.edu/kami/papers/icfp17.pdf[Kami] was
+developed in MIT.  Based on the experience of developing and using
+Kami at MIT, it was rewritten at SiFive to make it practical to build
+provably correct chips.
+
+== Semantics of Kami: an informal overview
+Any hardware block or _module_ is written as a set of registers
+representing the state of the block, and a set of _rules_. The
+behavior of the module is represented by a sequence of execution of
+rules. Rules execute by reading and writing the state _atomically_,
+i.e. when one rule is executing, no other rule executes. During its
+execution, a rule can also interact with the external world by calling
+methods, to which the rule supplies arguments (an output from the
+module), and takes back the result returned by the external world (an
+input to the module). Once a rule finishes execution, another rule is
+picked non-deterministically and is executed, and so on.
+
+A module _A_ is said to implement a specification module _B_ if,
+during every rule execution in _A_, if the rule calls any methods,
+then these methods (along with their arguments and return values) are
+the same as those called by some rule execution in _B_, and this
+property holds for every sequence of rule executions in _A_. Note that
+the return values are functions of the external world; we assume that
+the same value can be returned by the external world if the same
+method is called with the same argument in both _A_ and _B_.  The
+methods along with their arguments and return values that are called
+in a rule's execution are called a label, and the sequence of labels
+corresponding to the sequence of rule execution is called a trace.
+The above definition of _A_ implementing _B_ can be rephrased as
+follows: any trace that can be produced by _A_ can also be produced by
+_B_.
+
+While the above semantics cover most of the behavior of Kami modules,
+it is not complete. We will be discussing the last bit of the
+semantics towards the end of this article.
+
+== Syntax of Kami
+The syntax of Kami is designed to simply provide a way to represent a
+set of registers (with optional initial values), and a set of rules.
+The rules are written as _actions_ which read or write registers, call
+methods, deal with predicates (i.e. `if then else`), etc. The module
+below shows an example featuring all the syntactic components involved
+in writing a module, including writing _expressions_, writing
+_actions_, writing registers and writing rules.
+
+[source, kami]
+----
+----
