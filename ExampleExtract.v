@@ -1,5 +1,5 @@
 Require Import Kami.All.
-Require Import Kami.Tutorial.
+Require Import Kami.TutorialTactics.
 
 (* Example of how to extract a module to be used by the Haskell simulator *)
 
