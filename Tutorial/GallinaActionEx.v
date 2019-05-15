@@ -34,7 +34,19 @@ Section Ex.
     Ret (#x + #x + e)
     ).
 
-  (* In an Expr, one cannot read/write registers or call methods. *)
+  (* Example of an Expr; One cannot read/write registers or call methods. *)
   Definition exampleExpr (e: Bit 4 @# ty) (f: Bit 6 @# ty): Bit 10 @# ty := $3 + $4 + {< e, f >}.
+
+  (* Example of a LetExprSyntax *)
+  Definition exampleLetExpr (e: Bit 4 ## ty) (f: Bit 6 ## ty): Bit 10 ## ty :=
+    (
+      (* Note that we need to use LETE to bind a let-expression directly *)
+      LETE e' <- e;
+      LETE f' <- f;
+      
+      (* But we use a LETC to bind a normal expression into a let-binding of a let-expression *)
+      LETC x <- {< #e', #f' >};
+      RetE #x
+      ).
     
 End Ex.

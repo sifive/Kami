@@ -1975,10 +1975,10 @@ Notation "'IfE' cexpr 'then' tact 'else' fact 'as' name ; cont " :=
   (IfElseE cexpr%kami_expr tact fact (fun name => cont))
     (at level 14, right associativity) : kami_expr_scope.
 Notation "'IfE' cexpr 'then' tact 'else' fact ; cont " :=
-  (IfElse cexpr%kami_expr tact fact (fun _ => cont))
+  (IfElseE cexpr%kami_expr tact fact (fun _ => cont))
     (at level 14, right associativity) : kami_expr_scope.
 Notation "'IfE' cexpr 'then' tact ; cont" :=
-  (IfElse cexpr%kami_expr tact (RetE (Const _ Default))%kami_expr (fun _ => cont))
+  (IfElseE cexpr%kami_expr tact (RetE (Const _ Default))%kami_expr (fun _ => cont))
     (at level 14, right associativity) : kami_expr_scope.
 
 

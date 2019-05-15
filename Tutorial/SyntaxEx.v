@@ -383,14 +383,48 @@ Section exampleModule.
         LETA r2: Bit 10 <- convertLetExprSyntax_ActionT (
           LETC k1: Bit 10 <- #x13 | #x7;
           LETC k2 <- (#x8 | #k1);
-          SystemE (
-            DispString _ "Hello World\n" ::
+
+          (* We can have if-then-else inside let-expressions.
+            The predicate is a simple expression, *not* a let-expression *)
+          IfE (#k2 == $3)
+          then (
+            SystemE (
+              DispString _ "Hello World\n" ::
+              
+              DispString _ "Val1 Hex: " ::
+              DispHex #x13 ::
+              
+              nil );
+            RetE #k1 )
+          else (
+            RetE (#k1 + $4))
+          as k3;
+          
+          (* We can omit the else clause and/or the return value in an if-then-else
+            just like for actions *)
+          IfE (#k2 == #k3)
+          then (
+            SystemE (
+              DispString _ "Bye\n" ::
+              nil             
+              );
+            RetE ($$ WO));
+          
+          IfE (#k2 == (#k3 + $1))
+          then (
+            SystemE (
+              DispString _ "Bye\n" ::
+              nil             
+              ) ;
+            RetE ($$ WO))
+          else (
+            SystemE (
+              DispString _ "Good Bye\n" ::
+              nil             
+              ) ;
+              RetE ($$ WO));
             
-            DispString _ "Val1 Hex: " ::
-            DispHex #x13 ::
-            
-            nil );
-          RetE #k2
+          RetE (#k2 + #k3)
           ) ;
         (* Inside let expressions, you can have let bindings of expressions, system calls (i.e. display statements or finish statements),
           and if-then-else statements *)
