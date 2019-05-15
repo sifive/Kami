@@ -215,6 +215,9 @@ Section exampleModule.
         then (Assert #x10; Retv);
         (* Here, the firing of the rule requires x10 to be true only if x13 is 4 *)
         
+        LET x100: Void <- $$ WO;
+        (* Void is literally Bit 0, and WO is the only way to create a value of type Bit 0 *)       
+               
         (* Finally, we end any action by a return statement *)
         Retv
         )

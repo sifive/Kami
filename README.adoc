@@ -64,14 +64,11 @@ it is not complete. We will be discussing the last bit of the
 semantics towards the end of this article.
 
 == Syntax of Kami
-The syntax of Kami is designed to simply provide a way to represent a
-set of registers (with optional initial values), and a set of rules.
-The rules are written as _actions_ which read or write registers, call
-methods, deal with predicates (i.e. `if then else`), etc. The module
-below shows an example featuring all the syntactic components involved
-in writing a module, including writing _expressions_, writing
-_actions_, writing registers and writing rules.
+The syntax of Kami is designed to simply provide a way to represent a set of
+registers (with optional initial values), and a set of rules.  The rules are
+written as _actions_ which read or write registers, call methods, deal with
+predicates (i.e. `if then else`), etc. The module in
+link:TutorialSyntax.v[TutorialSyntax.v] shows an example featuring all the
+syntactic components involved in writing a module, including writing
+_expressions_, writing _actions_, writing registers and writing rules.
 
-[source, kami]
-----
-----
