@@ -2586,6 +2586,27 @@ Notation "'STRUCT_CONST' { s1 ; .. ; sN }" :=
   (getStructConst (Vector.cons _ (s1%struct_initial)%word _ ..
                                (Vector.cons _ (sN%struct_initial)%word _ (Vector.nil _)) ..)).
 
+Definition ltO{X} : forall n, n < 0 -> X.
+Proof.
+  refine (fun n p => match (_:False) with end); lia.
+Defined.
+
+Lemma ltSmSn_ltmn : forall {m n},
+  S m < S n -> m < n.
+Proof.
+  intros; lia.
+Qed.
+
+Fixpoint mkFin i n : i < n -> Fin.t n :=
+  match n with
+  | 0 => fun p => ltO p
+  | S m => match i with
+           | 0 => fun _ => Fin.F1
+           | S j => fun p => Fin.FS (mkFin (ltSmSn_ltmn p))
+           end
+  end.
+
+Notation "i #: n" := (@mkFin (i)%nat (n)%nat ltac:(lia)) (at level 10, only parsing).
 
 (* Useful Struct *)
 Definition Maybe k :=  STRUCT_TYPE {

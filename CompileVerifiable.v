@@ -14,6 +14,7 @@ Section Compile.
              (arg: fst argRetK @# ty)
              lret (cont: ty (snd argRetK) -> CompActionT lret): CompActionT lret
   | CompLetExpr k (e: Expr ty k) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
+  | CompNondet k lret (Cont: fullType ty k -> CompActionT lret): CompActionT lret
   | CompSys (ls: list (SysT ty)) lret (cont: CompActionT lret): CompActionT lret
   | CompRead (r: string) (k: FullKind) (readMap: regMapTy) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
   | CompUpd (r: string) (k: FullKind) (v: Expr ty k) (writeMap: regMapTy) lret (cont: regMapTy -> CompActionT lret): CompActionT lret
@@ -34,7 +35,7 @@ Section Compile.
       | Return x =>
         CompRet x writeMap
       | LetExpr k' expr cont => CompLetExpr expr (fun ret => @compileAction _ (cont ret) pred writeMap)
-      | ReadNondet k' cont => CompRet (@Const _ _ (getDefaultConst k)) writeMap
+      | ReadNondet k' cont => CompNondet k' (fun ret => @compileAction _ (cont ret) pred writeMap)
       | Assertion pred' cont =>
         compileAction cont (pred && pred')%kami_expr writeMap
       | Sys ls cont => CompSys ls (compileAction cont pred writeMap)
@@ -78,6 +79,10 @@ Section Semantics.
                    writeMap calls val
                    (sem_a: SemCompActionT (cont (evalExpr e)) writeMap calls val)
     : SemCompActionT (@CompLetExpr type RegsT k e lret cont) writeMap calls val
+  | SemCompNondet k (v: fullType type k) lret (cont: fullType type k -> CompActionT type RegsT lret)
+                   writeMap calls val
+                   (sem_a: SemCompActionT (cont v) writeMap calls val)
+    : SemCompActionT (@CompNondet type RegsT k lret cont) writeMap calls val
   | SemCompSys (ls: list (SysT type)) lret (cont: CompActionT type RegsT lret)
                writeMap calls val
                (sem_a: SemCompActionT cont writeMap calls val)
@@ -100,3 +105,66 @@ Section Semantics.
                    (sem_cont: SemCompActionT (cont valA writeMapA) writeMapCont callsCont valCont)
     : SemCompActionT (@CompLetFull type RegsT k a lret cont) writeMapCont callsCont valCont.
 End Semantics.
+
+Fixpoint actions_to_rules (acts : list (Action Void)) (n : string) : list RuleT :=
+  match acts with
+  | nil => nil
+  | a :: al => (n, a) :: actions_to_rules al (n++n)
+  end.
+
+Definition actions_to_module (o : list RegInitT) (acts : list (Action Void)) (n : string): BaseModule :=
+  BaseMod o (actions_to_rules acts n) nil.
+
+Fixpoint getMethsFullLabel (l : list FullLabel) : MethsT :=
+  match l with
+  | nil => nil
+  | a :: a' => (snd (snd a) ++ getMethsFullLabel a')%list
+ end.
+
+Fixpoint getMeths (ll : list (list FullLabel)) :  MethsT :=
+  match ll with
+  | nil => nil
+  | l :: lt => (getMethsFullLabel l ++ getMeths lt)%list
+  end.
+
+Fixpoint getExecsFullLabel (l : list FullLabel) : list RuleOrMeth :=
+  match l with
+  | nil => nil
+  | l :: lt => fst (snd l) :: getExecsFullLabel lt
+  end.
+
+Fixpoint getExecs (ll : list (list FullLabel)) : list RuleOrMeth :=
+  match ll with
+  | nil => nil
+  | l :: lt => (getExecsFullLabel l ++ getExecs lt)%list
+  end.
+
+
+Lemma TraceEquivOneAction k (a : ActionT type k) (o : RegsT) (newRegs: RegsT) (retl : type k):
+  forall calls readRegs, 
+  SemAction o a readRegs newRegs calls retl ->
+  SemCompActionT (compileAction o a (Const type true) (doUpdRegs newRegs o)) (doUpdRegs newRegs o) calls retl.
+Proof.
+  induction a; intros; simpl.
+  - inv H0.
+    EqDep_subst; simpl.
+    econstructor 1; eauto.
+  - inv H0; EqDep_subst; simpl.
+    econstructor 2; eauto.
+  - inv H0; EqDep_subst; simpl.
+    admit.
+  - admit.
+  - inv H0; EqDep_subst; simpl.
+    econstructor 5; eauto.
+  - inv H; EqDep_subst; simpl.
+    rewrite in_map_iff in HRegVal; inv HRegVal; destruct H; inv H.
+    destruct x, s0; simpl in *.
+    econstructor 5; eauto.
+    econstructor 7; eauto.
+    simpl.
+    assert (forall r ls ls', (doUpdRegs (r::nil) (doUpdRegs (r::ls) ls') = doUpdRegs (r::ls) ls')).
+    {
+      intros. simpl.
+      admit.
+    }
+Admitted.
