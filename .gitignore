@@ -21,3 +21,4 @@ Makefile.coq
 .coqdeps.d
 *~
 *.md
+*.hs

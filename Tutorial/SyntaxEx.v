@@ -2,6 +2,16 @@ Require Import Kami.All.
 
 (* In order to write a Kami module, one first opens a section using the same name as the module,
   and writes the following five lines of boiler plate code. *)
+(* Notation "'IfE' cexpr 'then' tact 'else' fact 'as' name ; cont " := *)
+(*   (IfElseE cexpr%kami_expr tact fact (fun name => cont)) *)
+(*     (at level 14, right associativity) : kami_expr_scope. *)
+(* Notation "'IfE' cexpr 'then' tact 'else' fact ; cont " := *)
+(*   (IfElse cexpr%kami_expr tact fact (fun _ => cont)) *)
+(*     (at level 14, right associativity) : kami_expr_scope. *)
+(* Notation "'IfE' cexpr 'then' tact ; cont" := *)
+(*   (IfElse cexpr%kami_expr tact (RetE (Const _ Default))%kami_expr (fun _ => cont)) *)
+(*     (at level 14, right associativity) : kami_expr_scope. *)
+
 
 Section exampleModule.
   Variable name : string.

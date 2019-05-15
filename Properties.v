@@ -408,16 +408,6 @@ Section InverseSemAction.
     destruct evalA; eauto; repeat eexists; try destruct (evalExpr p); eauto; try discriminate.
   Qed.
 
-  Lemma convertLetExprSyntax_ActionT_same k (e: LetExprSyntax type k):
-    SemAction o (convertLetExprSyntax_ActionT e) nil nil nil (evalLetExpr e).
-  Proof.
-    induction e; simpl; try constructor; auto.
-    specialize (H (evalLetExpr e)).
-    pose proof (SemLetAction (fun v => convertLetExprSyntax_ActionT (cont v)) (@DisjKey_nil_l string _ nil) IHe H) as sth.
-    rewrite ?(app_nil_l nil) in sth.
-    auto.
-  Qed.
-
   Lemma SemActionReadsSub k a reads upds calls ret:
     @SemAction o k a reads upds calls ret ->
     SubList reads o.
@@ -5368,6 +5358,29 @@ Section SimulationZeroAction.
   Qed.
 End SimulationZeroAction.
 
+Lemma SemAction_if k1 k (e: Bool @# type) (a1 a2: ActionT type k1) (a: type k1 -> ActionT type k) o reads u cs v:
+  (if evalExpr e
+   then SemAction o (LetAction a1 a) reads u cs v
+   else SemAction o (LetAction a2 a) reads u cs v) ->
+  SemAction o (IfElse e a1 a2 a) reads u cs v.
+Proof.
+  case_eq (evalExpr e); intros; inv H0; EqDep_subst.
+  - econstructor 7; eauto.
+  - econstructor 8; eauto.
+Qed.
+
+Lemma convertLetExprSyntax_ActionT_same o k (e: LetExprSyntax type k):
+  SemAction o (convertLetExprSyntax_ActionT e) nil nil nil (evalLetExpr e).
+Proof.
+  induction e; simpl; try constructor; auto.
+  specialize (H (evalLetExpr e)).
+  pose proof (SemLetAction (fun v => convertLetExprSyntax_ActionT (cont v)) (@DisjKey_nil_l string _ nil) IHe H) as sth.
+  rewrite ?(app_nil_l nil) in sth.
+  auto.
+  apply SemAction_if; auto.
+  case_eq (evalExpr pred); intros; subst; repeat econstructor; eauto; unfold not; simpl; intros; auto.
+Qed.
+
 Lemma convertLetExprSyntax_ActionT_full k (e: LetExprSyntax type k):
   forall o reads writes cs ret,
     SemAction o (convertLetExprSyntax_ActionT e) reads writes cs ret ->
@@ -5385,18 +5398,17 @@ Proof.
     apply H in HSemActionCont; dest; subst.
     apply IHe in HSemAction; dest; subst.
     repeat split; auto.
+  - apply inversionSemAction in H0; dest.
+    destruct (evalExpr pred); dest.
+    + apply IHe1 in H1; dest; subst.
+      apply H in H2; dest; subst.
+      repeat split; auto.
+    + apply IHe2 in H1; dest; subst.
+      apply H in H2; dest; subst.
+      repeat split; auto.
 Qed.
 
-Lemma SemAction_if k1 k (e: Bool @# type) (a1 a2: ActionT type k1) (a: type k1 -> ActionT type k) o reads u cs v:
-  (if evalExpr e
-   then SemAction o (LetAction a1 a) reads u cs v
-   else SemAction o (LetAction a2 a) reads u cs v) ->
-  SemAction o (IfElse e a1 a2 a) reads u cs v.
-Proof.
-  case_eq (evalExpr e); intros; inv H0; EqDep_subst.
-  - econstructor 7; eauto.
-  - econstructor 8; eauto.
-Qed.
+
 
 Section Simulation.
   Variable imp spec: BaseModule.

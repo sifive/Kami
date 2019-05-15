@@ -397,7 +397,9 @@ Section Phoas.
   Inductive LetExprSyntax k :=
   | NormExpr (e: Expr (SyntaxKind k)): LetExprSyntax k
   | SysE (ls: list SysT) (e: LetExprSyntax k): LetExprSyntax k
-  | LetE k' (e: LetExprSyntax k') (cont: ty k' -> LetExprSyntax k): LetExprSyntax k.
+  | LetE k' (e: LetExprSyntax k') (cont: ty k' -> LetExprSyntax k): LetExprSyntax k
+  | IfElseE (pred: Expr (SyntaxKind Bool)) k' (t f: LetExprSyntax k') (cont: ty k' -> LetExprSyntax k):
+      LetExprSyntax k.
     
   Inductive ActionT (lretT: Kind) : Type :=
   | MCall (meth: string) s:
@@ -424,6 +426,9 @@ Section Phoas.
     | NormExpr e' => Return e'
     | LetE _ e' cont => LetAction (convertLetExprSyntax_ActionT e') (fun v => convertLetExprSyntax_ActionT (cont v))
     | SysE ls cont => Sys ls (convertLetExprSyntax_ActionT cont)
+    | IfElseE pred k' t f cont => IfElse pred (convertLetExprSyntax_ActionT t)
+                                         (convertLetExprSyntax_ActionT f)
+                                         (fun v => convertLetExprSyntax_ActionT (cont v))
     end.
 End Phoas.
 
@@ -1054,6 +1059,9 @@ Section Semantics.
     | NormExpr e' => evalExpr e'
     | SysE ls cont => evalLetExpr cont
     | LetE _ e' cont => evalLetExpr (cont (evalLetExpr e'))
+    | IfElseE pred _ t f cont => evalLetExpr (cont (if evalExpr pred
+                                                    then evalLetExpr t
+                                                    else evalLetExpr f))
     end.
 
   Variable o: RegsT.
@@ -1963,6 +1971,17 @@ Notation "'LETC' name : t <- v ; c " :=
                                (at level 13, right associativity, name at level 99) : kami_expr_scope.
 Notation "'SystemE' ls ; c " :=
   (SysE ls c)%kami_expr (at level 13, right associativity, ls at level 99): kami_expr_scope.
+Notation "'IfE' cexpr 'then' tact 'else' fact 'as' name ; cont " :=
+  (IfElseE cexpr%kami_expr tact fact (fun name => cont))
+    (at level 14, right associativity) : kami_expr_scope.
+Notation "'IfE' cexpr 'then' tact 'else' fact ; cont " :=
+  (IfElse cexpr%kami_expr tact fact (fun _ => cont))
+    (at level 14, right associativity) : kami_expr_scope.
+Notation "'IfE' cexpr 'then' tact ; cont" :=
+  (IfElse cexpr%kami_expr tact (RetE (Const _ Default))%kami_expr (fun _ => cont))
+    (at level 14, right associativity) : kami_expr_scope.
+
+
 
 Notation "k ## ty" := (LetExprSyntax ty k) (no associativity, at level 98, only parsing).
 
