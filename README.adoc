@@ -1,4 +1,3 @@
-:sectnums:
 :toc:
 
 = Kami -- A Coq-based DSL for specifying and proving hardware designs
@@ -57,18 +56,44 @@ in a rule's execution are called a label, and the sequence of labels
 corresponding to the sequence of rule execution is called a trace.
 The above definition of _A_ implementing _B_ can be rephrased as
 follows: any trace that can be produced by _A_ can also be produced by
-_B_.
+_B_. We call this property `TraceInclusion`.
 
 While the above semantics cover most of the behavior of Kami modules,
 it is not complete. We will be discussing the last bit of the
 semantics towards the end of this article.
 
 == Syntax of Kami
-The syntax of Kami is designed to simply provide a way to represent a set of
-registers (with optional initial values), and a set of rules.  The rules are
-written as _actions_ which read or write registers, call methods, deal with
-predicates (i.e. `if then else`), etc. The module in
-link:TutorialSyntax.v[TutorialSyntax.v] shows an example featuring all the
-syntactic components involved in writing a module, including writing
-_expressions_, writing _actions_, writing registers and writing rules.
+The syntax of Kami is designed to simply provide a way to represent a
+set of registers (with optional initial values), and a set of rules.
+The rules are written as _actions_ which read or write registers, call
+methods, deal with predicates (i.e. `if then else`), etc. The module
+`exampleModule` in link:Tutorial/SyntaxEx.v[SyntaxEx.v] shows an
+example featuring all the syntactic components involved in writing a
+module, including writing every possible _expression_, _action_,
+register initialization and rule. The comments in the file give an
+informal specification of what each syntactic construct does.
 
+Notice that actions and let-expressions are essentially are
+https://en.wikipedia.org/wiki/Abstract_syntax_tree[ASTs] written in
+Gallina. So, one can construct these actions or let-expressions
+separately as Gallina terms without having to be inside a Kami
+module. This way, one can write generators that produce actions or
+let-expressions that can be composed in multiple ways into a module.
+link:Tutorial/GallinaActionEx.v[GallinaActionEx.v] shows how to write
+such Gallina terms. Notice the use of a strange parameter
+`ty: Kind -> Type`. This is used to get parametric ASTs that allow us
+to use the same AST for synthesizing circuits as well as for
+proofs. Read a tiny example, link:Tutorial/PhoasEx.v[PhoasEx.v] and
+http://adam.chlipala.net/papers/PhoasICFP08/PhoasICFP08.pdf[Parametric
+Higher Order Abstract Syntax (PHOAS) paper] to understand what PHOAS
+means. While understanding PHOAS is useful, one need not understand
+the concepts to build actions and let-expressions in Kami. Instead,
+one can view supplying `ty: Kind -> Types` as boiler plate code, and
+write types for expressions as `k @# ty`, let-expressions as `k ## ty`
+and actions as `ActionT ty k` (`k` represents the Kami type represented
+by these entities).
+
+== Proving implementations using Kami
+link:Tutorial/TacticsEx.v[TacticsEx.v] showcases how some of the Coq tactics developed
+in the Kami framework can be used to simplify the proof of `TraceInclusion`
+between two modules. The documentation for this is work in progress.
