@@ -172,9 +172,6 @@ Fixpoint getExecs (ll : list (list FullLabel)) : list RuleOrMeth :=
   | l :: lt => (getExecsFullLabel l ++ getExecs lt)%list
   end.
 
-Notation createBaseMod regs actions := (BaseMod regs (rules nil).
-
-
 (*
 Lemma TraceEquivOneAction k (a : ActionT type k) (o : RegsT) (newRegs: RegsT) (retl : type k):
   forall calls readRegs, 
