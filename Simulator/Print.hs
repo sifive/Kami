@@ -34,7 +34,7 @@ instance Show T.FullFormat where
 
 printVal :: T.FullFormat -> Val -> String
 printVal (T.FBool n bf) (BoolVal b) = space_pad n (if b then "1" else "0")
-printVal (T.FBit n m bf) (BitvectorVal bs) = space_pad m $ printNum bf bs
+printVal (T.FBit n m bf) (BVVal bs) = space_pad m $ printNum bf bs
 printVal (T.FStruct n _ names ffs) (StructVal fields) = "{ " ++ (concat $ 
     zipWith (\(name,val) ff -> name ++ ": " ++ (printVal ff val) ++ "; ") fields (map ffs (T.getFins n))
     ) ++ "}"

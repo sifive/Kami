@@ -12,18 +12,14 @@ import System.Random (randomRIO)
 
 import Debug.Trace
 
-data Val = BoolVal Bool | BitvectorVal BV.BV | StructVal [(String,Val)] | ArrayVal (V.Vector Val) deriving (Eq,Show)
-
--- unit val
-tt :: Val
-tt = BitvectorVal BV.nil
+data Val = BoolVal Bool | BVVal BV.BV | StructVal [(String,Val)] | ArrayVal (V.Vector Val) deriving (Eq,Show)
 
 boolCoerce :: Val -> Bool
 boolCoerce (BoolVal b) = b
 boolCoerce v = error $ "Encountered a non-boolean value when a boolean was expected. " ++ show v
 
-bvCoerce :: Val -> BV.BitVector
-bvCoerce (BitvectorVal bs) = bs
+bvCoerce :: Val -> BV.BV
+bvCoerce (BVVal bs) = bs
 bvCoerce v = error $ "Encountered a non-bitvector value when a bitvector was expected. " ++ show v
 
 structCoerce :: Val -> [(String,Val)]
@@ -40,30 +36,31 @@ struct_field_access fieldName v =
         Just v' -> v'
         _ -> error $ "Field " ++ fieldName ++ " not found." ++ show v
 
-randVal :: T.Kind -> IO Val
-randVal T.Bool = do
-    k <- randomRIO (0,1)
-    return $ BoolVal $ k == (1 :: Int)
-randVal (T.Bit n) = do
-    k <- randomRIO ((0 :: Integer), 2^n - 1)
-    return $ BitvectorVal $ BV.bitVec n k
-randVal (T.Struct n ks names) = do
-    let ks' = map ks (T.getFins n)
-    let names' = map names (T.getFins n)
-    vs <- mapM randVal ks'
-    return $ StructVal $ zip names' vs
-randVal (T.Array n k) = do
-    vs <- V.mapM randVal (V.replicate n k)
-    return $ ArrayVal vs
+-- randVal :: T.Kind -> IO Val
+-- randVal T.Bool = do
+--     k <- randomRIO (0,1)
+--     return $ BoolVal $ k == (1 :: Int)
+-- randVal (T.Bit n) = do
+--     k <- randomRIO ((0 :: Integer), 2^n - 1)
+--     return $ BVVal $ BV.bitVec n k
+-- randVal (T.Struct n ks names) = do
+--     let ks' = map ks (T.getFins n)
+--     let names' = map names (T.getFins n)
+--     vs <- mapM randVal ks'
+--     return $ StructVal $ zip names' vs
+-- randVal (T.Array n k) = do
+--     vs <- V.mapM randVal (V.replicate n k)
+--     return $ ArrayVal vs
 
--- zeroVal :: T.Kind -> Val
--- zeroVal T.Bool = BoolVal False
--- zeroVal (T.Bit n) = BitvectorVal $ replicate n False
--- zeroVal (T.Struct n kinds names) = StructVal $ map (\i -> (names $ of_nat_lt n i, defVal $ kinds $ of_nat_lt n i)) [0..(n-1)]
--- zeroVal (T.Array n k) = ArrayVal $ (replicate n $ defVal k)
+zeroVal :: T.Kind -> Val
+zeroVal T.Bool = BoolVal False
+zeroVal (T.Bit n) = BVVal $ BV.zeros n
+zeroVal (T.Struct n kinds names) = StructVal $ map (\i -> (names i, zeroVal $ kinds i)) $ T.getFins n
+zeroVal (T.Array n k) = ArrayVal $ (V.replicate n $ zeroVal k)
 
 --for debugging purposes
---randVal :: T.Kind -> IO Val
+randVal :: T.Kind -> IO Val
+randVal = pure . zeroVal
 
 randVal_FK :: T.FullKind -> IO Val
 randVal_FK (T.SyntaxKind k) = randVal k

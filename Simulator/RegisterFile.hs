@@ -96,9 +96,9 @@ rf_methcall state methName val =
         Just (fc, fileName) -> 
             case fc of
                 AsyncRead -> Just (Nothing, ArrayVal $ file_async_read state (file_of_fname fileName) arg_index)
-                ReadReq regName -> Just (Just $ IntRegWrite regName val, tt)
+                ReadReq regName -> Just (Just $ IntRegWrite regName val, BVVal $ BV.nil)
                 ReadResp regName -> Just (Nothing, file_sync_readresp state (file_of_fname fileName) regName)
-                Write -> Just (Just $ ArrWrite fileName (writes fileName) , tt)
+                Write -> Just (Just $ ArrWrite fileName (writes fileName) , BVVal BV.nil)
         Nothing -> Nothing
 
     where 

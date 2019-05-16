@@ -8,6 +8,7 @@ module Simulator.All(
     , module Simulator.Util
     , module Simulator.Value
     , module Simulator.Parse
+    , module Simulator.Lib
     )
  where
 
@@ -19,3 +20,4 @@ import Simulator.Strategy
 import Simulator.Util
 import Simulator.Value
 import Simulator.Parse
+import Simulator.Lib

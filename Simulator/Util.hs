@@ -2,7 +2,11 @@
 module Simulator.Util where
 
 import qualified Data.HashMap as M
+import qualified Data.BitVector as BV
+import qualified Data.Text as T
+
 import Data.Hashable
+import Data.Text.Read (hexadecimal)
 
 space_pad :: Int -> String -> String
 space_pad n str = replicate (n - length str) ' ' ++ str
@@ -11,27 +15,6 @@ resize_num :: Int -> String -> String
 resize_num n num
     | n > length num = replicate (n - length num) '0' ++ num
     | otherwise = drop (length num - n) num
-
--- dropLast :: Int -> [a] -> [a]
--- dropLast n = reverse . (drop n) . reverse
-
--- list_lshift :: Int -> a -> [a] -> [a]
--- list_lshift n x xs = replicate (min n (length xs)) x ++ dropLast n xs
-
--- list_rshift :: Int -> a -> [a] -> [a]
--- list_rshift n x xs = drop n xs ++ replicate (min n (length xs)) x
-
--- list_rshift_a :: Int -> [a] -> [a]
--- list_rshift_a _ [] = []
--- list_rshift_a n xs = drop n xs ++ replicate (min n (length xs)) (last xs)
-
--- int_of_list :: [Bool] -> Int
--- int_of_list [] = 0
--- int_of_list (b:xs) = (if b then 1 else 0) + 2 * int_of_list xs
-
--- list_of_int :: Int {- length -} -> Int {- value -} -> [Bool]
--- list_of_int 0 _ = []
--- list_of_int n x = (not $ even x) : list_of_int (n-1) (x `div` 2)
 
 pair_update :: (Ord a, Hashable a) => (a,b) -> M.Map a b -> M.Map a b
 pair_update (a,b) m = M.adjust (const b) a m
@@ -50,6 +33,14 @@ cdiv x y = ceiling $ (fromIntegral x / fromIntegral y)
 
 log2 :: Int -> Int
 log2 = ceiling . (logBase 2) . fromIntegral
+
+hex_to_integer :: T.Text -> Integer
+hex_to_integer txt = case hexadecimal txt of
+    Left str -> error $ "Formatting error: " ++ str
+    Right (x,str) -> if T.null str then x else error $ "Formatting error, extra text: " ++ T.unpack str
+
+hex_to_bv :: Int -> T.Text -> BV.BV
+hex_to_bv n = (BV.bitVec n) . hex_to_integer
 
 --tries to split a list at the first occurence of the given character, discarding that character
 binary_split :: Eq a => a -> [a] -> Maybe ([a],[a])

@@ -29,7 +29,7 @@ class Eval a b where
 
 instance Eval T.ConstT Val where
     eval (T.ConstBool b) = BoolVal b
-    eval (T.ConstBit _ w) = BitvectorVal $ BV.fromBits $ reverse $ list_of_word w
+    eval (T.ConstBit _ w) = BVVal $ BV.fromBits $ reverse $ list_of_word w
     eval (T.ConstStruct n _ names fields) = StructVal $ map 
         (\i -> (names i, eval $ fields i)) (T.getFins n)
     eval (T.ConstArray n _ vals) = ArrayVal $ V.map (eval . vals) (V.fromList $ T.getFins n)
@@ -44,8 +44,8 @@ instance Eval (T.CABoolOp) ([Bool] -> Bool) where
 
 instance Eval T.UniBitOp (BV.BV -> BV.BV) where
     eval (T.Inv _) = BV.not
-    eval (T.TruncLsb m _) = BV.least m
-    eval (T.TruncMsb _ n) = BV.most n
+    eval (T.TruncLsb m _) = if m == 0 then const BV.nil else BV.least m
+    eval (T.TruncMsb _ n) = if n == 0 then const BV.nil else BV.most n
     eval (T.UAnd _) = \v -> BV.fromBool $ BV.foldr (&&) True v
     eval (T.UOr _) = \v -> BV.fromBool $ BV.foldr (||) False v
     eval (T.UXor _) = \v -> BV.fromBool $ BV.foldr (/=) False v
@@ -68,19 +68,18 @@ instance Eval T.CABitOp ([BV.BV] -> BV.BV) where
 
 instance Eval (T.Expr ty) Val where
     eval (T.Var (T.SyntaxKind _) x) = unsafeCoerce x
-    --eval (T.Var (T.SyntaxKind _) x) = trace ("||||" ++ show ((unsafeCoerce x) :: Val) ++ "||||") $ unsafeCoerce x
     eval (T.Var T.NativeKind _) = error "Encountered a NativeKind."
     eval (T.Const _ c) = eval c
     eval (T.UniBool o e) = BoolVal $ eval o $ boolCoerce $ eval e
     eval (T.CABool o es) = BoolVal $ eval o $ map (boolCoerce . eval) es
-    eval (T.UniBit m n o e) = BitvectorVal $ eval o $ bvCoerce $ eval e
-    eval (T.CABit _ o es) = BitvectorVal $ eval o $ map (bvCoerce . eval) es
-    eval (T.BinBit _ _ _ o e1 e2) = BitvectorVal $ eval o (bvCoerce $ eval e1) (bvCoerce $ eval e2)
+    eval (T.UniBit m n o e) = BVVal $ eval o $ bvCoerce $ eval e
+    eval (T.CABit _ o es) = BVVal $ eval o $ map (bvCoerce . eval) es
+    eval (T.BinBit _ _ _ o e1 e2) = BVVal $ eval o (bvCoerce $ eval e1) (bvCoerce $ eval e2)
     eval (T.BinBitBool _ _ _ e1 e2) = BoolVal $ (bvCoerce $ eval e1) BV.<. (bvCoerce $ eval e2) --only works a.t.m. because there is only one BinBitBoolOp
     eval (T.ITE _ e1 e2 e3) = if (boolCoerce $ eval e1) then eval e2 else eval e3
     eval (T.Eq _ e1 e2) = case eval e1 of
         BoolVal b -> BoolVal $ b == (boolCoerce $ eval e2)
-        BitvectorVal v -> BoolVal $ v == (bvCoerce $ eval e2)
+        BVVal v -> BoolVal $ v == (bvCoerce $ eval e2)
         StructVal s -> BoolVal $ s == (structCoerce $ eval e2)
         ArrayVal a -> BoolVal $ a == (arrayCoerce $ eval e2)
     eval (T.ReadStruct _ _ names e i) = case lookup (names i) (structCoerce $ eval e) of
