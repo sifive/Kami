@@ -72,6 +72,9 @@ Section Compile.
       fold_left (fun acc a =>
                    CompLetFull acc (fun _ writeMap => compileAction a ($$ true)%kami_expr (CompactRegMap (VarRegMap writeMap)))) acts
                 (CompRet ($$ WO)%kami_expr (VarRegMap readMap)).
+
+    Definition compileRules (rules: list RuleT) :=
+      compileActions (map (fun a => snd a ty) rules).
   End ReadMap.
 End Compile.
 
@@ -168,6 +171,8 @@ Fixpoint getExecs (ll : list (list FullLabel)) : list RuleOrMeth :=
   | nil => nil
   | l :: lt => (getExecsFullLabel l ++ getExecs lt)%list
   end.
+
+Notation createBaseMod regs actions := (BaseMod regs (rules nil).
 
 
 (*
