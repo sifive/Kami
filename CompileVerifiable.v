@@ -3,11 +3,23 @@ Require Import Syntax StateMonad.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
-Local Open Scope string.
-
 Section Compile.
   Variable ty: Kind -> Type.
   Variable regMapTy: Type.
+
+  Notation NameVal := (string * {k: FullKind & Expr ty k})%type.
+  
+  Definition RegUpd := ((Bool @# ty) * NameVal)%type.
+  Notation RegUpds := (list RegUpd).
+
+  Definition RegState := (list NameVal).
+
+  Definition RegMapTy := (RegState * RegUpds)%type.
+  
+  Inductive RegMapExpr: Type :=
+  | VarRegMap (v: regMapTy): RegMapExpr
+  | UpdRegMap (r: string) (pred: Bool @# ty) (k: FullKind) (val: Expr ty k) (regMap: RegMapExpr): RegMapExpr
+  | CompactRegMap (regMap: RegMapExpr): RegMapExpr.
 
   Inductive CompActionT: Kind -> Type :=
   | CompCall (f: string) (argRetK: Kind * Kind) (pred: Bool @# ty)
@@ -16,9 +28,8 @@ Section Compile.
   | CompLetExpr k (e: Expr ty k) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
   | CompNondet k lret (Cont: fullType ty k -> CompActionT lret): CompActionT lret
   | CompSys (ls: list (SysT ty)) lret (cont: CompActionT lret): CompActionT lret
-  | CompRead (r: string) (k: FullKind) (readMap: regMapTy) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
-  | CompUpd (r: string) (k: FullKind) (v: Expr ty k) (writeMap: regMapTy) lret (cont: regMapTy -> CompActionT lret): CompActionT lret
-  | CompRet lret (e: lret @# ty) (newMap: regMapTy): CompActionT lret
+  | CompRead (r: string) (k: FullKind) (readMap: RegMapExpr) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
+  | CompRet lret (e: lret @# ty) (newMap: RegMapExpr): CompActionT lret
   | CompLetFull k (a: CompActionT k) lret (cont: ty k -> regMapTy -> CompActionT lret): CompActionT lret.
 
   Axiom cheat: forall t, t.
@@ -26,7 +37,7 @@ Section Compile.
   Section ReadMap.
     Variable readMap: regMapTy.
     Fixpoint compileAction k (a: ActionT ty k) (pred: Bool @# ty)
-             (writeMap: regMapTy)
+             (writeMap: RegMapExpr)
              {struct a}:
       CompActionT k :=
       match a in ActionT _ _ with
@@ -40,70 +51,89 @@ Section Compile.
         compileAction cont (pred && pred')%kami_expr writeMap
       | Sys ls cont => CompSys ls (compileAction cont pred writeMap)
       | ReadReg r k' cont =>
-        @CompRead r k' readMap _ (fun v => @compileAction _ (cont v) pred writeMap)
+        @CompRead r k' (VarRegMap readMap) _ (fun v => @compileAction _ (cont v) pred writeMap)
       | WriteReg r k' expr cont =>
-        @CompRead r k' readMap _
-                  (fun v => CompUpd r (IF pred then expr else (Var ty k' v))%kami_expr writeMap
-                                    (fun writeMap' => @compileAction _ cont pred writeMap'))
+        let writeMap' := UpdRegMap r pred expr writeMap in
+        @compileAction _ cont pred writeMap'
       | LetAction k' a' cont =>
         CompLetFull (@compileAction k' a' pred writeMap)
-                    (fun retval writeMap' => @compileAction k (cont retval) pred writeMap')
+                    (fun retval writeMap' => @compileAction k (cont retval) pred (VarRegMap writeMap'))
       | IfElse pred' k' aT aF cont =>
         CompLetFull (@compileAction k' aT (pred && pred')%kami_expr writeMap)
                     (fun valT writesT =>
-                       CompLetFull (@compileAction k' aF (pred && !pred')%kami_expr writesT)
+                       CompLetFull (@compileAction k' aF (pred && !pred')%kami_expr (VarRegMap writesT))
                                    (fun valF writesF =>
                                       CompLetExpr (IF pred' then #valT else #valF)%kami_expr
-                                                  (fun val => (@compileAction k (cont val) pred writesF))
+                                                  (fun val => (@compileAction k (cont val) pred (VarRegMap writesF)))
                     ))
       end.
 
     Definition compileActions (acts: list (ActionT ty Void)) :=
       fold_left (fun acc a =>
-                   CompLetFull acc
-                   (fun _ writeMap => compileAction a ($$ true)%kami_expr writeMap)) acts (CompRet ($$ WO)%kami_expr readMap).
+                   CompLetFull acc (fun _ writeMap => compileAction a ($$ true)%kami_expr (CompactRegMap (VarRegMap writeMap)))) acts
+                (CompRet ($$ WO)%kami_expr (VarRegMap readMap)).
   End ReadMap.
 End Compile.
 
 Section Semantics.
-  Variable readMap: RegsT.
-  Inductive SemCompActionT: forall k, CompActionT type RegsT k -> RegsT -> MethsT -> type k -> Prop :=
+  Local Notation UpdRegsT := RegsT.
+
+  Local Notation RegMapType := (RegsT * UpdRegsT)%type.
+
+  Inductive SemRegMapExpr: (RegMapExpr type RegMapType) -> RegMapType -> Prop :=
+  | SemVarRegMap v:
+      SemRegMapExpr (VarRegMap _ v) (fst v, snd v)
+  | SemUpdRegMapTrue r (pred: Bool @# type) k val regMap
+                     (PredTrue: evalExpr pred = true)
+                     old upds
+                     (HSemRegMap: SemRegMapExpr regMap (old, upds)):
+      SemRegMapExpr (@UpdRegMap _ _ r pred k val regMap) (old, (r, existT _ k (evalExpr val)) :: upds)
+  | SemUpdRegMapFalse r (pred: Bool @# type) k val regMap
+                      (PredTrue: evalExpr pred = false)
+                      old upds
+                      (HSemRegMap: SemRegMapExpr regMap (old, upds)):
+      SemRegMapExpr (@UpdRegMap _ _ r pred k val regMap) (old, upds)
+  | SemCompactRegMap old upds regMap (HSemRegMap: SemRegMapExpr regMap (old, upds)) newMap
+                     (HUpdRegs: UpdRegs (upds :: nil) old newMap):
+      SemRegMapExpr (@CompactRegMap _ _ regMap) (newMap, nil).
+  
+  Inductive SemCompActionT: forall k, CompActionT type RegMapType k -> RegMapType ->  MethsT -> type k -> Prop :=
   | SemCompCall (f: string) (argRetK: Kind * Kind) (pred: Bool @# type)
              (arg: fst argRetK @# type)
-             lret (cont: type (snd argRetK) -> CompActionT type RegsT lret)
+             lret (cont: type (snd argRetK) -> CompActionT _ _ lret)
              (ret: type (snd argRetK))
-             writeMap calls val
-             (sem_a: SemCompActionT (cont ret) writeMap calls val)
-    : SemCompActionT (@CompCall type RegsT f argRetK pred arg lret cont) writeMap ((f, existT _ argRetK (evalExpr arg, ret)) :: calls) val
-  | SemCompLetExpr k (e: Expr type k) lret (cont: fullType type k -> CompActionT type RegsT lret)
-                   writeMap calls val
-                   (sem_a: SemCompActionT (cont (evalExpr e)) writeMap calls val)
-    : SemCompActionT (@CompLetExpr type RegsT k e lret cont) writeMap calls val
-  | SemCompNondet k (v: fullType type k) lret (cont: fullType type k -> CompActionT type RegsT lret)
-                   writeMap calls val
-                   (sem_a: SemCompActionT (cont v) writeMap calls val)
-    : SemCompActionT (@CompNondet type RegsT k lret cont) writeMap calls val
-  | SemCompSys (ls: list (SysT type)) lret (cont: CompActionT type RegsT lret)
-               writeMap calls val
-               (sem_a: SemCompActionT cont writeMap calls val)
-    : SemCompActionT (CompSys ls cont) writeMap calls val
-  | SemCompRead (r: string) k (readMap: RegsT) lret (cont: fullType type k -> CompActionT type RegsT lret)
-                regV (HIn: In (r, existT _ k regV) readMap)
-                writeMap calls val
-                (sem_a: SemCompActionT (cont regV) writeMap calls val)
-    : SemCompActionT (@CompRead type RegsT r k readMap lret cont) writeMap calls val
-  | SemCompRet lret (e: lret @# type) (newMap: RegsT)
-    : SemCompActionT (@CompRet type RegsT lret e newMap) newMap nil (evalExpr e)
-  | SemCompUpd (r: string) k (v: Expr type k) (writeMap: RegsT) lret (cont: RegsT -> CompActionT type RegsT lret)
-               writeMap calls val writeMap'
-               (sem_a: SemCompActionT (cont (doUpdRegs ((r, existT _ k (evalExpr v)) :: nil) writeMap)) writeMap' calls val)
-    : SemCompActionT (@CompUpd type RegsT r k v writeMap lret cont) writeMap' calls val
-  | SemCompLetFull k (a: CompActionT type RegsT k) lret (cont: type k -> RegsT -> CompActionT type RegsT lret)
-                   writeMapA callsA valA
-                   (sem_a: SemCompActionT a writeMapA callsA valA)
-                   writeMapCont callsCont valCont
-                   (sem_cont: SemCompActionT (cont valA writeMapA) writeMapCont callsCont valCont)
-    : SemCompActionT (@CompLetFull type RegsT k a lret cont) writeMapCont callsCont valCont.
+             regMap calls val
+             (HSemCompActionT: SemCompActionT (cont ret) regMap calls val):
+      SemCompActionT (@CompCall _ _ f argRetK pred arg lret cont) regMap
+                     ((f, existT _ argRetK (evalExpr arg, ret)) :: calls) val
+  | SemCompLetExpr k e lret cont
+                   regMap calls val
+                   (HSemCompActionT: SemCompActionT (cont (evalExpr e)) regMap calls val):
+      SemCompActionT (@CompLetExpr _ _ k e lret cont) regMap calls val
+  | SemCompNondet k lret cont
+                  ret regMap calls val
+                  (HSemCompActionT: SemCompActionT (cont ret) regMap calls val):
+      SemCompActionT (@CompNondet _ _ k lret cont) regMap calls val
+  | SemCompSys ls lret cont
+               regMap calls val
+               (HSemCompActionT: SemCompActionT cont regMap calls val):
+      SemCompActionT (@CompSys _ _ ls lret cont) regMap calls val
+  | SemCompRead r k readMap lret cont
+                regMap calls val regVal
+                updatedRegs
+                (HUpdatedRegs: UpdRegs (snd regMap :: nil) (fst regMap) updatedRegs)
+                (HIn: In (r, (existT _ k regVal)) updatedRegs)
+                (HSemCompActionT: SemCompActionT (cont regVal) regMap calls val):
+      SemCompActionT (@CompRead _ _ r k readMap lret cont) regMap calls val
+  | SemCompRet lret e regMap regMapVal
+               (HRegMap: SemRegMapExpr regMap regMapVal):
+      SemCompActionT (@CompRet _ _ lret e regMap) regMapVal nil (evalExpr e)
+  | SemCompLetFull k a lret cont
+                   regMap_a calls_a val_a
+                   (HSemCompActionT_a: SemCompActionT a regMap_a calls_a val_a)
+                   regMap_cont calls_cont val_cont
+                   (HSemCompActionT_cont: SemCompActionT (cont val_a regMap_a) regMap_cont calls_cont val_cont):
+      SemCompActionT (@CompLetFull _ _ k a lret cont) regMap_cont (calls_a ++ calls_cont) val_cont.
 End Semantics.
 
 Fixpoint actions_to_rules (acts : list (Action Void)) (n : string) : list RuleT :=
@@ -140,6 +170,7 @@ Fixpoint getExecs (ll : list (list FullLabel)) : list RuleOrMeth :=
   end.
 
 
+(*
 Lemma TraceEquivOneAction k (a : ActionT type k) (o : RegsT) (newRegs: RegsT) (retl : type k):
   forall calls readRegs, 
   SemAction o a readRegs newRegs calls retl ->
@@ -168,3 +199,4 @@ Proof.
       admit.
     }
 Admitted.
+*)
