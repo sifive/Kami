@@ -36,31 +36,31 @@ struct_field_access fieldName v =
         Just v' -> v'
         _ -> error $ "Field " ++ fieldName ++ " not found." ++ show v
 
--- randVal :: T.Kind -> IO Val
--- randVal T.Bool = do
---     k <- randomRIO (0,1)
---     return $ BoolVal $ k == (1 :: Int)
--- randVal (T.Bit n) = do
---     k <- randomRIO ((0 :: Integer), 2^n - 1)
---     return $ BVVal $ BV.bitVec n k
--- randVal (T.Struct n ks names) = do
---     let ks' = map ks (T.getFins n)
---     let names' = map names (T.getFins n)
---     vs <- mapM randVal ks'
---     return $ StructVal $ zip names' vs
--- randVal (T.Array n k) = do
---     vs <- V.mapM randVal (V.replicate n k)
---     return $ ArrayVal vs
-
-zeroVal :: T.Kind -> Val
-zeroVal T.Bool = BoolVal False
-zeroVal (T.Bit n) = BVVal $ BV.zeros n
-zeroVal (T.Struct n kinds names) = StructVal $ map (\i -> (names i, zeroVal $ kinds i)) $ T.getFins n
-zeroVal (T.Array n k) = ArrayVal $ (V.replicate n $ zeroVal k)
-
---for debugging purposes
 randVal :: T.Kind -> IO Val
-randVal = pure . zeroVal
+randVal T.Bool = do
+    k <- randomRIO (0,1)
+    return $ BoolVal $ k == (1 :: Int)
+randVal (T.Bit n) = do
+    k <- randomRIO ((0 :: Integer), 2^n - 1)
+    return $ BVVal $ BV.bitVec n k
+randVal (T.Struct n ks names) = do
+    let ks' = map ks (T.getFins n)
+    let names' = map names (T.getFins n)
+    vs <- mapM randVal ks'
+    return $ StructVal $ zip names' vs
+randVal (T.Array n k) = do
+    vs <- V.mapM randVal (V.replicate n k)
+    return $ ArrayVal vs
+
+-- -- for debugging purposes
+-- zeroVal :: T.Kind -> Val
+-- zeroVal T.Bool = BoolVal False
+-- zeroVal (T.Bit n) = BVVal $ BV.zeros n
+-- zeroVal (T.Struct n kinds names) = StructVal $ map (\i -> (names i, zeroVal $ kinds i)) $ T.getFins n
+-- zeroVal (T.Array n k) = ArrayVal $ (V.replicate n $ zeroVal k)
+
+-- randVal :: T.Kind -> IO Val
+-- randVal = pure . zeroVal
 
 randVal_FK :: T.FullKind -> IO Val
 randVal_FK (T.SyntaxKind k) = randVal k

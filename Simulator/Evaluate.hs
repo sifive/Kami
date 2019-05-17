@@ -59,12 +59,12 @@ instance Eval T.BinBitOp (BV.BV -> BV.BV -> BV.BV) where
     eval (T.Sra m n) = BV.ashr
     eval (T.Concat _ _) = (BV.#)
 
-instance Eval T.CABitOp ([BV.BV] -> BV.BV) where
-    eval T.Add = foldr (+) 0
-    eval T.Mul = foldr (*) 0
-    eval T.Band = BV.and
-    eval T.Bor = BV.or
-    eval T.Bxor = foldr1 xor
+instance Eval T.CABitOp (Int -> [BV.BV] -> BV.BV) where
+    eval T.Add _ = foldr (+) 0
+    eval T.Mul _ = foldr (*) 1
+    eval T.Band n = foldr (.&.) $ BV.ones n
+    eval T.Bor n = foldr (.|.) $ BV.zeros n
+    eval T.Bxor n = foldr xor $ BV.zeros n
 
 instance Eval (T.Expr ty) Val where
     eval (T.Var (T.SyntaxKind _) x) = unsafeCoerce x
@@ -73,7 +73,7 @@ instance Eval (T.Expr ty) Val where
     eval (T.UniBool o e) = BoolVal $ eval o $ boolCoerce $ eval e
     eval (T.CABool o es) = BoolVal $ eval o $ map (boolCoerce . eval) es
     eval (T.UniBit m n o e) = BVVal $ eval o $ bvCoerce $ eval e
-    eval (T.CABit _ o es) = BVVal $ eval o $ map (bvCoerce . eval) es
+    eval (T.CABit n o es) = BVVal $ eval o n $ map (bvCoerce . eval) es
     eval (T.BinBit _ _ _ o e1 e2) = BVVal $ eval o (bvCoerce $ eval e1) (bvCoerce $ eval e2)
     eval (T.BinBitBool _ _ _ e1 e2) = BoolVal $ (bvCoerce $ eval e1) BV.<. (bvCoerce $ eval e2) --only works a.t.m. because there is only one BinBitBoolOp
     eval (T.ITE _ e1 e2 e3) = if (boolCoerce $ eval e1) then eval e2 else eval e3
