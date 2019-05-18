@@ -29,16 +29,16 @@ instance Show T.FullFormat where
     show (T.FBool _ _) = "Bool"
     show (T.FBit n _ _) = "(Bit " ++ show n ++ ")"
     show (T.FArray n k _) = "(Array " ++ show n ++ " " ++ show k ++ ")"
-    show (T.FStruct n fk fs _) = "(Struct " ++ "{" ++ (concat $ intersperse "; " $ 
+    show (T.FStruct n fk fs _) = "(Struct " ++ "{ " ++ (concat $ intersperse "; " $ 
         map (\i-> fs i ++ ":" ++ show (fk i)) (T.getFins n)) ++ "})"
 
 printVal :: T.FullFormat -> Val -> String
 printVal (T.FBool n bf) (BoolVal b) = space_pad n (if b then "1" else "0")
 printVal (T.FBit n m bf) (BVVal bs) = space_pad m $ printNum bf bs
 printVal (T.FStruct n _ names ffs) (StructVal fields) = "{ " ++ (concat $ 
-    zipWith (\(name,val) ff -> name ++ ": " ++ (printVal ff val) ++ "; ") fields (map ffs (T.getFins n))
+    zipWith (\(name,val) ff -> name ++ ":" ++ (printVal ff val) ++ "; ") fields (map ffs (T.getFins n))
     ) ++ "}"
-printVal (T.FArray n k ff) (ArrayVal vals) = "[ " ++ (concat (zipWith (\i v -> show i ++ ": " ++ printVal ff v ++ "; ") [0..((length vals)-1)] (V.toList vals))) ++ "]"
+printVal (T.FArray n k ff) (ArrayVal vals) = "[ " ++ (concat (zipWith (\i v -> show i ++ "=" ++ printVal ff v ++ "; ") [0..((length vals)-1)] (V.toList vals))) ++ "]"
 printVal ff v = error $ "Cannot print expression " ++ (show v) ++ " with FullFormat " ++ (show ff) ++ "."
 
 printNum :: T.BitFormat -> BV.BitVector -> String
