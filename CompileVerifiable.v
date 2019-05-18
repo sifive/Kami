@@ -1,4 +1,4 @@
-Require Import Syntax StateMonad.
+Require Import Syntax StateMonad Properties.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
@@ -8,13 +8,6 @@ Section Compile.
   Variable regMapTy: Type.
 
   Notation NameVal := (string * {k: FullKind & Expr ty k})%type.
-  
-  Definition RegUpd := ((Bool @# ty) * NameVal)%type.
-  Notation RegUpds := (list RegUpd).
-
-  Definition RegState := (list NameVal).
-
-  Definition RegMapTy := (RegState * RegUpds)%type.
   
   Inductive RegMapExpr: Type :=
   | VarRegMap (v: regMapTy): RegMapExpr
@@ -79,7 +72,7 @@ Section Compile.
 End Compile.
 
 Section Semantics.
-  Local Notation UpdRegsT := RegsT.
+  Local Notation UpdRegsT := (list RegsT).
 
   Local Notation RegMapType := (RegsT * UpdRegsT)%type.
 
@@ -90,25 +83,37 @@ Section Semantics.
                      (PredTrue: evalExpr pred = true)
                      old upds
                      (HSemRegMap: SemRegMapExpr regMap (old, upds)):
-      SemRegMapExpr (@UpdRegMap _ _ r pred k val regMap) (old, (r, existT _ k (evalExpr val)) :: upds)
+      SemRegMapExpr (@UpdRegMap _ _ r pred k val regMap) (old, match upds with
+                                                               | x :: xs => (x ++(r, existT _ k (evalExpr val))::nil) :: xs
+                                                               | nil => ((r, existT _ k (evalExpr val))::nil) :: nil
+                                                               end)
   | SemUpdRegMapFalse r (pred: Bool @# type) k val regMap
                       (PredTrue: evalExpr pred = false)
                       old upds
                       (HSemRegMap: SemRegMapExpr regMap (old, upds)):
       SemRegMapExpr (@UpdRegMap _ _ r pred k val regMap) (old, upds)
   | SemCompactRegMap old upds regMap (HSemRegMap: SemRegMapExpr regMap (old, upds)) newMap
-                     (HUpdRegs: UpdRegs (upds :: nil) old newMap):
+                     (HUpdRegs: UpdRegs upds old newMap):
       SemRegMapExpr (@CompactRegMap _ _ regMap) (newMap, nil).
-  
+
   Inductive SemCompActionT: forall k, CompActionT type RegMapType k -> RegMapType ->  MethsT -> type k -> Prop :=
-  | SemCompCall (f: string) (argRetK: Kind * Kind) (pred: Bool @# type)
+  | SemCompCallTrue (f: string) (argRetK: Kind * Kind) (pred: Bool @# type)
              (arg: fst argRetK @# type)
              lret (cont: type (snd argRetK) -> CompActionT _ _ lret)
              (ret: type (snd argRetK))
              regMap calls val
-             (HSemCompActionT: SemCompActionT (cont ret) regMap calls val):
+             (HSemCompActionT: SemCompActionT (cont ret) regMap calls val)
+             (HPred : evalExpr pred = true):
       SemCompActionT (@CompCall _ _ f argRetK pred arg lret cont) regMap
                      ((f, existT _ argRetK (evalExpr arg, ret)) :: calls) val
+  | SemCompCallFalse (f: string) (argRetK: Kind * Kind) (pred: Bool @# type)
+             (arg: fst argRetK @# type)
+             lret (cont: type (snd argRetK) -> CompActionT _ _ lret)
+             (ret: type (snd argRetK))
+             regMap calls val
+             (HSemCompActionT: SemCompActionT (cont ret) regMap calls val)
+             (HPred : evalExpr pred = false):
+      SemCompActionT (@CompCall _ _ f argRetK pred arg lret cont) regMap calls val
   | SemCompLetExpr k e lret cont
                    regMap calls val
                    (HSemCompActionT: SemCompActionT (cont (evalExpr e)) regMap calls val):
@@ -123,8 +128,9 @@ Section Semantics.
       SemCompActionT (@CompSys _ _ ls lret cont) regMap calls val
   | SemCompRead r k readMap lret cont
                 regMap calls val regVal
-                updatedRegs
-                (HUpdatedRegs: UpdRegs (snd regMap :: nil) (fst regMap) updatedRegs)
+                updatedRegs readMapValOld readMapValUpds
+                (HReadMap: SemRegMapExpr readMap (readMapValOld, readMapValUpds))
+                (HUpdatedRegs: UpdRegs readMapValUpds readMapValOld updatedRegs)
                 (HIn: In (r, (existT _ k regVal)) updatedRegs)
                 (HSemCompActionT: SemCompActionT (cont regVal) regMap calls val):
       SemCompActionT (@CompRead _ _ r k readMap lret cont) regMap calls val
@@ -139,43 +145,146 @@ Section Semantics.
       SemCompActionT (@CompLetFull _ _ k a lret cont) regMap_cont (calls_a ++ calls_cont) val_cont.
 End Semantics.
 
-Fixpoint actions_to_rules (acts : list (Action Void)) (n : string) : list RuleT :=
-  match acts with
-  | nil => nil
-  | a :: al => (n, a) :: actions_to_rules al (n++n)
-  end.
+Lemma getKindAttr_fst {A B : Type} {P : B -> Type}  {Q : B -> Type} (l1 : list (A * {x : B & P x})):
+  forall  (l2 : list (A * {x : B & Q x})),
+    getKindAttr l1 = getKindAttr l2 ->
+    (map fst l1) = (map fst l2).
+Proof.
+  induction l1, l2; intros; auto.
+  - simpl in *.
+    inv H.
+  - simpl in *.
+    inv H.
+  - simpl in *.
+    inv H.
+    erewrite IHl1; eauto.
+Qed.
 
-Definition actions_to_module (o : list RegInitT) (acts : list (Action Void)) (n : string): BaseModule :=
-  BaseMod o (actions_to_rules acts n) nil.
+Lemma SemRegExprVals expr1 :
+  forall v1 v2 v3 v4 (noDupOld1 : NoDup (map fst v1)) (noDupOld2 : NoDup (map fst v3)),
+  SemRegMapExpr expr1 (v1, v2) ->
+  SemRegMapExpr expr1 (v3, v4) ->
+  v1 = v3 /\ v2 = v4.
+Proof.
+  induction expr1; intros.
+  - inv H; inv H0; auto.
+  - inv H; inv H0; EqDep_subst; split; auto. (* specialize (IHexpr1 _ _ _ _ HSemRegMap HSemRegMap0); dest; subst; auto *)
+    + specialize (IHexpr1 _ _ _ _ noDupOld1 noDupOld2 HSemRegMap HSemRegMap0); dest; auto.
+    + specialize (IHexpr1 _ _ _ _ noDupOld1 noDupOld2 HSemRegMap HSemRegMap0); dest; subst; auto.
+    + specialize (IHexpr1 _ _ _ _ noDupOld1 noDupOld2 HSemRegMap HSemRegMap0); dest; auto.
+    + rewrite PredTrue0 in PredTrue; discriminate.
+    + rewrite PredTrue0 in PredTrue; discriminate.
+    + rewrite PredTrue0 in PredTrue; discriminate.
+    + specialize (IHexpr1 _ _ _ _ noDupOld1 noDupOld2 HSemRegMap HSemRegMap0); dest; auto.
+    + specialize (IHexpr1 _ _ _ _ noDupOld1 noDupOld2 HSemRegMap HSemRegMap0); dest; auto.
+  - inv H; inv H0; split; auto.
+    specialize (HUpdRegs) as P1.
+    specialize (HUpdRegs0) as P2.
+    inv HUpdRegs; dest.
+    specialize (getKindAttr_fst old v1 H) as P0.
+    setoid_rewrite <- P0 in noDupOld1.
+    inv HUpdRegs0; dest.
+    specialize (getKindAttr_fst old0 v3 H1) as P3.
+    setoid_rewrite <- P3 in noDupOld2.
+    specialize (IHexpr1 _ _ _ _ noDupOld1 noDupOld2 HSemRegMap HSemRegMap0); dest.
+    rewrite H3, H4 in *.
+    specialize (NoDup_UpdRegs noDupOld1).
+    admit.
+Admitted.
 
-Fixpoint getMethsFullLabel (l : list FullLabel) : MethsT :=
-  match l with
-  | nil => nil
-  | a :: a' => (snd (snd a) ++ getMethsFullLabel a')%list
- end.
+Lemma EquivWrites (k : Kind) (a : ActionT type k):
+  forall o calls retl expr1 expr2 v v' (bexpr : Bool @# type),
+    SemRegMapExpr expr1 v ->
+    SemRegMapExpr expr2 v ->
+    SemCompActionT (compileAction o a bexpr expr1) v' calls retl ->
+    SemCompActionT (compileAction o a bexpr expr2) v' calls retl.
+Proof.
+  Admitted.
+  (*
+  induction a; intros; simpl in *; eauto.
+  - inv H2; EqDep_subst; econstructor; eauto.
+  - inv H2; EqDep_subst; econstructor; eauto.
+  - inv H2; EqDep_subst; econstructor; eauto.
+  - inv H2; EqDep_subst; econstructor; eauto.
+  - inv H2; EqDep_subst; econstructor; eauto.
+  - remember (evalExpr bexpr) as P1.
+    destruct P1.
+    + destruct v as [r0 r1].
+      eapply IHa with (v:=(r0, r1++(r, existT _ k (evalExpr e))::nil)) (expr1 := UpdRegMap r bexpr e expr1); eauto.
+      * econstructor; eauto.
+      * econstructor; eauto.
+    + destruct v as [r0 r1].
+      eapply IHa with (v:=(r0, r1)) (expr1 := UpdRegMap r bexpr e expr1); eauto.
+      * econstructor; eauto.
+      * econstructor; eauto.
+  - inv H2; EqDep_subst.
+    inv HSemCompActionT_cont; EqDep_subst.
+    econstructor; eauto.
+    econstructor; eauto.
+  - inv H1; EqDep_subst; econstructor; eauto.
+  - inv H1; EqDep_subst.
+    econstructor.
+    admit.
+Admitted.
+    
+    
+Lemma UpdRegs_same_nil o :
+  UpdRegs (nil::nil) o o.
+Proof.
+  unfold UpdRegs.
+  repeat split; auto.
+  intros.
+  right; unfold not; split; intros; dest; auto.
+  destruct H0; subst; auto.
+Qed.
 
-Fixpoint getMeths (ll : list (list FullLabel)) :  MethsT :=
-  match ll with
-  | nil => nil
-  | l :: lt => (getMethsFullLabel l ++ getMeths lt)%list
-  end.
-
-Fixpoint getExecsFullLabel (l : list FullLabel) : list RuleOrMeth :=
-  match l with
-  | nil => nil
-  | l :: lt => fst (snd l) :: getExecsFullLabel lt
-  end.
-
-Fixpoint getExecs (ll : list (list FullLabel)) : list RuleOrMeth :=
-  match ll with
-  | nil => nil
-  | l :: lt => (getExecsFullLabel l ++ getExecs lt)%list
-  end.
-
-Notation createBaseMod regs actions := (BaseMod regs (rules nil).
-
-
-(*
+Lemma EquivActions k (a : ActionT type k):
+  forall o readRegs newRegs calls retl v regMapExpr o',
+    SemRegMapExpr (VarRegMap _ (o, v)) o' ->
+    SemRegMapExpr regMapExpr o' ->
+    SemAction o a readRegs newRegs calls retl ->
+    SemCompActionT (compileAction (o, nil) a (Const type true) regMapExpr) (o, v++newRegs) calls retl.
+Proof.
+  induction a; intros; simpl in *.
+  - apply inversionSemAction in H2; dest; subst.
+    econstructor 1; eauto.
+  - apply inversionSemAction in H2; dest; subst.
+    econstructor 3; eauto.
+  - apply inversionSemAction in H2; dest; subst.
+    inv H0; simpl in *.
+    eapply IHa in H3; econstructor; eauto.
+    
+    + econstructor 8; eauto.
+      eapply H with (v:= v++x0) in H4.
+      rewrite <- app_assoc in H4; assumption.
+  - apply inversionSemAction in H0; dest.
+    eapply H in H0.
+    econstructor 3; eauto.
+  - apply inversionSemAction in H0; dest; subst.
+    econstructor 5 with (readMapValOld := o) (readMapValUpds := nil); simpl; eauto.
+    + constructor.
+    + apply UpdRegs_same_nil.
+  - apply inversionSemAction in H; dest; subst.
+    eapply IHa with (v:= v ++ (r, existT (fullType type) k (evalExpr e))::nil) in H1.
+    rewrite <- app_assoc in H1.
+    simpl in H1.
+    
+    admit.
+  - apply inversionSemAction in H0; dest; subst.
+    remember (evalExpr e) as b1.
+    destruct b1; dest; subst.
+    + econstructor 7.
+      * eapply IHa1 in H1.
+        admit.
+      * admit.
+    + econstructor 7.
+      * eapply IHa2 in H1.
+        eapply H in H2.
+        admit.
+      * eapply IHa2 in H1.
+        eapply H in H2.
+        
+    (*
 Lemma TraceEquivOneAction k (a : ActionT type k) (o : RegsT) (newRegs: RegsT) (retl : type k):
   forall calls readRegs, 
   SemAction o a readRegs newRegs calls retl ->
@@ -204,4 +313,5 @@ Proof.
       admit.
     }
 Admitted.
+*)
 *)
