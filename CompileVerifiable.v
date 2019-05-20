@@ -72,10 +72,34 @@ Section Compile.
 End Compile.
 
 Section Semantics.
-  Local Notation UpdRegsT := (list RegsT).
+  Local Notation UpdRegT := RegsT.
+  Local Notation UpdRegsT := (list UpdRegT).
 
   Local Notation RegMapType := (RegsT * UpdRegsT)%type.
 
+  Section PriorityUpds.
+    Variable o: RegsT.
+    Inductive PriorityUpds: UpdRegsT -> RegsT -> Prop :=
+    | NoUpds: PriorityUpds nil o
+    | ConsUpds (upds: UpdRegsT) (prevUpds: UpdRegsT) (prevRegs: RegsT)
+               (prevCorrect: PriorityUpds prevUpds prevRegs)
+               (* (prevSameKey: getKindAttr o = getKindAttr prevRegs) *)
+               (u: UpdRegT)
+               (curr: RegsT)
+               (currRegsTCurr: getKindAttr o = getKindAttr curr)
+               (Hcurr: forall s v, In (s, v) curr -> In (s, v) u \/ ((~ In s (map fst u)) /\ In (s, v) prevRegs))
+               fullU
+               (HFullU: fullU = u :: prevUpds):
+        PriorityUpds fullU curr.
+
+    Lemma prevPrevRegsTrue u prevUpds curr (currPriority: PriorityUpds (u :: prevUpds) curr):
+      forall prev, PriorityUpds prevUpds prev -> getKindAttr o = getKindAttr prev.
+    Proof.
+      induction currPriority; simpl; auto; intros.
+      inversion H; auto.
+    Qed.
+  End PriorityUpds.
+    
   Inductive SemRegMapExpr: (RegMapExpr type RegMapType) -> RegMapType -> Prop :=
   | SemVarRegMap v:
       SemRegMapExpr (VarRegMap _ v) (fst v, snd v)
@@ -93,7 +117,7 @@ Section Semantics.
                       (HSemRegMap: SemRegMapExpr regMap (old, upds)):
       SemRegMapExpr (@UpdRegMap _ _ r pred k val regMap) (old, upds)
   | SemCompactRegMap old upds regMap (HSemRegMap: SemRegMapExpr regMap (old, upds)) newMap
-                     (HUpdRegs: UpdRegs upds old newMap):
+                     (HUpdRegs: PriorityUpds old upds newMap):
       SemRegMapExpr (@CompactRegMap _ _ regMap) (newMap, nil).
 
   Inductive SemCompActionT: forall k, CompActionT type RegMapType k -> RegMapType ->  MethsT -> type k -> Prop :=
@@ -130,7 +154,7 @@ Section Semantics.
                 regMap calls val regVal
                 updatedRegs readMapValOld readMapValUpds
                 (HReadMap: SemRegMapExpr readMap (readMapValOld, readMapValUpds))
-                (HUpdatedRegs: UpdRegs readMapValUpds readMapValOld updatedRegs)
+                (HUpdatedRegs: PriorityUpds readMapValOld readMapValUpds updatedRegs)
                 (HIn: In (r, (existT _ k regVal)) updatedRegs)
                 (HSemCompActionT: SemCompActionT (cont regVal) regMap calls val):
       SemCompActionT (@CompRead _ _ r k readMap lret cont) regMap calls val
@@ -181,14 +205,6 @@ Proof.
     specialize (HUpdRegs) as P1.
     specialize (HUpdRegs0) as P2.
     inv HUpdRegs; dest.
-    specialize (getKindAttr_fst old v1 H) as P0.
-    setoid_rewrite <- P0 in noDupOld1.
-    inv HUpdRegs0; dest.
-    specialize (getKindAttr_fst old0 v3 H1) as P3.
-    setoid_rewrite <- P3 in noDupOld2.
-    specialize (IHexpr1 _ _ _ _ noDupOld1 noDupOld2 HSemRegMap HSemRegMap0); dest.
-    rewrite H3, H4 in *.
-    specialize (NoDup_UpdRegs noDupOld1).
     admit.
 Admitted.
 
@@ -199,8 +215,8 @@ Lemma EquivWrites (k : Kind) (a : ActionT type k):
     SemCompActionT (compileAction o a bexpr expr1) v' calls retl ->
     SemCompActionT (compileAction o a bexpr expr2) v' calls retl.
 Proof.
-  Admitted.
-  (*
+Admitted.
+(*
   induction a; intros; simpl in *; eauto.
   - inv H2; EqDep_subst; econstructor; eauto.
   - inv H2; EqDep_subst; econstructor; eauto.
@@ -226,7 +242,7 @@ Proof.
     econstructor.
     admit.
 Admitted.
-    
+*)    
     
 Lemma UpdRegs_same_nil o :
   UpdRegs (nil::nil) o o.
@@ -243,7 +259,7 @@ Lemma EquivActions k (a : ActionT type k):
     SemRegMapExpr (VarRegMap _ (o, v)) o' ->
     SemRegMapExpr regMapExpr o' ->
     SemAction o a readRegs newRegs calls retl ->
-    SemCompActionT (compileAction (o, nil) a (Const type true) regMapExpr) (o, v++newRegs) calls retl.
+    SemCompActionT (compileAction (o, nil) a (Const type true) regMapExpr) (o, newRegs::v) calls retl.
 Proof.
   induction a; intros; simpl in *.
   - apply inversionSemAction in H2; dest; subst.
@@ -251,9 +267,16 @@ Proof.
   - apply inversionSemAction in H2; dest; subst.
     econstructor 3; eauto.
   - apply inversionSemAction in H2; dest; subst.
+    specialize H0 as smth.
     inv H0; simpl in *.
     eapply IHa in H3; econstructor; eauto.
-    
+    + apply (EquivWrites a (o, nil) (Const type true) smth (calls := x1) (retl := x5) (expr2 := regMapExpr) (v' := (o, x0::v))); eauto.
+    + eapply H in H4.
+      admit.
+      admit.
+      admit.
+Admitted.
+(*
     + econstructor 8; eauto.
       eapply H with (v:= v++x0) in H4.
       rewrite <- app_assoc in H4; assumption.
@@ -283,7 +306,7 @@ Proof.
         admit.
       * eapply IHa2 in H1.
         eapply H in H2.
-        
+*)        
     (*
 Lemma TraceEquivOneAction k (a : ActionT type k) (o : RegsT) (newRegs: RegsT) (retl : type k):
   forall calls readRegs, 
@@ -313,5 +336,4 @@ Proof.
       admit.
     }
 Admitted.
-*)
 *)
