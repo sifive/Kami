@@ -57,9 +57,6 @@ Proof.
   - exists x, x0, x1.
     repeat split; auto.
     econstructor; eauto.
-  - exists x, x0, x1.
-    repeat split; auto.
-    econstructor; eauto.
   - exists nil, nil, nil.
     repeat split; subst; auto.
     econstructor; eauto.
@@ -81,7 +78,6 @@ Proof.
   - econstructor 8; eauto.
   - econstructor 9; eauto.
   - econstructor 10; eauto.
-  - econstructor 11; eauto.
 Qed.
 
 Lemma key_in_split' : forall (A B C : Type)(l : list (A*B))(x : (A*C)),
@@ -200,7 +196,6 @@ Section PSemAction_rewrites.
     - econstructor 8; eauto.
     - econstructor 9; eauto.
     - econstructor 10; eauto.
-    - econstructor 11; eauto.
   Qed.
 
   Lemma PSemAction_rewrite_calls readRegs newRegs calls1 calls2 o:
@@ -223,7 +218,6 @@ Section PSemAction_rewrites.
       rewrite <- H; assumption.
     - econstructor 9; eauto.
     - econstructor 10; eauto.
-    - econstructor 11; eauto.
       rewrite HCalls in H; apply (Permutation_nil H).
   Qed.
 
@@ -257,7 +251,6 @@ Section PSemAction_rewrites.
       rewrite <- H; assumption.
     - econstructor 9; eauto.
     - econstructor 10; eauto.
-    - econstructor 11; eauto.
       rewrite HReadRegs in H; apply (Permutation_nil H).
   Qed.
 
@@ -281,7 +274,6 @@ Section PSemAction_rewrites.
       rewrite <- H; assumption.
     - econstructor 9; eauto.
     - econstructor 10; eauto.
-    - econstructor 11; eauto.
       rewrite HNewRegs in H; apply (Permutation_nil H).
   Qed.
   
@@ -1684,9 +1676,7 @@ Lemma WfActionT_PSemAction : forall (k : Kind)(a : ActionT type k)(retl : type k
     econstructor 8; eauto.
   - intros TMP1 TMP2; specialize (IHPSemAction H4 o1 TMP1 TMP2).
     econstructor 9; eauto.
-  - intros TMP1 TMP2; specialize (IHPSemAction H4 o1 TMP1 TMP2).
-    econstructor 10; eauto.
-  - intros; econstructor 11; eauto.
+  - intros; econstructor 10; eauto.
 Qed.
 
 Lemma papp_sublist_l : forall {A : Type} (l1 l2 l : list A),
@@ -2203,7 +2193,6 @@ Proof.
       try eapply IHa1; eauto; eapply IHa2; eauto.
   - intros; split; econstructor 8; eauto; inv H; EqDep_subst; eapply IHa; eauto.
   - intros; split; econstructor 9; eauto; inv H; EqDep_subst; eapply IHa; eauto.
-  - intros; split; econstructor 10.
 Qed.
 
 Lemma WfConcatMerge m1 m2 (k : Kind) (a : ActionT type k) :
@@ -2222,7 +2211,6 @@ Proof.
   - econstructor 7; inv H0; inv H1; EqDep_subst; intros; try eapply H, IHa1, IHa2; eauto.
   - econstructor 8; inv H; inv H0; EqDep_subst; eapply IHa; eauto.
   - econstructor 9; inv H; inv H0; EqDep_subst; eapply IHa; eauto.
-  - econstructor 10.
 Qed.
     
 

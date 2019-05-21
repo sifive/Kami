@@ -20,7 +20,6 @@ Section NeverCallBaseModule.
   | NeverCallReadReg r k lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (ReadReg r k c)
   | NeverCallWriteReg r k (e: Expr type k) lretT c: NeverCallActionT c  -> @NeverCallActionT lretT (WriteReg r e c)
   | NeverCallIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, NeverCallActionT (c v)) -> NeverCallActionT atrue -> NeverCallActionT afalse -> @NeverCallActionT lretT (IfElse p atrue afalse c)
-  | NeverCallAssertion (e: Expr type (SyntaxKind Bool)) lretT c: NeverCallActionT c -> @NeverCallActionT lretT (Assertion e c)
   | NeverCallSys ls lretT c: NeverCallActionT c -> @NeverCallActionT lretT (Sys ls c)
   | NeverCallReturn lretT e: @NeverCallActionT lretT (Return e).
 
@@ -680,7 +679,6 @@ Proof.
       intro; apply H1; rewrite HUCalls, map_app, in_app_iff;[left|right]; assumption.
   - econstructor 9; eauto.
   - econstructor 10; eauto.
-  - econstructor 11; eauto.
 Qed.
 
 Inductive PSemAction_meth_collector (f : DefMethT) (o : RegsT) : RegsT -> RegsT -> MethsT -> MethsT -> Prop :=
@@ -1187,13 +1185,11 @@ Proof.
   - inv H; EqDep_subst.
     econstructor 9; eauto.
   - inv H; EqDep_subst.
-    econstructor 10; eauto.
-  - inv H; EqDep_subst.
     apply app_eq_nil in HCalls; dest; subst.
     inv H2; simpl in *.
-    + econstructor 11; eauto.
+    + econstructor 10; eauto.
     + apply Permutation_nil in H7; discriminate.
-Qed.  
+Qed.
 
 Lemma Substeps_permutation_invariant m o l l' :
   l [=] l' ->
@@ -5195,10 +5191,6 @@ Proof.
            apply Permutation_app_head.
            repeat rewrite app_assoc.
            apply Permutation_app_tail, Permutation_app_comm.
-  - inv H; EqDep_subst.
-    specialize (IHa _ _ _ _ HPSemAction); dest.
-    exists x, x0, x1, x2, x3, x4, x5; repeat split; auto.
-    econstructor; eauto.
   - inv H; EqDep_subst.
     specialize (IHa _ _ _ _ HPSemAction); dest.
     exists x, x0, x1, x2, x3, x4, x5; repeat split; auto.

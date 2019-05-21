@@ -116,12 +116,6 @@ Section Semantics.
       (HUNewRegs: unewRegs [=] newRegs1 ++ newRegs2)
       (HUCalls: ucalls [=] calls1 ++ calls2):
       PSemAction (IfElse p a a' cont) ureadRegs unewRegs ucalls r2
-  | PSemAssertTrue
-      (p: Expr type (SyntaxKind Bool)) k2
-      (cont: ActionT type k2) readRegs2 newRegs2 calls2 (r2: type k2)
-      (HTrue: evalExpr p = true)
-      (HPSemAction: PSemAction cont readRegs2 newRegs2 calls2 r2):
-      PSemAction (Assertion p cont) readRegs2 newRegs2 calls2 r2
   | PSemDisplay
       (ls: list (SysT type)) k (cont: ActionT type k)
       r readRegs newRegs calls
@@ -394,9 +388,6 @@ Section InverseSemAction.
         news = news1 ++ news2 /\
         calls = calls1 ++ calls2
       end
-    | Assertion e c =>
-      SemAction o c reads news calls retC /\
-      evalExpr e = true
     | Sys _ c =>
       SemAction o c reads news calls retC
     | Return e =>
@@ -3006,9 +2997,7 @@ Lemma WfActionT_SemAction : forall (k : Kind)(a : ActionT type k)(retl : type k)
     econstructor 8; eauto.
   - intros TMP1 TMP2; specialize (IHSemAction H4 o1 TMP1 TMP2).
     econstructor 9; eauto.
-  - intros TMP1 TMP2; specialize (IHSemAction H4 o1 TMP1 TMP2).
-    econstructor 10; eauto.
-  - intros; econstructor 11; eauto.
+  - intros; econstructor 10; eauto.
 Qed.
 
 Lemma app_sublist_l : forall {A : Type} (l1 l2 l : list A),
@@ -4520,8 +4509,6 @@ Section LemmaNoSelfCall.
         specialize (H0 _ _ _ _ _ _ HSemAction _ H4).
         rewrite H0, IHNoCallActionT2.
         auto.
-    - inv H0; EqDep_subst; simpl in *.
-      eapply IHNoCallActionT; eauto.
     - inv H0; EqDep_subst; simpl in *.
       eapply IHNoCallActionT; eauto.
     - inv H; EqDep_subst; simpl in *.

@@ -215,13 +215,6 @@ Section Compile.
                              end |>))
       | _ => fun _ => ret defRtlExprs
       end expr
-    | Assertion pred cont =>
-      (do final <- convertActionToRtl cont retVar ;
-         let p := convertExprToRtl pred in
-         ret (final<| guard := (match guard final with
-                                | None => Some p
-                                | Some v => Some (p && v)%rtl_expr
-                                end) |>))
     | Sys ls cont =>
       (do final <- convertActionToRtl cont retVar ;
          ret (add systCalls final (RtlReadWire Bool (getActionGuard name), map getRtlDisp ls)))

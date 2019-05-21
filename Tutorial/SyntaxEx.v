@@ -212,19 +212,6 @@ Section exampleModule.
           nil);
         
         
-        (* One can also write an assert statement, which is like a when statement in haskell.
-          The entire rule's execution/firing is predicated on the assertion being true. *)
-        Assert #x15;
-        
-        (* All the assertions of a rule must be true for the rule to fire *)
-        Assert #x12;
-        
-        (* When an assertion is written inside an if-then-else statement,
-          then that assertion is active only when the corresponding predicate is true. For instance, *)
-        If (#x13 == $4)
-        then (Assert #x10; Retv);
-        (* Here, the firing of the rule requires x10 to be true only if x13 is 4 *)
-        
         LET x100: Void <- $$ WO;
         (* Void is literally Bit 0, and WO is the only way to create a value of type Bit 0 *)       
                

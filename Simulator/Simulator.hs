@@ -61,52 +61,46 @@ check_assertions act regs = isJust $ tryEval act where
     tryEval (T.Return e) = Just $ eval e
 
 simulate_action :: FileState -> [(String, Val -> IO Val)] -> T.ActionT Val -> M.Map String Val -> IO ([(String,Val)], [FileUpd] ,Val)
-simulate_action state meths act regs = sim act where
+simulate_action state meths act regs = sim act [] [] where
 
-    sim (T.MCall methName _ arg cont) = case rf_methcall state methName (eval arg) of
-        Just (Nothing,v) -> sim $ cont v
-        Just (Just u,v) -> do
-            (upd,fupd, v') <- sim $ cont v
-            return (upd, u:fupd, v')
+    sim (T.MCall methName _ arg cont) updates fupdates = case rf_methcall state methName (eval arg) of
+        Just (Nothing,v) -> sim (cont v) updates fupdates
+        Just (Just u,v) -> sim (cont v) updates (u:fupdates)
         Nothing -> case lookup methName meths of
             Nothing -> error ("Method " ++ methName ++ " not found.")
             Just f -> do
                 v <- f $ eval arg
-                sim $ cont v
+                sim (cont v) updates fupdates
 
-    sim (T.LetExpr _ e cont) = sim (cont $ unsafeCoerce $ (eval e :: Val))
+    sim (T.LetExpr _ e cont) updates fupdates = sim (cont $ unsafeCoerce $ (eval e :: Val)) updates fupdates
 
-    sim (T.LetAction _ a cont) = do
-        (upd, fupd, v) <- sim a
-        (upd', fupd', v') <- sim $ cont v
-        return (upd ++ upd', fupd ++ fupd', v')
+    sim (T.LetAction _ a cont) updates fupdates = do
+        (updates', fupdates', v) <- sim a updates fupdates
+        sim (cont v) updates' fupdates'
 
     --using a default val for now
-    sim (T.ReadNondet k cont) = sim $ cont $ unsafeCoerce $ defVal_FK k
+    sim (T.ReadNondet k cont) updates fupdates = sim (cont $ unsafeCoerce $ defVal_FK k) updates fupdates
 
-    sim (T.ReadReg regName _ cont) = case M.lookup regName regs of
+    sim (T.ReadReg regName _ cont) updates fupdates = case M.lookup regName regs of
         Nothing -> error ("Register " ++ regName ++ " not found.")
-        Just v -> sim $ cont $ unsafeCoerce v 
+        Just v -> sim (cont $ unsafeCoerce v) updates fupdates
 
-    sim (T.WriteReg regName _ e a) = case M.lookup regName regs of
+    sim (T.WriteReg regName _ e a) updates fupdates = case M.lookup regName regs of
         Nothing -> error ("Register " ++ regName ++ " not found.")
-        Just _ -> do
-            (upd,fupd,v) <- sim a
-            return ((regName,eval e):upd,fupd,v)
-
-    sim (T.IfElse e _ a1 a2 cont) = let a = if (boolCoerce $ eval e) then a1 else a2 in
+        Just _ -> sim a ((regName, eval e):updates) fupdates
+        
+    sim (T.IfElse e _ a1 a2 cont) updates fupdates = let a = if (boolCoerce $ eval e) then a1 else a2 in
         do
-            (upd,fupd,v) <- sim a
-            (upd',fupd',v') <- sim $ cont v
-            return (upd ++ upd', fupd ++ fupd', v')
+            (updates',fupdates',v) <- sim a updates fupdates
+            sim (cont v) updates' fupdates'
 
-    sim (T.Assertion e a) = if (boolCoerce $ eval e) then sim a else error "Assertion depends upon method return values."
+    sim (T.Assertion e a) updates fupdates = if (boolCoerce $ eval e) then sim a updates fupdates else error "Assertion depends upon method return values."
 
-    sim (T.Sys syss a) = do
+    sim (T.Sys syss a) updates fupdates = do
         execIOs $ map sysIO syss
-        sim a
+        sim a updates fupdates
 
-    sim (T.Return e) = return ([],[], eval e)
+    sim (T.Return e) updates fupdates = return (updates, fupdates, eval e)
 
 simulate_module :: Int -> ([T.RuleT] -> Str (IO T.RuleT)) -> [String] -> [(String, Val -> IO Val)] -> [T.RegFileBase] -> T.BaseModule -> IO (M.Map String Val)
 simulate_module _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."

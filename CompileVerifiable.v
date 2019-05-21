@@ -40,8 +40,6 @@ Section Compile.
         CompRet x writeMap
       | LetExpr k' expr cont => CompLetExpr expr (fun ret => @compileAction _ (cont ret) pred writeMap)
       | ReadNondet k' cont => CompNondet k' (fun ret => @compileAction _ (cont ret) pred writeMap)
-      | Assertion pred' cont =>
-        compileAction cont (pred && pred')%kami_expr writeMap
       | Sys ls cont => CompSys ls (compileAction cont pred writeMap)
       | ReadReg r k' cont =>
         @CompRead r k' (VarRegMap readMap) _ (fun v => @compileAction _ (cont v) pred writeMap)
