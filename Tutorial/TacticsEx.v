@@ -5,29 +5,28 @@ Section Named.
   Variable name: string.
   Local Notation "@^ x" := (name ++ "_" ++ x)%string (at level 0).
 
-  (* The implementation which keeps incrementing a counter in one rule and sends the value of the counter in the other *)
+  (* The implementation which keeps incrementing a counter in one step and sends the value of the counter in the other *)
   Definition IncrementerImpl :=
     MODULE {
       Register @^"counter" : Bit sz <- Default
       with Register @^"counter1" : Bit sz <- Default
       with Register @^"isSending" : Bool <- true
       
-      with Rule @^"send" :=
+      with Rule @^"send_and_inc" :=
       ( Read isSending: Bool <- @^"isSending" ;
-        Assert #isSending ;
-        Read counter: Bit sz <- @^"counter" ;
-        Call "counterVal"(#counter: _);
-        Write @^"isSending" <- !#isSending ;
-        Retv )
+        If #isSending
+        then (  
+          Read counter: Bit sz <- @^"counter" ;
+          Call "counterVal"(#counter: _);
+          Write @^"isSending" <- !#isSending ;
+          Retv)
+        else (
+          Read counter: Bit sz <- @^"counter" ;
+          Write @^"counter" <- #counter + $1;
+          Write @^"isSending" <- !#isSending ;
+          Retv );
+        Retv) }.
       
-      with Rule @^"inc" :=
-      ( Read isSending: Bool <- @^"isSending" ;
-        Assert !#isSending ;
-        Read counter: Bit sz <- @^"counter" ;
-        Write @^"counter" <- #counter + $1;
-        Write @^"isSending" <- !#isSending ;
-        Retv )
-      }.
 
   (* The specification which combines the two actions in one rule *)
   Definition IncrementerSpec :=
@@ -69,13 +68,13 @@ Section Named.
       the implementation are not combinable by automatically searching for at least one register with the two actions write to *)
     discharge_simulation Incrementer_invariant; discharge_CommonRegisterAuto.
     - simplify_simulatingRule @^"send_and_inc"; subst.
-      + rewrite (word0 x0); auto.
+      + rewrite (word0 x1); auto.
       + repeat discharge_string_dec.
         repeat (econstructor; eauto; simpl; subst).
         rewrite wzero_wplus; auto.
     - simplify_nilStep.
       econstructor; simpl; eauto; subst.
-      rewrite negb_true_iff in *; subst.
+      rewrite ?negb_true_iff in *; subst.
       rewrite wzero_wplus; simpl; auto.
   Qed.
 End Named.

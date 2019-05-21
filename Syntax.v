@@ -417,7 +417,6 @@ Section Phoas.
                                         ActionT k ->
                                         (ty k -> ActionT lretT) ->
                                         ActionT lretT
-  | Assertion: Expr (SyntaxKind Bool) -> ActionT lretT -> ActionT lretT
   | Sys: list SysT -> ActionT lretT -> ActionT lretT
   | Return: Expr (SyntaxKind lretT) -> ActionT lretT.
 
@@ -452,7 +451,7 @@ Definition RuleT := Attribute (Action Void).
 
 Inductive RegFileInitT (IdxNum: nat) (Data: Kind) :=
 | RFNonFile (init: option (ConstT Data))
-| RFFile (isAscii: bool) (isArg: bool) (file: string) (init: Fin.t IdxNum -> ConstT Data).
+| RFFile (isAscii: bool) (isArg: bool) (file: string) (offset size: nat) (init: Fin.t IdxNum -> ConstT Data).
 
 Record SyncRead := { readReqName : string ;
                      readResName : string ;
@@ -493,7 +492,7 @@ Definition getRegFileRegisters m :=
                                         | None => None
                                         | Some init' => Some (SyntaxConst (ConstArray (fun _ => init')))
                                         end
-                       | RFFile isAscii isArg file init => Some (SyntaxConst (ConstArray init))
+                       | RFFile isAscii isArg file offset size init => Some (SyntaxConst (ConstArray init))
                        end) :: match readers with
                                | Async _ => nil
                                | Sync isAddr read =>
@@ -703,7 +702,6 @@ Section WfBaseMod.
                                              @WfActionT lretT (WriteReg r e c)
   | WfIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, WfActionT (c v)) -> WfActionT atrue ->
                                                          WfActionT afalse -> @WfActionT lretT (IfElse p atrue afalse c)
-  | WfAssertion (e: Expr type (SyntaxKind Bool)) lretT c: WfActionT c -> @WfActionT lretT (Assertion e c)
   | WfSys ls lretT c: WfActionT c -> @WfActionT lretT (Sys ls c)
   | WfReturn lretT e: @WfActionT lretT (Return e).
 
@@ -731,8 +729,6 @@ Inductive WfConcatActionT : forall lretT, ActionT type lretT -> Mod -> Prop :=
 | WfConcatIfElse p k (atrue: ActionT type k) afalse lretT c m': (forall v, WfConcatActionT (c v) m') ->
                                                                 WfConcatActionT atrue m' -> WfConcatActionT afalse m' ->
                                                                 @WfConcatActionT lretT (IfElse p atrue afalse c) m'
-| WfConcatAssertion (e: Expr type (SyntaxKind Bool)) lretT c m': WfConcatActionT c m' ->
-                                                                 @WfConcatActionT lretT (Assertion e c) m'
 | WfConcatSys ls lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Sys ls c) m'
 | WfConcatReturn lretT e m': @WfConcatActionT lretT (Return e) m'.
 
@@ -785,7 +781,6 @@ Section NoCallActionT.
   | NoCallReadReg r k lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (ReadReg r k c)
   | NoCallWriteReg r k (e: Expr type k) lretT c: NoCallActionT c  -> @NoCallActionT lretT (WriteReg r e c)
   | NoCallIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, NoCallActionT (c v)) -> NoCallActionT atrue -> NoCallActionT afalse -> @NoCallActionT lretT (IfElse p atrue afalse c)
-  | NoCallAssertion (e: Expr type (SyntaxKind Bool)) lretT c: NoCallActionT c -> @NoCallActionT lretT (Assertion e c)
   | NoCallSys ls lretT c: NoCallActionT c -> @NoCallActionT lretT (Sys ls c)
   | NoCallReturn lretT e: @NoCallActionT lretT (Return e).
 End NoCallActionT.
@@ -1150,12 +1145,6 @@ Section Semantics.
       (HUNewRegs: unewRegs = newRegs1 ++ newRegs2)
       (HUCalls: ucalls = calls1 ++ calls2):
       SemAction (IfElse p a a' cont) ureadRegs unewRegs ucalls r2
-  | SemAssertTrue
-      (p: Expr type (SyntaxKind Bool)) k2
-      (cont: ActionT type k2) readRegs2 newRegs2 calls2 (r2: type k2)
-      (HTrue: evalExpr p = true)
-      (HSemAction: SemAction cont readRegs2 newRegs2 calls2 r2):
-      SemAction (Assertion p cont) readRegs2 newRegs2 calls2 r2
   | SemSys
       (ls: list (SysT type)) k (cont: ActionT type k)
       r readRegs newRegs calls
@@ -1473,7 +1462,6 @@ Fixpoint getCallsWithSign k (a: ActionT (fun _ => unit) k) :=
     end cont
   | WriteReg r k' expr cont =>
     getCallsWithSign cont
-  | Assertion pred cont => getCallsWithSign cont
   | Sys ls cont => getCallsWithSign cont
   | IfElse pred ktf t f cont =>
     getCallsWithSign t ++ getCallsWithSign f ++ getCallsWithSign (cont tt)
@@ -1521,7 +1509,6 @@ Fixpoint getRegWrites k (a: ActionT (fun _ => unit) k) :=
     end cont
   | WriteReg r k' expr cont =>
     (r, k') :: getRegWrites cont
-  | Assertion pred cont => getRegWrites cont
   | Sys ls cont => getRegWrites cont
   | IfElse pred ktf t f cont =>
     getRegWrites t ++ getRegWrites f ++ getRegWrites (cont tt)
@@ -1630,8 +1617,6 @@ Section inlineSingle.
       WriteReg r e (inlineSingle a)
     | IfElse p _ aT aF c =>
       IfElse p (inlineSingle aT) (inlineSingle aF) (fun ret => inlineSingle (c ret))
-    | Assertion e c =>
-      Assertion e (inlineSingle c)
     | Sys ls c =>
       Sys ls (inlineSingle c)
     | Return e =>
@@ -2047,16 +2032,12 @@ Notation "'If' cexpr 'then' tact 'else' fact ; cont " :=
 Notation "'If' cexpr 'then' tact ; cont" :=
   (IfElse cexpr%kami_expr tact (Return (Const _ Default)) (fun _ => cont))
     (at level 14, right associativity) : kami_action_scope.
-Notation "'Assert' expr ; cont " :=
-  (Assertion expr%kami_expr cont)
-    (at level 13, right associativity) : kami_action_scope.
 Notation "'System' sysexpr ; cont " :=
   (Sys sysexpr%kami_expr cont)
     (at level 13, right associativity) : kami_action_scope.
 Notation "'Ret' expr" :=
   (Return expr%kami_expr)%kami_expr (at level 13) : kami_action_scope.
 Notation "'Retv'" := (Return (Const _ (k := Void) Default)) : kami_action_scope.
-
 
 Delimit Scope kami_action_scope with kami_action.
 
