@@ -20,25 +20,15 @@ import System.Environment (getArgs)
 tt :: Val
 tt = BVVal BV.nil
 
-getPass :: Int -> IO Val
-getPass n = do
+getArgVal :: String -> Int -> IO Val
+getArgVal name n = do
     args <- getArgs
 
     let ps = catMaybes $ map (binary_split ':') args
 
-    case find (\(x,y) -> x == "pass") ps of
+    case find (\(x,y) -> x == name) ps of
         Just (_,y) -> return $ BVVal $ hex_to_bv n $ T.pack y
-        Nothing -> error "Pass address not supplied."
-
-getFail :: Int -> IO (Maybe Val)
-getFail n = do
-    args <- getArgs
-
-    let ps = catMaybes $ map (binary_split ':') args
-
-    case find (\(x,y) -> x == "fail") ps of
-        Just (_,y) -> return $ Just $ BVVal $ hex_to_bv n $ T.pack y
-        Nothing -> return Nothing
+        Nothing -> error $ "Argument value " ++ name ++ " not supplied."
 
 ppr_bin :: Kind -> Val -> String
 ppr_bin k = printVal $ H.fullFormatBinary k

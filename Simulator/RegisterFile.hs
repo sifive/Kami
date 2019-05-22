@@ -183,7 +183,7 @@ initialize_file args rfb state = do
                 vs <- mapM randVal $ V.replicate (T.rfIdxNum rfb) (T.rfData rfb)
                 return (vs,0)
             T.RFNonFile (Just c) -> return (V.replicate (T.rfIdxNum rfb) (eval c),0)
-            T.RFFile isAscii isArg file _ -> parseHex isAscii (T.rfData rfb) (T.rfIdxNum rfb) filepath
+            T.RFFile isAscii isArg file _ _ _ -> parseHex isAscii (T.rfData rfb) (T.rfIdxNum rfb) filepath
 
                 where
 
