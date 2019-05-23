@@ -44,6 +44,7 @@ Section Compile.
       | ReadReg r k' cont =>
         @CompRead r k' (VarRegMap readMap) _ (fun v => @compileAction _ (cont v) pred writeMap)
       | WriteReg r k' expr cont =>
+        (*HDisjUpds : key_not_In r (hd nil upds)*)
         let writeMap' := UpdRegMap r pred expr writeMap in
         @compileAction _ cont pred writeMap'
       | LetAction k' a' cont =>
@@ -99,8 +100,7 @@ Section Semantics.
   End PriorityUpds.
     
   Inductive SemRegMapExpr: (RegMapExpr type RegMapType) -> RegMapType -> Prop :=
-  | SemVarRegMap v
-                 (HDisjKeys : forall u, In u (snd v) -> NoDup (map fst u)):
+  | SemVarRegMap v:
       SemRegMapExpr (VarRegMap _ v) v
   | SemUpdRegMapTrue r (pred: Bool @# type) k val regMap
                      (PredTrue: evalExpr pred = true)
@@ -198,7 +198,7 @@ Proof.
   - inv H; inv H0; EqDep_subst; auto.
     specialize (IHexpr _ _ _ _ HSemRegMap HSemRegMap0); dest; split; subst;  auto.
 Qed.
-
+(*
 Lemma NoDup_RegMapExpr (rexpr : RegMapExpr type (RegsT * (list RegsT))):
   forall old new u,
     SemRegMapExpr rexpr (old, u::new) ->
@@ -427,7 +427,6 @@ Lemma EquivActions k a:
                     |nil => upds
                     |x :: xs => (newRegs ++ hd nil upds) :: tl upds
                     end) /\
-      newRegs [=] newRegs' /\
       SemAction o a readRegs newRegs' calls retl.
 Proof.
   induction a; subst; intros; simpl in *.
@@ -574,3 +573,4 @@ Proof.
     destruct (SemRegExprVals HSem HRegMap); subst.
     destruct l; simpl in *; auto.
 Admitted.
+*)

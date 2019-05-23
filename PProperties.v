@@ -23,11 +23,11 @@ Proof.
   - exists x, x0, x1.
     repeat split; eauto.
     econstructor 2; assumption.
-  - exists (x2++x), (x3++x0), (x4++x1).
+  - exists (x++x2), (x0++x3), (x1++x4).
     rewrite H1, H5 in HUReadRegs; rewrite H2, H6 in HUNewRegs; rewrite H3, H7 in HUCalls.
     repeat split; auto.
     + constructor 3 with (readRegs := x2) (newRegs := x3) (readRegsCont := x) (newRegsCont := x0) (calls := x4) (callsCont := x1) (v := v); eauto.
-      * intro; specialize (HDisjRegs k0); rewrite <- H6, <- H2; assumption.
+      intro; specialize (HDisjRegs k0); rewrite <- H6, <- H2; assumption.
   - exists x, x0, x1.
     repeat split; auto.
     econstructor 4; eauto.
@@ -40,14 +40,14 @@ Proof.
     + rewrite <- H1; assumption.
     + econstructor 6; auto.
       intro; specialize (HDisjRegs v); rewrite H1 in HDisjRegs; apply HDisjRegs.
-  - exists (x2++x), (x3++x0), (x4++x1).
+  - exists (x++x2), (x0++x3), (x1++x4).
     rewrite H1, H5 in HUReadRegs; rewrite H2, H6 in HUNewRegs; rewrite H3, H7 in HUCalls.
     repeat split; auto.
     econstructor 7; auto.
     + intro; specialize (HDisjRegs k); rewrite H2, H6 in HDisjRegs; apply HDisjRegs.
     + apply H8.
     + assumption.
-  - exists (x2++x), (x3++x0), (x4++x1).
+  - exists (x++x2), (x0++x3), (x1++x4).
     rewrite H1, H5 in HUReadRegs; rewrite H2, H6 in HUNewRegs; rewrite H3, H7 in HUCalls.
     repeat split; auto.
     econstructor 8; auto.
@@ -1388,8 +1388,8 @@ Proof.
     apply SubList_app_l in H0; dest.
     rewrite map_app in *.
     apply SubList_app_l in H1; dest.
-    specialize (IHPSemAction1 H0 H1).
-    specialize (IHPSemAction2 H3 H4).
+    specialize (IHPSemAction2 H0 H1).
+    specialize (IHPSemAction1 H3 H4).
     econstructor; eauto.
   - rewrite HNewReads in *.
     apply SubList_cons in H0; dest.
@@ -1404,15 +1404,15 @@ Proof.
     apply SubList_app_l in H0; dest.
     rewrite map_app in *.
     apply SubList_app_l in H1; dest.
-    specialize (IHPSemAction1 H0 H1).
-    specialize (IHPSemAction2 H3 H4).
+    specialize (IHPSemAction2 H0 H1).
+    specialize (IHPSemAction1 H3 H4).
     econstructor; eauto.
   - rewrite HUReadRegs in *; rewrite HUNewRegs in *.
     apply SubList_app_l in H0; dest.
     rewrite map_app in *.
     apply SubList_app_l in H1; dest.
-    specialize (IHPSemAction1 H0 H1).
-    specialize (IHPSemAction2 H3 H4).
+    specialize (IHPSemAction2 H0 H1).
+    specialize (IHPSemAction1 H3 H4).
     econstructor 8; eauto.
 Qed.
 

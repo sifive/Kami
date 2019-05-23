@@ -51,12 +51,12 @@ Section Semantics.
       k (a: ActionT type k) (v: type k) retK (fret: type retK)
       (cont: type k -> ActionT type retK)
       readRegs newRegs readRegsCont newRegsCont calls callsCont
-      (HDisjRegs: DisjKey newRegs newRegsCont)
+      (HDisjRegs: DisjKey newRegsCont newRegs)
       (HPSemAction: PSemAction a readRegs newRegs calls v)
       ureadRegs unewRegs ucalls
-      (HUReadRegs: ureadRegs [=] readRegs ++ readRegsCont)
-      (HUNewRegs: unewRegs [=] newRegs ++ newRegsCont)
-      (HUCalls: ucalls [=] calls ++ callsCont)
+      (HUReadRegs: ureadRegs [=] readRegsCont ++ readRegs)
+      (HUNewRegs: unewRegs [=] newRegsCont ++ newRegs)
+      (HUCalls: ucalls [=] callsCont ++ calls)
       (HPSemActionCont: PSemAction (cont v) readRegsCont newRegsCont callsCont fret):
       PSemAction (LetAction a cont) (ureadRegs) (unewRegs)
                 (ucalls) fret
@@ -91,14 +91,14 @@ Section Semantics.
       (r1: type k1)
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2  newRegs1 newRegs2 calls1 calls2 (r2: type k2)
-      (HDisjRegs: DisjKey newRegs1 newRegs2)
+      (HDisjRegs: DisjKey newRegs2 newRegs1)
       (HTrue: evalExpr p = true)
       (HAction: PSemAction a readRegs1 newRegs1 calls1 r1)
       (HPSemAction: PSemAction (cont r1) readRegs2 newRegs2 calls2 r2)
       ureadRegs unewRegs ucalls
-      (HUReadRegs: ureadRegs [=] readRegs1 ++ readRegs2)
-      (HUNewRegs: unewRegs [=] newRegs1 ++ newRegs2)
-      (HUCalls: ucalls [=] calls1 ++ calls2) :
+      (HUReadRegs: ureadRegs [=] readRegs2 ++ readRegs1)
+      (HUNewRegs: unewRegs [=] newRegs2 ++ newRegs1)
+      (HUCalls: ucalls [=] calls2 ++ calls1) :
       PSemAction (IfElse p a a' cont) ureadRegs unewRegs ucalls r2
   | PSemIfElseFalse
       (p: Expr type (SyntaxKind Bool)) k1
@@ -107,14 +107,14 @@ Section Semantics.
       (r1: type k1)
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 (r2: type k2)
-      (HDisjRegs: DisjKey newRegs1 newRegs2)
+      (HDisjRegs: DisjKey newRegs2 newRegs1)
       (HFalse: evalExpr p = false)
       (HAction: PSemAction a' readRegs1 newRegs1 calls1 r1)
       (HPSemAction: PSemAction (cont r1) readRegs2 newRegs2 calls2 r2)
       ureadRegs unewRegs ucalls
-      (HUReadRegs: ureadRegs [=] readRegs1 ++ readRegs2)
-      (HUNewRegs: unewRegs [=] newRegs1 ++ newRegs2)
-      (HUCalls: ucalls [=] calls1 ++ calls2):
+      (HUReadRegs: ureadRegs [=] readRegs2 ++ readRegs1)
+      (HUNewRegs: unewRegs [=] newRegs2 ++ newRegs1)
+      (HUCalls: ucalls [=] calls2 ++ calls1):
       PSemAction (IfElse p a a' cont) ureadRegs unewRegs ucalls r2
   | PSemDisplay
       (ls: list (SysT type)) k (cont: ActionT type k)
@@ -351,12 +351,12 @@ Section InverseSemAction.
       SemAction o (cont (evalExpr e)) reads news calls retC
     | LetAction _ a cont =>
       exists reads1 news1 calls1 reads2 news2 calls2 r1,
-      DisjKey news1 news2 /\
+      DisjKey news2 news1 /\
       SemAction o a reads1 news1 calls1 r1 /\
       SemAction o (cont r1) reads2 news2 calls2 retC /\
-      reads = reads1 ++ reads2 /\
-      news = news1 ++ news2 /\
-      calls = calls1 ++ calls2
+      reads = reads2 ++ reads1 /\
+      news = news2 ++ news1 /\
+      calls = calls2 ++ calls1
     | ReadNondet k c =>
       exists rv,
       SemAction o (c rv) reads news calls retC
@@ -373,20 +373,20 @@ Section InverseSemAction.
       news = (r, (existT _ _ (evalExpr e))) :: pnews
     | IfElse p _ aT aF c =>
       exists reads1 news1 calls1 reads2 news2 calls2 r1,
-      DisjKey news1 news2 /\
+      DisjKey news2 news1 /\
       match evalExpr p with
       | true =>
         SemAction o aT reads1  news1 calls1 r1 /\
         SemAction o (c r1) reads2 news2 calls2 retC /\
-        reads = reads1 ++ reads2 /\
-        news = news1 ++ news2 /\
-        calls = calls1 ++ calls2
+        reads = reads2 ++ reads1 /\
+        news = news2 ++ news1 /\
+        calls = calls2 ++ calls1
       | false =>
         SemAction o aF reads1 news1 calls1 r1 /\
         SemAction o (c r1) reads2 news2 calls2 retC /\
-        reads = reads1 ++ reads2 /\
-        news = news1 ++ news2 /\
-        calls = calls1 ++ calls2
+        reads = reads2 ++ reads1 /\
+        news = news2 ++ news1 /\
+        calls = calls2 ++ calls1
       end
     | Sys _ c =>
       SemAction o c reads news calls retC
@@ -2312,8 +2312,8 @@ Proof.
     apply SubList_app_l in H0; dest.
     rewrite map_app in *.
     apply SubList_app_l in H1; dest.
-    specialize (IHSemAction1 H0 H1).
-    specialize (IHSemAction2 H3 H4).
+    specialize (IHSemAction2 H0 H1).
+    specialize (IHSemAction1 H3 H4).
     econstructor; eauto.
   - subst.
     apply SubList_cons in H0; dest.
@@ -2328,15 +2328,15 @@ Proof.
     apply SubList_app_l in H0; dest.
     rewrite map_app in *.
     apply SubList_app_l in H1; dest.
-    specialize (IHSemAction1 H0 H1).
-    specialize (IHSemAction2 H3 H4).
+    specialize (IHSemAction2 H0 H1).
+    specialize (IHSemAction1 H3 H4).
     econstructor; eauto.
   - subst.
     apply SubList_app_l in H0; dest.
     rewrite map_app in *.
     apply SubList_app_l in H1; dest.
-    specialize (IHSemAction1 H0 H1).
-    specialize (IHSemAction2 H3 H4).
+    specialize (IHSemAction2 H0 H1).
+    specialize (IHSemAction1 H3 H4).
     econstructor 8; eauto.
 Qed.
 
@@ -2872,15 +2872,15 @@ Lemma WfActionT_ReadsWellDefined : forall (k : Kind)(a : ActionT type k)(retl : 
 Proof.
   induction 2; intros; subst; inversion H; EqDep_subst; auto.
   - rewrite map_app. repeat intro. apply in_app_iff in H0; destruct H0.
-    + apply (IHSemAction1 H3 _ H0).
     + apply (IHSemAction2 (H5 v) _ H0).
+    + apply (IHSemAction1 H3 _ H0).
   - inversion H; EqDep_subst. repeat intro. destruct H1;[subst;assumption|apply IHSemAction; auto].
   - rewrite map_app; repeat intro. apply in_app_iff in H0; destruct H0.
+    + apply (IHSemAction2 (H4 r1) _ H0).
     + apply (IHSemAction1 H7 _ H0).
-    + apply (IHSemAction2 (H4 r1) _ H0).
   - inversion H; EqDep_subst. rewrite map_app; repeat intro. apply in_app_iff in H0; destruct H0.
-    + apply (IHSemAction1 H8 _ H0).
     + apply (IHSemAction2 (H4 r1) _ H0).
+    + apply (IHSemAction1 H8 _ H0).
   - repeat intro; auto. contradiction.
 Qed.
 
@@ -2892,15 +2892,15 @@ Lemma WfActionT_WritesWellDefined : forall (k : Kind)(a : ActionT type k)(retl :
 Proof.
   induction 2; intros; subst; inversion H; EqDep_subst; auto.
   - rewrite map_app. repeat intro. apply in_app_iff in H0; destruct H0.
-    + apply (IHSemAction1 H3 _ H0).
     + apply (IHSemAction2 (H5 v) _ H0).
+    + apply (IHSemAction1 H3 _ H0).
   - inversion H; EqDep_subst. repeat intro. destruct H1;[subst;assumption|apply IHSemAction; auto].
   - rewrite map_app; repeat intro. apply in_app_iff in H0; destruct H0.
+    + apply (IHSemAction2 (H4 r1) _ H0).
     + apply (IHSemAction1 H7 _ H0).
-    + apply (IHSemAction2 (H4 r1) _ H0).
   - inversion H; EqDep_subst. rewrite map_app; repeat intro. apply in_app_iff in H0; destruct H0.
-    + apply (IHSemAction1 H8 _ H0).
     + apply (IHSemAction2 (H4 r1) _ H0).
+    + apply (IHSemAction1 H8 _ H0).
   - repeat intro; auto. contradiction.
 Qed.
 
@@ -3394,14 +3394,14 @@ Proof.
   - specialize (IHSemAction (H8 mret)).
     intro TMP; destruct TMP;[subst; contradiction|contradiction].
   - intro TMP; apply in_app_or in TMP; destruct TMP.
-    + eapply IHSemAction1; eauto.
     + eapply IHSemAction2; eauto.
+    + eapply IHSemAction1; eauto.
   - intro TMP; apply in_app_or in TMP; destruct TMP.
-    + eapply IHSemAction1; eauto.
     + eapply IHSemAction2; eauto.
+    + eapply IHSemAction1; eauto.
   - intro TMP; apply in_app_or in TMP; destruct TMP.
-    + eapply IHSemAction1; eauto.
     + eapply IHSemAction2; eauto.
+    + eapply IHSemAction1; eauto.
 Qed.
 
 Lemma getNumFromCalls_notIn f cs :
