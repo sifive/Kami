@@ -19,6 +19,7 @@ Section Compile.
              (arg: fst argRetK @# ty)
              lret (cont: ty (snd argRetK) -> CompActionT lret): CompActionT lret
   | CompLetExpr k (e: Expr ty k) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
+  | CompLetRegMap (rmap : RegMapExpr) lret (cont : regMapTy -> CompActionT lret): CompActionT lret
   | CompNondet k lret (Cont: fullType ty k -> CompActionT lret): CompActionT lret
   | CompSys (ls: list (SysT ty)) lret (cont: CompActionT lret): CompActionT lret
   | CompRead (r: string) (k: FullKind) (readMap: RegMapExpr) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
@@ -44,8 +45,7 @@ Section Compile.
       | ReadReg r k' cont =>
         @CompRead r k' (VarRegMap readMap) _ (fun v => @compileAction _ (cont v) pred writeMap)
       | WriteReg r k' expr cont =>
-        let writeMap' := UpdRegMap r pred expr writeMap in
-        @compileAction _ cont pred writeMap'
+        CompLetRegMap (UpdRegMap r pred expr writeMap) (fun v => @compileAction _ cont pred (VarRegMap v))
       | LetAction k' a' cont =>
         CompLetFull (@compileAction k' a' pred writeMap)
                     (fun retval writeMap' => @compileAction k (cont retval) pred (VarRegMap writeMap'))
@@ -81,7 +81,6 @@ Section Semantics.
     | NoUpds: PriorityUpds nil o
     | ConsUpds (upds: UpdRegsT) (prevUpds: UpdRegsT) (prevRegs: RegsT)
                (prevCorrect: PriorityUpds prevUpds prevRegs)
-               (* (prevSameKey: getKindAttr o = getKindAttr prevRegs) *)
                (u: UpdRegT)
                (curr: RegsT)
                (currRegsTCurr: getKindAttr o = getKindAttr curr)
@@ -105,7 +104,6 @@ Section Semantics.
                      (PredTrue: evalExpr pred = true)
                      old upds
                      (HSemRegMap: SemRegMapExpr regMap (old, upds))
-                     (HDisjUpds : key_not_In r (hd nil upds))
                      upds'
                      (HEqual : upds' = ((r, existT _ k (evalExpr val)) :: hd nil upds) :: tl upds):
       SemRegMapExpr (@UpdRegMap _ _ r pred k val regMap) (old, upds')
@@ -139,6 +137,11 @@ Section Semantics.
                    regMap calls val
                    (HSemCompActionT: SemCompActionT (cont (evalExpr e)) regMap calls val):
       SemCompActionT (@CompLetExpr _ _ k e lret cont) regMap calls val
+  | SemCompLetRegMap lret cont
+                     regMapExpr calls val old upds
+                     (HNoDupUpds : NoDup (map fst (hd nil upds)))
+                     (HSemRegMap : SemRegMapExpr regMapExpr (old, upds)):
+      SemCompActionT (@CompLetRegMap _ _ regMapExpr lret cont) (old, upds) calls val
   | SemCompNondet k lret cont
                   ret regMap calls val
                   (HSemCompActionT: SemCompActionT (cont ret) regMap calls val):
@@ -163,7 +166,7 @@ Section Semantics.
                    (HSemCompActionT_a: SemCompActionT a regMap_a calls_a val_a)
                    regMap_cont calls_cont val_cont
                    (HSemCompActionT_cont: SemCompActionT (cont val_a regMap_a) regMap_cont calls_cont val_cont):
-      SemCompActionT (@CompLetFull _ _ k a lret cont) regMap_cont (calls_a ++ calls_cont) val_cont.
+      SemCompActionT (@CompLetFull _ _ k a lret cont) regMap_cont (calls_cont ++ calls_a) val_cont.
 End Semantics.
 
 Lemma getKindAttr_fst {A B : Type} {P : B -> Type}  {Q : B -> Type} (l1 : list (A * {x : B & P x})):
@@ -171,14 +174,8 @@ Lemma getKindAttr_fst {A B : Type} {P : B -> Type}  {Q : B -> Type} (l1 : list (
     getKindAttr l1 = getKindAttr l2 ->
     (map fst l1) = (map fst l2).
 Proof.
-  induction l1, l2; intros; auto.
-  - simpl in *.
-    inv H.
-  - simpl in *.
-    inv H.
-  - simpl in *.
-    inv H.
-    erewrite IHl1; eauto.
+  induction l1, l2; intros; auto; simpl in *; inv H.
+  erewrite IHl1; eauto.
 Qed.
 
 Lemma SemRegExprVals expr :
@@ -197,6 +194,7 @@ Proof.
   - inv H; inv H0; EqDep_subst; auto.
     specialize (IHexpr _ _ _ _ HSemRegMap HSemRegMap0); dest; split; subst;  auto.
 Qed.
+
 (*
 Lemma NoDup_RegMapExpr (rexpr : RegMapExpr type (RegsT * (list RegsT))):
   forall old new u,
@@ -269,7 +267,7 @@ Proof.
   - inv H; EqDep_subst.
     eapply NoDup_RegMapExprs; eauto.
 Qed.
-
+*)
 (*
 Lemma EquivWrites (k : Kind) (a : ActionT type k):
   forall o calls retl expr1 expr2 v v' (bexpr : Bool @# type),
@@ -407,6 +405,7 @@ Proof.
     eapply IHl'; eauto.
 Qed.
 
+(*
 Lemma foo (lretT : Kind) (k : FullKind) a :
   forall writeMap old upds (HSem : SemRegMapExpr writeMap (old, upds)) o calls (retl : type lretT) upds' r (e : Expr type k),
     SemCompActionT (compileAction (o, nil) a (Const type true) (UpdRegMap r (Const type true) e writeMap)) upds' calls retl ->
@@ -414,7 +413,8 @@ Lemma foo (lretT : Kind) (k : FullKind) a :
 Proof.
   induction a; intros; try (inv H0; EqDep_subst; eauto).
   -
-    
+ *)
+(*
 Lemma EquivActions k a:
   forall
     writeMap old upds
@@ -428,6 +428,13 @@ Lemma EquivActions k a:
                     end) /\
       SemAction o a readRegs newRegs' calls retl.
 Proof.
+  induction a; subst; intros; simpl in *.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  -
   induction a; subst; intros; simpl in *.
   - inv H0; EqDep_subst.
     + specialize (H _ _ _ _ HSem _ _ _ _ HSemCompActionT); dest.
@@ -572,4 +579,4 @@ Proof.
     destruct (SemRegExprVals HSem HRegMap); subst.
     destruct l; simpl in *; auto.
 Admitted.
-*)
+ *)
