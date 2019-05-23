@@ -44,7 +44,6 @@ Section Compile.
       | ReadReg r k' cont =>
         @CompRead r k' (VarRegMap readMap) _ (fun v => @compileAction _ (cont v) pred writeMap)
       | WriteReg r k' expr cont =>
-        (*HDisjUpds : key_not_In r (hd nil upds)*)
         let writeMap' := UpdRegMap r pred expr writeMap in
         @compileAction _ cont pred writeMap'
       | LetAction k' a' cont =>
