@@ -3,10 +3,7 @@ Require Export Syntax Compile Rtl.
 
 Require Coq.extraction.Extraction.
 
-Require Export ExtrHaskellBasic ExtrHaskellNatInt.
-
-Extract Inductive string => "Prelude.String" [ "([])" "(:)" ].
-Extract Inlined Constant String.string_dec => "(Prelude.==)".
+Require Export ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString.
 
 Extraction Language Haskell.
 
@@ -21,14 +18,23 @@ Extract Inlined Constant projT1 => "Prelude.fst".
 Extract Inlined Constant projT2 => "Prelude.snd".
 Extract Inlined Constant map => "Prelude.map".
 Extract Inlined Constant concat => "Prelude.concat".
+Extract Inlined Constant mod2 => "Prelude.odd".
+Extract Constant nat_cast => "(\_ _ x -> x)".
+Extract Inlined Constant length => "Prelude.length".
+Extract Inlined Constant Datatypes.length => "Prelude.length".
+Extract Constant Nat.div2 => "(`Prelude.div` 2)".
+Extract Constant Nat.log2 => "(\x -> Prelude.floor (Prelude.logBase 2 (Prelude.fromIntegral x)))".
+Extract Constant Nat.log2_up => "(\x -> Prelude.ceiling (Prelude.logBase 2 (Prelude.fromIntegral x)))".
+Extract Constant List.fold_left => "(\f bs a -> Prelude.foldl f a bs)".
+Extract Constant natToWord => "(\sz n -> (sz, Prelude.toInteger n))".
+Extract Constant Vector.nth => "(\_ xs (_,i) -> xs Prelude.!! i)".
+Extract Constant sumSizes => "(\n f -> Prelude.sum (Prelude.map (\i -> f (n,i)) [0..(n Prelude.-1)]))".
 
-Extract Inductive ascii => "Prelude.Char"
-  [ "(\b0 b1 b2 b3 b4 b5 b6 b7 -> Prelude.toEnum ( (if b0 then 1 else 0) Prelude.+ (if b1 then 2 else 0) Prelude.+ (if b2 then 4 else 0) Prelude.+ (if b3 then 8 else 0) Prelude.+ (if b4 then 16 else 0) Prelude.+ (if b5 then 32 else 0)\
-    Prelude.+ (if b6 then 64 else 0) Prelude.+ (if b7 then 128 else 0)))" ]
-  "(\f a ->
-       let shiftL x i = if i Prelude.== 0 then x else shiftL (x `Prelude.div` 2) (i Prelude.- 1) in
-       let testbit x y = (shiftL x y) `Prelude.mod` 2 Prelude.== 1 in
-       f (testbit (Prelude.fromEnum a) 0) (testbit (Prelude.fromEnum a) 1) (testbit (Prelude.fromEnum a) 2) (testbit (Prelude.fromEnum a) 3) (testbit (Prelude.fromEnum a) 4) (testbit (Prelude.fromEnum a) 5) (testbit (Prelude.fromEnum a) 6) (testbit (Prelude.fromEnum a) 7))".
 
-Extract Inlined Constant Ascii.ascii_dec => "(Prelude.==)".
+Extract Inductive word => "(Prelude.Int,Prelude.Integer)" ["(0,0)" "(\b _ (n,v) -> let v' = Data.Bits.shiftL v 1 in if b then (n Prelude.+1,Data.Bits.setBit v' 0) else (n Prelude.+1,v'))"]
+  "(\f0 fS (n,v) -> if n Prelude.== 0 then f0 () else fS (Data.Bits.testBit v 0) (n Prelude.-1) ((n Prelude.-1), Data.Bits.shiftR v 1))".
 
+Extract Inductive Fin.t => "(Prelude.Int,Prelude.Int)" ["(\n -> (n,0))" "(\n (_,i) -> (n,Prelude.succ i))"]
+  "(\f0 fS (n,i) -> if i Prelude.== 0 then f0 n else fS n (n Prelude.-1, i Prelude.-1))".
+
+Extract Inductive Vector.t => "[]" ["[]" "(\x _ xs -> x : xs)"] "(\fnil fcons xs -> case xs of { [] -> fnil (); (x:xs) -> fcons x (Prelude.length xs) xs })".

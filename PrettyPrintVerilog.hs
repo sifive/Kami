@@ -6,15 +6,13 @@ import Data.Char
 import Control.Monad.State.Lazy
 import qualified Data.Map.Lazy as H
 import Debug.Trace
+import Numeric
 
-instance Show T.Coq_word where
-  show w = show (T.wordToNat 0 w)
+log2_up :: Int -> Int
+log2_up = ceiling . (logBase 2) . fromIntegral
 
-intToFin :: Int -> Int -> T.Coq_t
-intToFin m 0 = T.F1 (m-1)
-intToFin m n = T.FS (m-1) (intToFin (m-1) (n-1))
-
-deriving instance Eq T.Coq_t
+intToFin :: Int -> Int -> (Int,Int)
+intToFin = (,)
 
 ppDealSize0 :: T.Kind -> String -> String -> String
 ppDealSize0 ty def str = if T.size ty == 0 then def else str
@@ -22,16 +20,8 @@ ppDealSize0 ty def str = if T.size ty == 0 then def else str
 ppVecLen :: Int -> String
 ppVecLen n = "[" ++ show (n-1) ++ ":0]"
 
-finToInt :: T.Coq_t -> Int
-finToInt (T.F1 _) = 0
-finToInt (T.FS _ x) = Prelude.succ (finToInt x)
-
-instance Show T.Coq_t where
-  show f = show (finToInt f)
-
-wordToList :: T.Coq_word -> [Bool]
-wordToList T.WO = []
-wordToList (T.WS b _ w) = b : wordToList w
+finToInt :: (Int,Int) -> Int
+finToInt = snd
 
 ppTypeVec :: T.Kind -> Int -> (T.Kind, [Int])
 ppTypeVec k@(T.Array i' k') i =
@@ -66,13 +56,16 @@ ppType (T.Struct n fk fs) =
 ppPrintVar :: (String, Int) -> String
 ppPrintVar (s, v) = ppName $ s ++ if v /= 0 then '#' : show v else []
 
-ppWord :: [Bool] -> String
-ppWord [] = []
-ppWord (b : bs) = (if b then '1' else '0') : ppWord bs
+padwith :: a -> Int -> [a] -> [a]
+padwith x n xs = let m = n - length xs in
+  if m > 0 then replicate m x ++ xs else xs
+
+ppWord :: (Int,Integer) -> String
+ppWord (n,i) = padwith '0' n $ showIntAtBase 2 intToDigit i ""
 
 ppConst :: T.ConstT -> String
 ppConst (T.ConstBool b) = if b then "1'b1" else "1'b0"
-ppConst (T.ConstBit sz w) = show sz ++ "\'b" ++ ppWord (reverse $ wordToList w)
+ppConst (T.ConstBit sz w) = show sz ++ "\'b" ++ ppWord w
 ppConst (T.ConstArray n k fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (reverse $ T.getFins n))) ++ "}"
 ppConst (T.ConstStruct n fk fs fv) = '{' : intercalate ", " (snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins n)) (Data.List.map ppConst (Data.List.map fv (T.getFins n))))))) ++ "}"
 
@@ -220,12 +213,12 @@ ppRfInstance (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum da
      T.RtlAsync readLs ->
        concatMap (\(read, _) ->
                     ("." ++ ppName read ++ "$_enable(" ++ ppName read ++ "$_enable), ") ++
-                    (ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "" ("." ++ ppName read ++ "$_argument(" ++ ppName read ++ "$_argument), ")) ++
+                    (ppDealSize0 (T.Bit (log2_up idxNum)) "" ("." ++ ppName read ++ "$_argument(" ++ ppName read ++ "$_argument), ")) ++
                     ppDealSize0 (T.Array num dataType) "" ("." ++ ppName read ++ "$_return(" ++ ppName read ++ "$_return), ")) readLs
      T.RtlSync isAddr readLs ->
        concatMap (\(T.Build_RtlSyncRead (T.Build_SyncRead readRq readRs _) _ _) ->
                     ("." ++ ppName readRq ++ "$_enable(" ++ ppName readRq ++ "$_enable), ") ++
-                    (ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "" ("." ++ ppName readRq ++ "$_argument(" ++ ppName readRq ++ "$_argument), ")) ++
+                    (ppDealSize0 (T.Bit (log2_up idxNum)) "" ("." ++ ppName readRq ++ "$_argument(" ++ ppName readRq ++ "$_argument), ")) ++
                     ("." ++ ppName readRs ++ "$_enable(" ++ ppName readRs ++ "$_enable), ") ++
                     ppDealSize0 (T.Array num dataType) "" ("." ++ ppName readRs ++ "$_return(" ++ ppName readRs ++ "$_return), ")) readLs) ++
   ("." ++ ppName write ++ "$_enable(" ++ ppName write ++ "$_enable), ") ++
@@ -240,12 +233,12 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
      T.RtlAsync readLs ->
        concatMap (\(read, _) ->
                     ("  input " ++ ppDeclType (ppName read ++ "$_enable") T.Bool ++ ",\n") ++
-                   (ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "" ("  input " ++ ppDeclType (ppName read ++ "$_argument") (T.Bit (T._Nat__log2_up idxNum)) ++ ",\n")) ++
+                   (ppDealSize0 (T.Bit (log2_up idxNum)) "" ("  input " ++ ppDeclType (ppName read ++ "$_argument") (T.Bit (log2_up idxNum)) ++ ",\n")) ++
                    ppDealSize0 (T.Array num dataType) "" ("  output " ++ ppDeclType (ppName read ++ "$_return") (T.Array num dataType) ++ ",\n")) readLs
      T.RtlSync isAddr readLs ->
        concatMap (\(T.Build_RtlSyncRead (T.Build_SyncRead readRq readRs _) _ _) ->
                     ("  input " ++ ppDeclType (ppName readRq ++ "$_enable") T.Bool ++ ",\n") ++
-                   (ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "" ("  input " ++ ppDeclType (ppName readRq ++ "$_argument") (T.Bit (T._Nat__log2_up idxNum)) ++ ",\n")) ++
+                   (ppDealSize0 (T.Bit (log2_up idxNum)) "" ("  input " ++ ppDeclType (ppName readRq ++ "$_argument") (T.Bit (log2_up idxNum)) ++ ",\n")) ++
                     ("  input " ++ ppDeclType (ppName readRs ++ "$_enable") T.Bool ++ ",\n") ++
                    ppDealSize0 (T.Array num dataType) "" ("  output " ++ ppDeclType (ppName readRs ++ "$_return") (T.Array num dataType) ++ ",\n")) readLs) ++
    ("  input " ++ ppDeclType (ppName write ++ "$_enable") T.Bool ++ ",\n") ++
@@ -269,7 +262,7 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
      T.RtlSync isAddr readLs ->
        concatMap (\(T.Build_RtlSyncRead (T.Build_SyncRead readRq readRs readReg) bypRqRs bypWrRd) ->
                     if isAddr
-                    then ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "" ("  " ++ ppDeclType (ppName readReg) (T.Bit (T._Nat__log2_up idxNum)) ++ ";\n")
+                    then ppDealSize0 (T.Bit (log2_up idxNum)) "" ("  " ++ ppDeclType (ppName readReg) (T.Bit (log2_up idxNum)) ++ ";\n")
                     else ppDealSize0 (T.Array num dataType) "" ("  " ++ ppDeclType (ppName readReg) (T.Array num dataType)) ++
                          ppDealSize0 (T.Array num dataType) "" ("  " ++ ppDeclType (ppName (readReg ++ "$_temp")) (T.Array num dataType))
                  ) readLs
@@ -288,8 +281,8 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
   let writeByps readAddr i = 
         concatMap (\j -> "(" ++ 
                          "(" ++ ppName write ++ "$_enable && (" ++
-                         "(" ++ ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "0" (ppName write ++ "$_argument.addr + " ++ show j) ++ ") == " ++
-                         "(" ++ ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "0" (readAddr ++ " + " ++ show i) ++ "))" ++
+                         "(" ++ ppDealSize0 (T.Bit (log2_up idxNum)) "0" (ppName write ++ "$_argument.addr + " ++ show j) ++ ") == " ++
+                         "(" ++ ppDealSize0 (T.Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i) ++ "))" ++
                          (if isWrMask
                           then " && " ++ ppName write ++ "$_argument.mask[" ++ show j ++ "]"
                           else "") ++
@@ -299,8 +292,8 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
     let readResponse readResp readAddr isByp =
           ppDealSize0 (T.Array num dataType) "" ("  assign " ++ ppName readResp ++ " = " ++ "{" ++
                                                 intercalate ", " (map (\i ->
-                                                                          ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "0" (readAddr ++ " + " ++ show i ++ " < " ++ show idxNum) ++ " ? " ++
-                                                                          (if isByp then writeByps readAddr i else "") ++ ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ (ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "0" (readAddr ++ " + " ++ show i)) ++ "]") ++ ": " ++ show (T.size dataType) ++ "'b0")
+                                                                          ppDealSize0 (T.Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i ++ " < " ++ show idxNum) ++ " ? " ++
+                                                                          (if isByp then writeByps readAddr i else "") ++ ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ (ppDealSize0 (T.Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i)) ++ "]") ++ ": " ++ show (T.size dataType) ++ "'b0")
                                                                   (reverse [0 .. (num-1)])) ++ "};\n") in
       (case reads of
          T.RtlAsync readLs -> concatMap (\(read, bypass) ->
@@ -324,7 +317,7 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
   "      if(" ++ ppName write ++ "$_enable) begin\n" ++
   concat (map (\i ->
                  (if isWrMask then "        if(" ++ ppName write ++ "$_argument.mask[" ++ show i ++ "])\n" else "") ++
-                ppDealSize0 dataType "" ("          " ++ ppName name ++ "$_data[" ++ ppDealSize0 (T.Bit (T._Nat__log2_up idxNum)) "0" (ppName write ++ "$_argument.addr + " ++ show i) ++ "] <= " ++
+                ppDealSize0 dataType "" ("          " ++ ppName name ++ "$_data[" ++ ppDealSize0 (T.Bit (log2_up idxNum)) "0" (ppName write ++ "$_argument.addr + " ++ show i) ++ "] <= " ++
                                          ppDealSize0 dataType "" (ppName write ++ "$_argument.data[" ++ show i ++ "]") ++ ";\n")) [0 .. (num-1)]) ++
   "      end\n" ++
   (case reads of
@@ -349,10 +342,10 @@ removeDups = nubBy (\(a, _) (b, _) -> a == b)
 getAllMethodsRegFileList :: [T.RtlRegFileBase] -> [(String, (T.Kind, T.Kind))]
 getAllMethodsRegFileList ls = concat (map (\(T.Build_RtlRegFileBase isWrMask num dataArray readLs write idxNum d init) ->
                                               (write, (T.coq_WriteRq idxNum d, T.Bit 0)) :
-                                              (map (\x -> (fst x, (T.Bit (T._Nat__log2_up idxNum), d)))
+                                              (map (\x -> (fst x, (T.Bit (log2_up idxNum), d)))
                                                (case readLs of
-                                                  T.RtlAsync reads -> map (\(x, _) -> (x, (T.Bit (T._Nat__log2_up idxNum), d))) reads
-                                                  T.RtlSync _ reads -> map (\(T.Build_RtlSyncRead (T.Build_SyncRead rq rs _) _ _) -> (rq, (T.Bit (T._Nat__log2_up idxNum), T.Bit 0))) reads ++
+                                                  T.RtlAsync reads -> map (\(x, _) -> (x, (T.Bit (log2_up idxNum), d))) reads
+                                                  T.RtlSync _ reads -> map (\(T.Build_RtlSyncRead (T.Build_SyncRead rq rs _) _ _) -> (rq, (T.Bit (log2_up idxNum), T.Bit 0))) reads ++
                                                                        map (\(T.Build_RtlSyncRead (T.Build_SyncRead rq rs _) _ _) -> (rs, (T.Bit 0, d))) reads
                                                ))) ls)
 
@@ -499,7 +492,7 @@ printDiff _ _ = putStrLn "Wrong lengths"
 
 ppConstMem :: T.ConstT -> String
 ppConstMem (T.ConstBool b) = if b then "1" else "0"
-ppConstMem (T.ConstBit sz w) = if sz == 0 then "0" else ppWord (reverse $ wordToList w)
+ppConstMem (T.ConstBit sz w) = if sz == 0 then "0" else ppWord w
 ppConstMem (T.ConstStruct num fk fs fv) = Data.List.concatMap ppConstMem (Data.List.map fv (T.getFins num))
 ppConstMem (T.ConstArray num k fv) = Data.List.concatMap ppConstMem (Data.List.map fv (reverse $ T.getFins num))
 

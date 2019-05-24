@@ -51,6 +51,11 @@ binary_split x xs = go xs [] where
 --type of infinite streams
 data Str a = (:+) a (Str a)
 
+unwind_list :: [a] -> Str a
+unwind_list xs = go xs where
+    go [] = go xs
+    go (y:ys) = y :+ go ys
+
 --applies the function to every n+1th elt of the stream
 intersperse_with_period :: Int -> (a -> a) -> Str a -> Str a
 intersperse_with_period n f xs = go n xs where
