@@ -1,4 +1,4 @@
-Require Import Syntax StateMonad Properties.
+Require Import Syntax StateMonad Properties All.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
@@ -19,6 +19,7 @@ Section Compile.
              (arg: fst argRetK @# ty)
              lret (cont: ty (snd argRetK) -> CompActionT lret): CompActionT lret
   | CompLetExpr k (e: Expr ty k) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
+  | CompLetRegMap (rmap : RegMapExpr) lret (cont : regMapTy -> CompActionT lret): CompActionT lret
   | CompNondet k lret (Cont: fullType ty k -> CompActionT lret): CompActionT lret
   | CompSys (ls: list (SysT ty)) lret (cont: CompActionT lret): CompActionT lret
   | CompRead (r: string) (k: FullKind) (readMap: RegMapExpr) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
@@ -44,8 +45,7 @@ Section Compile.
       | ReadReg r k' cont =>
         @CompRead r k' (VarRegMap readMap) _ (fun v => @compileAction _ (cont v) pred writeMap)
       | WriteReg r k' expr cont =>
-        let writeMap' := UpdRegMap r pred expr writeMap in
-        @compileAction _ cont pred writeMap'
+        CompLetRegMap (UpdRegMap r pred expr writeMap) (fun v => @compileAction _ cont pred (VarRegMap v))
       | LetAction k' a' cont =>
         CompLetFull (@compileAction k' a' pred writeMap)
                     (fun retval writeMap' => @compileAction k (cont retval) pred (VarRegMap writeMap'))
@@ -81,7 +81,6 @@ Section Semantics.
     | NoUpds: PriorityUpds nil o
     | ConsUpds (upds: UpdRegsT) (prevUpds: UpdRegsT) (prevRegs: RegsT)
                (prevCorrect: PriorityUpds prevUpds prevRegs)
-               (* (prevSameKey: getKindAttr o = getKindAttr prevRegs) *)
                (u: UpdRegT)
                (curr: RegsT)
                (currRegsTCurr: getKindAttr o = getKindAttr curr)
@@ -99,14 +98,12 @@ Section Semantics.
   End PriorityUpds.
     
   Inductive SemRegMapExpr: (RegMapExpr type RegMapType) -> RegMapType -> Prop :=
-  | SemVarRegMap v
-                 (HDisjKeys : forall u, In u (snd v) -> NoDup (map fst u)):
+  | SemVarRegMap v:
       SemRegMapExpr (VarRegMap _ v) v
   | SemUpdRegMapTrue r (pred: Bool @# type) k val regMap
                      (PredTrue: evalExpr pred = true)
                      old upds
                      (HSemRegMap: SemRegMapExpr regMap (old, upds))
-                     (HDisjUpds : key_not_In r (hd nil upds))
                      upds'
                      (HEqual : upds' = ((r, existT _ k (evalExpr val)) :: hd nil upds) :: tl upds):
       SemRegMapExpr (@UpdRegMap _ _ r pred k val regMap) (old, upds')
@@ -140,6 +137,12 @@ Section Semantics.
                    regMap calls val
                    (HSemCompActionT: SemCompActionT (cont (evalExpr e)) regMap calls val):
       SemCompActionT (@CompLetExpr _ _ k e lret cont) regMap calls val
+  | SemCompLetRegMap lret cont
+                     regMapExpr calls val regMap regMap'
+                     (HNoDupUpds : NoDup (map fst (hd nil (snd regMap))))
+                     (HSemRegMap : SemRegMapExpr regMapExpr regMap)
+                     (HSemCompActionT: SemCompActionT (cont regMap) regMap' calls val):
+      SemCompActionT (@CompLetRegMap _ _ regMapExpr lret cont) regMap' calls val
   | SemCompNondet k lret cont
                   ret regMap calls val
                   (HSemCompActionT: SemCompActionT (cont ret) regMap calls val):
@@ -164,7 +167,7 @@ Section Semantics.
                    (HSemCompActionT_a: SemCompActionT a regMap_a calls_a val_a)
                    regMap_cont calls_cont val_cont
                    (HSemCompActionT_cont: SemCompActionT (cont val_a regMap_a) regMap_cont calls_cont val_cont):
-      SemCompActionT (@CompLetFull _ _ k a lret cont) regMap_cont (calls_a ++ calls_cont) val_cont.
+      SemCompActionT (@CompLetFull _ _ k a lret cont) regMap_cont (calls_cont ++ calls_a) val_cont.
 End Semantics.
 
 Lemma getKindAttr_fst {A B : Type} {P : B -> Type}  {Q : B -> Type} (l1 : list (A * {x : B & P x})):
@@ -172,33 +175,21 @@ Lemma getKindAttr_fst {A B : Type} {P : B -> Type}  {Q : B -> Type} (l1 : list (
     getKindAttr l1 = getKindAttr l2 ->
     (map fst l1) = (map fst l2).
 Proof.
-  induction l1, l2; intros; auto.
-  - simpl in *.
-    inv H.
-  - simpl in *.
-    inv H.
-  - simpl in *.
-    inv H.
-    erewrite IHl1; eauto.
+  induction l1, l2; intros; auto; simpl in *; inv H.
+  erewrite IHl1; eauto.
 Qed.
 
 Lemma SemRegExprVals expr :
-  forall old1 old2 upds1 upds2 ,
-  SemRegMapExpr expr (old1, upds1) ->
-  SemRegMapExpr expr (old2, upds2) ->
-  old1 = old2 /\ upds1 = upds2.
+  forall o1 o2,
+  SemRegMapExpr expr o1 ->
+  SemRegMapExpr expr o2 ->
+  o1 = o2.
 Proof.
-  induction expr; intros.
-  - inv H; inv H0; auto.
-  - inv H; inv H0; EqDep_subst; auto.
-    + specialize (IHexpr _ _ _ _ HSemRegMap HSemRegMap0); dest.
-      destruct upds, upds0; split; auto; repeat f_equal; try discriminate; inv H0; auto.
-    + congruence.
-    + congruence.
-  - inv H; inv H0; EqDep_subst; auto.
-    specialize (IHexpr _ _ _ _ HSemRegMap HSemRegMap0); dest; split; subst;  auto.
+  induction expr; intros; inv H; inv H0; EqDep_subst; auto;
+    try congruence; specialize (IHexpr _ _ HSemRegMap HSemRegMap0); inv IHexpr; auto.
 Qed.
 
+(*
 Lemma NoDup_RegMapExpr (rexpr : RegMapExpr type (RegsT * (list RegsT))):
   forall old new u,
     SemRegMapExpr rexpr (old, u::new) ->
@@ -241,11 +232,13 @@ Proof.
   - inv H; simpl in *; destruct H0; subst; simpl; eauto.
     constructor.
 Qed.
-
+ *)
+(*
 Lemma NoDup_UpdKeys (k : Kind) (a : ActionT type k) :
-  forall o calls retl rexpr old upds (bexpr : Bool @# type),
-    SemCompActionT (compileAction (o, nil) a bexpr rexpr) (old, upds) calls retl ->
-    (forall u, In u upds -> NoDup (map fst u)).
+  forall o calls retl rexpr old u upds (bexpr : Bool @# type)
+         (NoDups : (forall u, In u upds -> NoDup (map fst u))),
+    SemCompActionT (compileAction (o, nil) a bexpr rexpr) (old, u::upds) calls retl ->
+    NoDup (map fst u).
 Proof.
   induction a; intros.
   - inv H0; EqDep_subst.
@@ -259,7 +252,7 @@ Proof.
     eapply H; eauto.
   - inv H0; EqDep_subst.
     eapply H; eauto.
-  - eapply IHa in H; eauto.
+  - inv H; simpl in *; auto.
   - inv H0; EqDep_subst.
     inv HSemCompActionT_cont; EqDep_subst.
     inv HSemCompActionT_cont0; EqDep_subst.
@@ -268,9 +261,9 @@ Proof.
     + eapply H; eauto.
   - inv H; EqDep_subst; eapply IHa; eauto.
   - inv H; EqDep_subst.
-    eapply NoDup_RegMapExprs; eauto.
-Qed.
-
+    admit.
+Admitted.
+*)
 (*
 Lemma EquivWrites (k : Kind) (a : ActionT type k):
   forall o calls retl expr1 expr2 v v' (bexpr : Bool @# type),
@@ -399,37 +392,135 @@ Lemma NoDup_app_split {A : Type} (l l' : list A) :
 Proof.
   induction l'; repeat intro;[inv H1|].
   specialize (NoDup_remove _ _ _ H) as P0; dest.
-  inv H1.
-  - apply H3.
-    rewrite in_app_iff; left; auto.
-  - apply H3.
-    rewrite in_app_iff; right.
-    exfalso.
-    eapply IHl'; eauto.
+  inv H1; apply H3; rewrite in_app_iff; auto.
+  exfalso; eapply IHl'; eauto.
 Qed.
-    
+
+(*
+Lemma foo (lretT : Kind) (k : FullKind) a :
+  forall writeMap old upds (HSem : SemRegMapExpr writeMap (old, upds)) o calls (retl : type lretT) upds' r (e : Expr type k),
+    SemCompActionT (compileAction (o, nil) a (Const type true) (UpdRegMap r (Const type true) e writeMap)) upds' calls retl ->
+    key_not_In r (hd nil upds).
+Proof.
+  induction a; intros; try (inv H0; EqDep_subst; eauto).
+  -
+ *)
+(*
+
 Lemma EquivActions k a:
   forall
     writeMap old upds
-    (HSem: SemRegMapExpr writeMap (old, upds)),
+    (HSem: SemRegMapExpr writeMap (old, upds)) (NoDupUpds : forall u, In u upds -> NoDup (map fst u)),
   forall o calls retl upds',
     @SemCompActionT k (compileAction (o, nil) a (Const type true) writeMap) upds' calls retl ->
+    (forall u, In u (snd upds') -> NoDup (map fst u)) /\
     exists newRegs readRegs,
       upds' = (old, match newRegs with
                     |nil => upds
-                    |x :: xs => (newRegs ++ hd nil upds) :: tl upds
+                    |_ :: _ => (newRegs ++ hd nil upds) :: tl upds
                     end) /\
-        SemAction o a readRegs newRegs calls retl.
+      SemAction o a readRegs newRegs calls retl.
 Proof.
+  induction a; subst; intros; simpl in *.
+  - inv H0; EqDep_subst;[|discriminate].
+    specialize (H _ _ _ _ HSem NoDupUpds _ _ _ _ HSemCompActionT); dest; split; auto.
+    exists x, x0; split; auto.
+    econstructor; eauto.
+  - inv H0; EqDep_subst.
+    specialize (H _ _ _ _ HSem NoDupUpds _ _ _ _ HSemCompActionT); dest; split; auto.
+    exists x, x0; split; auto.
+    econstructor; eauto.
+  - inv H0; EqDep_subst.
+    specialize (IHa _ _ _ HSem NoDupUpds _ _ _ _ HSemCompActionT_a); dest.
+    assert (SemRegMapExpr (VarRegMap type regMap_a) (old, snd regMap_a)) as HSem0.
+    { rewrite H1; constructor. }
+    specialize (H _ _ _ _ HSem0 H0 _ _ _ _ HSemCompActionT_cont); dest.
+    split; auto.
+    exists (x1++x), (x2++x0); split.
+    + rewrite H1 in *; destruct x; simpl in *; auto.
+      * rewrite app_nil_r; assumption.
+      * destruct x1; simpl in *; auto.
+        rewrite <-app_assoc, app_comm_cons; auto.
+    + econstructor; eauto.
+      rewrite H3, H1 in H; simpl in *.
+      clear - H.
+      destruct x, x1; eauto using DisjKey_nil_r, DisjKey_nil_l; simpl in *.
+      specialize (H _ (or_introl _ eq_refl)); simpl in *.
+      rewrite map_app, app_comm_cons in H.
+      intro.
+      destruct (In_dec string_dec k (map fst (p0::x1))); auto.
+      right; intro.
+      destruct (NoDup_app_Disj string_dec _ _ H k); auto.
+      apply H1; simpl in *; rewrite map_app, in_app_iff.
+      clear - H0; firstorder fail.
+  - inv H0; EqDep_subst.
+    specialize (H _ _ _ _ HSem NoDupUpds _ _ _ _ HSemCompActionT); dest; split; auto.
+    exists x, x0; split; auto.
+    econstructor; eauto.
+  - inv H0; EqDep_subst.
+    specialize (H _ _ _ _ HSem NoDupUpds _ _ _ _ HSemCompActionT); dest; split; auto.
+    exists x, ((r, existT _ k regVal) :: x0).
+    split; auto.
+    econstructor; eauto.
+    inv HReadMap; inv HUpdatedRegs; auto.
+    discriminate.
+  - inv H; EqDep_subst.
+    inv HSemRegMap; EqDep_subst; simpl in *; [|discriminate].
+    assert (SemRegMapExpr (VarRegMap type (old0, ((r, existT (fullType type) k (evalExpr e)) :: hd nil upds0) :: tl upds0))
+                          (old0, ((r, existT (fullType type) k (evalExpr e)) :: hd nil upds0) :: tl upds0)).
+    { constructor. }
+    specialize (SemRegExprVals HSem HSemRegMap0) as P0; inv P0.
+    assert (forall u, In u (((r, existT (fullType type) k (evalExpr e)) :: hd nil upds0) :: tl upds0) -> NoDup (map fst u)).
+    { intros; simpl in *.
+      destruct H0; subst; simpl in *; auto.
+      eapply NoDupUpds.
+      destruct upds0; simpl in *; auto.
+    }
+    specialize (IHa _ _ _ H H0 _ _ _ _ HSemCompActionT); dest; split; auto.
+    exists ((r, existT (fullType type) k (evalExpr e))::x), x0; split.
+    + destruct x; simpl in *; auto.
+      repeat rewrite app_comm_cons.
+      repeat rewrite <-app_assoc; simpl.
+      admit.
+    + econstructor; eauto.
+      assumption.
+    + admit.
+  -
+    SearchPattern (_ -> (_::nil)++_ = _::_).
+      
+    specialize (IHa _ _ _ HSem NoDupUpds _ _ _ _ HSemCompActionT).
+    split; auto.
+    + intros.
+      destruct H; subst; simpl; auto.
+      eapply NoDupUpds.
+      destruct upds1;simpl in *; auto.
+    + 
+    
+        
+      
+      
+      
+      
+      
+      rewrite 
+        
+      
+    + econstructor; eauto.
+    admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  -
   induction a; subst; intros; simpl in *.
   - inv H0; EqDep_subst.
     + specialize (H _ _ _ _ HSem _ _ _ _ HSemCompActionT); dest.
-      exists x, x0; split; auto.
+      exists x, x0, x1; repeat split; auto.
       econstructor; eauto.
     + discriminate.
   - inv H0; EqDep_subst.
     specialize (H _ _ _ _ HSem _ _ _ _ HSemCompActionT); dest.
-    exists x, x0; split; auto.
+    exists x, x0, x1; repeat split; auto.
     econstructor; eauto.
   - inv H0; EqDep_subst.
     specialize (IHa _ _ _ HSem _ _ _ _ HSemCompActionT_a); dest.
@@ -440,10 +531,78 @@ Proof.
       eapply (NoDup_UpdKeys _ _ _ _ HSemCompActionT_a); simpl in *; auto.
     }
     specialize (H _ _ _ _ HSem0 _ _ _ _ HSemCompActionT_cont); dest.
-    exists (x1++x), (x0++x2); split.
+    exists (x2++x), (x0++x3),(x1++x4); split.
     + rewrite H0 in H; simpl in *.
-      destruct x1; simpl in *; auto.
-      destruct x; simpl in *; [rewrite app_nil_r|]; auto.
+      destruct x. rewrite app_nil_r. assumption.
+      destruct x2. simpl in *. assumption.
+      simpl in *. rewrite <- app_assoc. rewrite <- app_comm_cons. assumption.
+    + repeat split.
+      rewrite Permutation.Permutation_app_comm. apply Permutation.Permutation_app; auto.
+      econstructor; eauto.
+      intro.
+      destruct (In_dec string_dec k0 (map fst x0));[|auto].
+      right; intro.
+      destruct upds'.
+      specialize (NoDup_UpdKeys _ _ _ _ HSemCompActionT_cont) as P0.
+      rewrite H0 in H.
+      inv H.
+      destruct x.
+      apply Permutation.Permutation_nil in H1.
+      rewrite H1 in i.
+      inversion i.
+      destruct x2.
+      apply Permutation.Permutation_nil in H3.
+      rewrite H3 in H5.
+      inversion H5.
+      simpl in *.
+      specialize (P0 _ (or_introl eq_refl)).
+      rewrite <- H3 in H5.
+      rewrite <- H1 in i.
+      simpl in *.
+      destruct i, H5.
+      subst.
+      inv P0.
+      apply H6.
+      rewrite map_app. simpl.
+      rewrite H0.
+      rewrite in_app_iff.
+      right.
+      left.
+      reflexivity.
+      inv P0.
+      rewrite map_app in H8; simpl in H8.
+      apply NoDup_remove_2 in H8.
+      apply H8.
+      rewrite in_app_iff.
+      left.
+      assumption.
+      subst.
+      inv P0.
+      apply H6.
+      rewrite map_app.
+      simpl.
+      rewrite in_app_iff.
+      right.
+      right.
+      rewrite map_app.
+      rewrite in_app_iff.
+      left.
+      assumption.
+      inv P0.
+      rewrite map_app in H8.
+      specialize (NoDup_app_Disj string_dec _ _ H8 k0) as P1.
+      destruct P1; [contradiction|].
+      apply H5.
+      right.
+      rewrite map_app.
+      rewrite in_app_iff.
+      left.
+      assumption.
+(*      
+                 
+      inv P0.
+      destruct x; simpl in *; auto.
+      destruct x2; simpl in *; [rewrite app_nil_r|]; auto.
       rewrite <- app_assoc, <-app_comm_cons; assumption.
     + econstructor; eauto.
       * rewrite H in HSemCompActionT_cont.
@@ -469,28 +628,32 @@ Proof.
         -- rewrite app_comm_cons in P0.
            apply (NoDup_app_split _ _ P0 _ (in_cons _ _ _ H3)).
            simpl; rewrite in_app_iff; right; left; assumption.
-      * admit.
+*)
   - inv H0; EqDep_subst.
     specialize (H _ _ _ _ HSem _ _ _ _ HSemCompActionT); dest; subst.
-    exists x, x0; split; auto.
+    exists x, x0, x1; repeat split; auto.
     econstructor; eauto.
   - inv H0; EqDep_subst.
     specialize (H _ _ _ _ HSem _ _ _ _ HSemCompActionT); dest; subst.
-    exists x, ((r, existT _ k regVal)::x0); split; auto.
+    exists x, x0, ((r, existT _ k regVal)::x1); repeat split; auto.
     econstructor; eauto.
     inv HReadMap.
     inv HUpdatedRegs; auto.
     discriminate.
-  - admit.
+  - assert (SemRegMapExpr (UpdRegMap r (Const type true) e writeMap) (old, (((r, existT _ k (evalExpr e)) :: hd nil upds) :: tl upds))) as P0.
+    {
+      econstructor; eauto.
+      
   - admit.
   - inv H; EqDep_subst.
     specialize (IHa _ _ _ HSem _ _ _ _ HSemCompActionT); dest; subst.
-    exists x, x0; split; auto.
+    exists x, x0, x1; repeat split; auto.
     constructor; assumption.
-  - exists nil, nil; simpl in *.
+  - exists nil, nil, nil; simpl in *.
     inv H; EqDep_subst.
-    split; [|constructor; auto].
+    repeat split; [ | |constructor]; auto.
     destruct upds'.
     destruct (SemRegExprVals HSem HRegMap); subst.
     destruct l; simpl in *; auto.
 Admitted.
+ *)
