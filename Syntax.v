@@ -1081,13 +1081,13 @@ Section Semantics.
       k (a: ActionT type k) (v: type k) retK (fret: type retK)
       (cont: type k -> ActionT type retK)
       readRegs newRegs readRegsCont newRegsCont calls callsCont
-      (HDisjRegs: DisjKey newRegsCont newRegs)
+      (HDisjRegs: DisjKey newRegs newRegsCont)
       (HSemAction: SemAction a readRegs newRegs calls v)
       (HSemActionCont: SemAction (cont v) readRegsCont newRegsCont callsCont fret)
       uReadRegs uNewRegs uCalls
-      (HReadRegs: uReadRegs = readRegsCont ++ readRegs)
-      (HNewRegs: uNewRegs = newRegsCont ++ newRegs)
-      (HCalls: uCalls = callsCont ++ calls):
+      (HReadRegs: uReadRegs = readRegs ++ readRegsCont)
+      (HNewRegs: uNewRegs = newRegs ++ newRegsCont)
+      (HCalls: uCalls = calls ++ callsCont):
       SemAction (LetAction a cont) uReadRegs uNewRegs uCalls fret
   | SemReadNondet
       valueT (valueV: fullType type valueT)
@@ -1120,14 +1120,14 @@ Section Semantics.
       (r1: type k1)
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2  newRegs1 newRegs2 calls1 calls2 (r2: type k2)
-      (HDisjRegs: DisjKey newRegs2 newRegs1)
+      (HDisjRegs: DisjKey newRegs1 newRegs2)
       (HTrue: evalExpr p = true)
       (HAction: SemAction a readRegs1 newRegs1 calls1 r1)
       (HSemAction: SemAction (cont r1) readRegs2 newRegs2 calls2 r2)
       ureadRegs unewRegs ucalls
-      (HUReadRegs: ureadRegs = readRegs2 ++ readRegs1)
-      (HUNewRegs: unewRegs = newRegs2 ++ newRegs1)
-      (HUCalls: ucalls = calls2 ++ calls1):
+      (HUReadRegs: ureadRegs = readRegs1 ++ readRegs2)
+      (HUNewRegs: unewRegs = newRegs1 ++ newRegs2)
+      (HUCalls: ucalls = calls1 ++ calls2) :
       SemAction (IfElse p a a' cont) ureadRegs unewRegs ucalls r2
   | SemIfElseFalse
       (p: Expr type (SyntaxKind Bool)) k1
@@ -1136,14 +1136,14 @@ Section Semantics.
       (r1: type k1)
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 (r2: type k2)
-      (HDisjRegs: DisjKey newRegs2 newRegs1)
+      (HDisjRegs: DisjKey newRegs1 newRegs2)
       (HFalse: evalExpr p = false)
       (HAction: SemAction a' readRegs1 newRegs1 calls1 r1)
       (HSemAction: SemAction (cont r1) readRegs2 newRegs2 calls2 r2)
       ureadRegs unewRegs ucalls
-      (HUReadRegs: ureadRegs = readRegs2 ++ readRegs1)
-      (HUNewRegs: unewRegs = newRegs2 ++ newRegs1)
-      (HUCalls: ucalls = calls2 ++ calls1):
+      (HUReadRegs: ureadRegs = readRegs1 ++ readRegs2)
+      (HUNewRegs: unewRegs = newRegs1 ++ newRegs2)
+      (HUCalls: ucalls = calls1 ++ calls2):
       SemAction (IfElse p a a' cont) ureadRegs unewRegs ucalls r2
   | SemSys
       (ls: list (SysT type)) k (cont: ActionT type k)
