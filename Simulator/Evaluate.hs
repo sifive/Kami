@@ -20,16 +20,16 @@ import GHC.Base (unsafeCoerce#)
 unsafeCoerce :: a -> b
 unsafeCoerce = unsafeCoerce#
 
-list_of_word :: T.Coq_word -> [Bool]
-list_of_word T.WO = []
-list_of_word (T.WS b _ w) = b : (list_of_word w)
+-- list_of_word :: T.Coq_word -> [Bool]
+-- list_of_word T.WO = []
+-- list_of_word (T.WS b _ w) = b : (list_of_word w)
 
 class Eval a b where
     eval :: a -> b
 
 instance Eval T.ConstT Val where
     eval (T.ConstBool b) = BoolVal b
-    eval (T.ConstBit _ w) = BVVal $ BV.fromBits $ reverse $ list_of_word w
+    eval (T.ConstBit _ (n,v)) = BVVal $ BV.bitVec n v
     eval (T.ConstStruct n _ names fields) = StructVal $ map 
         (\i -> (names i, eval $ fields i)) (T.getFins n)
     eval (T.ConstArray n _ vals) = ArrayVal $ V.map (eval . vals) (V.fromList $ T.getFins n)

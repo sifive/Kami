@@ -29,8 +29,8 @@ readTok n txt = let txt' = T.filter (/= '_') txt in
 getToks :: Int -> T.Text -> [(Integer, BV.BV)]
 getToks n text = toks_to_addr_vals $ concat $ map ((map $ readTok n) . (filter (not . T.null)) . (T.split isSpace)) $ T.lines text
 
-word_of_bv :: BV.BV -> H.Coq_word
-word_of_bv v = H.natToWord (BV.size v) (fromIntegral $ BV.nat v)
+word_of_bv :: BV.BV -> (Int,Integer)
+word_of_bv v = (BV.size v, BV.nat v)
 
 expr_of_bv :: BV.BV -> H.Expr Val
 expr_of_bv v = H.Const (H.Bit $ BV.size v) $ H.ConstBit (BV.size v) $ word_of_bv v
@@ -41,17 +41,16 @@ toks_to_addr_vals = go 0 where
     go n ((Addr k):toks) = go k toks
     go n ((Value bs):toks) = (n,bs) : go (n+1) toks
 
-offset_pairs :: [(Integer, BV.BV)] -> (Int, [(Integer, BV.BV)])
-offset_pairs [] = (0, [])
-offset_pairs ((n,v):ps) = (fromIntegral n, (0,v):map (\(i,v') -> (i-n, v')) ps)
+offset_pairs :: Int -> [(Integer, BV.BV)] -> [(Integer, BV.BV)]
+offset_pairs offset ps = map (\(i,v) -> (i - fromIntegral offset,v)) ps
 
-parseHex :: Bool -> H.Kind -> Int ->  FilePath -> IO (V.Vector Val, Int)
-parseHex isAscii k arrSize filepath
+parseHex :: Bool -> H.Kind -> Int -> Int -> FilePath -> IO (V.Vector Val)
+parseHex isAscii k arrSize offset filepath
     | isAscii = do
         text <- T.readFile filepath
-        let (n,pairs) = offset_pairs $ getToks (H.size k) text
-        let v_init = V.replicate (arrSize - n) (defVal k)
+        let pairs = offset_pairs offset $ getToks (H.size k) text
+        let v_init = V.replicate (arrSize - offset) (defVal k)
         let val_pairs = map (\(i,v) -> (fromIntegral i, eval $ H.unpack k $ expr_of_bv v)) pairs
-        return (v_init V.// val_pairs, n)
+        return $ v_init V.// val_pairs
 
     | otherwise = error "Binary not yet supported."
