@@ -238,8 +238,9 @@ Proof.
 Qed.
 
 Lemma predFalse_UpdsNil k a:
-  forall (bexpr: Bool @# type) old regMap1 regMap2 calls val (HNbexpr : evalExpr bexpr = false) rexpr (HRegMap : SemRegMapExpr rexpr regMap1),
-    @SemCompActionT k (compileAction (old, nil) a bexpr rexpr) regMap2 calls val ->
+  forall (bexpr: Bool @# type) o regMap1 regMap2 calls val
+         (HNbexpr : evalExpr bexpr = false) rexpr (HRegMap : SemRegMapExpr rexpr regMap1),
+    @SemCompActionT k (compileAction (o, nil) a bexpr rexpr) regMap2 calls val ->
     regMap1 = regMap2 /\ calls = nil.
 Proof.
   induction a; intros.
@@ -259,7 +260,7 @@ Proof.
     rewrite TMP in HSemCompActionT_a.
     inv HSemCompActionT_a; EqDep_subst.
     inv HRegMapWf; inv H; EqDep_subst;[congruence|].
-    assert (SemRegMapExpr (VarRegMap type (old0, upds)) (old0, upds));[constructor|].
+    assert (SemRegMapExpr (VarRegMap type (old, upds)) (old, upds));[constructor|].
     specialize (IHa _ _ _ _ _ _ HNbexpr _ H HSemCompActionT_cont); dest.
     rewrite (SemRegExprVals HRegMap HSemRegMap); auto.
   - simpl in *; inv H0; EqDep_subst.
@@ -306,36 +307,37 @@ Qed.
 
 Lemma EquivActions k a:
   forall
-    writeMap old upds
+    writeMap o old upds
+    (HConsistent : getKindAttr o = getKindAttr old)
     (WfMap : WfRegMapExpr writeMap (old, upds)),
   forall calls retl upds',
-    @SemCompActionT k (compileAction (old, nil) a (Const type true) writeMap) upds' calls retl ->
+    @SemCompActionT k (compileAction (o, nil) a (Const type true) writeMap) upds' calls retl ->
     (forall u, In u (snd upds') -> NoDup (map fst u) /\ SubList (getKindAttr u) (getKindAttr old)) /\
     exists newRegs readRegs,
       upds' = (old, match newRegs with
                     |nil => upds
                     |_ :: _ => (hd nil upds ++ newRegs) :: tl upds
                     end) /\
-      SemAction old a readRegs newRegs calls retl.
+      SemAction o a readRegs newRegs calls retl.
 Proof.
   induction a; subst; intros; simpl in *.
   - inv H0; EqDep_subst;[|discriminate].
-    specialize (H _ _ _ _ WfMap _ _ _ HSemCompActionT); dest; split; auto.
+    specialize (H _ _ _ _ _ HConsistent WfMap _ _ _ HSemCompActionT); dest; split; auto.
     exists x, x0; split; auto.
     econstructor; eauto.
   - inv H0; EqDep_subst.
-    specialize (H _ _ _ _ WfMap _ _ _ HSemCompActionT); dest; split; auto.
+    specialize (H _ _ _ _ _ HConsistent WfMap _ _ _ HSemCompActionT); dest; split; auto.
     exists x, x0; split; auto.
     econstructor; eauto.
   - inv H0; EqDep_subst.
-    specialize (IHa _ _ _ WfMap _ _ _ HSemCompActionT_a); dest.
+    specialize (IHa _ _ _ _ HConsistent WfMap _ _ _ HSemCompActionT_a); dest.
     assert (WfRegMapExpr (VarRegMap type regMap_a) regMap_a) as WfMap0.
     { unfold WfRegMapExpr; split;[econstructor|].
       destruct regMap_a; inv H1; intros.
       apply (H0 _ H1).
     }
     rewrite H1 in *.
-    specialize (H _ _ _ _ WfMap0 _ _ _ HSemCompActionT_cont); dest.
+    specialize (H _ _ _ _ _ HConsistent WfMap0 _ _ _ HSemCompActionT_cont); dest.
     split; auto.
     exists (x++x1), (x0++x2); split.
     + destruct x1; simpl in *; auto.
@@ -354,11 +356,11 @@ Proof.
       destruct (NoDup_app_Disj string_dec _ _ H k); auto.
       apply H2; rewrite in_app_iff; right; auto.
   - inv H0; EqDep_subst.
-    specialize (H _ _ _ _ WfMap _ _ _ HSemCompActionT); dest; split; auto.
+    specialize (H _ _ _ _ _ HConsistent WfMap _ _ _ HSemCompActionT); dest; split; auto.
     exists x, x0; split; auto.
     econstructor; eauto.
   - inv H0; EqDep_subst.
-    specialize (H _ _ _ _ WfMap _ _ _ HSemCompActionT); dest; split; auto.
+    specialize (H _ _ _ _ _ HConsistent WfMap _ _ _ HSemCompActionT); dest; split; auto.
     exists x, ((r, existT _ k regVal) :: x0).
     split; auto.
     econstructor; eauto.
@@ -375,17 +377,18 @@ Proof.
     assert (WfRegMapExpr (VarRegMap type (r0, (hd nil upds0 ++ (r, existT (fullType type) k (evalExpr e)) :: nil) :: tl upds0))
                          (r0, (hd nil upds0 ++ (r, existT (fullType type) k (evalExpr e)) :: nil) :: tl upds0)) as WfMap0.
     { split; auto. constructor. }
-    specialize (IHa _ _ _ WfMap0 _ _ _ HSemCompActionT_cont); dest; simpl in *; split; auto.
+    specialize (IHa _ _ _ _ HConsistent WfMap0 _ _ _ HSemCompActionT_cont);
+      dest; simpl in *; split; auto.
     exists ((r, existT (fullType type) k (evalExpr e)) :: nil ++ x), x0; split.
     + destruct x; simpl in *; auto.
       rewrite <- app_assoc in H3. rewrite <-app_comm_cons in H3.
       simpl in H3; auto.
     + rewrite H3 in H; simpl in *; destruct x; econstructor; eauto; simpl in *; specialize (H _ (or_introl _ eq_refl)); dest.
-      * rewrite map_app in H6; simpl in *.
+      * rewrite map_app, <-HConsistent in H6; simpl in *.
         apply (H6 (r, k)).
         rewrite in_app_iff; right; left; reflexivity.
       * repeat intro; inv H7.
-      * rewrite map_app in H6; simpl in *.
+      * rewrite map_app, <-HConsistent in H6; simpl in *.
         apply (H6 (r, k)).
         rewrite map_app; repeat rewrite in_app_iff; simpl; auto.
       * repeat intro.
@@ -412,14 +415,14 @@ Proof.
       assert (evalExpr (!e)%kami_expr = false) as P5.
       { simpl; rewrite <- HeqP0; auto. }
       specialize (SemCompActionEquivBexpr _ _ _ _ _ P4 P2) as P6.
-      specialize (IHa1 _ _ _ WfMap _ _ _ P6); dest.
+      specialize (IHa1 _ _ _ _ HConsistent WfMap _ _ _ P6); dest.
       rewrite <- HeqP0 in HSemCompActionT.
       destruct (predFalse_UpdsNil _ _ _ P5 (SemVarRegMap regMap_a) P3).
       assert (WfRegMapExpr (VarRegMap type regMap_a0) regMap_a0) as P7.
       { unfold WfRegMapExpr; split; [constructor|]. subst; eauto. }
       rewrite <- H3 in P7 at 2.
       rewrite H1 in P7.
-      specialize (H _ _ _ _ P7 _ _ _ HSemCompActionT); dest.
+      specialize (H _ _ _ _ _ HConsistent P7 _ _ _ HSemCompActionT); dest.
       split; auto.
       exists (x++x1), (x0++x2).
       destruct x; simpl; split; auto.
@@ -450,12 +453,12 @@ Proof.
         clear - WfMap.
         unfold WfRegMapExpr in *; dest; repeat split;[constructor| |]; eapply H0; eauto.
       }
-      specialize (IHa2 _ _ _ WfMap0 _ _ _ P6); dest.
+      specialize (IHa2 _ _ _ _ HConsistent WfMap0 _ _ _ P6); dest.
       rewrite <- HeqP0 in HSemCompActionT.
       assert (WfRegMapExpr (VarRegMap type regMap_a0) regMap_a0) as P7.
       { unfold WfRegMapExpr; split; [constructor|]. subst; eauto. }
       rewrite  H5 in P7 at 2.
-      specialize (H _ _ _ _ P7 _ _ _ HSemCompActionT); dest.
+      specialize (H _ _ _ _ _ HConsistent P7 _ _ _ HSemCompActionT); dest.
       split; auto.
       exists (x++x1), (x0++x2).
       destruct x; simpl; split; auto.
@@ -476,7 +479,7 @@ Proof.
         left; intro; apply H1.
         rewrite map_app, in_app_iff; auto.
   - inv H; EqDep_subst.
-    specialize (IHa _ _ _ WfMap _ _ _ HSemCompActionT); dest; split; auto.
+    specialize (IHa _ _ _ _ HConsistent WfMap _ _ _ HSemCompActionT); dest; split; auto.
     exists x, x0.
     split; auto.
     econstructor; eauto.
