@@ -23,6 +23,9 @@ ppVecLen n = "[" ++ show (n-1) ++ ":0]"
 finToInt :: (Int,Int) -> Int
 finToInt = snd
 
+deformat :: String -> String
+deformat = concatMap (\c -> if c == '\n' then "\\n" else c:[])
+
 ppTypeVec :: T.Kind -> Int -> (T.Kind, [Int])
 ppTypeVec k@(T.Array i' k') i =
   let (k'', is) = ppTypeVec k' i'
@@ -58,7 +61,7 @@ ppPrintVar (s, v) = ppName $ s ++ if v /= 0 then '#' : show v else []
 
 padwith :: a -> Int -> [a] -> [a]
 padwith x n xs = let m = n - length xs in
-  if m > 0 then replicate m x ++ xs else xs
+  if m > 0 then replicate m x ++ xs else drop (-m) xs
 
 ppWord :: (Int,Integer) -> String
 ppWord (n,i) = padwith '0' n $ showIntAtBase 2 intToDigit i ""
@@ -373,7 +376,7 @@ ppExprList (T.Struct n fk fs) e = concatMap (\i -> ppExprList (fk i) (T.RtlReadS
 ppExprList (T.Array n k) e = concatMap (\i -> ppExprList k (T.RtlReadArrayConst n k e i)) (T.getFins n)
 
 ppRtlSys :: T.RtlSysT -> State (H.Map String (Int, T.Kind)) String
-ppRtlSys (T.RtlDispString s) = return $ "        $write(\"" ++ s ++ "\");\n"
+ppRtlSys (T.RtlDispString s) = return $ "        $write(\"" ++ deformat s ++ "\");\n"
 ppRtlSys (T.RtlDispExpr k e f) = do
   printExprs <- mapM (\i -> ppRtlExpr "sys" i) (ppExprList k e)
   return $ "        $write(\"" ++ ppFullFormat f ++ "\"" ++ concatMap (\x -> ", " ++ x) printExprs ++ ");\n"

@@ -50,7 +50,7 @@ sysIO :: T.SysT Val -> IO ()
 sysIO T.Finish = do
     hPutStrLn stdout "Exiting..."
     exitSuccess
-sysIO (T.DispString msg) = hPutStr stdout $ format_string msg
+sysIO (T.DispString msg) = hPutStr stdout $ {- format_string -} msg
 sysIO (T.DispExpr _ e ff) = hPutStr stdout $ printVal ff $ eval e
 
 format_string :: String -> String
@@ -58,5 +58,5 @@ format_string [] = []
 format_string ('\\':'n':rest) = '\n': format_string rest
 format_string ('\\':'r':rest) = '\r': format_string rest
 format_string ('\\':'t':rest) = '\t': format_string rest
-format_string ('\\':_:rest) = error "backlash encountered."
+format_string ('\\':_:rest) = error "backslash encountered."
 format_string (c:rest) = c : format_string rest
