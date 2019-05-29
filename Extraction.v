@@ -12,13 +12,12 @@ Set Extraction KeepSingleton.
 Unset Extraction AutoInline.
 
 Extract Inductive sigT => "(,)" ["(,)"].
-Extract Inductive word => "(Prelude.Int,Prelude.Integer)" ["(0,0)" "(\b _ (n,v) -> let v' = Data.Bits.shiftL v 1 in if b then (n Prelude.+1,Data.Bits.setBit v' 0) else (n Prelude.+1,v'))"]
-  "(\f0 fS (n,v) -> if n Prelude.== 0 then f0 () else fS (Data.Bits.testBit v 0) (n Prelude.-1) ((n Prelude.-1), Data.Bits.shiftR v 1))".
-Extract Inductive Fin.t => "(Prelude.Int,Prelude.Int)" ["(\n -> (n,0))" "(\n (_,i) -> (n,Prelude.succ i))"]
-  "(\f0 fS (n,i) -> if i Prelude.== 0 then f0 n else fS n (n Prelude.-1, i Prelude.-1))".
+Extract Inductive word => "CustomExtract.EWord" ["CustomExtract.wordNil" "CustomExtract.wordCons"] "CustomExtract.wordRec".
+Extract Inductive Fin.t => "CustomExtract.EFin" ["CustomExtract.fin0" "CustomExtract.finS"] "CustomExtract.finRec".
 (* Extract Inductive Vector.t => "[]" ["[]" "(\x xs -> x : xs)"] "(\fnil fcons xs -> case xs of { [] -> fnil (); (x:xs) -> fcons x xs })".
 Extract Inductive Vector.t => "[]" ["[]" "(:)"].
  *)
+
 Extract Inlined Constant fst => "Prelude.fst".
 Extract Inlined Constant snd => "Prelude.snd".
 Extract Inlined Constant projT1 => "Prelude.fst".
