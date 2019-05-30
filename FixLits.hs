@@ -6,7 +6,45 @@ import qualified Data.Text.IO as T
 import Data.Char (isSpace)
 import System.Environment (getArgs)
 
-data Tok = White T.Text | Txt T.Text | LParen | RParen | Zero | Succ | Nil | Cons | Chr Char | NatLit Int | StringLit T.Text
+import CustomExtract
+
+data Tok =
+
+    --text
+      White T.Text
+    | Txt T.Text
+    | LParen
+    | RParen
+
+    --nats
+    | Zero
+    | Succ
+    | NatLit Int
+
+    --strings
+    | Nil
+    | Cons
+    | Chr Char
+    | StringLit T.Text
+
+    --words
+    | WNil
+    | WCons
+    | BoolLit Bool
+    | WordLit EWord
+
+    --fins
+    | FZero
+    | FSucc
+    | FLit EFin
+
+    --vectors
+    | VNil
+    | VCons
+    | VecLit [T.Text]
+
+
+
     deriving (Show)
 
 assert :: Bool -> Maybe ()
@@ -38,13 +76,25 @@ toks txt
                     Just rest -> Zero : toks rest
                     Nothing -> case T.stripPrefix "Prelude.succ" txt of
                         Just rest -> Succ : toks rest
-                        Nothing -> case T.stripPrefix "[]" txt of
-                            Just rest -> Nil : toks rest
-                            Nothing -> case stripChar txt of
-                                Just (c,rest) -> (Chr c) : (toks rest)
-                                Nothing -> case isSpace $ T.head txt of
-                                    True -> let (white,rest) = T.span isSpace txt in (White white) : toks rest
-                                    False -> let (txt',rest) = T.span (\c -> not $ isSpace c && c /= '(' && c /= ')') txt in (Txt txt') : toks rest
+                        Nothing -> case T.stripPrefix "CustomExtract.wordNil" txt of
+                            Just rest -> WNil : toks rest
+                            Nothing -> case T.stripPrefix "CustomExtract.wordCons" txt of
+                                Just rest -> WCons : toks rest
+                                Nothing -> case T.stripPrefix "Prelude.True" txt of
+                                    Just rest -> BoolLit True : toks rest
+                                    Nothing -> case T.stripPrefix "Prelude.False" txt of
+                                        Just rest -> BoolLit False : toks rest
+                                        Nothing -> case T.stripPrefix "CustomExtract.fin0" txt of
+                                            Just rest -> FZero : toks rest
+                                            Nothing -> case T.stripPrefix "CustomExtract.finS" txt of
+                                                Just rest -> FSucc : toks rest
+                                                Nothing -> case T.stripPrefix "[]" txt of
+                                                    Just rest -> Nil : toks rest
+                                                    Nothing -> case stripChar txt of
+                                                        Just (c,rest) -> (Chr c) : (toks rest)
+                                                        Nothing -> case isSpace $ T.head txt of
+                                                            True -> let (white,rest) = T.span isSpace txt in (White white) : toks rest
+                                                            False -> let (txt',rest) = T.span (\c -> not $ isSpace c && c /= '(' && c /= ')') txt in (Txt txt') : toks rest
 
 drop_rps :: Int -> [Tok] -> [Tok]
 drop_rps n ts 
@@ -69,6 +119,35 @@ parse_string ts = go T.empty ts where
     go acc (LParen:rest) = go acc rest
     go _ _ = Nothing
 
+parse_word :: [Tok] -> Maybe ([Bool], [Tok])
+parse_word ts = go [] ts where
+    go bs (WCons:_:BoolLit b:rest) = do
+        (n,rest') <- parse_nat rest
+        go (b:bs) rest'
+    go bs (WNil:rest) = Just (bs, drop_rps (length bs-1) rest)
+    go bs ((White _):rest) = go bs rest
+    go bs (LParen:rest) = go bs rest
+    go bs (RParen:rest) = go bs rest
+    go _ _ = Nothing
+
+parse_fin :: [Tok] -> Maybe (EFin, [Tok])
+parse_fin ts = go (0,0) ts where
+    go x (FSucc:rest) = do
+        (n,rest') <- parse_nat rest
+        go (finS n x) rest'
+    go x (FZero:_:LParen:rest) = do
+        (n,rest') <- parse_nat rest
+        let (k,i) = x
+        return ((k+n,i), drop_rps (k+1) rest')
+    go x (FZero:rest) = do
+        (n,rest') <- parse_nat rest
+        let (k,i) = x
+        return ((k+n,i), drop_rps (k) rest')
+    go x ((White _):rest) = go x rest
+    go x (LParen:rest) = go x rest
+    go x (RParen:rest) = go x rest
+    go _ _ = Nothing
+
 fix_lits :: [Tok] -> [Tok]
 fix_lits ts = case ts of
     [] -> []
@@ -78,6 +157,12 @@ fix_lits ts = case ts of
     (Cons:rest) -> case parse_string ts of
         Just (txt,rest') -> (StringLit txt) : fix_lits rest'
         Nothing -> Cons : fix_lits rest
+    (WCons:rest) -> case parse_word ts of
+        Just (bs,rest') -> (WordLit $ foldr (\b (n,v) -> wordCons b n (n,v)) wordNil $ reverse bs) : fix_lits rest' 
+        Nothing -> WCons : fix_lits rest
+    (FSucc:rest) -> case parse_fin ts of
+        Just (x,rest') -> (FLit x) : fix_lits rest'
+        Nothing -> FSucc : fix_lits rest
     (t:rest) -> t : fix_lits rest
 
 single_quotes :: Char -> T.Text
@@ -98,6 +183,13 @@ print_tok Cons = "(:)"
 print_tok (Chr c) = single_quotes c
 print_tok (NatLit n) = T.pack $ show n
 print_tok (StringLit str) = double_quotes str
+print_tok WNil = "CustomExtract.wordNil"
+print_tok WCons = "CustomExtract.wordCons"
+print_tok (BoolLit b) = if b then "Prelude.True" else "Prelude.False"
+print_tok (WordLit w) = T.pack $ show w
+print_tok FZero = "CustomExtract.fin0"
+print_tok FSucc = "CustomExtract.finS"
+print_tok (FLit x) = T.pack $ show x
 
 -- foomain :: IO()
 -- foomain = do

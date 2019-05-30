@@ -36,7 +36,7 @@ fin0 :: Int -> EFin
 fin0 n = (n,0)
 
 finS :: Int -> EFin -> EFin
-finS n (_,i) = (n,i+1)
+finS _ (n,i) = (n+1,i+1)
 
 finRec :: (Int -> a) -> (Int -> EFin -> a) -> EFin -> a
 finRec f0 fS (n,i) = if i == 0 then f0 n else fS n (n-1, i-1)
