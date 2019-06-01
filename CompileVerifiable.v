@@ -698,24 +698,6 @@ Section Properties.
         exists (s, s0); auto.
   Qed.
   
-  Lemma PriorityDoubleNil o:
-    NoDup (map fst o) ->
-    forall o',
-      PriorityUpds o (nil::nil) o' ->
-      o = o'.
-  Proof.
-    intros.
-    inv H0; inv HFullU; inv prevCorrect;[|discriminate]; simpl in *.
-    apply getKindAttr_map_fst in currRegsTCurr.
-    assert (forall s v, In (s, v) o' -> In (s, v) prevRegs).
-    { intros.
-      destruct (Hcurr _ _ H0);[contradiction|dest]; auto.
-    }
-    symmetry.
-    apply KeyMatch; auto.
-    rewrite currRegsTCurr in H; assumption.
-  Qed.
-  
   Lemma CompactPriorityUpds upds:
     forall old,
       NoDup (map fst old) ->
@@ -723,7 +705,17 @@ Section Properties.
         PriorityUpds old (nil::upds) new -> PriorityUpds old upds new.
   Proof.
     induction upds; intros.
-    - rewrite (PriorityDoubleNil H H0); constructor.
+    - enough (old = new).
+      { subst; constructor. }
+      inv H0; inv HFullU; inv prevCorrect;[|discriminate]; simpl in *.
+      apply getKindAttr_map_fst in currRegsTCurr.
+      assert (forall s v, In (s, v) new -> In (s, v) prevRegs).
+      { intros.
+        destruct (Hcurr _ _ H0);[contradiction|dest]; auto.
+      }
+      symmetry.
+      apply KeyMatch; auto.
+      rewrite currRegsTCurr in H; assumption.
     - inv H0; inv HFullU.
       enough ( new = prevRegs).
       { rewrite H0; auto. }
@@ -876,4 +868,21 @@ Section Properties.
         * reflexivity.
   Qed.
 
+  Corollary EquivLoop' {m : BaseModule} {o ls rules upds calls retl}
+            (HTrace : Trace m o ls) (HoInitNoDups : NoDup (map fst o))
+            (HNoMeths : (getMethods m) = nil) (HValidSch : SubList rules (getRules m)):
+    @SemCompActionT Void (compileRules type (o, nil) rules) (o, upds) calls retl ->
+    (forall u, In u upds -> (NoDup (map fst u)) /\ SubList (getKindAttr u) (getKindAttr o)) /\
+    exists o' (ls' : list (list FullLabel)),
+      PriorityUpds o upds o' /\
+      concat upds = getLabelUpds (concat ls') /\
+      getLabelCalls (concat (rev ls')) = calls /\
+      Trace m o' (ls' ++ ls).
+  Proof.
+    rewrite <- (rev_involutive rules).
+    assert (SubList (rev rules) (getRules m)) as P0.
+    { repeat intro; apply HValidSch; rewrite in_rev; assumption. }
+    eapply EquivLoop; eauto.
+  Qed.
+      
 End Properties.
