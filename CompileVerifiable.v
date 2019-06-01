@@ -85,7 +85,7 @@ Section Semantics.
     Variable o: RegsT.
     Inductive PriorityUpds: UpdRegsT -> RegsT -> Prop :=
     | NoUpds: PriorityUpds nil o
-    | ConsUpds (upds: UpdRegsT) (prevUpds: UpdRegsT) (prevRegs: RegsT)
+    | ConsUpds (prevUpds: UpdRegsT) (prevRegs: RegsT)
                (prevCorrect: PriorityUpds prevUpds prevRegs)
                (u: UpdRegT)
                (curr: RegsT)
@@ -744,7 +744,7 @@ Section Properties.
       (forall u, In u upds -> (NoDup (map fst u)) /\ SubList (getKindAttr u) (getKindAttr o)) /\
       exists o' (ls' : list (list FullLabel)),
         PriorityUpds o upds o' /\
-        concat upds = getLabelUpds (concat ls') /\
+        upds = (map getLabelUpds ls') /\
         getLabelCalls (concat (rev ls')) = calls /\
         Trace m o' (ls' ++ ls).
   Proof.
@@ -797,9 +797,10 @@ Section Properties.
       clear H8; subst.
       exists (doUpdRegs x1 x), (((x1, (Rle (fst a), calls_cont0))::nil)::x0).
       unfold getLabelCalls, getLabelUpds in *; simpl in *.
-      rewrite <- H3; simpl in *.
+      (* rewrite <- H3; simpl in *. *)
+      rewrite app_nil_r.
       repeat split; auto.
-      + econstructor; auto.
+      + econstructor 2 with (u := x1); auto.
         * rewrite CompactPriorityUpds_iff in H2; auto.
           apply H2.
         * specialize (H7 _ (or_introl eq_refl)); dest.
@@ -809,21 +810,21 @@ Section Properties.
              assumption.
           -- intros.
              rewrite <- (prevPrevRegsTrue' H2).
-             apply H7.
+             apply H4.
              rewrite in_map_iff.
              exists (s, v); simpl; split; auto.
         * repeat intro.
           rewrite (getKindAttr_map_fst _ _ (prevPrevRegsTrue' H2)) in HoInitNoDups.
           specialize (H7 _ (or_introl eq_refl)); dest.
-          rewrite (prevPrevRegsTrue' H2) in H8.
-          specialize (doUpdRegs_UpdRegs _ (HoInitNoDups) _ H7 H8) as P4.
+          rewrite (prevPrevRegsTrue' H2) in H7.
+          specialize (doUpdRegs_UpdRegs _ (HoInitNoDups) _ H4 H7) as P4.
           unfold UpdRegs in P4; dest.
-          specialize (H11 _ _ H4); dest.
-          destruct H11; dest.
-          -- inv H11; auto.
-             inv H13.
+          specialize (H10 _ _ H3); dest.
+          destruct H10; dest.
+          -- inv H10; auto.
+             inv H12.
           -- right; split; auto.
-             intro; apply H11.
+             intro; apply H10.
              exists x1; split; simpl; auto.
       + repeat rewrite concat_map.
         repeat rewrite map_app; simpl.
@@ -833,7 +834,7 @@ Section Properties.
       + destruct a; simpl in *.
         econstructor 2.
         * apply H5.
-        * assert (Step m x ((x1, (Rle s, calls_cont0))::nil)).
+        * assert (Step m x ((x1, (Rle s, calls_cont0))::nil)) as P3.
           { econstructor.
             - econstructor 2; eauto; specialize (Trace_sameRegs HTrace) as TMP; simpl in *.
               + rewrite <- TMP, (prevPrevRegsTrue' H2); reflexivity.
@@ -843,16 +844,16 @@ Section Properties.
               + specialize (H7 _ (or_introl eq_refl)); dest.
                 rewrite <- TMP, (prevPrevRegsTrue' H2).
                 apply (SemActionUpdSub H9).
-              + intros; inv H4.
-              + intros; inv H4.
+              + intros; inv H3.
+              + intros; inv H3.
               + econstructor.
                 rewrite <- TMP.
                 apply (eq_sym (prevPrevRegsTrue' H2)).
             - unfold MatchingExecCalls_Base; intros.
-              rewrite HNoMeths in H4.
-              inv H4.
+              rewrite HNoMeths in H3.
+              inv H3.
           }
-          apply H4.
+          apply P3.
         * simpl.
           apply doUpdRegs_enuf; auto.
           -- specialize (H7 _ (or_introl (eq_refl))); dest; auto.
@@ -862,7 +863,7 @@ Section Properties.
              ++ intros.
                 specialize (H7 _ (or_introl (eq_refl))); dest.
                 rewrite <-(prevPrevRegsTrue' H2).
-                apply H8.
+                apply H7.
                 rewrite in_map_iff.
                 exists (s0, v); auto.
         * reflexivity.
@@ -875,7 +876,7 @@ Section Properties.
     (forall u, In u upds -> (NoDup (map fst u)) /\ SubList (getKindAttr u) (getKindAttr o)) /\
     exists o' (ls' : list (list FullLabel)),
       PriorityUpds o upds o' /\
-      concat upds = getLabelUpds (concat ls') /\
+      upds = (map getLabelUpds ls') /\
       getLabelCalls (concat (rev ls')) = calls /\
       Trace m o' (ls' ++ ls).
   Proof.
