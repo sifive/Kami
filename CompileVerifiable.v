@@ -745,7 +745,7 @@ Section Properties.
       exists o' (ls' : list (list FullLabel)),
         PriorityUpds o upds o' /\
         upds = (map getLabelUpds ls') /\
-        getLabelCalls (concat (rev ls')) = calls /\
+        calls = concat (map getLabelCalls (rev ls')) /\
         Trace m o' (ls' ++ ls).
   Proof.
     induction rules; simpl in *; intros.
@@ -797,7 +797,6 @@ Section Properties.
       clear H8; subst.
       exists (doUpdRegs x1 x), (((x1, (Rle (fst a), calls_cont0))::nil)::x0).
       unfold getLabelCalls, getLabelUpds in *; simpl in *.
-      (* rewrite <- H3; simpl in *. *)
       rewrite app_nil_r.
       repeat split; auto.
       + econstructor 2 with (u := x1); auto.
@@ -826,10 +825,9 @@ Section Properties.
           -- right; split; auto.
              intro; apply H10.
              exists x1; split; simpl; auto.
-      + repeat rewrite concat_map.
-        repeat rewrite map_app; simpl.
+      + repeat rewrite map_app; simpl.
         repeat rewrite concat_app; simpl.
-        rewrite app_nil_r.
+        repeat rewrite app_nil_r.
         reflexivity.
       + destruct a; simpl in *.
         econstructor 2.
@@ -877,7 +875,7 @@ Section Properties.
     exists o' (ls' : list (list FullLabel)),
       PriorityUpds o upds o' /\
       upds = (map getLabelUpds ls') /\
-      getLabelCalls (concat (rev ls')) = calls /\
+      calls = concat (map getLabelCalls (rev ls')) /\
       Trace m o' (ls' ++ ls).
   Proof.
     rewrite <- (rev_involutive rules).
