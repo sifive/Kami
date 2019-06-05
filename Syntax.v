@@ -522,26 +522,6 @@ Delimit Scope kami_expr_scope with kami_expr.
 Notation "name :: ty" := (name%string,  ty) (only parsing) : kami_struct_scope.
 Delimit Scope kami_struct_scope with kami_struct.
 
-Section nth_Fin.
-  Variable A: Type.
-  Fixpoint nth_Fin (ls: list A): Fin.t (length ls) -> A :=
-    match ls return Fin.t (length ls) -> A with
-    | nil => fun pf => Fin.case0 _ pf
-    | x :: xs => fun i =>
-                   match i in Fin.t n return n = length (x :: xs) -> A with
-                   | Fin.F1 _ => fun _ => x
-                   | Fin.FS _ y => fun pf =>
-                                     nth_Fin xs
-                                             match eq_add_S _ _ pf in _ = Y return Fin.t Y with
-                                             | eq_refl => y
-                                             end
-                   end eq_refl
-    end.
-
-  Definition nth_Fin' (ls: list A) n (pf: n = length ls) (i: Fin.t n): A :=
-    nth_Fin ls (Fin.cast i pf).
-End nth_Fin.
-
 Definition getStruct ls :=
   (Struct (fun i => snd (nth_Fin ls i)) (fun j => fst (nth_Fin ls j))).
 
@@ -1927,112 +1907,11 @@ Notation "name ::= value" :=
           (name%string, _) value) (at level 50) : kami_struct_init_scope.
 Delimit Scope kami_struct_init_scope with struct_init.
 
-
-Definition fin_case n x :
-  forall (P : Fin.t (S n) -> Type),
-    P Fin.F1 ->
-    (forall y, P (Fin.FS y)) ->
-    P x :=
-  match x in Fin.t n0
-     return
-       forall P,
-         match n0 return (Fin.t n0 -> (Fin.t n0 -> Type) -> Type) with
-           | 0 => fun _ _ => False
-           | S m => fun x P => P Fin.F1 -> (forall x0, P (Fin.FS x0)) -> P x
-         end x P
-  with
-    | Fin.F1 _ => fun _ H1 _ => H1
-    | Fin.FS _ _ => fun _ _ HS => HS _
-  end.
-
-Ltac fin_dep_destruct v :=
-  pattern v; apply fin_case; clear v; intros.
-
-Lemma Fin_cast_lemma : forall m n i (p q : m = n),
-  Fin.cast i p = Fin.cast i q.
-Proof.
-  intros.
-  rewrite (UIP_nat _ _ p q); reflexivity.
-Defined.
-
-Definition UIP(X : Type) := forall (x y : X)(p q : x = y), p = q.
-
-Definition discrete(X : Type) := forall (x y : X), {x = y} + {x <> y}.
-
-Theorem hedberg : forall X, discrete X -> UIP X.
-Proof.
-  intros X Xdisc x y.
-
-  assert ( 
-      lemma :
-        forall proof : x = y,  
-          match Xdisc x x, Xdisc x y with
-          | left r, left s => proof = eq_trans (eq_sym r) s
-          | _, _ => False
-          end
-    ).
-  {
-    destruct proof.
-    destruct (Xdisc x x) as [pr | f].
-    destruct pr; auto.
-    elim f; reflexivity.
-  }
-
-  intros p q.
-  assert (p_given_by_dec := lemma p).
-  assert (q_given_by_dec := lemma q).
-  destruct (Xdisc x x).
-  destruct (Xdisc x y).
-  apply (eq_trans p_given_by_dec (eq_sym q_given_by_dec)).
-  contradiction.
-  contradiction.
-Defined.
-
-Definition map_length_red := 
-  (fun (A B : Type) (f : A -> B) (l : list A) =>
-     list_ind (fun l0 : list A => Datatypes.length (map f l0) = Datatypes.length l0) eq_refl
-              (fun (a : A) (l0 : list A) (IHl : Datatypes.length (map f l0) = Datatypes.length l0) =>
-                 f_equal_nat nat S (Datatypes.length (map f l0)) (Datatypes.length l0) IHl) l)
-  : forall (A B : Type) (f : A -> B) (l : list A), Datatypes.length (map f l) = Datatypes.length l.
-  
-Section nth_Fin_map2.
-  Variable A B: Type.
-  Variable g: A -> B.
-  Variable f: B -> Type.
-
-  Fixpoint nth_Fin_map2 (ls: list A):
-    forall (p : Fin.t (length (map g ls)))
-           (val: f (g (nth_Fin ls (Fin.cast p (map_length_red g ls))))),
-      f (nth_Fin (map g ls) p).
-    refine
-      match ls return forall (p : Fin.t (length (map g ls)))
-                             (val: f (g (nth_Fin ls (Fin.cast p (map_length_red g ls))))),
-          f (nth_Fin (map g ls) p) with
-      | nil => fun i _ => Fin.case0 (fun j => f (nth_Fin (map g nil) j)) i
-      | x :: xs => fun p => _
-      end.
-    fin_dep_destruct p.
-    + exact val.
-    + apply (nth_Fin_map2 xs y).
-      match goal with
-      | |- f (g (nth_Fin xs (Fin.cast y ?P))) => 
-        rewrite (hedberg eq_nat_dec P (f_equal Init.Nat.pred (map_length_red g (x :: xs))))
-      end.
-      exact val.
-  Defined.
-End nth_Fin_map2.
-
 Notation getStructVal ls :=
   (BuildStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i))
                (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j))
                (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => Expr _ (SyntaxKind (snd x)))
                                       ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))).
-
-(* Definition getStructVal ty (ls: list {a: Attribute Kind & Expr ty (SyntaxKind (snd a))}) := *)
-(*   (BuildStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i)) *)
-(*                (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j)) *)
-(*                (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => Expr ty (SyntaxKind (snd x))) *)
-(*                                       ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))). *)
 
 Notation "'STRUCT' { s1 ; .. ; sN }" :=
   (getStructVal (cons s1%struct_init ..
@@ -2237,13 +2116,6 @@ Notation "name ::= value" :=
   (existT (fun a : Attribute Kind => ConstT (snd a))
           (name%string, _) value) (at level 50) : kami_struct_initial_scope.
 Delimit Scope kami_struct_initial_scope with struct_initial.
-
-(* Definition getStructConst (ls: list {a: Attribute Kind & ConstT (snd a)}) := *)
-(*   Eval cbv [length map] in *)
-(*     (ConstStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i)) *)
-(*                  (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j)) *)
-(*                  (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => ConstT (snd x)) *)
-(*                                         ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))). *)
 
 Notation getStructConst ls :=
   (ConstStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i))
