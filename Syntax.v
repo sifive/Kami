@@ -2,10 +2,10 @@ Require Export Bool Ascii String List FunctionalExtensionality Psatz PeanoNat.
 Require Export bbv.Word Lib.VectorFacts Lib.EclecticLib.
 
 Export Word.Notations.
+Export ListNotations.
 
 Require Import Permutation RecordUpdate.RecordSet.
 Require Import ZArith.
-Import ListNotations.
 
 Global Set Implicit Arguments.
 Global Set Asymmetric Patterns.
@@ -522,19 +522,39 @@ Delimit Scope kami_expr_scope with kami_expr.
 Notation "name :: ty" := (name%string,  ty) (only parsing) : kami_struct_scope.
 Delimit Scope kami_struct_scope with kami_struct.
 
-Notation getStruct ls :=
-  (Struct (fun i => snd (Vector.nth ls i)) (fun j => fst (Vector.nth ls j))) (only parsing).
+Section nth_Fin.
+  Variable A: Type.
+  Fixpoint nth_Fin (ls: list A): Fin.t (length ls) -> A :=
+    match ls return Fin.t (length ls) -> A with
+    | nil => fun pf => Fin.case0 _ pf
+    | x :: xs => fun i =>
+                   match i in Fin.t n return n = length (x :: xs) -> A with
+                   | Fin.F1 _ => fun _ => x
+                   | Fin.FS _ y => fun pf =>
+                                     nth_Fin xs
+                                             match eq_add_S _ _ pf in _ = Y return Fin.t Y with
+                                             | eq_refl => y
+                                             end
+                   end eq_refl
+    end.
 
-Definition WriteRq lgIdxNum Data := (getStruct (Vector.cons _ ("addr", Bit lgIdxNum) _
-                                                            (Vector.cons _ ("data", Data) _ (Vector.nil _)))).
+  Definition nth_Fin' (ls: list A) n (pf: n = length ls) (i: Fin.t n): A :=
+    nth_Fin ls (Fin.cast i pf).
+End nth_Fin.
+
+Definition getStruct ls :=
+  (Struct (fun i => snd (nth_Fin ls i)) (fun j => fst (nth_Fin ls j))).
+
+Definition WriteRq lgIdxNum Data := (getStruct (cons ("addr", Bit lgIdxNum)
+                                                     (cons ("data", Data) nil))).
 
   (* STRUCT_TYPE { "addr" :: Bit lgIdxNum ; *)
   (*               "data" :: Data }. *)
 
-Definition WriteRqMask lgIdxNum num Data := (getStruct (Vector.cons _ ("addr", Bit lgIdxNum) _
-                                                                    (Vector.cons _ ("data", Array num Data) _
-                                                                                 (Vector.cons _ ("mask", Array num Bool) _
-                                                                                              (Vector.nil _))))).
+Definition WriteRqMask lgIdxNum num Data := (getStruct (cons ("addr", Bit lgIdxNum)
+                                                             (cons ("data", Array num Data)
+                                                                   (cons ("mask", Array num Bool)
+                                                                         nil)))).
 
 (* Definition WriteRqMask lgIdxNum num Data := STRUCT_TYPE { "addr" :: Bit lgIdxNum ; *)
 (*                                                           "data" :: Array num Data ; *)
@@ -1907,14 +1927,116 @@ Notation "name ::= value" :=
           (name%string, _) value) (at level 50) : kami_struct_init_scope.
 Delimit Scope kami_struct_init_scope with struct_init.
 
+
+Definition fin_case n x :
+  forall (P : Fin.t (S n) -> Type),
+    P Fin.F1 ->
+    (forall y, P (Fin.FS y)) ->
+    P x :=
+  match x in Fin.t n0
+     return
+       forall P,
+         match n0 return (Fin.t n0 -> (Fin.t n0 -> Type) -> Type) with
+           | 0 => fun _ _ => False
+           | S m => fun x P => P Fin.F1 -> (forall x0, P (Fin.FS x0)) -> P x
+         end x P
+  with
+    | Fin.F1 _ => fun _ H1 _ => H1
+    | Fin.FS _ _ => fun _ _ HS => HS _
+  end.
+
+Ltac fin_dep_destruct v :=
+  pattern v; apply fin_case; clear v; intros.
+
+Lemma Fin_cast_lemma : forall m n i (p q : m = n),
+  Fin.cast i p = Fin.cast i q.
+Proof.
+  intros.
+  rewrite (UIP_nat _ _ p q); reflexivity.
+Defined.
+
+Definition UIP(X : Type) := forall (x y : X)(p q : x = y), p = q.
+
+Definition discrete(X : Type) := forall (x y : X), {x = y} + {x <> y}.
+
+Theorem hedberg : forall X, discrete X -> UIP X.
+Proof.
+  intros X Xdisc x y.
+
+  assert ( 
+      lemma :
+        forall proof : x = y,  
+          match Xdisc x x, Xdisc x y with
+          | left r, left s => proof = eq_trans (eq_sym r) s
+          | _, _ => False
+          end
+    ).
+  {
+    destruct proof.
+    destruct (Xdisc x x) as [pr | f].
+    destruct pr; auto.
+    elim f; reflexivity.
+  }
+
+  intros p q.
+  assert (p_given_by_dec := lemma p).
+  assert (q_given_by_dec := lemma q).
+  destruct (Xdisc x x).
+  destruct (Xdisc x y).
+  apply (eq_trans p_given_by_dec (eq_sym q_given_by_dec)).
+  contradiction.
+  contradiction.
+Defined.
+
+Definition map_length_red := 
+  (fun (A B : Type) (f : A -> B) (l : list A) =>
+     list_ind (fun l0 : list A => Datatypes.length (map f l0) = Datatypes.length l0) eq_refl
+              (fun (a : A) (l0 : list A) (IHl : Datatypes.length (map f l0) = Datatypes.length l0) =>
+                 f_equal_nat nat S (Datatypes.length (map f l0)) (Datatypes.length l0) IHl) l)
+  : forall (A B : Type) (f : A -> B) (l : list A), Datatypes.length (map f l) = Datatypes.length l.
+  
+Section nth_Fin_map2.
+  Variable A B: Type.
+  Variable g: A -> B.
+  Variable f: B -> Type.
+
+  Fixpoint nth_Fin_map2 (ls: list A):
+    forall (p : Fin.t (length (map g ls)))
+           (val: f (g (nth_Fin ls (Fin.cast p (map_length_red g ls))))),
+      f (nth_Fin (map g ls) p).
+    refine
+      match ls return forall (p : Fin.t (length (map g ls)))
+                             (val: f (g (nth_Fin ls (Fin.cast p (map_length_red g ls))))),
+          f (nth_Fin (map g ls) p) with
+      | nil => fun i _ => Fin.case0 (fun j => f (nth_Fin (map g nil) j)) i
+      | x :: xs => fun p => _
+      end.
+    fin_dep_destruct p.
+    + exact val.
+    + apply (nth_Fin_map2 xs y).
+      match goal with
+      | |- f (g (nth_Fin xs (Fin.cast y ?P))) => 
+        rewrite (hedberg eq_nat_dec P (f_equal Init.Nat.pred (map_length_red g (x :: xs))))
+      end.
+      exact val.
+  Defined.
+End nth_Fin_map2.
+
 Notation getStructVal ls :=
-  (BuildStruct (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
-               (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j))
-               (fun k => Vector_nth_map2_r (@projT1 _ _) (fun x => Expr _ (SyntaxKind (snd x))) ls k (projT2 (Vector.nth ls k)))).
+  (BuildStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i))
+               (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j))
+               (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => Expr _ (SyntaxKind (snd x)))
+                                      ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))).
+
+(* Definition getStructVal ty (ls: list {a: Attribute Kind & Expr ty (SyntaxKind (snd a))}) := *)
+(*   (BuildStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i)) *)
+(*                (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j)) *)
+(*                (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => Expr ty (SyntaxKind (snd x))) *)
+(*                                       ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))). *)
 
 Notation "'STRUCT' { s1 ; .. ; sN }" :=
-  (getStructVal (Vector.cons _ s1%struct_init _ ..
-                             (Vector.cons _ sN%struct_init _ (Vector.nil _)) ..))
+  (getStructVal (cons s1%struct_init ..
+                      (cons sN%struct_init nil) ..))
   : kami_expr_scope.
 
 Notation "name ::= value" :=
@@ -2116,10 +2238,18 @@ Notation "name ::= value" :=
           (name%string, _) value) (at level 50) : kami_struct_initial_scope.
 Delimit Scope kami_struct_initial_scope with struct_initial.
 
+(* Definition getStructConst (ls: list {a: Attribute Kind & ConstT (snd a)}) := *)
+(*   Eval cbv [length map] in *)
+(*     (ConstStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i)) *)
+(*                  (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j)) *)
+(*                  (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => ConstT (snd x)) *)
+(*                                         ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))). *)
+
 Notation getStructConst ls :=
-  (ConstStruct (fun i => snd (Vector.nth (Vector.map (@projT1 _ _) ls) i))
-               (fun j => fst (Vector.nth (Vector.map (@projT1 _ _) ls) j))
-               (fun k => Vector_nth_map2_r (@projT1 _ _) (fun x => ConstT (snd x)) ls k (projT2 (Vector.nth ls k)))).
+  (ConstStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i))
+               (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j))
+               (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => ConstT (snd x))
+                                      ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))).
 
 Delimit Scope kami_scope with kami.
 
@@ -2492,10 +2622,9 @@ Section unittests.
     :=  STRUCT {
             "field0" ::= Const type false;
             "field1" ::= Const type (natToWord 4 2);
-            "field2" ::= Const type (natToWord 5 3)}%kami_expr.
+            "field2" ::= Const type (natToWord 5 3)}%kami_expr%struct_init.
 
   Section struct_get_field_default_unittests.
-
     Let test0
     :  test_struct @% "field0" ==> false
       := eq_refl false.
@@ -2558,14 +2687,14 @@ Local Definition testExtract ty n n1 n2 (pf1: n > n1) (pf2: n1 > n2) (a: Bit n @
 
 
 Notation "'STRUCT_TYPE' { s1 ; .. ; sN }" :=
-  (getStruct (Vector.cons _ s1%kami_struct _ .. (Vector.cons _ sN%kami_struct _ (Vector.nil _)) ..)).
+  (getStruct (cons s1%kami_struct .. (cons sN%kami_struct nil) ..)).
 
 Notation "'ARRAY_CONST' { x1 ; .. ; xn }" :=
-  (ConstArray (Vector.nth (Vector.cons _ (x1%kami_init)%word _ .. (Vector.cons _ (xn%kami_init)%word _ (Vector.nil _)) ..))).
+  (ConstArray (nth_Fin' (cons (x1%kami_init)%word .. (cons (xn%kami_init)%word nil) ..) eq_refl)).
 
 Notation "'STRUCT_CONST' { s1 ; .. ; sN }" :=
-  (getStructConst (Vector.cons _ (s1%struct_initial)%word _ ..
-                               (Vector.cons _ (sN%struct_initial)%word _ (Vector.nil _)) ..)).
+  (getStructConst (cons (s1%struct_initial)%word ..
+                               (cons (sN%struct_initial)%word nil) ..)).
 
 Definition ltO{X} : forall n, n < 0 -> X.
 Proof.
