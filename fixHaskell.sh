@@ -2,7 +2,15 @@
 
 mkdir -p Haskell
 
-ghc FixLits.hs -o fixlits
+includes=""
+
+[[ -z $1 ]] || includes="-i$1"
+
+cmd="ghc $includes $1/FixLits.hs -o fixlits"
+
+echo $cmd
+
+$cmd
 
 echo "Fixing Literals"
 for file in $(find . -maxdepth 1 -name "*.hs")
