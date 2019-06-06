@@ -2109,7 +2109,7 @@ Definition makeConst k (c: ConstT k): ConstFullT (SyntaxKind k) := SyntaxConst c
 Delimit Scope kami_init_scope with kami_init.
 
 Notation "'ARRAY' { x1 ; .. ; xn }" :=
-  (BuildArray (Vector.nth (Vector.cons _ x1%kami_init _ .. (Vector.cons _ xn%kami_init _ (Vector.nil _)) ..)))
+  (BuildArray (nth_Fin (cons x1%kami_init .. (cons xn%kami_init nil) ..)))
   : kami_expr_scope.
 
 Notation "name ::= value" :=
