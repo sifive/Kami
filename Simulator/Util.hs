@@ -42,6 +42,10 @@ hex_to_integer txt = case hexadecimal txt of
 hex_to_bv :: Int -> T.Text -> BV.BV
 hex_to_bv n = (BV.bitVec n) . hex_to_integer
 
+partition :: [Int] {- chunksizes -} -> BV.BV -> [BV.BV]
+partition [] _ = []
+partition (n:ns) v = (BV.most n v) : partition ns (BV.least (BV.size v - n) v)
+
 --tries to split a list at the first occurence of the given character, discarding that character
 binary_split :: Eq a => a -> [a] -> Maybe ([a],[a])
 binary_split x xs = go xs [] where

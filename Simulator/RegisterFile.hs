@@ -18,7 +18,7 @@ import System.Environment (getArgs)
 
 data RegFile = RegFile {
       fileName :: String
-    , offset :: Int
+--    , offset :: Int
     , isWrMask :: Bool
     , chunkSize :: Int
     , readers :: T.RegFileReaders
@@ -54,8 +54,8 @@ array_of_file state file =
 
 file_async_read :: FileState -> RegFile -> Int -> V.Vector Val
 file_async_read state file i 
-    | i < offset file = error "Read out of bounds."
-    | otherwise = V.slice (i - offset file) (chunkSize file) (array_of_file state file)
+    | i < 0 = error "Read out of bounds."
+    | otherwise = V.slice i (chunkSize file) (array_of_file state file)
 
 file_sync_readresp :: FileState -> RegFile -> String -> Val
 file_sync_readresp state file regName = case readers file of
@@ -66,7 +66,7 @@ file_sync_readresp state file regName = case readers file of
 
             --isAddr = True
             case M.lookup regName $ int_regs state of
-                Just v -> ArrayVal $ V.slice (fromIntegral i - offset file) (chunkSize file) (array_of_file state file)
+                Just v -> ArrayVal $ V.slice (fromIntegral i) (chunkSize file) (array_of_file state file)
 
                     where i = BV.nat $ bvCoerce v
 
@@ -81,11 +81,11 @@ file_sync_readresp state file regName = case readers file of
 
 file_writes_mask :: RegFile -> Int -> V.Vector Bool -> V.Vector Val -> [(Int,Val)]
 file_writes_mask file i mask vals =
-    map (\j -> (i - offset file + j, vals V.! j)) $ filter (mask V.!) [0..(chunkSize file - 1)]
+    map (\j -> (i+j, vals V.! j)) $ filter (mask V.!) [0..(chunkSize file - 1)]
 
 file_writes_no_mask :: RegFile -> Int -> V.Vector Val -> [(Int,Val)]
 file_writes_no_mask file i vals =
-    map (\j -> (i - offset file + j, vals V.! j)) [0 .. (chunkSize file - 1)]
+    map (\j -> (i+j, vals V.! j)) [0 .. (chunkSize file - 1)]
 
 
 rf_methcall :: FileState -> String -> Val -> Maybe (Maybe FileUpd,Val)
@@ -131,13 +131,13 @@ process_args = catMaybes . map (binary_split '=')
 initialize_file :: [(String,FilePath)] -> T.RegFileBase -> FileState -> IO FileState
 initialize_file args rfb state = do
 
-    (arr,off) <- arr_and_off
+    arr <- array
 
     let fn = T.rfDataArray rfb
 
     let rf = RegFile {
         fileName = fn
-        , offset = 0 -- off
+ --       , offset = 0 -- off
         , isWrMask = T.rfIsWrMask rfb
         , chunkSize = T.rfNum rfb
         , readers = T.rfRead rfb
@@ -173,15 +173,14 @@ initialize_file args rfb state = do
 
      where
 
-        arr_and_off = case T.rfInit rfb of
+        array = case T.rfInit rfb of
             T.RFNonFile Nothing -> do
-                vs <- V.replicateM (T.rfIdxNum rfb) (randVal $ T.rfData rfb)
---                vs <- mapM randVal $ V.replicate (T.rfIdxNum rfb) (T.rfData rfb)
-                return (vs,0)
-            T.RFNonFile (Just c) -> return (V.replicate (T.rfIdxNum rfb) (eval c),0)
-            T.RFFile isAscii isArg file offset _ _ -> do 
-                vs <- parseHex isAscii (T.rfData rfb) (T.rfIdxNum rfb) offset filepath
-                return (vs,offset)
+--                vs <- V.replicateM (T.rfIdxNum rfb) (randVal $ T.rfData rfb)
+                vs <- mapM randVal $ V.replicate (T.rfIdxNum rfb) (T.rfData rfb)
+                return vs
+            T.RFNonFile (Just c) -> return $ V.replicate (T.rfIdxNum rfb) (eval c)
+            T.RFFile isAscii isArg file _ _ _ -> 
+                parseHex isAscii (T.rfData rfb) (T.rfIdxNum rfb) filepath
 
                 where
 

@@ -59,7 +59,8 @@ randVal (T.Struct n ks names) = do
     vs <- mapM randVal ks'
     return $ StructVal $ zip names' vs
 randVal (T.Array n k) = do
-    vs <- V.mapM randVal (V.replicate n k)
+--    vs <- V.mapM randVal (V.replicate n k)
+    vs <- V.replicateM n (randVal k)
     return $ ArrayVal vs
 
 -- -- for debugging purposes

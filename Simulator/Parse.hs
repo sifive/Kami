@@ -41,33 +41,27 @@ toks_to_addr_vals = go 0 where
     go n ((Addr k):toks) = go k toks
     go n ((Value bs):toks) = (n,bs) : go (n+1) toks
 
-offset_pairs :: Int -> [(Integer, BV.BV)] -> [(Integer, BV.BV)]
-offset_pairs offset ps = map (\(i,v) -> (i - fromIntegral offset,v)) ps
+-- offset_pairs :: Int -> [(Integer, BV.BV)] -> [(Integer, BV.BV)]
+-- offset_pairs offset ps = map (\(i,v) -> (i - fromIntegral offset,v)) ps
 
-partition :: [Int] {- chunksizes -} -> BV.BV -> [BV.BV]
-partition [] _ = []
-partition (n:ns) v = (BV.most n v) : partition ns (BV.least (BV.size v - n) v)
-
-myunpack :: H.Kind -> BV.BV -> Val
-myunpack H.Bool v = BoolVal $ v BV.@. 0
-myunpack (H.Bit _) v = BVVal v
-myunpack (H.Array n k) v = ArrayVal $ V.fromList $ map (myunpack k) $ BV.split n v
-myunpack (H.Struct n kinds names) v =
+val_unpack :: H.Kind -> BV.BV -> Val
+val_unpack H.Bool v = BoolVal $ v BV.@. 0
+val_unpack (H.Bit _) v = BVVal v
+val_unpack (H.Array n k) v = ArrayVal $ V.fromList $ map (val_unpack k) $ BV.split n v
+val_unpack (H.Struct n kinds names) v =
     let names' = map names $ H.getFins n in
     let kinds' = map kinds $ H.getFins n in
     let bvs = partition (map H.size kinds') v in
-        StructVal $ zip names' (zipWith myunpack kinds' bvs) 
+        StructVal $ zip names' (zipWith val_unpack kinds' bvs) 
 
-
-
-parseHex :: Bool -> H.Kind -> Int -> Int -> FilePath -> IO (V.Vector Val)
-parseHex isAscii k arrSize offset filepath
+parseHex :: Bool -> H.Kind -> Int -> FilePath -> IO (V.Vector Val)
+parseHex isAscii k arrSize filepath
     | isAscii = do
         text <- T.readFile filepath
-        let pairs = offset_pairs offset $ getToks (H.size k) text
-        let v_init = V.replicate (arrSize - offset) (defVal k)
+        let pairs = getToks (H.size k) text
+        let v_init = V.replicate arrSize (defVal k)
 --        let val_pairs = map (\(i,v) -> (fromIntegral i, eval $ H.unpack k $ expr_of_bv v)) pairs
-        let val_pairs = map (\(i,v) -> (fromIntegral i, myunpack k v)) pairs
+        let val_pairs = map (\(i,v) -> (fromIntegral i, val_unpack k v)) pairs
         return $ v_init V.// val_pairs
 
     | otherwise = error "Binary not yet supported."
