@@ -36,6 +36,16 @@ struct_field_access fieldName v =
         Just v' -> v'
         _ -> error $ "Field " ++ fieldName ++ " not found." ++ show v
 
+defVal :: T.Kind -> Val
+defVal T.Bool = BoolVal False
+defVal (T.Bit n) = BVVal $ BV.zeros n
+defVal (T.Struct n kinds names) = StructVal $ map (\i -> (names i, defVal $ kinds i)) $ T.getFins n
+defVal (T.Array n k) = ArrayVal $ (V.replicate n $ defVal k)
+
+defVal_FK :: T.FullKind -> Val
+defVal_FK T.NativeKind = error "Encountered a NativeKind."
+defVal_FK (T.SyntaxKind k) = defVal k
+
 randVal :: T.Kind -> IO Val
 randVal T.Bool = do
     k <- randomRIO (0,1)
@@ -53,14 +63,9 @@ randVal (T.Array n k) = do
     return $ ArrayVal vs
 
 -- -- for debugging purposes
--- zeroVal :: T.Kind -> Val
--- zeroVal T.Bool = BoolVal False
--- zeroVal (T.Bit n) = BVVal $ BV.zeros n
--- zeroVal (T.Struct n kinds names) = StructVal $ map (\i -> (names i, zeroVal $ kinds i)) $ T.getFins n
--- zeroVal (T.Array n k) = ArrayVal $ (V.replicate n $ zeroVal k)
 
 -- randVal :: T.Kind -> IO Val
--- randVal = pure . zeroVal
+-- randVal = pure . defVal
 
 randVal_FK :: T.FullKind -> IO Val
 randVal_FK (T.SyntaxKind k) = randVal k

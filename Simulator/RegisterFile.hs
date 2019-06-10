@@ -175,7 +175,8 @@ initialize_file args rfb state = do
 
         arr_and_off = case T.rfInit rfb of
             T.RFNonFile Nothing -> do
-                vs <- mapM randVal $ V.replicate (T.rfIdxNum rfb) (T.rfData rfb)
+                vs <- V.replicateM (T.rfIdxNum rfb) (randVal $ T.rfData rfb)
+--                vs <- mapM randVal $ V.replicate (T.rfIdxNum rfb) (T.rfData rfb)
                 return (vs,0)
             T.RFNonFile (Just c) -> return (V.replicate (T.rfIdxNum rfb) (eval c),0)
             T.RFFile isAscii isArg file offset _ _ -> do 

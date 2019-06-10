@@ -31,10 +31,44 @@ Extract Inlined Constant Datatypes.length => "Prelude.length".
 Extract Constant Nat.div2 => "(`Prelude.div` 2)".
 Extract Constant Nat.log2 => "(\x -> Prelude.floor (Prelude.logBase 2 (Prelude.fromIntegral x)))".
 Extract Constant Nat.log2_up => "(\x -> Prelude.ceiling (Prelude.logBase 2 (Prelude.fromIntegral x)))".
-Extract Constant List.fold_left => "(\f bs a -> Prelude.foldl f a bs)".
+Extract Constant List.fold_left => "(\f bs a -> Data.List.foldl' f a bs)".
 Extract Constant natToWord => "(\sz n -> (sz, Prelude.toInteger n))".
 Extract Constant wordToNat => "(\_ (_,v) -> Prelude.fromIntegral v)".
 Extract Constant sumSizes => "(\n f -> Prelude.sum (Prelude.map (\i -> f (n,i)) [0..(n Prelude.-1)]))".
+Extract Constant nth_Fin => "(\xs (_,i) -> xs Prelude.!! i)".
+Extract Constant nth_Fin_map2 => "(\_ _ _ x -> x)".
+Extract Constant getFins => "(\x -> Prelude.map ((,) (x Prelude.-1)) [0..(x Prelude.- 1)])".
+Extract Constant Fin.to_nat => "(\_ (_,i) -> i)".
+Extract Constant Fin.cast => "(\_ x _ -> x)".
+Extract Constant Fin.of_nat_lt => "(\i n -> (n,i))".
+Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)".
+Extract Inlined Constant getBool => "Prelude.id".
+
+(*
+Extract Inlined Constant concat => "Prelude.concat".
+*)
+
+(*
+Extract Inlined Constant filter => "Prelude.filter".
+*)
+
+(*
+Extract Inlined Constant find => "Data.List.find".
+*)
+
+(*
+Extract Constant seq => "(\x y -> [x..(x Prelude.+ y Prelude.- 1)])".
+*)
+
+Extract Constant range => "(\x y -> [x..(y Prelude.- 1)])".
+Extract Constant getFinsBound => "(\bound n -> Prelude.map ((,) (n Prelude.- 1)) [0..(Prelude.min (n Prelude.- 1) (bound Prelude.-1))])".
+
+(*
+Extract Constant Nat.pow => "(\x y -> x Prelude.^ y)".
+
+*)
+
+
 (* Extraction Implicit Vector.cons [1].
 Extract Constant Vector.caseS => "(\f n xs -> f (Prelude.head xs) n (Prelude.tail xs))".
 Extraction Implicit Vector.map [4].

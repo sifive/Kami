@@ -90,9 +90,5 @@ instance Eval (T.Expr ty) Val where
     eval (T.ReadArrayConst n _ a i) = (arrayCoerce $ eval a) V.! (T.to_nat n i)
     eval (T.BuildArray n _ exprs) = ArrayVal $ V.map (eval . exprs) (V.fromList $ T.getFins n)
 
-defVal :: T.Kind -> Val
-defVal k = eval (T.getDefaultConst k)
-
-defVal_FK :: T.FullKind -> Val
-defVal_FK T.NativeKind = error "Encountered a NativeKind."
-defVal_FK (T.SyntaxKind k) = defVal k
+-- defVal :: T.Kind -> Val
+-- defVal k = eval (T.getDefaultConst k)

@@ -12,7 +12,7 @@ import Data.Text.Read (hexadecimal)
 
 import Simulator.Util
 import Simulator.Value
-import Simulator.Evaluate
+--import Simulator.Evaluate
 
 import Data.Char (isSpace)
 import Data.List.Split (wordsBy)
@@ -44,13 +44,30 @@ toks_to_addr_vals = go 0 where
 offset_pairs :: Int -> [(Integer, BV.BV)] -> [(Integer, BV.BV)]
 offset_pairs offset ps = map (\(i,v) -> (i - fromIntegral offset,v)) ps
 
+partition :: [Int] {- chunksizes -} -> BV.BV -> [BV.BV]
+partition [] _ = []
+partition (n:ns) v = (BV.most n v) : partition ns (BV.least (BV.size v - n) v)
+
+myunpack :: H.Kind -> BV.BV -> Val
+myunpack H.Bool v = BoolVal $ v BV.@. 0
+myunpack (H.Bit _) v = BVVal v
+myunpack (H.Array n k) v = ArrayVal $ V.fromList $ map (myunpack k) $ BV.split n v
+myunpack (H.Struct n kinds names) v =
+    let names' = map names $ H.getFins n in
+    let kinds' = map kinds $ H.getFins n in
+    let bvs = partition (map H.size kinds') v in
+        StructVal $ zip names' (zipWith myunpack kinds' bvs) 
+
+
+
 parseHex :: Bool -> H.Kind -> Int -> Int -> FilePath -> IO (V.Vector Val)
 parseHex isAscii k arrSize offset filepath
     | isAscii = do
         text <- T.readFile filepath
         let pairs = offset_pairs offset $ getToks (H.size k) text
         let v_init = V.replicate (arrSize - offset) (defVal k)
-        let val_pairs = map (\(i,v) -> (fromIntegral i, eval $ H.unpack k $ expr_of_bv v)) pairs
+--        let val_pairs = map (\(i,v) -> (fromIntegral i, eval $ H.unpack k $ expr_of_bv v)) pairs
+        let val_pairs = map (\(i,v) -> (fromIntegral i, myunpack k v)) pairs
         return $ v_init V.// val_pairs
 
     | otherwise = error "Binary not yet supported."

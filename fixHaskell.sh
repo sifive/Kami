@@ -57,3 +57,12 @@ do
   fi
 done
 
+for file in $(grep -l "Data\.List" Haskell/*.hs)
+do
+  grep -q "import qualified Data\.List" $file
+  if [ $? -ne 0 ]
+  then
+    $SED -i -e '0,/^import/{s/^import/import qualified Data.List\nimport/}' $file
+  fi
+done
+
