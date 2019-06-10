@@ -137,7 +137,7 @@ initialize_file args rfb state = do
 
     let rf = RegFile {
         fileName = fn
-        , offset = off
+        , offset = 0 -- off
         , isWrMask = T.rfIsWrMask rfb
         , chunkSize = T.rfNum rfb
         , readers = T.rfRead rfb
