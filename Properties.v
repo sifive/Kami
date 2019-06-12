@@ -5356,6 +5356,21 @@ Proof.
   - econstructor 8; eauto.
 Qed.
 
+Lemma SemAction_if_split k1 k (e: Bool @# type) (a1 a2: ActionT type k1) (a: type k1 -> ActionT type k) o reads1 reads2 u1 u2 cs1 cs2 v1 v2 reads u cs v:
+  (if evalExpr e
+   then SemAction o (LetAction a1 a) reads1 u1 cs1 v1
+   else SemAction o (LetAction a2 a) reads2 u2 cs2 v2) ->
+  (reads = if evalExpr e then reads1 else reads2) ->
+  (u = if evalExpr e then u1 else u2) ->
+  (cs = if evalExpr e then cs1 else cs2) ->
+  (v = if evalExpr e then v1 else v2) ->
+  SemAction o (IfElse e a1 a2 a) reads u cs v.
+Proof.
+  intros.
+  eapply SemAction_if.
+  destruct (evalExpr e); subst; auto.
+Qed.
+
 Lemma convertLetExprSyntax_ActionT_same o k (e: LetExprSyntax type k):
   SemAction o (convertLetExprSyntax_ActionT e) nil nil nil (evalLetExpr e).
 Proof.
@@ -5364,7 +5379,7 @@ Proof.
   pose proof (SemLetAction (fun v => convertLetExprSyntax_ActionT (cont v)) (@DisjKey_nil_l string _ nil) IHe H) as sth.
   rewrite ?(app_nil_l nil) in sth.
   auto.
-  apply SemAction_if; auto.
+  eapply SemAction_if; eauto;
   case_eq (evalExpr pred); intros; subst; repeat econstructor; eauto; unfold not; simpl; intros; auto.
 Qed.
 

@@ -39,11 +39,11 @@ Section Compile.
                              (forall x,
                                 match k' return (Expr (fun _ => VarType) k' -> Set) with
                                   | SyntaxKind k => fun _ => RtlExpr k
-                                  | NativeKind _ => fun _ => IDProp
+                                  | NativeKind _ _ => fun _ => IDProp
                                 end (Var (fun _ => VarType) k' x))
                        with
                          | SyntaxKind k => fun x => RtlReadWire k (name, x)
-                         | NativeKind t => fun _ => idProp
+                         | NativeKind t _ => fun _ => idProp
                        end x'
       | Const k x => RtlConst x
       | UniBool x x0 => RtlUniBool x (@convertExprToRtl _ x0)
@@ -63,11 +63,11 @@ Section Compile.
               (forall x0 x1,
                  match k' return (Expr (fun _ => VarType) k' -> Set) with
                    | SyntaxKind k => fun _ => RtlExpr k
-                   | NativeKind _ => fun _ => IDProp
+                   | NativeKind _ _ => fun _ => IDProp
                  end (ITE x x0 x1))
         with
           | SyntaxKind k => fun x0 x1 => RtlITE (@convertExprToRtl _ x) (@convertExprToRtl _ x0) (@convertExprToRtl _ x1)
-          | NativeKind t => fun _ _ => idProp
+          | NativeKind t _ => fun _ _ => idProp
         end x0' x1'
     end.
 

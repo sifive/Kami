@@ -24,7 +24,7 @@ Inductive Kind :=
 
 Inductive FullKind: Type :=
 | SyntaxKind: Kind -> FullKind
-| NativeKind (t: Type): FullKind.
+| NativeKind (t: Type) (c : t) : FullKind.
 
 Inductive ConstT: Kind -> Type :=
 | ConstBool: bool -> ConstT Bool
@@ -34,7 +34,7 @@ Inductive ConstT: Kind -> Type :=
 
 Inductive ConstFullT: FullKind -> Type :=
 | SyntaxConst k: ConstT k -> ConstFullT (SyntaxKind k)
-| NativeConst t (c': t): ConstFullT (NativeKind t).
+| NativeConst t (c' : t) : ConstFullT (NativeKind c').
 
 Coercion ConstBool : bool >-> ConstT.
 Coercion ConstBit : word >-> ConstT.
@@ -47,6 +47,12 @@ Fixpoint getDefaultConst (k: Kind): ConstT k :=
       ConstStruct fk fs (fun i => getDefaultConst (fk i))
     | Array n k => ConstArray (fun _ => getDefaultConst k)
   end.
+
+Fixpoint getDefaultConstFullKind (k : FullKind) : ConstFullT k :=
+  match k with
+  | SyntaxKind k' => SyntaxConst (getDefaultConst k')
+  | NativeKind t c' => NativeConst c'
+                         end.
 
 Inductive UniBoolOp: Set :=
 | Neg: UniBoolOp.
@@ -89,7 +95,7 @@ Section Phoas.
   Variable ty: Kind -> Type.
   Definition fullType k := match k with
                              | SyntaxKind k' => ty k'
-                             | NativeKind k' => k'
+                             | NativeKind k' c' => k'
                            end.
 
   Inductive Expr: FullKind -> Type :=
@@ -705,7 +711,29 @@ Section WfBaseMod.
   | WfSys ls lretT c: WfActionT c -> @WfActionT lretT (Sys ls c)
   | WfReturn lretT e: @WfActionT lretT (Return e).
 
-  Definition WfBaseModule :=
+   Inductive WfActionT': forall lretT, ActionT type lretT -> Prop :=
+  | WfMCall' meth s e lretT c v: (WfActionT' (c v)) -> @WfActionT' lretT (MCall meth s e c)
+  | WfLetExpr' k (e: Expr type k) lretT c v: (WfActionT' (c v)) -> @WfActionT' lretT (LetExpr e c)
+  | WfLetAction' k (a: ActionT type k) lretT c v: WfActionT' a -> (WfActionT' (c v)) -> @WfActionT' lretT (LetAction a c)
+  | WfReadNondet' k lretT c v: (WfActionT' (c v)) -> @WfActionT' lretT (ReadNondet k c)
+  | WfReadReg' r k lretT c v: (WfActionT' (c v)) -> In (r, k) (getKindAttr (getRegisters m)) ->
+                           @WfActionT' lretT (ReadReg r k c)
+  | WfWriteReg' r k (e: Expr type k) lretT c: WfActionT' c  -> In (r, k) (getKindAttr (getRegisters m)) ->
+                                             @WfActionT' lretT (WriteReg r e c)
+  | WfIfElse' p k (atrue: ActionT type k) afalse lretT c v: (WfActionT' (c v)) -> WfActionT' atrue ->
+                                                         WfActionT' afalse -> @WfActionT' lretT (IfElse p atrue afalse c)
+  | WfSys' ls lretT c: WfActionT' c -> @WfActionT' lretT (Sys ls c)
+  | WfReturn' lretT e: @WfActionT' lretT (Return e).
+
+ (* Lemma WfActionTEquiv lret a: @WfActionT' lret a -> WfActionT a.
+   Proof.
+     induction a; intros.
+     -
+       inv H0; EqDep_subst.
+       econstructor; intros.
+       intros. *)
+
+ Definition WfBaseModule :=
     (forall rule, In rule (getRules m) -> WfActionT (snd rule type)) /\
     (forall meth, In meth (getMethods m) -> forall v, WfActionT (projT2 (snd meth) type v)) /\
     NoDup (map fst (getMethods m)) /\ NoDup (map fst (getRegisters m)) /\ NoDup (map fst (getRules m)).
@@ -1186,16 +1214,26 @@ Section MethT_dec.
    *)
   Lemma method_values_eq
   :  forall (s : Signature) (x y : SignT s), existT SignT s x = existT SignT s y -> x = y.
-  Proof (Eqdep_dec.inj_pair2_eq_dec Signature Signature_dec SignT).
+  Proof.
+    intros. inv H. apply (Eqdep_dec.inj_pair2_eq_dec Signature Signature_dec SignT) in H1. auto.
+  Qed.
+     
   
   (*
-  Asserts that the values passed two and returned
+  Asserts that the values passed to and returned
   by two method calls differ if their signatures
   differ.
    *)
   Lemma method_values_neq 
     :  forall (s r : Signature) (x : SignT s) (y : SignT r), s <> r -> existT SignT s x <> existT SignT r y.
-  Proof (fun s r x y H H0 => H (projT1_eq H0)).
+  Proof.
+    intros.
+    unfold not. intros.
+    inv H0. 
+    apply H; reflexivity.
+  Qed.
+    
+  (*Proof (fun s r x y H H0 => H (projT1_eq H0)).*)
 
   (*
   Determines whether or not the Gallina terms
@@ -1228,6 +1266,7 @@ Section MethT_dec.
                    => H (method_values_eq H0)))
             (method_denotation_values_dec x y).
 
+  
   (*
   Determines whether or not the values passed to,
   and returned by, two method calls are equal.
@@ -1420,6 +1459,10 @@ Definition TraceInclusion m1 m2 :=
      (nthProp2 WeakInclusion ls1 ls2).
 
 Definition TraceEquiv m1 m2 := TraceInclusion m1 m2 /\ TraceInclusion m2 m1.
+
+
+
+
 
 
 
@@ -2642,3 +2685,4 @@ Local Definition testFieldUpd (ty: Kind -> Type) :=
    + Compiler verification (difficult)
    + PUAR: Linux/Certikos
  *)
+
