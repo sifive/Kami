@@ -68,7 +68,7 @@ instance Eval T.CABitOp (Int -> [BV.BV] -> BV.BV) where
 
 instance Eval (T.Expr ty) Val where
     eval (T.Var (T.SyntaxKind _) x) = unsafeCoerce x
-    eval (T.Var T.NativeKind _) = error "Encountered a NativeKind."
+    eval (T.Var (T.NativeKind _) _) = error "Encountered a NativeKind."
     eval (T.Const _ c) = eval c
     eval (T.UniBool o e) = BoolVal $ eval o $ boolCoerce $ eval e
     eval (T.CABool o es) = BoolVal $ eval o $ map (boolCoerce . eval) es
@@ -86,7 +86,9 @@ instance Eval (T.Expr ty) Val where
         Just v -> v
         Nothing -> error ("Field " ++ names i ++ " not found.")
     eval (T.BuildStruct n _ names exprs) = StructVal $ map (\i -> (names i, eval $ exprs i)) (T.getFins n)
-    eval (T.ReadArray _ _ a i) = (arrayCoerce $ eval a) V.! (fromIntegral $ BV.nat $ bvCoerce $ eval i) 
+    eval (T.ReadArray n k a v) = 
+        let i = fromIntegral $ BV.nat $ bvCoerce $ eval v in
+            if i < n then (arrayCoerce $ eval a) V.! i else defVal k
     eval (T.ReadArrayConst n _ a i) = (arrayCoerce $ eval a) V.! (T.to_nat n i)
     eval (T.BuildArray n _ exprs) = ArrayVal $ V.map (eval . exprs) (V.fromList $ T.getFins n)
 

@@ -43,7 +43,7 @@ defVal (T.Struct n kinds names) = StructVal $ map (\i -> (names i, defVal $ kind
 defVal (T.Array n k) = ArrayVal $ (V.replicate n $ defVal k)
 
 defVal_FK :: T.FullKind -> Val
-defVal_FK T.NativeKind = error "Encountered a NativeKind."
+defVal_FK (T.NativeKind _) = error "Encountered a NativeKind."
 defVal_FK (T.SyntaxKind k) = defVal k
 
 randVal :: T.Kind -> IO Val
@@ -70,4 +70,4 @@ randVal (T.Array n k) = do
 
 randVal_FK :: T.FullKind -> IO Val
 randVal_FK (T.SyntaxKind k) = randVal k
-randVal_FK (T.NativeKind) = error "Encountered a NativeKind."
+randVal_FK (T.NativeKind _) = error "Encountered a NativeKind."
