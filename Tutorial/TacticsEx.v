@@ -76,5 +76,9 @@ Section Named.
       econstructor; simpl; eauto; subst.
       rewrite ?negb_true_iff in *; subst.
       rewrite wzero_wplus; simpl; auto.
-  Qed.
+
+      (* Note that while this example does not create spurious existentials, usually, there is a plethora of existentials created that can be instantiated with arbitrary values as they do not affect the proof. These goals are discharged with the following two commands*)
+      Unshelve.
+      all: repeat constructor.
+Qed.
 End Named.
