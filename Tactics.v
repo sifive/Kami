@@ -1,6 +1,16 @@
 Require Import Lib.EclecticLib Syntax Properties.
 
-Ltac discharge_string_dec := destruct_string_dec; discharge_append.
+Lemma string_dec_refl {A} : forall (s: string) (T E: A),
+  (if string_dec s s then T else E) = T.
+Proof. intros; destruct (string_dec _ _); easy. Qed.
+
+Lemma string_dec_neq {A} : forall (s1 s2: string) (T E: A),
+  s1 <> s2 ->
+  (if string_dec s1 s2 then T else E) = E.
+Proof. intros; destruct (string_dec _ _); easy. Qed.
+
+Ltac discharge_string_dec :=
+  repeat (rewrite string_dec_refl || rewrite string_dec_neq by (intros ?; discharge_append)).
 
 Ltac discharge_NoSelfCall :=
   unfold NoSelfCallBaseModule, NoSelfCallRulesBaseModule, NoSelfCallMethsBaseModule; split; auto; simpl; intros;
@@ -56,39 +66,40 @@ Local Ltac discharge_init :=
                                  end
       end; simpl; eauto.
 
-Ltac clean_hyp :=
-  simpl in *;
-  repeat match goal with
-         | |- NoSelfCallBaseModule _ => discharge_NoSelfCall
-         | H: DisjKey _ _ |- _ => clear H
-         | H: key_not_In _ _ |- _ => clear H
-         | H: ?a = ?a |- _ => clear H
-         | H: ?a <> ?b |- _ => clear H
-         | H: False |- _ => exfalso; apply H
-         | H: ?a <> ?a |- _ => exfalso; apply (H eq_refl)
-         | H: _ \/ _ |- _ => destruct H; subst
-         | H: _ /\ _ |- _ => destruct H; subst
-         | H: exists x, _ |- _ => let y := fresh x in destruct H as [y ?]
-         | H: (?A, ?B) = (?P, ?Q) |- _ =>
-           apply inversionPair in H; destruct H as [? ?]; subst
-         | H: existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _ => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
-         | H: existT ?a ?b1 ?c1 = existT ?a ?b2 ?c2 |- _ => apply inversionExistT in H;
-                                                            destruct H as [? ?]; subst
-         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
-           apply append_remove_prefix in H; subst
-         | H: ?a = ?b |- _ => discriminate
-         | H: SemAction _ (convertLetExprSyntax_ActionT ?e) _ _ _ _ |- _ =>
-           apply convertLetExprSyntax_ActionT_full in H
-         | H: SemAction _ _ _ _ _ _ |- _ =>
-           apply inversionSemAction in H
-         | H: if ?P then _ else _ |- _ => case_eq P; let i := fresh in intros i; rewrite ?i in *
-         | H: Forall2 _ _ _ |- _ => inv H; dest
-         | H: RegT |- _ => destruct H as [? [? ?]];
-                           repeat (unfold fst, snd, projT1, projT2 in *; subst)
-         | H: In _ _ |- _ => simpl in H
-         | |- exists rspec : list RegT,
-             Forall2 _ _ _ /\ _ _ _ => discharge_init
-         end.
+Ltac clean_hyp_step :=
+  match goal with
+  | |- NoSelfCallBaseModule _ => discharge_NoSelfCall
+  | H: DisjKey _ _ |- _ => clear H
+  | H: key_not_In _ _ |- _ => clear H
+  | H: ?a = ?a |- _ => clear H
+  | H: ?a <> ?b |- _ => clear H
+  | H: False |- _ => exfalso; apply H
+  | H: ?a <> ?a |- _ => exfalso; apply (H eq_refl)
+  | H: _ \/ _ |- _ => destruct H; subst
+  | H: _ /\ _ |- _ => destruct H; subst
+  | H: exists x, _ |- _ => let y := fresh x in destruct H as [y ?]
+  | H: (?A, ?B) = (?P, ?Q) |- _ =>
+    apply inversionPair in H; destruct H as [? ?]; subst
+  | H: existT ?a ?b ?c1 = existT ?a ?b ?c2 |- _ => apply Eqdep.EqdepTheory.inj_pair2 in H; subst
+  | H: existT ?a ?b1 ?c1 = existT ?a ?b2 ?c2 |- _ => apply inversionExistT in H;
+                                                     destruct H as [? ?]; subst
+  | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
+    apply append_remove_prefix in H; subst
+  | H: ?a = ?b |- _ => discriminate
+  | H: SemAction _ (convertLetExprSyntax_ActionT ?e) _ _ _ _ |- _ =>
+    apply convertLetExprSyntax_ActionT_full in H
+  | H: SemAction _ _ _ _ _ _ |- _ =>
+    apply inversionSemAction in H
+  | H: if ?P then _ else _ |- _ => case_eq P; let i := fresh in intros i; rewrite ?i in *
+  | H: Forall2 _ _ _ |- _ => inv H; dest
+  | H: RegT |- _ => destruct H as [? [? ?]];
+                    repeat (unfold fst, snd, projT1, projT2 in *; subst)
+  | H: In _ _ |- _ => simpl in H
+  | |- exists rspec : list RegT,
+      Forall2 _ _ _ /\ _ _ _ => discharge_init
+  end.
+
+Ltac clean_hyp := simpl in *; repeat clean_hyp_step.
 
 Ltac discharge_CommonRegister disjReg :=
   match goal with

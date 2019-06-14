@@ -69,7 +69,7 @@ Section Named.
     discharge_simulation Incrementer_invariant; discharge_CommonRegisterAuto.
     - simplify_simulatingRule @^"send_and_inc"; subst.
       + rewrite (word0 mret); auto.
-      + repeat discharge_string_dec.
+      + simpl. discharge_string_dec.
         repeat (econstructor; eauto; simpl; subst).
         rewrite wzero_wplus; auto.
     - simplify_nilStep.
