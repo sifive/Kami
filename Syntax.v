@@ -2169,7 +2169,7 @@ Notation getStructConst ls :=
 Delimit Scope kami_scope with kami.
 
 Notation "'RegisterN' name : type <- init" :=
-  (MERegister (name%string, existT RegInitValT type (Some ((init)%kami_init)%word)))
+  (MERegister (name%string, existT RegInitValT type (Some ((NativeConst init)%kami_init)%word)))
     (at level 13, name at level 99) : kami_scope.
 
 Notation "'Register' name : type <- init" :=
