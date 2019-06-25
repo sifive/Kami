@@ -21,17 +21,17 @@ Ltac discharge_NoSelfCall :=
          | _ => constructor; auto; simpl; try intro; discharge_DisjKey
          end.
 
-Ltac discharge_SemAction :=
+  Ltac discharge_SemAction :=
   match goal with
   | |- SemAction _ _ _ _ ?meths _ =>
     repeat match goal with
            | |- SemAction _ (If ?p then _ else _ as _; _)%kami_action _ _ _ _ => eapply SemAction_if_split
            | |- if ?P then SemAction _ _ _ _ _ _ else SemAction _ _ _ _ _ _ =>
-             case_eq P; let H := fresh in intros H; rewrite ?H in *; unfold evalExpr in *; try discriminate
+             case_eq P; let H := fresh in intros H; rewrite ?H in *; cbn [evalExpr] in *; try discriminate
            | |- SemAction _ (convertLetExprSyntax_ActionT _) _ _ _ _ => eapply convertLetExprSyntax_ActionT_same
            | |- SemAction _ _ _ _ _ _ => econstructor
            end;
-    rewrite ?key_not_In_fst; unfold not; intros; unfold evalExpr, evalConstT in *;
+    rewrite ?key_not_In_fst; unfold not; intros; cbn [evalExpr evalConstT] in *;
     repeat match goal with
            | |- In _ _ => simpl; auto
            | |- ?a = ?a => reflexivity
