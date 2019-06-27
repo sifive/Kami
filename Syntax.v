@@ -1731,7 +1731,7 @@ Definition inlineSingle_Rules_pos meths n rules :=
   | None => rules
   end.
 
-Definition inlineAll_Rules meths rules := fold_left (fun newRules n => inlineSingle_Rules_pos meths n newRules) (0 upto (length meths)) rules.
+Definition inlineAll_Rules meths rules := fold_left (fun newRules n => inlineSingle_Rules_pos meths n newRules) (seq 0 (length meths)) rules.
 
 Definition inlineAll_Rules_mod m :=
   (BaseMod (getRegisters m) (inlineAll_Rules (getMethods m) (getRules m)) (getMethods m)).
@@ -1742,7 +1742,7 @@ Definition inlineSingle_Meths_pos newMeths n :=
   | None => newMeths
   end.
 
-Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (0 upto (length meths)) meths.
+Definition inlineAll_Meths meths := fold_left inlineSingle_Meths_pos (seq 0 (length meths)) meths.
 
 Definition inlineAll_Meths_mod m :=
   (BaseMod (getRegisters m) (getRules m) (inlineAll_Meths (getMethods m))).

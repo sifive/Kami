@@ -3417,8 +3417,8 @@ Theorem TraceInclusion_inline_BaseModule_rules regs rules meths f:
   TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (map (inlineSingle_Rule f) rules) meths)).
 Proof.
   intros.
-  specialize (inline_rule_fold_right f H (0 upto (length rules)) H0) as P1.
-  specialize (WfMod_inline_all_Rule _ (0 upto (length rules)) H0 H) as P2.
+  specialize (inline_rule_fold_right f H (seq 0 (length rules)) H0) as P1.
+  specialize (WfMod_inline_all_Rule _ (seq 0 (length rules)) H0 H) as P2.
   repeat rewrite map_fold_right_eq in *.
   assumption.
 Qed.
@@ -3430,7 +3430,7 @@ Lemma WfBaseMod_inline_BaseModule_Rules m f:
 Proof.
   intros.
   assert (WfMod m) as TMP;[constructor; auto|specialize (WfMod_getFlat TMP) as P1; clear TMP].
-  specialize (WfMod_inline_all_Rule _ (0 upto (length (getRules m))) H P1) as P2.
+  specialize (WfMod_inline_all_Rule _ (seq 0 (length (getRules m))) H P1) as P2.
   repeat rewrite map_fold_right_eq in *; simpl in *.
   inv P2; auto.
 Qed.
@@ -3458,7 +3458,7 @@ Theorem TraceInclusion_inline_BaseModule_meths regs rules meths f:
 Proof.
   intros.
   unfold inlineSingle_BaseModule.
-  specialize (inline_meth_fold_right f H (0 upto (length meths)) H0) as P1.
+  specialize (inline_meth_fold_right f H (seq 0 (length meths)) H0) as P1.
   repeat rewrite map_fold_right_eq in *.
   assumption.
 Qed.
@@ -3470,7 +3470,7 @@ Lemma WfBaseMod_inline_BaseModule_Meths m f:
 Proof.
   intros.
   assert (WfMod m) as TMP;[constructor; auto|specialize (WfMod_getFlat TMP) as P1; clear TMP].
-  specialize (WfMod_inline_all_Meth _ (0 upto (length (getMethods m))) H P1) as P2.
+  specialize (WfMod_inline_all_Meth _ (seq 0 (length (getMethods m))) H P1) as P2.
   repeat rewrite map_fold_right_eq in *; simpl in *.
   inv P2; auto.
 Qed.
@@ -3499,7 +3499,7 @@ Proof.
   intros.
   unfold inlineSingle_BaseModule.
   specialize (TraceInclusion_inline_BaseModule_rules f H H0) as P1.
-  specialize (WfMod_inline_all_Rule _ (0 upto (length rules)) H0 H) as P2.
+  specialize (WfMod_inline_all_Rule _ (seq 0 (length rules)) H0 H) as P2.
   specialize (TraceInclusion_inline_BaseModule_meths f P2 H0) as P3.
   repeat rewrite map_fold_right_eq in *.
   apply (TraceInclusion_trans P1 P3).
@@ -3543,7 +3543,7 @@ Section inline_all_all.
     case_eq (nth_error meths n); intros sth; [intros sthEq|split; [assumption | apply TraceInclusion_refl]].
     split.
     - apply nth_error_In in sthEq.
-      pose proof (WfMod_inline_all_Rule sth (0 upto (length rules)) sthEq WfH).
+      pose proof (WfMod_inline_all_Rule sth (seq 0 (length rules)) sthEq WfH).
       repeat rewrite map_fold_right_eq in *.
       assumption.
     - apply TraceInclusion_inline_BaseModule_rules; auto.
@@ -3581,7 +3581,8 @@ Section inline_all_all.
   Proof.
     intros WfH.
     unfold inlineAll_Rules.
-    induction (Datatypes.length meths); simpl in *; [split; [assumption | apply TraceInclusion_refl]|].
+    induction (Datatypes.length meths); [simpl in *; split; [assumption | apply TraceInclusion_refl]|].
+    rewrite seq_eq.
     rewrite fold_left_app; simpl in *.
     destruct IHn as [IHn1 IHn2].
     pose proof (TraceInclusion_inlineSingle_pos_Rules IHn1 n) as [sth1 sth2].
@@ -3625,7 +3626,7 @@ Section inline_all_all.
     case_eq (nth_error meths n); intros sth; [intros sthEq|split; [assumption | apply TraceInclusion_refl]].
     split.
     - apply nth_error_In in sthEq.
-      pose proof (WfMod_inline_all_Meth sth (0 upto (length meths)) sthEq WfH).
+      pose proof (WfMod_inline_all_Meth sth (seq 0 (length meths)) sthEq WfH).
       repeat rewrite map_fold_right_eq in *.
       assumption.
     - apply TraceInclusion_inline_BaseModule_meths; auto.
@@ -3663,7 +3664,8 @@ Section inline_all_all.
   Proof.
     intros WfH.
     unfold inlineAll_Meths.
-    induction (Datatypes.length meths); simpl; [split; [assumption | apply TraceInclusion_refl]|].
+    induction (Datatypes.length meths); [simpl; split; [assumption | apply TraceInclusion_refl]|].
+    rewrite seq_eq.
     rewrite fold_left_app; simpl.
     destruct IHn as [IHn1 IHn2].
     pose proof (TraceInclusion_inlineSingle_pos_Meths IHn1 n) as [sth1 sth2].
@@ -3823,7 +3825,7 @@ Section flatten_and_inline_all.
       map fst rules = map fst (inlineAll_Rules meths rules).
   Proof.
     unfold inlineAll_Rules.
-    induction (0 upto Datatypes.length meths); simpl; auto.
+    induction (seq 0 (Datatypes.length meths)); simpl; auto.
     intros.
     rewrite <- IHl.
     apply SameKeys_inlineSome_Rules.
@@ -4088,7 +4090,7 @@ Proof.
   intros.
   unfold inlineSingle_Rule_map_BaseModule.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
-  specialize (WfMod_inline_all_Rule (regs:= (getAllRegisters m)) (rules:= (getAllRules m)) (meths:= (getAllMethods m)) f (0 upto (length (getAllRules m))) inMeths) as P2.
+  specialize (WfMod_inline_all_Rule (regs:= (getAllRegisters m)) (rules:= (getAllRules m)) (meths:= (getAllMethods m)) f (seq 0 (length (getAllRules m))) inMeths) as P2.
   repeat rewrite map_fold_right_eq in *.
   unfold getFlat in *; simpl in *.
   rewrite WfMod_createHide in *; dest; simpl in *; split; eauto.
@@ -4103,7 +4105,7 @@ Proof.
   intros.
   unfold inlineSingle_Meth_map_BaseModule.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
-  specialize (WfMod_inline_all_Meth (regs:= (getAllRegisters m)) (rules:= (getAllRules m)) (meths:= (getAllMethods m)) f (0 upto (length (getAllMethods m))) inMeths) as P2.
+  specialize (WfMod_inline_all_Meth (regs:= (getAllRegisters m)) (rules:= (getAllRules m)) (meths:= (getAllMethods m)) f (seq 0 (length (getAllMethods m))) inMeths) as P2.
   repeat rewrite map_fold_right_eq in *.
   unfold getFlat in *; simpl in *.
   rewrite WfMod_createHide in *; dest; simpl in *; split; eauto.
@@ -6154,8 +6156,8 @@ Theorem TraceInclusion_inline_BaseModule_rules_l regs rules meths f:
 Proof.
   intros.
   unfold inlineSingle_BaseModule.
-  specialize (inline_rule_fold_right_l f H (0 upto (length rules)) H0) as P1.
-  specialize (WfMod_inline_all_Rule _ (0 upto (length rules)) H0 H) as P2.
+  specialize (inline_rule_fold_right_l f H (seq 0 (length rules)) H0) as P1.
+  specialize (WfMod_inline_all_Rule _ (seq 0 (length rules)) H0 H) as P2.
   repeat rewrite map_fold_right_eq in *.
   assumption.
 Qed.
@@ -6179,7 +6181,7 @@ Theorem TraceInclusion_inline_BaseModule_meths_l regs rules meths f:
 Proof.
   intros.
   unfold inlineSingle_BaseModule.
-  specialize (inline_meth_fold_right_l f H (0 upto (length meths)) H0) as P1.
+  specialize (inline_meth_fold_right_l f H (seq 0 (length meths)) H0) as P1.
   repeat rewrite map_fold_right_eq in *.
   assumption.
 Qed.
@@ -6204,7 +6206,7 @@ Proof.
   intros.
   unfold inlineSingle_BaseModule.
   specialize (TraceInclusion_inline_BaseModule_rules_l f H H0) as P1.
-  specialize (WfMod_inline_all_Rule _ (0 upto (length rules)) H0 H) as P2.
+  specialize (WfMod_inline_all_Rule _ (seq 0 (length rules)) H0 H) as P2.
   specialize (TraceInclusion_inline_BaseModule_meths_l f P2 H0) as P3.
   repeat rewrite map_fold_right_eq in *.
   apply (TraceInclusion_trans P3 P1).
@@ -6233,7 +6235,7 @@ Section inline_all_all_l.
     case_eq (nth_error meths n); intros sth; [intros sthEq|split; [assumption | apply TraceInclusion_refl]].
     split.
     - apply nth_error_In in sthEq.
-      pose proof (WfMod_inline_all_Rule sth (0 upto (length rules)) sthEq WfH).
+      pose proof (WfMod_inline_all_Rule sth (seq 0 (length rules)) sthEq WfH).
       repeat rewrite map_fold_right_eq in *.
       assumption.
     - apply TraceInclusion_inline_BaseModule_rules_l; auto.
@@ -6257,7 +6259,8 @@ Section inline_all_all_l.
   Proof.
     intros WfH.
     unfold inlineAll_Rules.
-    induction (Datatypes.length meths); simpl in *; [split; [assumption | apply TraceInclusion_refl]|].
+    induction (Datatypes.length meths); [simpl in *; split; [assumption | apply TraceInclusion_refl]|].
+    rewrite seq_eq.
     rewrite fold_left_app; simpl in *.
     destruct IHn as [IHn1 IHn2].
     pose proof (TraceInclusion_inlineSingle_pos_Rules_l IHn1 n) as [sth1 sth2].
@@ -6287,7 +6290,7 @@ Section inline_all_all_l.
     case_eq (nth_error meths n); intros sth; [intros sthEq|split; [assumption | apply TraceInclusion_refl]].
     split.
     - apply nth_error_In in sthEq.
-      pose proof (WfMod_inline_all_Meth sth (0 upto (length meths)) sthEq WfH).
+      pose proof (WfMod_inline_all_Meth sth (seq 0 (length meths)) sthEq WfH).
       repeat rewrite map_fold_right_eq in *.
       assumption.
     - apply TraceInclusion_inline_BaseModule_meths_l; auto.
@@ -6311,7 +6314,8 @@ Section inline_all_all_l.
   Proof.
     intros WfH.
     unfold inlineAll_Meths.
-    induction (Datatypes.length meths); simpl; [split; [assumption | apply TraceInclusion_refl]|].
+    induction (Datatypes.length meths); [simpl; split; [assumption | apply TraceInclusion_refl]|].
+    rewrite seq_eq.
     rewrite fold_left_app; simpl.
     destruct IHn as [IHn1 IHn2].
     pose proof (TraceInclusion_inlineSingle_pos_Meths_l IHn1 n) as [sth1 sth2].

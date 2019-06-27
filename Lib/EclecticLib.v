@@ -247,16 +247,16 @@ Section fold_left_map.
   Qed.
 End fold_left_map.
 
-Fixpoint range b t :=
-  match t with
-  | S p => (match Nat.eq_dec b p with
-            | left _ => nil
-            | right _ => range b p
-            end ++ p :: nil)%list
-  | 0 => nil
-  end.
-
-Infix "upto" := range (at level 15, no associativity).
+Lemma seq_eq sz: forall n, seq n (S sz) = seq n sz ++ [n + sz].
+Proof.
+  induction sz; simpl; auto; intros; repeat f_equal.
+  - rewrite Nat.add_0_r; auto.
+  - specialize (IHsz (S n)).
+    assert (sth: S n + sz = n + S sz) by omega.
+    rewrite <- sth.
+    rewrite <- IHsz.
+    auto.
+Qed.
 
 Section map_fold_eq.
   Variable A: Type.
@@ -268,14 +268,15 @@ Section map_fold_eq.
     | S m => zeroToN m ++ m :: nil
     end.
 
-  Lemma zeroToN_upto n: zeroToN n = 0 upto n.
+  Lemma zeroToN_upto n: zeroToN n = seq 0 n.
   Proof.
     induction n; simpl; auto.
     rewrite IHn.
-    f_equal.
-    destruct n; auto.
+    pose proof (seq_eq n 0) as sth.
+    simpl in sth.
+    auto.
   Qed.
-    
+   
   Fixpoint transform_nth_left ls i :=
     match ls with
     | nil => nil
@@ -334,7 +335,7 @@ Section map_fold_eq.
     induction ys; simpl; auto.
   Qed.
 
-  Lemma map_fold_left_eq ls: map f ls = fold_left transform_nth_left (0 upto (length ls)) ls.
+  Lemma map_fold_left_eq ls: map f ls = fold_left transform_nth_left (seq 0 (length ls)) ls.
   Proof.
     rewrite <- zeroToN_upto.
     apply map_fold_left_eq'.
@@ -406,7 +407,7 @@ Section map_fold_eq'.
     auto.
   Qed.
 
-  Lemma map_fold_right_eq ls: map f ls = fold_right transform_nth_right ls (0 upto (length ls)).
+  Lemma map_fold_right_eq ls: map f ls = fold_right transform_nth_right ls (seq 0 (length ls)).
   Proof.
     rewrite <- zeroToN_upto.
     eapply map_fold_right_eq'.
@@ -1448,21 +1449,20 @@ Proof.
   eapply combine_length; eauto.
 Qed.
 
-Lemma length_upto t:
-  forall b,
-    (t > b \/ t = 0)%nat ->
-    length (b upto t) = (t - b)%nat.
-Proof.
-  induction t; simpl; auto; intros.
-  destruct (Nat.eq_dec b t); simpl; subst.
-  - destruct t; auto.
-    Omega.omega.
-  - specialize (IHt b ltac:(Omega.omega)).
-    rewrite app_length.
-    rewrite IHt.
-    simpl.
-    destruct b; Omega.omega.
-Qed.
+(* Lemma length_upto t: *)
+(*   forall b, *)
+(*     (t > b \/ t = 0)%nat -> *)
+(*     length (b upto t) = (t - b)%nat. *)
+(* Proof. *)
+(*   induction t; simpl; auto; intros. *)
+(*   destruct (Nat.eq_dec b t); simpl; subst. *)
+(*   - destruct t; auto. *)
+(*     rewrite seq_length. *)
+(*     auto. *)
+(*   - specialize (IHt b ltac:(Omega.omega)). *)
+(*     rewrite seq_length. *)
+(*     destruct b; auto. *)
+(* Qed. *)
 
 Lemma nth_combine A B n:
   forall (l1: list A) (l2: list B) a b,
@@ -1502,49 +1502,25 @@ Qed.
 
 Lemma upto_0_n_length n:
   0 <> n ->
-  length (0 upto n) <> 0.
+  length (seq 0 n) <> 0.
 Proof.
-  intros; intro.
-  destruct n; [tauto|].
-  rewrite length_upto in * by (Omega.omega).
-  Omega.omega.
+  rewrite seq_length.
+  intros; congruence.
 Qed.
 
 Lemma nth_0_upto_n_0 n:
-  nth 0 (0 upto n) 0 = 0.
+  nth 0 (seq 0 n) 0 = 0.
 Proof.
   induction n; simpl; auto.
-  match goal with
-  | |- context [if ?P then _ else _] => destruct P; simpl; auto
-  end.
-  rewrite app_nth1; auto.
-  pose proof (upto_0_n_length n0).
-  Omega.omega.
 Qed.
 
 Lemma nth_0_upto_n n:
   forall i,
     (i < n)%nat ->
-    nth i (0 upto n) 0 = i.
+    nth i (seq 0 n) 0 = i.
 Proof.
-  induction n; simpl; intros; auto.
-  - Omega.omega.
-  - match goal with
-    | |- context [if ?P then _ else _] => destruct P; simpl; auto; subst
-    end.
-    + destruct i; auto; try Omega.omega.
-    + destruct (Nat.eq_dec i n); subst.
-      * pose proof (@length_upto n 0 ltac:(Omega.omega)) as sth.
-        assert (sth2: (n - 0)%nat = n) by Omega.omega.
-        rewrite sth2 in *.
-        rewrite <- sth at 1.
-        rewrite length_minus1_nth.
-        auto.
-      * rewrite app_nth1.
-        -- eapply IHn; eauto.
-           Omega.omega.
-        -- rewrite (@length_upto n 0 ltac:(Omega.omega)).
-           Omega.omega.
+  intros.
+  rewrite seq_nth; auto.
 Qed.
 
 Lemma log2_up_pow2 n:
