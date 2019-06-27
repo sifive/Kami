@@ -895,9 +895,19 @@ Proof.
       apply (n1 H).
 Defined.
 
-Lemma Signature_dec: forall (s1 s2: Signature), {s1 = s2} + {s1 <> s2}.
-Proof.
-  decide equality; apply Kind_dec.
+Definition Signature_dec (s1 s2: Signature): {s1 = s2} + {s1 <> s2}.
+  refine match s1, s2 with
+         | (k11, k12), (k21, k22) => match Kind_dec k11 k21, Kind_dec k12 k22 with
+                                     | left pf1, left pf2 => left _
+                                     | left pf1, right pf2 => right (fun x => pf2 _)
+                                     | right pf1, left pf2 => right (fun x => pf1 _)
+                                     | right pf1, right pf2 => right (fun x => pf1 _)
+                                     end
+         end.
+  - subst; auto.
+  - exact (f_equal snd x).
+  - exact (f_equal fst x).
+  - exact (f_equal fst x).
 Defined.
 
 Lemma isEq k: forall (e1: type k) (e2: type k),
