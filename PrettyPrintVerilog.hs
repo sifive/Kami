@@ -158,27 +158,27 @@ ppRtlExpr who e =
     T.RtlReadStruct num fk fs e i ->
       do
         new <- optionAddToTrunc who (T.Struct num fk fs) e
-        return $ new ++ '.' : ppName (fs i)
+        return $ ppDealSize0 (fk i) "0" (new ++ '.' : ppName (fs i))
     T.RtlBuildStruct num fk fs es ->
       do
         strs <- mapM (ppRtlExpr who) (filterKind0 num fk es)  -- (Data.List.map es (getFins num))
-        return $ '{': intercalate ", " strs ++ "}"
+        return $ ppDealSize0 (T.Struct num fk fs) "0" ('{': intercalate ", " strs ++ "}")
     T.RtlReadArray n k vec idx ->
       do
         xidx <- ppRtlExpr who idx
         xvec <- ppRtlExpr who vec
         new <- optionAddToTrunc who (T.Array n k) vec
-        return $ new ++ '[' : xidx ++ "]"
+        return $ ppDealSize0 k "0" (new ++ '[' : xidx ++ "]")
     T.RtlReadArrayConst n k vec idx ->
       do
         let xidx = finToInt idx
         xvec <- ppRtlExpr who vec
         new <- optionAddToTrunc who (T.Array n k) vec
-        return $ new ++ '[' : show xidx ++ "]"
+        return $ ppDealSize0 k "0" (new ++ '[' : show xidx ++ "]")
     T.RtlBuildArray n k fv ->
       do
         strs <- mapM (ppRtlExpr who) (Data.List.map fv (reverse $ T.getFins n))
-        return $ if T.size k == 0 || n == 0 then "0" else '{': intercalate ", " strs ++ "}"
+        return $ ppDealSize0 (T.Array n k) "0" ('{': intercalate ", " strs ++ "}")
   where
     filterKind0 num fk es = snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins num)) (Data.List.map es (T.getFins num)))))
     uniExpr op e =
