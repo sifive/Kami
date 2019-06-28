@@ -72,7 +72,6 @@ Ltac clean_hyp_step :=
   | H: DisjKey _ _ |- _ => clear H
   | H: key_not_In _ _ |- _ => clear H
   | H: ?a = ?a |- _ => clear H
-  | H: ?a <> ?b |- _ => clear H
   | H: False |- _ => exfalso; apply H
   | H: ?a <> ?a |- _ => exfalso; apply (H eq_refl)
   | H: _ \/ _ |- _ => destruct H; subst
