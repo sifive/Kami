@@ -7,6 +7,7 @@ import qualified Data.Text as T
 
 import Data.Hashable
 import Data.Text.Read (hexadecimal)
+import System.Environment (getArgs)
 
 space_pad :: Int -> String -> String
 space_pad n str = replicate (n - length str) ' ' ++ str
@@ -65,3 +66,9 @@ intersperse_with_period :: Int -> (a -> a) -> Str a -> Str a
 intersperse_with_period n f xs = go n xs where
     go 0 (x :+ ys) = f x :+ go n ys
     go m (x :+ ys) = x :+ go (m-1) ys
+
+debug_mode :: IO Bool
+debug_mode = do
+    args <- getArgs
+    return $ "--debug" `elem` args
+
