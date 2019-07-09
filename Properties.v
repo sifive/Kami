@@ -1,5 +1,5 @@
 Require Import Kami.Syntax Lib.Fold. Import KamiNotations.
-
+Import Word.Notations.
 Import ListNotations.
 Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.

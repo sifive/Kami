@@ -1,6 +1,9 @@
 Require Export Bool Ascii String List FunctionalExtensionality Psatz PeanoNat.
 Require Export bbv.Word Lib.VectorFacts Lib.EclecticLib All.
 
+Require Kami.Syntax. Import KamiNotations.
+
+Print Scopes.
 Export Word.Notations.
 
 Require Import Permutation RecordUpdate.RecordSet.

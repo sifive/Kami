@@ -1,4 +1,4 @@
-Require Import SyntaxDoubleWrites Syntax CompileVerifiable StateMonad Properties All.
+Require Import SyntaxDoubleWrites Syntax CompileVerifiable StateMonad Properties All. Import KamiNotations.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
