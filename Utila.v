@@ -4,6 +4,7 @@
  *)
 Require Import Syntax. Import KamiNotations.
 Require Import List.
+Import Word.Notations.
 Import ListNotations.
 
 Section utila.
