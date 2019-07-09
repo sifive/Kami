@@ -3038,7 +3038,6 @@ Module KamiNotations.
   Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_expr
                                                                             (at level 100, only parsing) : kami_expr_scope.
 End KamiNotations.
-Import KamiNotations.
 
 (* TODO
    + Compiler verification (difficult)
