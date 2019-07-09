@@ -1,4 +1,5 @@
 Require Import Syntax RecordUpdate.RecordSet Rtl StateMonad.
+Import KamiNotations.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
