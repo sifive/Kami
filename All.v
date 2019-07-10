@@ -1,4 +1,4 @@
 Require Export AllNoNotations.
-Export KamiNotations.
+Require Export KamiNotations.
 Export Word.Notations.
 Export ListNotations.

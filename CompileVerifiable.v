@@ -1,4 +1,4 @@
-Require Import Syntax StateMonad Properties All. Import KamiNotations. 
+Require Import Syntax StateMonad Properties All.
 Import Word.Notations.
 
 Set Implicit Arguments.

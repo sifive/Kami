@@ -1,4 +1,4 @@
-Require Import Kami.All. Import KamiNotations.
+Require Import Kami.All.
 Import Word.Notations.
 
 Section Named.
