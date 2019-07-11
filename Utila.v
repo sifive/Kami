@@ -2,7 +2,7 @@
   This library contains useful functions for generating Kami
   expressions.
  *)
-Require Import Syntax KamiNotations.
+Require Import Syntax KamiNotations LibStruct.
 Require Import List.
 Import Word.Notations.
 Import ListNotations.
