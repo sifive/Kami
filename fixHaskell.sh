@@ -6,7 +6,7 @@ includes=""
 
 [[ -z $1 ]] || includes="-i$1"
 
-cmd="ghc $includes $1/FixLits.hs -o fixlits"
+cmd="ghc -j -O1 --make $includes $1/FixLits.hs"
 
 echo $cmd
 
@@ -15,7 +15,7 @@ $cmd
 echo "Fixing Literals"
 for file in $(find . -maxdepth 1 -name "*.hs")
 do
-  ./fixlits $file
+  ./FixLits $file
   mv $file Haskell
   echo "$file fixed."
 done
