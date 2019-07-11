@@ -1,4 +1,5 @@
 Require Import Kami.All.
+Import Word.Notations.
 
 Section Named.
   Variable sz: nat.

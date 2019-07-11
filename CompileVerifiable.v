@@ -1,4 +1,5 @@
 Require Import Syntax StateMonad Properties All.
+Import Word.Notations.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.

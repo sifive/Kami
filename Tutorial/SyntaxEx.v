@@ -1,4 +1,4 @@
-Require Import Kami.All.
+Require Import Kami.All. Import Word.Notations.
 
 (* In order to write a Kami module, one first opens a section using the same name as the module,
   and writes the following five lines of boiler plate code. *)

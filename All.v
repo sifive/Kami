@@ -1,2 +1,5 @@
-Require Export bbv.Word bbv.HexNotationWord Rtl Compile Lib.Fold Lib.EclecticLib Utila RecordUpdate.RecordSet.
-Require Export Syntax Properties PProperties PPlusProperties Extraction Tactics.
+Require Export AllNoNotations.
+(* N.b.: this module exports notations or things dependent on them *)
+Require Export KamiNotations LibStruct.
+Export Word.Notations.
+Export ListNotations.
