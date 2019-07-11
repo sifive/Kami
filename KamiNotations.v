@@ -132,12 +132,6 @@ Require Import RecordUpdate.RecordSet.
             (name%string, _) value) (at level 50) : kami_struct_init_scope.
   Delimit Scope kami_struct_init_scope with struct_init.
 
-  Notation getStructVal ls :=
-    (BuildStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i))
-                 (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j))
-                 (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => Expr _ (SyntaxKind (snd x)))
-                                     ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))).
-
   Notation "'STRUCT' { s1 ; .. ; sN }" :=
     (getStructVal (cons s1%struct_init ..
                         (cons sN%struct_init nil) ..))
@@ -316,12 +310,6 @@ Require Import RecordUpdate.RecordSet.
     (existT (fun a : Attribute Kind => ConstT (snd a))
             (name%string, _) value) (at level 50) : kami_struct_initial_scope.
   Delimit Scope kami_struct_initial_scope with struct_initial.
-
-  Notation getStructConst ls :=
-    (ConstStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i))
-                 (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j))
-                 (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => ConstT (snd x))
-                                     ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))).
 
   Delimit Scope kami_scope with kami.
 

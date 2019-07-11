@@ -526,6 +526,18 @@ Fixpoint getRules m :=
 Definition getStruct ls :=
   (Struct (fun i => snd (nth_Fin ls i)) (fun j => fst (nth_Fin ls j))).
 
+Definition getStructVal ty ls :=
+  (BuildStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i))
+               (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j))
+               (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => Expr ty (SyntaxKind (snd x)))
+                                      ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))).
+
+Definition getStructConst ls :=
+  (ConstStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i))
+               (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j))
+               (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => ConstT (snd x))
+                                      ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))).
+
 Definition WriteRq lgIdxNum Data := (getStruct (cons ("addr", Bit lgIdxNum)
                                                      (cons ("data", Data) nil))).
 
