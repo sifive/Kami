@@ -23,6 +23,46 @@ Section nth_Fin.
 
   Definition nth_Fin' (ls: list A) n (pf: n = length ls) (i: Fin.t n): A :=
     nth_Fin ls (Fin.cast i pf).
+
+  Fixpoint nth_Fin'' (ls: list A) n (pf: n <= length ls) {struct ls} : Fin.t n -> A.
+  Proof.
+    refine(
+    match ls return (n <= length ls) -> Fin.t n -> A with
+    | nil => fun pf i => Fin.case0 _ (Fin.cast i _)
+    | x :: xs => fun pf i =>
+       match i in Fin.t m return m <= length (x :: xs) -> A with
+       | Fin.F1 _ => fun _ => x
+       | Fin.FS _ z => fun pf => nth_Fin'' xs _ _ z
+       end _
+    end _).
+    all: cbn in *; abstract omega.
+  Defined.
+
+  Lemma nth_Fin'_nth : forall n d (i: Fin.t n) (xs: list A) (len_eq: n = length xs),
+    let i' := proj1_sig (Fin.to_nat i) in
+    nth_Fin' xs len_eq i = nth i' xs d.
+  Proof.
+    induction n; cbn; intros *; try easy.
+    destruct xs; cbn in *; try easy.
+    inversion len_eq.
+    destruct i eqn:?; cbn; auto.
+    destruct (Fin.to_nat _) eqn:?; cbn.
+    assert (n0 = n); subst.
+    { inversion len_eq; subst; auto. }
+    specialize (IHn d t xs (f_equal pred len_eq)).
+    rewrite Heqs in IHn; cbn in IHn; auto.
+  Qed.
+
+  Lemma nth_Fin_nth : forall d (xs: list A) (i: Fin.t (length xs)),
+    let i' := proj1_sig (Fin.to_nat i) in
+    nth_Fin xs i = nth i' xs d.
+  Proof.
+    cbn; intros.
+    rewrite <- (nth_Fin'_nth _ _ _ eq_refl).
+    unfold nth_Fin'; f_equal.
+    clear; induction i; cbn; auto.
+    rewrite <- IHi; auto.
+  Qed.
 End nth_Fin.
 
 Definition fin_case n x :
@@ -51,6 +91,20 @@ Proof.
   intros.
   rewrite (UIP_nat _ _ p q); reflexivity.
 Defined.
+
+Lemma fin_to_nat_cast : forall n (i: Fin.t n) m (Heq: n = m),
+  proj1_sig (Fin.to_nat (Fin.cast i Heq)) = proj1_sig (Fin.to_nat i).
+Proof.
+  induction n; cbn; intros *; try easy.
+  destruct m; try easy.
+  assert (n = m) by auto.
+  destruct i eqn:?; cbn; auto.
+  assert (n0 = n) by (subst; auto); subst.
+  specialize (IHn t m eq_refl).
+  destruct (Fin.to_nat t) eqn:?; cbn in *.
+  rewrite <- (Fin_cast_lemma _ eq_refl).
+  destruct (Fin.to_nat (Fin.cast t eq_refl)) eqn:?; cbn in *; auto.
+Qed.
 
 Definition UIP(X : Type) := forall (x y : X)(p q : x = y), p = q.
 
@@ -415,6 +469,20 @@ Section map_fold_eq'.
 End map_fold_eq'.
 
 
+Lemma nth_error_nth A : forall (xs: list A) n d v,
+  nth_error xs n = Some v ->
+  nth n xs d = v.
+Proof.
+  induction xs; cbn; intros; destruct n; cbn in *; try easy; auto.
+  inversion H; auto.
+Qed.
+
+Lemma nth_error_not_None A : forall n (xs: list A),
+  nth_error xs n <> None ->
+  exists x, nth_error xs n = Some x.
+Proof.
+  induction n; destruct xs; cbn; try easy; eauto.
+Qed.
 
 Fixpoint getFins n :=
   match n return list (Fin.t n) with
@@ -432,6 +500,35 @@ Fixpoint getFinsBound m n: list (Fin.t n) :=
   end.
 
 Definition mapOrFins n (x: Fin.t n) := fold_left (fun a b => x = b \/ a) (getFins n) False.
+
+Lemma getFins_length : forall n, length (getFins n) = n.
+Proof.
+  induction n; cbn; auto.
+  rewrite map_length; auto.
+Qed.
+
+Lemma getFins_all : forall n (i: Fin.t n), In i (getFins n).
+Proof.
+  induction i; cbn; auto using in_map.
+Qed.
+
+Lemma getFins_nth_error : forall n (i: Fin.t n),
+  let i' := proj1_sig (Fin.to_nat i) in
+  nth_error (getFins n) i' = Some i.
+Proof.
+  induction i; cbn in *; auto.
+  destruct (Fin.to_nat i); cbn in *.
+  apply map_nth_error; auto.
+Qed.
+
+Lemma getFins_nth : forall n d (i: Fin.t n),
+  let i' := proj1_sig (Fin.to_nat i) in
+  nth i' (getFins n) d = i.
+Proof.
+  intros.
+  apply nth_error_nth.
+  apply getFins_nth_error.
+Qed.
 
 Lemma fold_left_or_init: forall A (f: A -> Prop) ls (P: Prop), P -> fold_left (fun a b => f b \/ a) ls P.
 Proof.
@@ -1718,3 +1815,50 @@ Section NoDup.
   Qed.
 End NoDup.
 
+Section Forall.
+  Variables (A B C: Type).
+  Variable P: A -> Prop.
+  Variable P2: A -> B -> Prop.
+
+  Lemma Forall2_length : forall xs ys,
+    Forall2 P2 xs ys ->
+    length xs = length ys.
+  Proof. induction 1; cbn; auto. Qed.
+
+  Lemma Forall_map : forall (f: B -> A) xs,
+    Forall P (map f xs) <-> Forall (fun x => P (f x)) xs.
+  Proof.
+    split; induction xs; cbn; intros * Hall; constructor; inv Hall; auto.
+  Qed.
+
+  Lemma Forall_combine : forall xs ys,
+    length xs = length ys ->
+    Forall (fun p => let '(x, y) := p in P2 x y) (List.combine xs ys) <->
+    Forall2 (fun x y => P2 x y) xs ys.
+  Proof.
+    induction xs; destruct ys; cbn in *; try easy; intros Hlen; inv Hlen.
+    split; intros Hall; constructor; inv Hall; auto; apply IHxs; auto.
+  Qed.
+
+  Lemma Forall2_nth_error : forall xs ys,
+    Forall2 P2 xs ys ->
+    forall n x y, (n < length xs)%nat ->
+      nth_error xs n = Some x ->
+      nth_error ys n = Some y ->
+      P2 x y.
+  Proof.
+    induction 1; cbn; intros * Hn Hx Hy; [omega |].
+    destruct n; cbn in *; [inv Hx; inv Hy; auto |].
+    eapply IHForall2; eauto; omega.
+  Qed.
+
+  Lemma Forall2_nth : forall xs ys d d',
+    Forall2 P2 xs ys ->
+    forall n, (n < length xs)%nat ->
+      P2 (nth n xs d) (nth n ys d').
+  Proof.
+    induction 1; cbn; intros * Hn; [omega |].
+    destruct n; auto.
+    apply IHForall2; omega.
+  Qed.
+End Forall.

@@ -5,7 +5,16 @@
 Require Import Syntax KamiNotations LibStruct.
 Require Import List.
 Import Word.Notations.
+Require Import EclecticLib.
 Import ListNotations.
+
+Module EqIndNotations.
+  Notation "A || B @ X 'by' E"
+    := (eq_ind_r (fun X => B) A E) (at level 40, left associativity).
+
+  Notation "A || B @ X 'by' <- H"
+    := (eq_ind_r (fun X => B) A (eq_sym H)) (at level 40, left associativity).
+End EqIndNotations.
 
 Section utila.
 
@@ -404,12 +413,6 @@ Section utila.
 
   (* V. Correctness Proofs *)
 
-  Local Notation "A || B @ X 'by' E"
-    := (eq_ind_r (fun X => B) A E) (at level 40, left associativity).
-
-  Local Notation "A || B @ X 'by' <- H"
-    := (eq_ind_r (fun X => B) A (eq_sym H)) (at level 40, left associativity).
-
   Section ver.
 
     Local Notation "{{ X }}" := (evalExpr X).
@@ -570,6 +573,8 @@ Section utila.
   Arguments utila_sem_foldr_cons_correct {u} {j} {k}.
 
   Section monad_ver.
+
+    Import EqIndNotations.
 
     Variable sem : utila_sem_type.
 
@@ -751,6 +756,8 @@ Section utila.
   End monad_ver.
 
   Section expr_ver.
+
+    Import EqIndNotations.
 
     Local Notation "{{ X }}" := (evalExpr X).
 
@@ -1137,5 +1144,134 @@ Section utila.
     Close Scope kami_expr.
 
   End expr_ver.
+
+  (* Conversions between list and Array *)
+  Section ArrayList.
+    Variable A: Kind.
+    Notation ArrTy ty n := (Array n A @# ty).
+    Local Open Scope kami_expr.
+
+    Definition array_to_list' {ty n} (xs: ArrTy ty n) idxs : list (A @# ty) :=
+      map (fun i => ReadArrayConst xs i) idxs.
+
+    Definition array_to_list {ty n} (xs: ArrTy ty n) : list (A @#ty) :=
+      array_to_list' xs (getFins n).
+
+    Definition list_to_array {ty} (xs: list (A @# ty)) : ArrTy ty (length xs) :=
+      BuildArray (fun i => nth_Fin xs i).
+
+    Lemma array_to_list_len {ty} : forall n (xs: ArrTy ty n),
+      n = length (array_to_list xs).
+    Proof.
+      intros; unfold array_to_list, array_to_list'.
+      rewrite map_length, getFins_length; auto.
+    Qed.
+
+    Lemma array_to_list_id : forall (xs: list (A @# type)),
+      map (@evalExpr _) (array_to_list (list_to_array xs)) = map (@evalExpr _) xs.
+    Proof.
+      unfold array_to_list, array_to_list'; intros.
+      rewrite map_map; cbn.
+      induction xs; cbn; auto.
+      rewrite map_map, <- IHxs; auto.
+    Qed.
+
+    Lemma list_to_array_id : forall n (xs: ArrTy type n) (i: Fin.t n),
+      let i' := Fin.cast i (array_to_list_len xs) in
+      (evalExpr (list_to_array (array_to_list xs))) i' = (evalExpr xs) i.
+    Proof.
+      intros; cbn; subst i'.
+      unfold array_to_list, array_to_list'.
+      erewrite nth_Fin_nth.
+      rewrite map_nth; cbn.
+      rewrite fin_to_nat_cast, getFins_nth; auto.
+      Unshelve.
+      auto.
+    Qed.
+
+    Lemma array_to_list'_forall {ty} : forall n idxs (xs: ArrTy ty n),
+      Forall2 (fun i v => v = ReadArrayConst xs i) idxs (array_to_list' xs idxs).
+    Proof.
+      induction idxs; cbn; intros *; constructor; eauto.
+    Qed.
+
+    Lemma array_to_list_forall {ty} : forall n (xs: ArrTy ty n),
+      Forall2 (fun i v => v = ReadArrayConst xs i) (getFins n) (array_to_list xs).
+    Proof.
+      unfold array_to_list; intros; apply array_to_list'_forall.
+    Qed.
+
+    Lemma array_to_list_nth {ty} : forall n (xs: ArrTy ty n) (i: Fin.t n) i',
+      i' = proj1_sig (Fin.to_nat i) ->
+      nth_error (array_to_list xs) i' = Some (ReadArrayConst xs i).
+    Proof.
+      intros.
+      assert (Hi': (i' < n)%nat).
+      { destruct (Fin.to_nat i); subst; cbn; auto. }
+      rewrite <- getFins_length in Hi'.
+      pose proof (array_to_list_forall xs) as Hall.
+      assert (Hlen: length (array_to_list xs) = n).
+      { apply Forall2_length in Hall.
+        rewrite getFins_length in Hall; auto.
+      }
+      assert (exists x, nth_error (array_to_list xs) i' = Some x) as (? & Hnth).
+      { eapply nth_error_not_None.
+        rewrite nth_error_Some.
+        rewrite Hlen, <- getFins_length; auto.
+      }
+      pose proof (getFins_nth_error i) as Hnth'; cbn in Hnth'; subst.
+      eapply Forall2_nth_error in Hall; eauto; subst; auto.
+    Qed.
+
+    Definition array_forall {ty n} (f: A @# ty -> Bool @# ty) (xs: ArrTy ty n) : Bool @# ty :=
+      utila_all (map f (array_to_list xs)).
+
+    Lemma array_forall_correct : forall f n (xs: ArrTy _ n),
+      evalExpr (array_forall f xs) = true <->
+      Forall (fun v => evalExpr (f v) = true) (array_to_list xs).
+    Proof.
+      unfold array_forall; intros.
+      set (ys := array_to_list xs) in *; clearbody ys.
+      rewrite utila_all_correct; split; intros Hall.
+      - induction ys; constructor; inv Hall; auto.
+      - induction ys; constructor; inv Hall; auto.
+    Qed.
+
+    Definition fin_to_bit {ty n} (i: Fin.t n) : Bit (Nat.log2_up n) @# ty :=
+      Const _ (natToWord _ (proj1_sig (Fin.to_nat i))).
+
+    Definition array_forall_except {ty n}
+        (f: A @# ty -> Bool @# ty)
+        (xs: ArrTy ty n)
+        (j: Bit (Nat.log2_up n) @# ty)
+        : Bool @# ty :=
+      utila_all (map (fun vi => let '(v, i) := vi in (j == fin_to_bit i) || f v)
+                     (List.combine (array_to_list xs) (getFins n)))%kami_expr.
+
+    Lemma array_forall_except_correct : forall f n (xs: ArrTy _ n) j,
+      evalExpr (array_forall_except f xs j) = true <->
+      Forall2 (fun v i =>
+          evalExpr (j == fin_to_bit i) = false -> evalExpr (f v) = true)
+        (array_to_list xs) (getFins n).
+    Proof.
+      unfold array_forall_except; intros.
+      assert (Hlen: length (getFins n) = length (array_to_list xs))
+        by (eauto using Forall2_length, array_to_list_forall).
+      rewrite getFins_length in Hlen.
+      set (ys := array_to_list xs) in *; clearbody ys.
+      rewrite utila_all_correct; split; intros Hall; subst.
+      - rewrite Forall_map in Hall.
+        rewrite <- Forall_combine by (rewrite getFins_length; auto).
+        set (zs := List.combine _ _) in *; clearbody zs.
+        induction zs as [| (? & ?) zs]; constructor; inv Hall; auto; cbn in *.
+        rewrite orb_true_iff in *; intuition congruence.
+      - rewrite Forall_map.
+        rewrite <- Forall_combine in Hall by (rewrite getFins_length; auto).
+        set (zs := List.combine _ _) in *; clearbody zs.
+        induction zs as [| (? & ?) zs]; constructor; inv Hall; auto; cbn in *.
+        rewrite orb_true_iff in *.
+        destruct (getBool _); intuition.
+    Qed.
+  End ArrayList.
 
 End utila.

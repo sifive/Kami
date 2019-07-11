@@ -161,7 +161,8 @@ initialize_file args rfb state = do
     newvals <- case T.rfRead rfb of
                     T.Async _ -> return []
                     T.Sync b rs -> mapM (\r -> do
-                                                v <- randVal (if b then T.Bit (log2 $ T.rfIdxNum rfb) else T.rfData rfb)
+                                                debug <- debug_mode
+                                                v <- (if debug then (pure . defVal) else randVal) (if b then T.Bit (log2 $ T.rfIdxNum rfb) else T.rfData rfb)
                                                 return (T.readRegName r, v)) rs
 
     return $ state {
@@ -175,8 +176,8 @@ initialize_file args rfb state = do
 
         array = case T.rfInit rfb of
             T.RFNonFile Nothing -> do
---                vs <- V.replicateM (T.rfIdxNum rfb) (randVal $ T.rfData rfb)
-                vs <- mapM randVal $ V.replicate (T.rfIdxNum rfb) (T.rfData rfb)
+                debug <- debug_mode
+                vs <- mapM (if debug then (pure . defVal) else randVal) $ V.replicate (T.rfIdxNum rfb) (T.rfData rfb)
                 return vs
             T.RFNonFile (Just c) -> return $ V.replicate (T.rfIdxNum rfb) (eval c)
             T.RFFile isAscii isArg file _ _ _ -> 

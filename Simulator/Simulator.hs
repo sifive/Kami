@@ -35,7 +35,8 @@ initialize :: T.RegInitT -> IO (String,Val)
 initialize (_, (_, Just (T.NativeConst _))) = error "Encountered a NativeConst."
 initialize (regName, (_, Just (T.SyntaxConst _ c))) = return (regName, eval c)
 initialize (regName, (k, Nothing)) = do
-    v <- randVal_FK k
+    debug <- debug_mode
+    v <- (if debug then (pure . defVal_FK) else randVal_FK) k
     return (regName,v)
 
 simulate_action :: FileState -> [(String, Val -> FileState -> M.Map String Val -> IO Val)] -> T.ActionT Val -> M.Map String Val -> IO ([(String,Val)], [FileUpd] ,Val)
