@@ -30,10 +30,18 @@ execIOs :: [IO ()] -> IO ()
 execIOs = foldr (>>) (return ())
 
 cdiv :: Int -> Int -> Int
-cdiv x y = ceiling $ (fromIntegral x / fromIntegral y)
+cdiv x y = ceiling (fromIntegral x / fromIntegral y)
 
 log2 :: Int -> Int
 log2 = ceiling . (logBase 2) . fromIntegral
+
+hex_to_maybe_integer :: T.Text -> Maybe Integer
+hex_to_maybe_integer txt = case hexadecimal txt of
+    Left str -> Nothing
+    Right (x,str) -> if T.null str then Just x else Nothing
+
+hex_to_maybe_integer_str :: String -> Maybe Integer
+hex_to_maybe_integer_str = hex_to_maybe_integer . T.pack
 
 hex_to_integer :: T.Text -> Integer
 hex_to_integer txt = case hexadecimal txt of
@@ -71,4 +79,10 @@ debug_mode :: IO Bool
 debug_mode = do
     args <- getArgs
     return $ "--debug" `elem` args
+
+interactive_mode :: IO Bool
+interactive_mode = do
+    args <- getArgs
+    return $ "--interactive" `elem` args
+
 

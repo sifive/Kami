@@ -15,6 +15,7 @@ import Data.List (intersperse)
 import Numeric (showHex)
 import System.Exit (exitSuccess)
 import System.IO
+import Control.Monad (when)
 
 instance Show T.Kind where
     show T.Bool = "Bool"
@@ -48,10 +49,15 @@ printNum T.Hex v = resize_num (BV.size v `cdiv` 4) $ tail $ tail $ BV.showHex v
 
 sysIO :: T.SysT Val -> IO ()
 sysIO T.Finish = do
-    hPutStrLn stdout "Exiting..."
+    interactive <- interactive_mode
+    when (not interactive) $ hPutStrLn stdout "Exiting..."
     exitSuccess
-sysIO (T.DispString msg) = hPutStr stdout $ {- format_string -} msg
-sysIO (T.DispExpr _ e ff) = hPutStr stdout $ printVal ff $ eval e
+sysIO (T.DispString msg) = do
+    interactive <- interactive_mode
+    when (not interactive) $ hPutStr stdout $ msg
+sysIO (T.DispExpr _ e ff) = do
+    interactive <- interactive_mode
+    when (not interactive) $ hPutStr stdout $ printVal ff $ eval e
 
 format_string :: String -> String
 format_string [] = []

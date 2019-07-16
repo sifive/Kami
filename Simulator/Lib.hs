@@ -8,9 +8,12 @@ import HaskellTarget as H
 import Simulator.Print
 import Simulator.Util
 import Simulator.Value
+import Simulator.RegisterFile
 
 import qualified Data.Text as T
 import qualified Data.BitVector as BV
+import qualified Data.HashMap as M
+import qualified Data.Vector as V
 
 import Data.List (find)
 import Data.Maybe (catMaybes)
@@ -32,17 +35,39 @@ getArgVal name n = do
         Just (_,y) -> return $ BVVal $ hex_to_bv n $ T.pack y
         Nothing -> error $ "Argument value " ++ name ++ " not supplied."
 
-ppr_bin :: Kind -> Val -> String
-ppr_bin k = printVal $ H.fullFormatBinary k
+ppr_bitformat :: H.BitFormat -> Val -> String
+ppr_bitformat bf (BoolVal b) = if b then "1" else "0"
+ppr_bitformat bf (BVVal v) = printNum bf v
+ppr_bitformat bf (StructVal fields) = "{ " ++ (concat $ 
+    map (\(name,val) -> name ++ ":" ++ (ppr_bitformat bf val) ++ "; ") fields
+    ) ++ "}"
+ppr_bitformat bf (ArrayVal vals) = "[ " ++ (concat (zipWith (\i v -> show i ++ "=" ++ ppr_bitformat bf v ++ "; ") [0..((length vals)-1)] (V.toList vals))) ++ "]"
 
-ppr_hex :: Kind -> Val -> String
-ppr_hex k = printVal $ H.fullFormatHex k
+ppr_bin :: Val -> String
+ppr_bin = ppr_bitformat H.Binary
 
-ppr_dec :: Kind -> Val -> String
-ppr_dec k = printVal $ H.fullFormatDecimal k
+ppr_hex :: Val -> String
+ppr_hex = ppr_bitformat H.Hex
+
+ppr_dec :: Val -> String
+ppr_dec = ppr_bitformat H.Decimal
 
 getRuleNames :: H.BaseModule -> [String]
 getRuleNames mod = map fst $ H.getRules mod
+
+print_reg :: M.Map String Val -> String -> IO()
+print_reg regs regname =
+    case M.lookup regname regs of
+        Just v -> putStrLn $ ppr_hex v
+        Nothing -> putStrLn $ "Register " ++ regname ++ " not found."
+
+print_file_reg :: FileState -> String -> Int -> IO()
+print_file_reg state filename addr =
+    case M.lookup filename (arrs state) of
+        Just arr -> case arr V.!? addr of
+                Just v -> putStrLn $ ppr_hex v
+                Nothing -> putStrLn "Index out of bounds."
+        Nothing -> putStrLn $ "File " ++ filename ++ " not found."
 
 --generates rules randomly from the given list
 rand_rules :: [H.RuleT] -> Str (IO H.RuleT)
