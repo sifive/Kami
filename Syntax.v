@@ -48,7 +48,7 @@ Fixpoint getDefaultConst (k: Kind): ConstT k :=
     | Array n k => ConstArray (fun _ => getDefaultConst k)
   end.
 
-Notation Default := (getDefaultConst _). (* ok *)
+Notation Default := (getDefaultConst _).
 
 Fixpoint getDefaultConstFullKind (k : FullKind) : ConstFullT k :=
   match k with
@@ -444,9 +444,9 @@ Definition Action (retTy : Kind) := forall ty, ActionT ty retTy.
 Definition Signature := (Kind * Kind)%type.
 Definition MethodT (sig : Signature) := forall ty, ty (fst sig) -> ActionT ty (snd sig).
 
-Notation Void := (Bit 0).       (* ok *)
+Notation Void := (Bit 0).
 
-Notation Attribute A := (string * A)%type (only parsing). (* ok *)
+Notation Attribute A := (string * A)%type (only parsing).
 
 Section RegInitValT.
   Variable x: FullKind.
@@ -489,7 +489,7 @@ Inductive Mod: Type :=
 
 Coercion Base: BaseModule >-> Mod.
 
-Notation getKindAttr ls := (map (fun x => (fst x, projT1 (snd x))) ls). (* ok *)
+Notation getKindAttr ls := (map (fun x => (fst x, projT1 (snd x))) ls).
 
 Definition getRegFileRegisters m :=
   match m with
@@ -1056,14 +1056,14 @@ Definition evalConstFullT k (e: ConstFullT k) :=
   end.
 
 (* maps register names to the values which they currently hold *)
-Notation RegT := (Attribute (sigT (fullType type))). (* ok *)
+Notation RegT := (Attribute (sigT (fullType type))).
 Definition RegsT := (list RegT).
 
 (* a pair of the value sent to a method call and the value it returned *)
 Definition SignT k := (type (fst k) * type (snd k))%type.
 
 (* a list of simulatenous method call actions made during a single step *)
-Notation MethT := (Attribute (sigT SignT)). (* ok *)
+Notation MethT := (Attribute (sigT SignT)).
 Definition MethsT := (list MethT).
 
 
@@ -1209,9 +1209,9 @@ Inductive RuleOrMeth :=
 | Rle (rn: string)
 | Meth (f: MethT).
 
-Notation getRleOrMeth := (fun x => fst (snd x)). (* ok *)
+Notation getRleOrMeth := (fun x => fst (snd x)).
 
-Notation FullLabel := (RegsT * (RuleOrMeth * MethsT))%type. (* ok *)
+Notation FullLabel := (RegsT * (RuleOrMeth * MethsT))%type.
 
 
 Lemma SignT_dec: forall k1 k2 (s1 s2: SignT (k1, k2)), {s1 = s2} + {s1 <> s2}.
@@ -1428,7 +1428,7 @@ Notation regInit := (fun (o': RegT) (r: RegInitT)  => fst o' = fst r /\
                                                           match pf in _ = Y return _ Y with
                                                           | eq_refl => projT2 (snd o')
                                                           end = evalConstFullT x
-                                                        end). (* ok *)
+                                                        end).
 
 Fixpoint findReg (s: string) (u: RegsT) :=
   match u with
@@ -1858,8 +1858,8 @@ Definition struct_get_field_index
               else F H0)
        n
        (PeanoNat.Nat.lt_succ_diag_r n).
-(* EXPORTED *)
-(* Local *) Ltac struct_get_field_ltac packet name :=
+
+Ltac struct_get_field_ltac packet name :=
   let val := eval cbv in (struct_get_field_index packet name) in
       match val with
       | Some ?x => exact (ReadStruct packet x)
@@ -1870,8 +1870,8 @@ Definition struct_get_field_index
         let newstr := constr:(("major error - struct_get_field_index not reducing " ++ name)%string) in
         fail 0 newstr
       end.
-(* EXPORTED *)
-(* Local *) Ltac struct_set_field_ltac packet name newval :=
+
+Ltac struct_set_field_ltac packet name newval :=
   let val := eval cbv in (struct_get_field_index packet name) in
       match val with
       | Some ?x => exact (UpdateStruct packet x newval)
