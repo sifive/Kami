@@ -4646,6 +4646,40 @@ Section SimulationGen.
         specialize (HDisjRegs k).
         tauto.
   Qed.
+
+  Lemma InvertStep o l:
+    l <> nil ->
+    Step imp o l ->
+    (exists r a reads upds calls,
+        l = (upds, (Rle r, calls)) :: nil /\
+        In (r, a) (getRules imp) /\
+        SemAction o (a type) reads upds calls WO) \/
+    (exists f sign arg ret a reads upds calls,
+        l = (upds, (Meth (f, existT SignT sign (arg, ret)), calls)) :: nil /\
+        In (f, existT MethodT sign a) (getMethods imp) /\
+        SemAction o (a type arg) reads upds calls ret).
+  Proof.
+    intros ? H.
+    inv H.
+    pose proof (SubstepsSingle HSubsteps).
+    destruct l; simpl.
+    - left; tauto.
+    - simpl in H.
+      assert (sth: Datatypes.length l = 0) by lia.
+      rewrite length_zero_iff_nil in sth; subst; clear H0.
+      destruct p.
+      destruct p.
+      destruct r0.
+      + left.
+        inv HSubsteps; inv HLabel.
+        exists rn0, rb, reads, u, cs.
+        repeat split; auto.
+      + right.
+        inv HSubsteps; inv HLabel.
+        destruct fb.
+        exists fn, x, argV, retV, m, reads, u, cs.
+        repeat split; auto.
+  Qed.
         
   Theorem simulationGen:
     TraceInclusion (Base imp) (Base spec).
