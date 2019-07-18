@@ -12,7 +12,9 @@ Set Extraction KeepSingleton.
 Unset Extraction AutoInline.
 
 Extract Inductive sigT => "(,)" ["(,)"].
-Extract Inductive word => "CustomExtract.EWord" ["CustomExtract.wordNil" "CustomExtract.wordCons"] "CustomExtract.wordRec".
+(* Extract Inductive word => "(Prelude.Int,Prelude.Int)" ["(,)"] "(\fmk (x,y) -> fmk x y)" *) (* <- use this one *)
+
+(* Extract Inductive word => "CustomExtract.EWord" ["CustomExtract.wordNil" "CustomExtract.wordCons"] "CustomExtract.wordRec". *)
 Extract Inductive Fin.t => "CustomExtract.EFin" ["CustomExtract.fin0" "CustomExtract.finS"] "CustomExtract.finRec".
 (* Extract Inductive Vector.t => "[]" ["[]" "(\x xs -> x : xs)"] "(\fnil fcons xs -> case xs of { [] -> fnil (); (x:xs) -> fcons x xs })".
 Extract Inductive Vector.t => "[]" ["[]" "(:)"].
@@ -24,7 +26,7 @@ Extract Inlined Constant projT1 => "Prelude.fst".
 Extract Inlined Constant projT2 => "Prelude.snd".
 Extract Inlined Constant map => "Prelude.map".
 Extract Inlined Constant concat => "Prelude.concat".
-Extract Inlined Constant mod2 => "Prelude.odd".
+(*Extract Inlined Constant mod2 => "Prelude.odd".*)
 Extract Constant nat_cast => "(\_ _ x -> x)".
 Extract Inlined Constant length => "Prelude.length".
 Extract Inlined Constant Datatypes.length => "Prelude.length".
@@ -32,8 +34,8 @@ Extract Constant Nat.div2 => "(`Prelude.div` 2)".
 Extract Constant Nat.log2 => "(\x -> Prelude.floor (Prelude.logBase 2 (Prelude.fromIntegral x)))".
 Extract Constant Nat.log2_up => "(\x -> Prelude.ceiling (Prelude.logBase 2 (Prelude.fromIntegral x)))".
 Extract Constant List.fold_left => "(\f bs a -> Data.List.foldl' f a bs)".
-Extract Constant natToWord => "(\sz n -> (sz, Prelude.toInteger n))".
-Extract Constant wordToNat => "(\_ (_,v) -> Prelude.fromIntegral v)".
+Extract Constant of_nat => "(\sz n -> (sz, Prelude.toInteger n))".
+Extract Constant wordVal => "(\_ (_,v) -> Prelude.fromIntegral v)".
 Extract Constant sumSizes => "(\n f -> Prelude.sum (Prelude.map (\i -> f (n,i)) [0..(n Prelude.-1)]))".
 Extract Constant nth_Fin => "(\xs (_,i) -> xs Prelude.!! i)".
 Extract Constant nth_Fin_map2 => "(\_ _ _ x -> x)".

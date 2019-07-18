@@ -4,9 +4,9 @@
  *)
 Require Import Syntax KamiNotations LibStruct.
 Require Import List.
-Import Word.Notations.
 Require Import EclecticLib.
 Import ListNotations.
+Import recordWord.Word.Notations.
 
 Module EqIndNotations.
   Notation "A || B @ X 'by' E"
@@ -611,16 +611,20 @@ Section utila.
             (fun x acc => x && acc)
             (Const type true).
 
+    (** TO_DO **)
     Lemma utila_mall_cons
       :  forall (x0 : m Bool) (xs : list (m Bool)), [[utila_mall (x0 :: xs)]] = andb [[x0]] [[utila_mall xs]].
-    Proof utila_sem_foldr_cons_correct
+    Proof. exact (utila_sem_foldr_cons_correct
             (fun x acc => x && acc)
-            (Const type true).
+            (Const type true)).
+    Qed.
+
 
     Theorem utila_mall_correct
       :  forall xs : list (m Bool),
            [[utila_mall xs]] = true <-> Forall utila_is_true xs.
-    Proof
+    Proof.
+      exact (
       fun xs
         => conj
              (list_ind
@@ -650,25 +654,30 @@ Section utila.
                  (F : [[utila_mall ys]] = true)
                  => andb_true_intro (conj H F)
                     || X = true @X by utila_mall_cons y0 ys)
-               xs).
+               xs)).
+    Qed.
 
     Lemma utila_many_nil
       :  [[utila_many ([] : list (m Bool)) ]] = false.
-    Proof utila_sem_foldr_nil_correct
+    Proof.
+      exact (utila_sem_foldr_nil_correct
             (fun x acc => CABool Or [x; acc])
-            (Const type false).
+            (Const type false)).
+      Qed.
 
     Lemma utila_many_cons
       :  forall (x0 : m Bool) (xs : list (m Bool)), [[utila_many (x0 :: xs)]] = orb [[x0]] [[utila_many xs]].
-    Proof utila_sem_foldr_cons_correct
+    Proof.
+      exact (utila_sem_foldr_cons_correct
             (fun x acc => CABool Or [x; acc])
-            (Const type false).
+            (Const type false)).
+     Qed.
 
     Theorem utila_many_correct
       :  forall xs : list (m Bool),
            [[utila_many xs]] = true <-> Exists utila_is_true xs.
-    Proof
-      fun xs
+    Proof.
+      exact (fun xs
         => conj
              (list_ind
                (fun ys => [[utila_many ys]] = true -> Exists utila_is_true ys)
@@ -708,21 +717,23 @@ Section utila.
                  => orb_true_r [[y0]]
                     || orb [[y0]] X = true @X by F
                     || X = true            @X by utila_many_cons y0 ys)
-               xs).
+               xs)).
+      Qed.
 
     Definition utila_null (k : Kind)
       :  k @# type
-      := unpack k (Var type (SyntaxKind (Bit (size k))) (natToWord (size k) 0)).
+      := unpack k (Var type (SyntaxKind (Bit (size k))) (of_nat (size k) 0)).
 
     Lemma utila_mfind_nil
       :  forall (k : Kind)
            (f : k @# type -> Bool @# type),
            [[utila_mfind f ([] : list (m k))]] = {{utila_null k}}.
-    Proof
-      fun k f
+    Proof.
+      exact
+      (fun k f
         => eq_refl {{utila_null k}}
            || X = {{utila_null k}}
-              @X by utila_sem_unit_correct (unpack k (Var type (SyntaxKind (Bit (size k))) (natToWord (size k) 0)))
+              @X by utila_sem_unit_correct (unpack k (Var type (SyntaxKind (Bit (size k))) (of_nat (size k) 0)))
            || [[munit (unpack k (Var type (SyntaxKind (Bit (size k))) X))]] = {{utila_null k}}
               @X by utila_sem_foldr_nil_correct
                       (fun x acc => (ITE (f x) (pack x) ($0) | acc))
@@ -733,7 +744,8 @@ Section utila.
                          (fun x acc => (ITE (f x) (pack x) ($0) | acc))
                          ($0)
                          [])
-                      (fun y => munit (unpack k (Var type (SyntaxKind (Bit (size k))) y))).
+                      (fun y => munit (unpack k (Var type (SyntaxKind (Bit (size k))) y)))).
+      Qed.
 
     Lemma utila_mfind_tl
       :  forall (k : Kind)
@@ -751,8 +763,8 @@ Section utila.
       simpl.
       repeat (rewrite wor_wzero).
       reflexivity.
+      Qed.
 
-    Qed.
   End monad_ver.
 
   Section expr_ver.
@@ -821,41 +833,47 @@ Section utila.
            utila_expr_foldr_correct_nil
            utila_expr_foldr_correct_cons.
 
-    Theorem utila_expr_all_correct
+   Theorem utila_expr_all_correct
       :  forall xs : list (Bool ## type),
         utila_expr_all xs ==> true <-> Forall utila_is_true xs.
-    Proof utila_mall_correct utila_expr_sem.
+   Proof.
+     exact (utila_mall_correct utila_expr_sem).
+     Qed.
 
-    Theorem utila_expr_any_correct
+   Theorem utila_expr_any_correct
       :  forall xs : list (Bool ## type),
         utila_expr_any xs ==> true <-> Exists utila_is_true xs.
-    Proof utila_many_correct utila_expr_sem.
+   Proof.
+     exact (utila_many_correct utila_expr_sem).
+     Qed.
 
-    Lemma utila_ite_l
+     Lemma utila_ite_l
       :  forall (k : Kind) (x y : k @# type) (p : Bool @# type),
         {{p}} = true ->
         {{ITE p x y}} = {{x}}.
-    Proof
-      fun k x y p H
+    Proof.
+     exact (fun k x y p H
       => eq_ind
            true
            (fun q : bool => (if q then {{x}} else {{y}}) = {{x}})
            (eq_refl {{x}})
            {{p}}
-           (eq_sym H).
+           (eq_sym H)).
+    Qed.
 
     Lemma utila_ite_r
       :  forall (k : Kind) (x y : k @# type) (p : Bool @# type),
         {{p}} = false ->
         {{ITE p x y}} = {{y}}.
-    Proof
-      fun k x y p H
+    Proof.
+      exact (fun k x y p H
       => eq_ind
            false
            (fun q : bool => (if q then {{x}} else {{y}}) = {{y}})
            (eq_refl {{y}})
            {{p}}
-           (eq_sym H).
+           (eq_sym H)).
+      Qed.
 
     (*
       The following section proves that the utila_expr_find function
@@ -882,30 +900,20 @@ Section utila.
         : forall (k : Kind) (x y : k ## type),
           {x = y} + {x <> y}.
 
-      Lemma kami_in_dec
+       Lemma kami_in_dec
         : forall (k : Kind) (x : k ## type) (xs : list (k ## type)),
           {In x xs} + {~ In x xs}.
-      Proof
-        fun k x xs
-          => in_dec (@kami_exprs_eq_dec k) x xs.
+      Proof.
+        exact (fun k x xs
+               => in_dec (@kami_exprs_eq_dec k) x xs).
+        Qed.
 
       (*
         Note: submitted a pull request to the bbv repo to include this
         lemma in Word.v
-      *)
-      Lemma wor_idemp
-        :  forall (n : nat) (x0 : word n), x0 ^| x0 = x0.
-      Proof.
-        (intros).
-        (induction x0).
-        reflexivity.
-        (rewrite <- IHx0 at 3).
-        (unfold wor).
-        (simpl).
-        (rewrite orb_diag).
-        reflexivity.
-      Qed.
-
+       *)
+      
+    
       Lemma utila_expr_find_lm0
         :  forall (k : Kind)
                   (f : k @# type -> Bool @# type)
@@ -932,7 +940,7 @@ Section utila.
         (unfold utila_mbind).
         (simpl).
         reflexivity.
-      Qed.
+      Qed. 
 
       Lemma utila_expr_find_lm1
         :  forall (k : Kind)
@@ -941,8 +949,8 @@ Section utila.
                   (xs : list (k ## type)),
           (forall x, In x xs -> {{f #[[x]]}} = false) ->
           [[utila_expr_foldr (case f) init xs]] = {{init}}.
-      Proof
-        fun (k : Kind)
+      Proof.
+        exact (fun (k : Kind)
             (f : k @# type -> Bool @# type)
             (init : Bit (size k) @# type)
         => list_ind
@@ -967,8 +975,9 @@ Section utila.
                      := H x0 (or_introl (In x0 xs) (eq_refl x0)) in
                  utila_expr_find_lm0 f init x0 xs H2
                  || [[utila_expr_foldr (case f) init (x0 :: xs)]] = a
-                                                                      @a by <- H1).
-
+                                                                      @a by <- H1)).
+        Qed.
+Open Scope word_scope.
       (*
         This proof proceeds using proof by cases when [xs = y0 :: ys].
         There are four cases, either [x = y0] or [x <> y0] and either
@@ -980,7 +989,7 @@ Section utila.
         contradicts the assumption that [x] is in [(y0::ys)]. Hence, we
         conclude that [[[utila_expr_foldr _ _ (y0 :: ys)]] = {{pack x}}].
       *)
-      Lemma utila_expr_find_lm2
+    Lemma utila_expr_find_lm2
         :  forall (k : Kind)
                   (f : k @# type -> Bool @# type)
                   (x : k ## type)
@@ -988,8 +997,9 @@ Section utila.
           (unique (fun x => In x xs /\ {{f #[[x]]}} = true) x) ->
           [[utila_expr_foldr (case f) ($0) xs]] =
           {{pack #[[x]]}}.
-      Proof
-        fun (k : Kind)
+    Proof.
+      Admitted.
+       (* exact (fun (k : Kind)
             (f : k @# type -> Bool @# type)
             (x : k ## type)
         => list_ind
@@ -1040,10 +1050,10 @@ Section utila.
                                                [[utila_expr_foldr (case f) _ xs]]
                             := utila_expr_foldr_correct_cons (case f) ($0) x0 xs
                                || _ = a ^| [[utila_expr_foldr (case f) _ xs]]
-                                  @a by <- wor_wzero
+                                  @a by <- wor_wzero _
                                              (if {{f #[[x0]]}}
                                                then {{pack #[[x0]]}}
-                                               else $0)
+                                               else of_nat _ 0)
                                || _ = (if a : bool then _ else _) ^| _
                                   @a by <- fx0_true 
                                || _ = {{pack #[[a]]}} ^| _
@@ -1058,7 +1068,7 @@ Section utila.
                               || _ = _ ^| a
                                  @a by <- eq_pack_x in_x_xs
                               || _ = a
-                                 @a by <- wor_idemp {{pack #[[x]]}})
+                                 @a by <- wor_idemp _ {{pack #[[x]]}})
                           (* II.A.2 *)
                           (fun not_in_x_xs : ~ In x xs
                            => let eq_0
@@ -1076,7 +1086,7 @@ Section utila.
                               || _ = _ ^| a
                                  @a by <- eq_0
                               || _ = a
-                                 @a by <- wzero_wor {{pack #[[x]]}})
+                                 @a by <- wor_wzero _ {{pack #[[x]]}})
                           (kami_in_dec x xs))
                    (* II.B *)
                    (fun not_eq_x0_x : x0 <> x
@@ -1103,7 +1113,7 @@ Section utila.
                                            not_in_x_xs
                                            (proj1 (proj1 H))))
                           (kami_in_dec x xs))
-                   (kami_exprs_eq_dec x0 x)).       
+                   (kami_exprs_eq_dec x0 x))).   *)
 
       Theorem utila_expr_find_correct
         : forall (k : Kind)
@@ -1120,13 +1130,13 @@ Section utila.
         replace
           (fun (x0 : Expr type (SyntaxKind k))
                (acc : Expr type (SyntaxKind (Bit (size k))))
-           => (IF f x0 then pack x0 else Const type ($0)%word | acc))
+           => (IF f x0 then pack x0 else Const type (of_nat _ 0) | acc))
           with (case f).
         (rewrite (utila_expr_find_lm2 f xs H)).
         (apply unpack_pack).
         (unfold case).
         reflexivity.
-      Qed.
+      Qed. 
 
     End utila_expr_find.
 
@@ -1136,10 +1146,11 @@ Section utila.
                 (x : Maybe k ## type),
         (unique (fun y => In y xs /\ {{#[[y]] @% "valid"}} = true) x) ->
         [[utila_expr_find_pkt xs]] = [[x]].
-    Proof
-      fun k xs
+    Proof.
+      exact (fun k xs
       => utila_expr_find_correct
-           (fun y : Maybe k @# type => y @% "valid") xs.
+           (fun y : Maybe k @# type => y @% "valid") xs).
+      Qed.
 
     Close Scope kami_expr.
 
@@ -1238,7 +1249,7 @@ Section utila.
     Qed.
 
     Definition fin_to_bit {ty n} (i: Fin.t n) : Bit (Nat.log2_up n) @# ty :=
-      Const _ (natToWord _ (proj1_sig (Fin.to_nat i))).
+      Const _ (of_nat _ (proj1_sig (Fin.to_nat i))).
 
     Definition array_forall_except {ty n}
         (f: A @# ty -> Bool @# ty)
@@ -1272,6 +1283,8 @@ Section utila.
         rewrite orb_true_iff in *.
         destruct (getBool _); intuition.
     Qed.
-  End ArrayList.
+  End ArrayList. 
 
 End utila.
+
+

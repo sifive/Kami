@@ -343,7 +343,7 @@ Definition getRegInit (y: sigT RegInitValT): {x: Kind & option (ConstT x)} :=
                                                        | _ => Void
                                                        end with
                 | SyntaxConst k c => c
-                | _ => WO
+                | _ => (ZToWord 0 0)
                 end
          end.
 

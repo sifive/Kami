@@ -1,5 +1,4 @@
 Require Import Kami.Syntax KamiNotations Lib.Fold.
-Import Word.Notations.
 Import ListNotations.
 Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
@@ -141,7 +140,7 @@ Section BaseModule.
              rn rb
              (HInRules: In (rn, rb) (getRules m))
              reads u cs
-             (HPAction: PSemAction o (rb type) reads u cs WO)
+             (HPAction: PSemAction o (rb type) reads u cs (of_nat 0 0))
              (HReadsGood: SubList (getKindAttr reads)
                                   (getKindAttr (getRegisters m)))
              (HUpdGood: SubList (getKindAttr u)
@@ -174,7 +173,7 @@ Section BaseModule.
             rn rb
             (HInRules: In (rn, rb) (getRules m))
             reads u cs
-            (HPAction: PSemAction o (rb type) reads u cs WO)
+            (HPAction: PSemAction o (rb type) reads u cs (of_nat 0 0))
             (HReadsGood: SubList (getKindAttr reads)
                                  (getKindAttr (getRegisters m)))
             (HUpdGood: SubList (getKindAttr u)
@@ -470,28 +469,32 @@ Section evalExpr.
   Qed.
 
   Lemma evalExpr_Void (e: Expr type (SyntaxKind (Bit 0))):
-    evalExpr e = WO.
+    evalExpr e = (of_nat 0 0).
   Proof.
-    inversion e; auto.
-  Qed.
+    destruct (evalExpr e).
+    arithmetizeWord.
+    simpl in *.
+    lia.
+ Qed.
 
-  Lemma evalExpr_countLeadingZeros ni: forall no (e: Expr type (SyntaxKind (Bit ni))),
-      evalExpr (countLeadingZeros no e) = countLeadingZerosWord no (evalExpr e).
+ Lemma evalExpr_countLeadingZeros ni: forall no (e: Expr type (SyntaxKind (Bit ni))),
+      evalExpr (countLeadingZeros no e) = countLeadingZerosWord _ no (evalExpr e).
   Proof.
     induction ni; simpl; intros; auto.
     rewrite evalExpr_castBits.
     simpl.
-    unfold wzero at 2.
+    unfold of_nat at 2.
+    unfold wordWrap.
+    arithmetizeWord.
     rewrite wzero_wplus.
-    match goal with
-    | |- (if getBool ?P then _ else _) = (if ?P then _ else _) => destruct P; auto
-    end.
+    destruct weq; auto.
     repeat f_equal.
     rewrite IHni.
     simpl.
     rewrite evalExpr_castBits.
     repeat f_equal.
-  Qed.
+Qed.
+  
 End evalExpr.
 
 
@@ -655,7 +658,7 @@ Qed.
 
 Lemma concat_perm_rewrite (A : Type) (l l' : list (list A)):
   l [=] l' ->
-  concat l [=] concat l'.
+  List.concat l [=] List.concat l'.
 Proof.
   induction 1.
   - reflexivity.
@@ -666,7 +669,7 @@ Proof.
 Qed.
 
 Global Instance concat_perm_rewrite' {A : Type}:
-  Proper (@Permutation (list A) ==> @Permutation A) (@concat A) | 10.
+  Proper (@Permutation (list A) ==> @Permutation A) (@List.concat A) | 10.
 Proof.
   repeat red; eauto using concat_perm_rewrite.
 Qed.
@@ -3912,60 +3915,78 @@ Section TraceSubstitute.
   Qed.
 End TraceSubstitute.
 
-Lemma word0_neq: forall w : word 1, w <> WO~0 -> w = WO~1.
-Proof.
-  intros.
-  shatter_word w.
-  destruct x; auto.
-  tauto.
-Qed.
 
 Section test.
   Variable ty: Kind -> Type.
   Definition Slt2 n (e1 e2: Expr ty (SyntaxKind (Bit (n + 1)))) :=
-    ITE (Eq (UniBit (TruncMsb n 1) e1) (Const ty WO~0))
-        (ITE (Eq (UniBit (TruncMsb n 1) e2) (Const ty WO~0)) (BinBitBool (LessThan _) e1 e2) (Const ty false))
-        (ITE (Eq (UniBit (TruncMsb n 1) e2) (Const ty WO~1)) (BinBitBool (LessThan _) e1 e2) (Const ty true)).
+    ITE (Eq (UniBit (TruncMsb n 1) e1) (Const ty (of_nat 1 0)))
+        (ITE (Eq (UniBit (TruncMsb n 1) e2) (Const ty (of_nat 1 0))) (BinBitBool (LessThan _) e1 e2) (Const ty false))
+        (ITE (Eq (UniBit (TruncMsb n 1) e2) (Const ty (of_nat 1 ((Nat.pow 2 1) - 1)))) (BinBitBool (LessThan _) e1 e2) (Const ty true)).
 End test.
 
 Lemma Slt_same n e1 e2: evalExpr (Slt2 n e1 e2) = evalExpr (Slt n e1 e2).
 Proof.
   unfold Slt2, Slt.
   simpl.
-  destruct (weq (split2 n 1 (evalExpr e1)) WO~0); simpl; auto.
+  destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e1)) (of_nat 1 0)); simpl; auto.
   - rewrite e.
-    destruct (weq (split2 n 1 (evalExpr e2)) WO~0); simpl; auto.
+    destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e2)) (of_nat 1 0)); simpl; auto.
     + rewrite e0.
-      destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
-    + destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
-      * destruct (weq WO~0 (split2 n 1 (evalExpr e2))); simpl; auto.
-      * destruct (weq WO~0 (split2 n 1 (evalExpr e2))); simpl; auto.
+      destruct (wlt_dec _ (evalExpr e1) (evalExpr e2)).
+      simpl. destruct weq.
+      * simpl. reflexivity.
+      * simpl. contradiction.
+      * simpl. destruct weq. simpl. reflexivity.
+        simpl. contradiction.
+    + destruct (wlt_dec _ (evalExpr e1) (evalExpr e2)); simpl; auto.
+      * destruct (weq _ (of_nat 1 0) (@truncMsb 1 (n+1) (evalExpr e2))); simpl; auto.
+      * destruct (weq _ (of_nat 1 0) (@truncMsb 1 (n+1) (evalExpr e2))); simpl; auto.
         apply word0_neq in n0.
+        simpl in n0.
+        admit.
+        (*
+
+        
+        destruct (evalExpr e1).
+        destruct (evalExpr e2).
+        arithmetizeWord.
         pre_word_omega.
         rewrite wordToNat_split2 in *.
         pose proof (pow2_zero n) as sth0.
         rewrite Nat.div_small_iff in e by lia.
         assert (sth: 0 < #(evalExpr e2) / pow2 n) by lia.
-        rewrite Nat.div_str_pos_iff in sth; lia.
-  - destruct (weq (split2 n 1 (evalExpr e2)) WO~0); simpl; auto.
+        rewrite Nat.div_str_pos_iff in sth; lia. *)
+  - destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e2)) (of_nat 1 0)); simpl; auto.
     + rewrite e.
-      destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
-      * destruct (weq (split2 n 1 (evalExpr e1)) WO~0); simpl; auto.
+      destruct (wlt_dec _ (evalExpr e1) (evalExpr e2)); simpl; auto.
+      * destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e1)) (of_nat 1 0)); simpl; auto.
         apply word0_neq in n1.
-        pre_word_omega.
+        simpl in n1.
+        destruct weq.
+        ** simpl. inversion e3.
+        ** simpl. apply word0_neq in n0.
+           simpl in n0.
+           admit.
+        (*pre_word_omega.
         rewrite wordToNat_split2 in *.
         pose proof (pow2_zero n) as sth0.
         rewrite Nat.div_small_iff in e by lia.
         assert (sth: 0 < #(evalExpr e1) / pow2 n) by lia.
-        rewrite Nat.div_str_pos_iff in sth; lia.
-      * destruct (weq (split2 n 1 (evalExpr e1)) WO~0); simpl; auto.
-        tauto.
+        rewrite Nat.div_str_pos_iff in sth; lia.*)
+      * destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e1)) (of_nat 1 0)); simpl; auto.
+        tauto. destruct weq.
+        ** simpl. inversion e3.
+        ** simpl. reflexivity.
     + apply word0_neq in n0.
       apply word0_neq in n1.
       rewrite ?n0, ?n1.
       simpl.
-      destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
-Qed.
+      destruct (wlt_dec _ (evalExpr e1) (evalExpr e2)); simpl; auto.
+      ** destruct weq. simpl. reflexivity.
+         simpl. exfalso. apply n2. reflexivity.
+      ** destruct weq. simpl. reflexivity.
+         simpl. reflexivity.
+Admitted.
 
 Lemma mergeSeparatedBaseFile_noHides (rfl : list RegFileBase) :
   getHidden (mergeSeparatedBaseFile rfl) = nil.
@@ -3993,14 +4014,14 @@ Proof.
 Qed.
 
 Lemma getAllRegisters_mergeBaseFile (rfl : list RegFileBase) :
-  getAllRegisters (mergeSeparatedBaseFile rfl) = (concat (map getRegFileRegisters rfl)).
+  getAllRegisters (mergeSeparatedBaseFile rfl) = (List.concat (map getRegFileRegisters rfl)).
 Proof.
   induction rfl;auto.
   simpl; rewrite IHrfl; reflexivity.
 Qed.
 
 Lemma getAllRegisters_mergeBaseMod (bl : list BaseModule) :
-  getAllRegisters (mergeSeparatedBaseMod bl) = (concat (map getRegisters bl)).
+  getAllRegisters (mergeSeparatedBaseMod bl) = (List.concat (map getRegisters bl)).
 Proof.
   induction bl; auto.
   simpl; rewrite IHbl; reflexivity.
@@ -4013,14 +4034,14 @@ Proof.
 Qed.
 
 Lemma getAllMethods_mergeBaseFile (rfl : list RegFileBase) :
-  getAllMethods (mergeSeparatedBaseFile rfl) = (concat (map getRegFileMethods rfl)).
+  getAllMethods (mergeSeparatedBaseFile rfl) = (List.concat (map getRegFileMethods rfl)).
 Proof.
   induction rfl;auto.
   simpl; rewrite IHrfl; reflexivity.
 Qed.
 
 Lemma getAllMethods_mergeBaseMod (bl : list BaseModule) :
-  getAllMethods (mergeSeparatedBaseMod bl) = (concat (map getMethods bl)).
+  getAllMethods (mergeSeparatedBaseMod bl) = (List.concat (map getMethods bl)).
 Proof.
   induction bl; auto.
   simpl; rewrite IHbl; reflexivity.
@@ -4039,7 +4060,7 @@ Proof.
 Qed.
 
 Lemma getAllRules_mergeBaseMod (bl : list BaseModule) :
-  getAllRules (mergeSeparatedBaseMod bl) = (concat (map getRules bl)).
+  getAllRules (mergeSeparatedBaseMod bl) = (List.concat (map getRules bl)).
 Proof.
   induction bl; auto.
   simpl; rewrite IHbl; reflexivity.
@@ -4428,7 +4449,7 @@ Section SimulationZeroAct.
   Variable simulation:
     forall oImp rImp uImp rleImp csImp oImp' aImp,
       In (rleImp, aImp) (getRules imp) ->
-      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      SemAction oImp (aImp type) rImp uImp csImp (of_nat 0 0) ->
       UpdRegs [uImp] oImp oImp' ->
       forall oSpec,
         simRel oImp oSpec ->
@@ -4436,7 +4457,7 @@ Section SimulationZeroAct.
          (exists rleSpec aSpec,
              In (rleSpec, aSpec) (getRules spec) /\
              exists rSpec uSpec,
-               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               SemAction oSpec (aSpec type) rSpec uSpec csImp (of_nat 0 0) /\
                exists oSpec',
                  UpdRegs [uSpec] oSpec oSpec' /\
                  simRel oImp' oSpec')).
@@ -4563,7 +4584,7 @@ Section SimulationGen.
   Variable simulationRule:
     forall oImp rImp uImp rleImp csImp oImp' aImp,
       In (rleImp, aImp) (getRules imp) ->
-      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      SemAction oImp (aImp type) rImp uImp csImp (of_nat 0 0) ->
       UpdRegs [uImp] oImp oImp' ->
       forall oSpec,
         simRel oImp oSpec ->
@@ -4571,7 +4592,7 @@ Section SimulationGen.
          (exists rleSpec aSpec,
              In (rleSpec, aSpec) (getRules spec) /\
              exists rSpec uSpec,
-               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               SemAction oSpec (aSpec type) rSpec uSpec csImp (of_nat 0 0) /\
                exists oSpec',
                  UpdRegs [uSpec] oSpec oSpec' /\
                  simRel oImp' oSpec')).
@@ -4603,7 +4624,7 @@ Section SimulationGen.
     forall oImp rImpl1 uImpl1 rleImpl1 aImp1 csImp1
            rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
       In (rleImpl1, aImp1) (getRules imp) ->
-      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 WO ->
+      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 (of_nat 0 0) ->
       In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
       SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
       exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
@@ -5074,14 +5095,14 @@ Section SimulationGeneralEx.
   Variable simulationRule:
     forall oImp rImp uImp rleImp csImp aImp,
       In (rleImp, aImp) (getRules imp) ->
-      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      SemAction oImp (aImp type) rImp uImp csImp (of_nat 0 0) ->
       forall oSpec,
         simRel oImp oSpec ->
         ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = []) \/
          (exists rleSpec aSpec,
              In (rleSpec, aSpec) (getRules spec) /\
              exists rSpec uSpec,
-               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               SemAction oSpec (aSpec type) rSpec uSpec csImp (of_nat 0 0) /\
                exists oSpec',
                  UpdRegs [uSpec] oSpec oSpec' /\
                  simRel (doUpdRegs uImp oImp) oSpec')).
@@ -5112,7 +5133,7 @@ Section SimulationGeneralEx.
     forall oImp rImpl1 uImpl1 rleImpl1 aImp1 csImp1
            rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
       In (rleImpl1, aImp1) (getRules imp) ->
-      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 WO ->
+      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 (of_nat 0 0) ->
       In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
       SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
       exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
@@ -5165,14 +5186,14 @@ Section SimulationZeroA.
   Variable simulation:
     forall oImp rImp uImp rleImp csImp aImp,
       In (rleImp, aImp) (getRules imp) ->
-      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      SemAction oImp (aImp type) rImp uImp csImp (of_nat 0 0) ->
       forall oSpec,
         simRel oImp oSpec ->
         ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = []) \/
          (exists rleSpec aSpec,
              In (rleSpec, aSpec) (getRules spec) /\
              exists rSpec uSpec,
-               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               SemAction oSpec (aSpec type) rSpec uSpec csImp (of_nat 0 0) /\
                exists oSpec',
                  UpdRegs [uSpec] oSpec oSpec' /\
                  simRel (doUpdRegs uImp oImp) oSpec')).
@@ -5209,14 +5230,14 @@ Section SimulationGeneral.
   Variable simulationRule:
     forall oImp rImp uImp rleImp csImp aImp,
       In (rleImp, aImp) (getRules imp) ->
-      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      SemAction oImp (aImp type) rImp uImp csImp (of_nat 0 0) ->
       forall oSpec,
         simRel oImp oSpec ->
         ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = []) \/
          (exists rleSpec aSpec,
              In (rleSpec, aSpec) (getRules spec) /\
              exists rSpec uSpec,
-               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               SemAction oSpec (aSpec type) rSpec uSpec csImp (of_nat 0 0) /\
                  simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec))).
 
   Variable simulationMeth:
@@ -5243,7 +5264,7 @@ Section SimulationGeneral.
     forall oImp rImpl1 uImpl1 rleImpl1 aImp1 csImp1
            rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
       In (rleImpl1, aImp1) (getRules imp) ->
-      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 WO ->
+      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 (of_nat 0 0) ->
       In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
       SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
       exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
@@ -5309,14 +5330,14 @@ Section SimulationZeroAction.
   Variable simulation:
     forall oImp rImp uImp rleImp csImp aImp,
       In (rleImp, aImp) (getRules imp) ->
-      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      SemAction oImp (aImp type) rImp uImp csImp (of_nat 0 0) ->
       forall oSpec,
         simRel oImp oSpec ->
         ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = []) \/
          (exists rleSpec aSpec,
              In (rleSpec, aSpec) (getRules spec) /\
              exists rSpec uSpec,
-               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               SemAction oSpec (aSpec type) rSpec uSpec csImp (of_nat 0 0) /\
                  simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec))).
 
   Theorem simulationZeroAction:
@@ -5427,14 +5448,14 @@ Section Simulation.
   Variable simulationRule:
     forall oImp rImp uImp rleImp csImp aImp,
       In (rleImp, aImp) (getRules imp) ->
-      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      SemAction oImp (aImp type) rImp uImp csImp (of_nat 0 0) ->
       forall oSpec,
         simRel oImp oSpec ->
         ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = nil) \/
          (exists rleSpec aSpec,
              In (rleSpec, aSpec) (getRules spec) /\
              exists rSpec uSpec,
-               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               SemAction oSpec (aSpec type) rSpec uSpec csImp (of_nat 0 0) /\
                  simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec))).
 
   Variable simulationMeth:
@@ -5461,7 +5482,7 @@ Section Simulation.
     forall oImp rImpl1 uImpl1 rleImpl1 aImp1 csImp1
            rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
       In (rleImpl1, aImp1) (getRules imp) ->
-      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 WO ->
+      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 (of_nat 0 0) ->
       In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
       SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
       exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
@@ -5479,3 +5500,5 @@ Section Simulation.
     eapply simulationGeneral; eauto; intros.
   Qed.
 End Simulation.
+
+

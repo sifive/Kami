@@ -45,26 +45,10 @@ Inductive NeverCallMod: Mod -> Prop :=
 *)
 Lemma num_method_calls_positive
   : forall (method : MethT) (labels : list FullLabel),
-      0 <= getNumCalls method labels.
-Proof 
-fun method
-  => list_ind _
-       (ltac:(discriminate) : 0 <= getNumCalls method [])
-       (fun (label : FullLabel) (labels : list FullLabel)
-         (H : 0 <= getNumFromCalls method (concat (map PPT_calls labels)))
-         => list_ind _ H
-              (fun (method0 : MethT) (methods : MethsT)
-                (H0 : 0 <= getNumFromCalls method (methods ++ concat (map PPT_calls labels)))
-                => sumbool_ind
-                     (fun methods_eq
-                       => 0 <=
-                            if methods_eq
-                              then 1 + getNumFromCalls method (methods ++ concat (map PPT_calls labels))
-                              else getNumFromCalls method (methods ++ concat (map PPT_calls labels)))
-                     (fun _ => Z.add_nonneg_nonneg 1 _ (Zle_0_pos 1) H0)
-                     (fun _ => H0)
-                     (MethT_dec method method0))
-              (snd (snd label))).
+    0 <= getNumCalls method labels.  
+Proof.
+  apply getNumCalls_nonneg.
+Defined.
 
 (*
   Proves that the number of method executions
@@ -119,13 +103,13 @@ Section BaseModule.
   Variable o: RegsT.
 
   Definition getLabelUpds (ls: list FullLabel) :=
-    concat (map (fun x => fst x) ls).
+    List.concat (map (fun x => fst x) ls).
   
   Definition getLabelExecs (ls: list FullLabel) :=
     map (fun x => fst (snd x)) ls.
   
   Definition getLabelCalls (ls: list FullLabel) :=
-    concat (map (fun x => (snd (snd x))) ls).
+    List.concat (map (fun x => (snd (snd x))) ls).
 
 
   Lemma getLabelCalls_perm_rewrite l l' :
@@ -1773,7 +1757,7 @@ Proof.
     inv H1.
     specialize (KeyMatching3 _ _ _ H H0 HInRules (eq_refl)) as P1.
     destruct rle; simpl in *; inv P1; subst.
-    exists reads, oldExecs, u, oldUpds, cs, oldCalls, WO.
+    exists reads, oldExecs, u, oldUpds, cs, oldCalls, (of_nat 0 0).
     repeat split; auto.
     repeat intro; apply (HNoRle _ H1).
   - rewrite HExecs in H1.
@@ -1803,7 +1787,7 @@ Lemma PPlus_inline_Rule_with_action f m o rn rb upds1 upds2 execs calls1 calls2 
   SubList (getKindAttr reads) (getKindAttr (getRegisters m)) ->
   SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) ->
   DisjKey upds2 upds1 ->
-  PSemAction o (inlineSingle f (rb type)) reads upds1 calls1 WO ->
+  PSemAction o (inlineSingle f (rb type)) reads upds1 calls1 (of_nat 0 0) ->
   PPlusSubsteps m o upds2 execs calls2 ->
   PPlusSubsteps (inlineSingle_Rule_BaseModule f rn m) o (upds1++upds2) ((Rle rn)::execs) (calls1++calls2).
 Proof.
@@ -1909,7 +1893,7 @@ Proof.
       [rewrite app_assoc; apply Permutation_app_tail, Permutation_app_comm| rewrite P5].
     assert ((filter (complement (called_by f)) x3) ++ x12 ++ x13 [=] (x12 ++ (filter (complement (called_by f)) x3))++x13) as P6;
       [rewrite app_assoc; apply Permutation_app_tail, Permutation_app_comm| rewrite P6].
-    rewrite (shatter_word_0) in P4.
+    rewrite (unique_word_0) in P4.
     eapply PPlus_inline_Rule_with_action with (reads:= (x9++x)); eauto.
     + intro; rewrite <-H18, Permutation_app_comm; rewrite H8 in H15; repeat rewrite filter_app, map_app in H15; rewrite filter_idemp, filter_complement_nil in H15.
       simpl in *; specialize (H13 rn'); rewrite H15 in H13; repeat rewrite in_app_iff in *; clear - H13; firstorder fail.
@@ -2635,7 +2619,7 @@ Proof.
     + econstructor 2.
       * clear - H14; inv H14; auto.
       * apply H5.
-      * rewrite shatter_word_0 in H6.
+      * rewrite unique_word_0 in H6.
         apply H6.
       * assumption.
       * assumption.
@@ -5255,7 +5239,7 @@ Lemma PPlus_inlineSingle_BaseModule_with_action f m o rn rb upds execs calls:
     DisjKey upds2 upds1 /\
     SubList (getKindAttr reads) (getKindAttr (getRegisters m)) /\
     SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) /\
-    PSemAction o (inlineSingle f (rb type)) reads upds1 calls1 WO /\
+    PSemAction o (inlineSingle f (rb type)) reads upds1 calls1 (of_nat 0 0) /\
     PPlusSubsteps m o upds2 execs calls2.
 Proof.
   intros.
@@ -5264,7 +5248,7 @@ Proof.
   eapply (ExtractRuleAction) in H; simpl in *; eauto; dest.
   simpl in *.
   exists x1, x2, x3, x4, x; repeat split; auto.
-  - rewrite shatter_word_0 in H; assumption.
+  - rewrite unique_word_0 in H; assumption.
   - apply Permutation_cons_inv in H9.
     rewrite H9.
     rewrite <- (inlineSingle_Rule_preserves_names) in H3.
@@ -5812,7 +5796,7 @@ Proof.
       * econstructor 2; auto.
         -- inv H11; auto.
         -- apply H2.
-        -- rewrite shatter_word_0 in H3; apply H3.
+        -- rewrite unique_word_0 in H3; apply H3.
         -- assumption.
         -- assumption.
         -- rewrite H13 in H6; clear - H6; intro k.
