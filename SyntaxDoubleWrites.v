@@ -38,7 +38,6 @@ Variable o: RegsT.
       k (a: ActionT type k) (v: type k) retK (fret: type retK)
       (cont: type k -> ActionT type retK)
       readRegs newRegs readRegsCont newRegsCont calls callsCont
-      (*(HDisjRegs: DisjKey newRegs newRegsCont)*)
       (HSemAction: SemActionDoubleWrites a readRegs newRegs calls v)
       (HSemActionCont: SemActionDoubleWrites (cont v) readRegsCont newRegsCont callsCont fret)
       uReadRegs uNewRegs uCalls
@@ -66,7 +65,6 @@ Variable o: RegsT.
       retK (fret: type retK)
       (cont: ActionT type retK) readRegs newRegs calls anewRegs
       (HRegVal: In (r, k) (getKindAttr o))
-      (*(HDisjRegs: key_not_In r newRegs)*)
       (HANewRegs: anewRegs = (r, (existT _ _ (evalExpr e))) :: newRegs)
       (HSemAction:  SemActionDoubleWrites cont readRegs newRegs calls fret):
        SemActionDoubleWrites (WriteReg r e cont) readRegs anewRegs calls fret
@@ -77,7 +75,6 @@ Variable o: RegsT.
       (r1: type k1)
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2  newRegs1 newRegs2 calls1 calls2 (r2: type k2)
-      (*(HDisjRegs: DisjKey newRegs1 newRegs2)*)
       (HTrue: evalExpr p = true)
       (HAction:  SemActionDoubleWrites a readRegs1 newRegs1 calls1 r1)
       (HSemAction:  SemActionDoubleWrites (cont r1) readRegs2 newRegs2 calls2 r2)
@@ -93,7 +90,6 @@ Variable o: RegsT.
       (r1: type k1)
       k2 (cont: type k1 -> ActionT type k2)
       readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 (r2: type k2)
-      (*(HDisjRegs: DisjKey newRegs1 newRegs2)*)
       (HFalse: evalExpr p = false)
       (HAction:  SemActionDoubleWrites a' readRegs1 newRegs1 calls1 r1)
       (HSemAction:  SemActionDoubleWrites (cont r1) readRegs2 newRegs2 calls2 r2)

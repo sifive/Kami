@@ -33,6 +33,7 @@ Section DoubleWritesProof.
       apply H0.
       apply H4.
   Qed.
+  
 
   Lemma getKindAttr_consistent (k : Kind) (a : ActionT type k) (o : RegsT):
     forall newRegs readRegs calls retl,
@@ -203,35 +204,36 @@ Section DoubleWritesProof.
   Qed.
 
 
-  Lemma FalseSemCompAction (k : Kind) (a : ActionT type k) (o : RegsT) (m : BaseModule):
-    forall regMap regMapExpr (bexpr : Bool @# type) (WfRegMap : WfRegMapExpr regMapExpr regMap),
+  Lemma FalseSemCompAction (k : Kind) (a : ActionT type k) (o oInit : RegsT) uInit (m : BaseModule):
+    forall regMap regMapExpr (bexpr : Bool @# type) (WfRegMap : WfRegMapExpr regMapExpr regMap) (HPriorityUpds : PriorityUpds oInit uInit o) ,
       getKindAttr o = getKindAttr (getRegisters m) ->
+      getKindAttr oInit = getKindAttr (getRegisters m) ->
       WfActionT m a -> 
       evalExpr bexpr = false ->
       exists retl,
-        SemCompActionT (compileAction (o,nil) a bexpr regMapExpr) regMap nil retl.
+        SemCompActionT (compileAction (oInit,uInit) a bexpr regMapExpr) regMap nil retl.
   Proof.
     induction a; simpl in *; subst.
     - (* Meth Call *)
       intros.
-      inversion H1; EqDep_subst.
-      specialize (H5 (evalConstT (getDefaultConst (snd s)))).
-      specialize (H (evalConstT (getDefaultConst (snd s))) _ _ _ WfRegMap H0 H5 H2).
+      inversion H2; EqDep_subst.
+      specialize (H6 (evalConstT (getDefaultConst (snd s)))).
+      specialize (H (evalConstT (getDefaultConst (snd s))) _ _ _ WfRegMap HPriorityUpds H0 H1 H6 H3).
       destruct H.
       exists x.
-      econstructor. eapply H. assumption.
+      econstructor 2. eapply H. assumption.
     - (* Let expr *)
       intros.
-      inversion H1; EqDep_subst.
-      specialize (H5 (evalExpr e)).
-      specialize (H (evalExpr e) _ _ _ WfRegMap H0 H5 H2).
+      inversion H2; EqDep_subst.
+      specialize (H6 (evalExpr e)).
+      specialize (H (evalExpr e) _ _ _ WfRegMap HPriorityUpds H0 H1 H6 H3).
       destruct H.
       exists x.
       econstructor. assumption.
     - (* Let Action *)
       intros.
-      inversion H1; EqDep_subst.
-      specialize (IHa _ _ _ WfRegMap H0 H6 H2).
+      inversion H2; EqDep_subst.
+      specialize (IHa _ _ _ WfRegMap HPriorityUpds H0 H1 H7 H3).
       destruct IHa.
       assert (WfRegMapExpr (VarRegMap type regMap) regMap).
       {
@@ -239,33 +241,32 @@ Section DoubleWritesProof.
         constructor.
         destruct WfRegMap. assumption.
       }
-      specialize (H8 x).
-      specialize (H x _ _ _ H4 H0 H8 H2).
+      specialize (H9 x).
+      specialize (H x _ _ _ H5 HPriorityUpds H0 H1 H9 H3).
       destruct H. exists x0.
       rewrite <- (app_nil_r (nil : MethsT)).
-      econstructor. 
-      eapply H3. apply H.
+      econstructor; eauto.
     - (* Non Det *)
       intros.
-      inversion H1; EqDep_subst.
-      specialize (H5 (evalConstFullT (getDefaultConstFullKind k))).
-      specialize (H (evalConstFullT (getDefaultConstFullKind k)) _ _ _ WfRegMap H0 H5 H2).
+      inversion H2; EqDep_subst.
+      specialize (H6 (evalConstFullT (getDefaultConstFullKind k))).
+      specialize (H (evalConstFullT (getDefaultConstFullKind k)) _ _ _ WfRegMap HPriorityUpds H0 H1 H6 H3).
       destruct H.
       exists x.
       econstructor.
       apply H.
     -(* Read *)
       intros.
-      inversion H1; EqDep_subst.
+      inversion H2; EqDep_subst.
       specialize (getRegisterValue); intros.
-      rewrite <- H0 in H8.
-      specialize (H3 _ _ _ H8).
-      destruct H3.
-      specialize (H6 x).
-      specialize (H x _ _ _ WfRegMap H0 H6 H2).
+      rewrite <- H0 in H9.
+      specialize (H4 _ _ _ H9).
+      destruct H4.
+      specialize (H7 x).
+      specialize (H x _ _ _ WfRegMap HPriorityUpds H0 H1 H7 H3).
       destruct H. exists x0.
       econstructor; eauto.
-      constructor. apply NoUpds. 
+      constructor. 
     -(* Write *)
       intros.
       assert (WfRegMapExpr (VarRegMap type regMap) regMap).
@@ -274,8 +275,8 @@ Section DoubleWritesProof.
         constructor.
         destruct WfRegMap. assumption.
       }
-      inversion H0; EqDep_subst.
-      specialize (IHa _ _ _ H2 H H6 H1).
+      inversion H1; EqDep_subst.
+      specialize (IHa _ _ _ H3 HPriorityUpds H H0 H7 H2).
       destruct IHa.
       exists x. simpl in *.
       rewrite <- (app_nil_r (nil : MethsT)).
@@ -287,12 +288,12 @@ Section DoubleWritesProof.
     -(* If-else *)
       intros. 
       assert ((evalExpr (bexpr && !e)%kami_expr = evalExpr bexpr)) as P1.
-      { simpl. rewrite -> H2. simpl. destruct (evalExpr e). simpl. reflexivity.
+      { simpl. rewrite -> H3. simpl. destruct (evalExpr e). simpl. reflexivity.
         reflexivity. }
       assert ((evalExpr (bexpr && e)%kami_expr = false)) as P2.
-      { simpl. rewrite -> H2. simpl. reflexivity. }
-      inversion H1; EqDep_subst.
-      specialize (IHa1 _ _ _ WfRegMap H0 H10 H2).
+      { simpl. rewrite -> H3. simpl. reflexivity. }
+      inversion H2; EqDep_subst.
+      specialize (IHa1 _ _ _ WfRegMap HPriorityUpds H0 H1 H11 H3).
       destruct IHa1.
       assert (WfRegMapExpr (VarRegMap type regMap) regMap).
       {
@@ -300,67 +301,71 @@ Section DoubleWritesProof.
         constructor.
         destruct WfRegMap. assumption.
       }
-      rewrite -> H2 in P1.
-      specialize (IHa2 _ _ _ H4 H0 H11 P2).
+      rewrite -> H3 in P1.
+      specialize (IHa2 _ _ _ H5 HPriorityUpds H0 H1 H12 P2).
       remember (evalExpr e) as P0.
       destruct IHa2.
       destruct P0.
-      * specialize (H7 x).
-        specialize (H x _ _ _ H4 H0 H7 P2).
+      * specialize (H8 x).
+        specialize (H x _ _ _ H5 HPriorityUpds H0 H1 H8 P2).
         destruct H.
         exists x1.  rewrite <- (app_nil_r (nil : MethsT)).
         econstructor. simpl in *.
         apply  SemCompActionEquivBexpr with (bexpr1 := bexpr).
-        simpl. rewrite -> H2. simpl. reflexivity.
-        apply H3.
+        simpl. rewrite -> H3. simpl. reflexivity.
+        apply H4.
         rewrite <- (app_nil_r (nil : MethsT)).
         econstructor.
         apply SemCompActionEquivBexpr with (bexpr1 := (bexpr && e)%kami_expr).
-        simpl. rewrite -> H2. simpl. reflexivity.
-        apply H5.
+        simpl. rewrite -> H3. simpl. reflexivity.
+        apply H6.
         simpl. econstructor. simpl.
         rewrite <- HeqP0. 
         apply SemCompActionEquivBexpr with (bexpr1 := (bexpr && e)%kami_expr).
-        simpl. rewrite -> H2. simpl. reflexivity.
+        simpl. rewrite -> H3. simpl. reflexivity.
         apply H.
-      * specialize (H7 x0).
-        specialize (H x0 _ _ _ H4 H0 H7 P2).
+      * specialize (H8 x0).
+        specialize (H x0 _ _ _ H5 HPriorityUpds H0 H1 H8 P2).
         destruct H.
         exists x1.  rewrite <- (app_nil_r (nil : MethsT)).
         econstructor. simpl in *.
         apply  SemCompActionEquivBexpr with (bexpr1 := bexpr).
-        simpl. rewrite -> H2. simpl. reflexivity.
-        apply H3.
+        simpl. rewrite -> H3. simpl. reflexivity.
+        apply H4.
         rewrite <- (app_nil_r (nil : MethsT)).
         econstructor.
         apply SemCompActionEquivBexpr with (bexpr1 := (bexpr && e)%kami_expr).
-        simpl. rewrite -> H2. simpl. reflexivity.
-        apply H5.
+        simpl. rewrite -> H3. simpl. reflexivity.
+        apply H6.
         simpl. econstructor. simpl.
         rewrite <- HeqP0. 
         apply SemCompActionEquivBexpr with (bexpr1 := (bexpr && e)%kami_expr).
-        simpl. rewrite -> H2. simpl. reflexivity.
+        simpl. rewrite -> H3. simpl. reflexivity.
         apply H.
     - (* Sys *)
       intros.
-      inversion H0; EqDep_subst.
-      specialize (IHa _ _ _ WfRegMap H H4 H1).
+      inversion H1; EqDep_subst.
+      specialize (IHa _ _ _ WfRegMap HPriorityUpds H H0 H5 H2).
       destruct IHa.
-      exists x. econstructor. apply H2.
+      exists x. econstructor. apply H3.
     - (* Ret *)
       intros.
-      inversion H0; EqDep_subst.
+      inversion H1; EqDep_subst.
       exists (evalExpr e).
       econstructor. reflexivity.
       assumption.
   Qed.
 
 
-  Lemma EquivActionNoDupWritesNew (k : Kind) (a : ActionT type k) (o : RegsT) (m : BaseModule) :
+  Lemma EquivActionNoDupWritesNew (k : Kind) (a : ActionT type k) (o oInit: RegsT) uInit  (m : BaseModule)
+        (HoInitNoDups : NoDup (map fst oInit))
+        (HuInitNoDups : forall u, In u uInit -> NoDup (map fst u))
+        (HPriorityUpds : PriorityUpds oInit uInit o)
+        (HOgetReg : getKindAttr o = getKindAttr (getRegisters m)) :
     forall newRegs readRegs calls retl,
       SemActionDoubleWrites o a readRegs newRegs calls retl ->
       NoDup (map fst newRegs) ->
-      getKindAttr o = getKindAttr (getRegisters m) ->
+      getKindAttr oInit = getKindAttr (getRegisters m) ->
       WfActionT m a -> 
       forall old writeMap upds
              (HConsistent: getKindAttr o = getKindAttr old)
@@ -372,7 +377,7 @@ Section DoubleWritesProof.
                          |nil => upds
                          |_ :: _ => (hd nil upds ++ newRegs) :: tl upds
                          end)) /\
-          SemCompActionT (compileAction (o,nil) a (Const type true) writeMap) upds' calls retl.
+          SemCompActionT (compileAction (oInit, uInit) a (Const type true) writeMap) upds' calls retl.
   Proof.
     induction a; subst; intros; simpl in *.
     - (* Meth Call *)
@@ -495,7 +500,6 @@ Section DoubleWritesProof.
       * assumption.
       * econstructor; eauto.
         apply SemVarRegMap.
-        apply NoUpds.
     - (* Write *)
       inv H; EqDep_subst.
       inv H0.
@@ -691,29 +695,26 @@ Section DoubleWritesProof.
            { simpl; auto. simpl. rewrite -> P2. simpl; auto. }
            specialize (P1 (!e)%kami_expr). rewrite -> PF in P1.
            assert (WfRegMapExpr (VarRegMap type (old, match newRegs1 with
-                                                      | nil => upds
-                                                      | _ :: _ => (hd nil upds ++ newRegs1) :: tl upds
-                                                      end)) (old, match newRegs1 with
-                                                                  | nil => upds
-                                                                  | _ :: _ => (hd nil upds ++ newRegs1) :: tl upds
-                                                                  end)).
+                                                          | nil => upds
+                                                          | _ :: _ => (hd nil upds ++ newRegs1) :: tl upds
+                                                          end)) (old, match newRegs1 with
+                                                                      | nil => upds
+                                                                      | _ :: _ => (hd nil upds ++ newRegs1) :: tl upds
+                                                                      end)).
            {
              unfold WfRegMapExpr in *; auto. }
            econstructor.
-           simpl.
            apply SemCompActionEquivBexpr with (bexpr1 := (Const type true)).
            simpl in *. rewrite -> HeqP0 in HTrue. rewrite -> HTrue.
            reflexivity. apply H8.
-           specialize (P12 _ a2 o _ _ _ _ H14 H2 H13 P1).
+           specialize (P12 _ a2 o oInit uInit _ _ _ _ H14 HPriorityUpds HOgetReg H2 H13 P1).
            destruct P12. 
-           
-           
-           rewrite <- (app_nil_l calls2).  
+           rewrite <- (app_nil_l calls2).
            econstructor 8 with (regMap_a := (old, match newRegs1 with
                                                   | nil => upds
                                                   | _ :: _ => (hd nil upds ++ newRegs1) :: tl upds
                                                   end)) (val_a := x0).
-           assumption.
+           apply H15. 
            simpl in *. econstructor. simpl in *.
            rewrite -> P2. apply H11.
       * rewrite map_app, NoDup_app_iff in H1; dest.
@@ -819,9 +820,10 @@ Section DoubleWritesProof.
             assert (evalExpr (Const type true && e)%kami_expr = false).
             {
               simpl. rewrite -> HFalse in HeqP0; auto. }
-            specialize (P12 _ a1 o _ _ _ _ H11 H2 H15 H13).
+            specialize (P12 _ a1 o oInit uInit _ _ _ _ H11 HPriorityUpds HOgetReg H2 H15 H13).
             destruct P12.
-            econstructor 8 with (regMap_a := (old, upds)) (val_a := x0). assumption.
+            econstructor 8 with (regMap_a := (old, upds)) (val_a := x0).
+            apply H14. 
             simpl in *. econstructor 8 with (regMap_a :=  (old, match newRegs1 with
                                                                 | nil => upds
                                                                 | _ :: _ => (hd nil upds ++ newRegs1) :: tl upds
