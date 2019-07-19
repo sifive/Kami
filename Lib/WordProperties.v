@@ -80,11 +80,11 @@ Qed.
 
 Fixpoint countLeadingZerosWord ni no: word ni -> word no :=
   match ni return word ni -> word no with
-  | 0 => fun _ => (ZToWord _ 0)
+  | 0 => fun _ => (zToWord _ 0)
   | S m => fun e =>
-             if (weq _ (@truncMsb 1 (m+1) (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e)) (ZToWord 1 0))
-             then (wadd _ (ZToWord _ 1) (@countLeadingZerosWord m no (@truncLsb m (m+1) (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e))))
-             else (ZToWord _ 0)
+             if (weq _ (@truncMsb 1 (m+1) (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e)) (zToWord 1 0))
+             then (wadd _ (zToWord _ 1) (@countLeadingZerosWord m no (@truncLsb m (m+1) (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e))))
+             else (zToWord _ 0)
   end.
 
 
@@ -120,7 +120,7 @@ Hint Rewrite
 
 Ltac rewrite_bitwise := repeat (autorewrite with nat_bitwise_no_hyps).
 
-Ltac bitblast := repeat f_equal; eapply Z.bits_inj_iff; unfold Nat.eqf; intros; rewrite_bitwise.
+Ltac bitblast := repeat f_equal; eapply Z.bits_inj_iff; unfold Z.eqf; intros; rewrite_bitwise.
 
 Lemma boundProofZ (sz : nat) (w : Z):
   (w mod (2^ Z.of_nat sz))%Z = w -> (w < (2^ Z.of_nat sz))%Z.
@@ -181,7 +181,7 @@ Ltac arithmetizeWord :=
                      | H: inhabited ?P |- _ => destruct H
                      end.
 
-Lemma word0_neq: forall w : word 1, w <> (ZToWord 1 0) -> w = (ZToWord 1 1).
+Lemma word0_neq: forall w : word 1, w <> (zToWord 1 0) -> w = (zToWord 1 1).
 Proof.
   intros.
   arithmetizeWord.
@@ -207,7 +207,7 @@ Proof.
 Qed.
 
 
-Lemma wor_wzero : forall sz w, wor _ (ZToWord sz 0) w = w.
+Lemma wor_wzero : forall sz w, wor _ (zToWord sz 0) w = w.
 Proof.
   intros.
   arithmetizeWord.
@@ -216,7 +216,7 @@ Qed.
 
 
 Lemma unique_word_0 : forall a : word 0,
-    a = ZToWord 0 0.
+    a = zToWord 0 0.
 Proof.
   intros.
   arithmetizeWord.
@@ -229,7 +229,7 @@ Proof.
   * apply Z.mod_1_r.
 Qed.
 
-Lemma wzero_wplus: forall sz w, wadd _ (ZToWord sz 0) w = w.
+Lemma wzero_wplus: forall sz w, wadd _ (zToWord sz 0) w = w.
 Proof.
   intros.
   arithmetizeWord.

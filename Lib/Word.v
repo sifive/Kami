@@ -34,7 +34,7 @@ Section Word.
       mk (wrap_value n) (minimize_eq_proof Z.eq_dec (Zdiv.Zmod_mod n _)).
     
 
-    Definition ZToWord := wordWrap.
+    Definition zToWord := wordWrap.
 
     Definition boolToZ b : Z :=
       match b with
@@ -99,14 +99,14 @@ Section Word.
   End fixedWidth.
 
   Definition truncLsb {lsb outSz} (w : @word outSz) : @word lsb := 
-    ZToWord lsb (wordVal outSz w).
+    zToWord lsb (wordVal outSz w).
 
   Definition truncMsb {msb outSz} (w : @word outSz) : @word msb :=
-    ZToWord msb (Z.div (wordVal outSz w) (Z.pow 2 (Z.of_nat (Nat.sub outSz msb)))).
+    zToWord msb (Z.div (wordVal outSz w) (Z.pow 2 (Z.of_nat (Nat.sub outSz msb)))).
 
 
   Definition wconcat {msb lsb outSz} (w1 : @word msb) (w2 : @word lsb) :  @word outSz :=
-    ZToWord outSz (Z.add (Z.mul (wordVal msb w1) (Z.of_nat (Nat.pow 2 lsb))) (wordVal lsb w2)).
+    zToWord outSz (Z.add (Z.mul (wordVal msb w1) (Z.of_nat (Nat.pow 2 lsb))) (wordVal lsb w2)).
 
   Definition get_msb {sz} (w : @word sz) : @word 1 :=
     (@truncMsb 1 sz w).
@@ -115,18 +115,18 @@ Section Word.
     (@truncLsb 1 sz w).
 
   Definition wordValSigned {sz} (w : @word sz) : @word sz :=
-    (ZToWord _ (Z.of_nat (Nat.pow 2 sz) - (wordVal _ w))).
+    (zToWord _ (Z.of_nat (Nat.pow 2 sz) - (wordVal _ w))).
 
   Definition wsraOne {sz1 sz2} (w1 : @word sz1) (w2 : @word sz2) : @word sz1 :=
     if (Z.ltb (wordVal _ w1) (Z.of_nat (Nat.pow 2 (sz1 - 1)))) then
-      (ZToWord _ (Z.div (wordVal _ w1) (Z.of_nat (Nat.pow 2 sz2)))) else
-      (ZToWord _ (Z.add (wordVal sz1 w1) (Z.div (wordVal _ (@wordValSigned sz1 w1)) (Z.of_nat (Nat.pow 2 sz2))))).
+      (zToWord _ (Z.div (wordVal _ w1) (Z.of_nat (Nat.pow 2 sz2)))) else
+      (zToWord _ (Z.add (wordVal sz1 w1) (Z.div (wordVal _ (@wordValSigned sz1 w1)) (Z.of_nat (Nat.pow 2 sz2))))).
 
 
   Fixpoint wsraFix {sz1 sz2 : nat} (w1 : @word sz1) (w2 : nat) : @word sz1 :=
     match w2 with
     | O => w1
-    | S n => @wsraOne sz1 1 (@wsraFix sz1 sz2 w1 n) (ZToWord 1 1)
+    | S n => @wsraOne sz1 1 (@wsraFix sz1 sz2 w1 n) (zToWord 1 1)
     end.
 
   Definition wsra {sz1 sz2 : nat} (w1 : @word sz1) (w2 : @word sz2) : @word sz1 :=
