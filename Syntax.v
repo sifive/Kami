@@ -40,7 +40,7 @@ Coercion ConstBit : word >-> ConstT.
 Fixpoint getDefaultConst (k: Kind): ConstT k :=
   match k with
     | Bool => ConstBool false
-    | Bit n => ConstBit (of_nat n 0)
+    | Bit n => ConstBit (zToWord n 0)
     | Struct n fk fs =>
       ConstStruct fk fs (fun i => getDefaultConst (fk i))
     | Array n k => ConstArray (fun _ => getDefaultConst k)
@@ -131,7 +131,7 @@ Section Phoas.
              (i: Expr (SyntaxKind (Bit (Nat.log2_up n))))
              (v: Expr (SyntaxKind k)) :=
     BuildArray (fun i' : Fin.t n =>
-                  ITE (Eq i (Const (of_nat _ (proj1_sig (Fin.to_nat i'))))) v
+                  ITE (Eq i (Const (zToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i')))))) v
                       (ReadArrayConst e i')).
 
   Definition UpdateArrayConst n k (e: Expr (SyntaxKind (Array n k)))
@@ -165,26 +165,26 @@ Section Phoas.
       UniBit (TruncMsb lsb n) (UniBit (TruncLsb (lsb + n) msb) e).
 
     Definition OneExtend msb lsb (e: Expr (SyntaxKind (Bit lsb))): Expr (SyntaxKind (Bit (lsb + msb))) :=
-      (BinBit (Concat msb lsb) (Const (of_nat msb ((Nat.pow 2 msb) - 1)))) e.
+      (BinBit (Concat msb lsb) (Const (zToWord msb ((Z.pow 2 (Z.of_nat msb)) - 1)))) e.
 
     Definition ZeroExtend msb lsb (e: Expr (SyntaxKind (Bit lsb))): Expr (SyntaxKind (Bit (lsb + msb))) :=
-      (BinBit (Concat msb lsb) (Const (of_nat msb 0))) e.
+      (BinBit (Concat msb lsb) (Const (zToWord msb 0))) e.
 
     Definition SignExtend lsb msb: Expr (SyntaxKind (Bit lsb)) -> Expr (SyntaxKind (Bit (lsb + msb))).
       refine
         match lsb return Expr (SyntaxKind (Bit lsb)) -> Expr (SyntaxKind (Bit (lsb + msb))) with
-        | 0 => fun _ => Const (of_nat msb 0)
+        | 0 => fun _ => Const (zToWord msb 0)
         | S m => fun e => BinBit (Concat msb (S m)) (ITE (Eq (UniBit (TruncMsb m 1)
                                                                      (castBits _ e))
-                                                             (Const (of_nat 1 0)))
-                                                         (Const (of_nat msb 0))
-                                                         (Const (of_nat msb ((Nat.pow 2 msb) - 1)))) e
+                                                             (Const (zToWord 1 0)))
+                                                         (Const (zToWord msb 0))
+                                                         (Const (zToWord msb ((Z.pow 2 (Z.of_nat msb)) - 1)))) e
         end; abstract lia.
     Defined.
 
     Fixpoint replicate sz (e: Expr (SyntaxKind (Bit sz))) n : Expr (SyntaxKind (Bit (n * sz))) :=
       match n with
-      | 0 => Const (of_nat 0 0)
+      | 0 => Const (zToWord 0 0)
       | S m => BinBit (Concat (m * sz) sz) (replicate e m) e
       end.
     
@@ -236,12 +236,12 @@ Section Phoas.
     Fixpoint countLeadingZeros ni no: Expr (SyntaxKind (Bit ni)) -> Expr (SyntaxKind (Bit no)).
     refine
       match ni return Expr (SyntaxKind (Bit ni)) -> Expr (SyntaxKind (Bit no)) with
-      | 0 => fun _ => Const ((of_nat _ 0))
+      | 0 => fun _ => Const ((zToWord _ 0))
       | S m => fun e =>
-                 ITE (Eq (UniBit (TruncMsb m 1) (castBits (eq_sym (Nat.add_1_r m)) e)) (Const (of_nat 1 0)))
-                     (CABit Add [Const (of_nat _ 1);
+                 ITE (Eq (UniBit (TruncMsb m 1) (castBits (eq_sym (Nat.add_1_r m)) e)) (Const (zToWord 1 0)))
+                     (CABit Add [Const (zToWord _ 1);
                                      countLeadingZeros m _ (UniBit (TruncLsb m 1) (castBits (eq_sym (Nat.add_1_r m)) e))])
-                     (Const (of_nat _ 0))
+                     (Const (zToWord _ 0))
       end.
     Defined.
 
@@ -271,7 +271,7 @@ Section Phoas.
           (sizes: Fin.t n -> nat)
           (f: forall i, Expr (SyntaxKind (Bit (sizes i)))),
           Expr (SyntaxKind (Bit (sumSizes sizes))) with
-      | 0 => fun _ _ => Const (of_nat 0 0)
+      | 0 => fun _ _ => Const (zToWord 0 0)
       | S m => fun sizes f =>
                  BinBit
                    (Concat _ _) (f Fin.F1)
@@ -281,7 +281,7 @@ Section Phoas.
     Fixpoint pack (k: Kind): Expr (SyntaxKind k) -> Expr (SyntaxKind (Bit (size k))).
       refine
       match k return Expr (SyntaxKind k) -> Expr (SyntaxKind (Bit (size k))) with
-      | Bool => fun e => (ITE e (Const  (of_nat 1 ((Nat.pow 2 1) - 1))) (Const (of_nat 1 0)))
+      | Bool => fun e => (ITE e (Const  (zToWord 1 ((Z.pow 2 1) - 1))) (Const (zToWord 1 0)))
       | Bit n => fun e => e
       | Struct n fk fs =>
         fun e =>
@@ -291,11 +291,11 @@ Section Phoas.
         fun e =>
           (fix help i :=
              match i return Expr (SyntaxKind (Bit (i * size k))) with
-             | 0 => Const (of_nat 0 0)
+             | 0 => Const (zToWord 0 0)
              | S m =>
                castBits _ (BinBit
                              (Concat (size k) (m * size k))
-                             (@pack k (ReadArray e (Const (of_nat (Nat.log2_up n) m))))
+                             (@pack k (ReadArray e (Const (zToWord (Nat.log2_up n) (Z.of_nat m)))))
                              (help m))
              end) n
       end; abstract lia.
@@ -330,7 +330,7 @@ Section Phoas.
 
     Fixpoint unpack (k: Kind): Expr (SyntaxKind (Bit (size k))) -> Expr (SyntaxKind k) :=
       match k return Expr (SyntaxKind (Bit (size k))) -> Expr (SyntaxKind k) with
-      | Bool => fun e => Eq e (Const  (of_nat 1 ((Nat.pow 2 1) - 1)))
+      | Bool => fun e => Eq e (Const  (zToWord 1 ((Z.pow 2 1) - 1)))
       | Bit _ => fun e => e
       | Struct n fk fs =>
         fun e => BuildStruct
@@ -558,7 +558,7 @@ Definition buildNumDataArray num dataArray IdxNum Data ty (idx: ty (Bit (Nat.log
                                    ReadArray
                                      (Var ty _ val)
                                      (CABit Add (Var ty (SyntaxKind _) idx ::
-                                                     Const ty (of_nat _ (proj1_sig (Fin.to_nat i))) :: nil))))).
+                                                     Const ty (zToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) :: nil))))).
                                                                                                                    
 Definition updateNumDataArray num dataArray IdxNum Data ty (idxData: ty (WriteRq (Nat.log2_up IdxNum)
                                                                                  (Array num Data))):
@@ -570,12 +570,12 @@ Definition updateNumDataArray num dataArray IdxNum Data ty (idxData: ty (WriteRq
                                     (UpdateArray newArr
                                                  (CABit Add (ReadStruct (Var ty (SyntaxKind _) idxData)
                                                                         Fin.F1 ::
-                                                                        Const ty (of_nat _ (proj1_sig (Fin.to_nat i))) ::
+                                                                        Const ty (zToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) ::
                                                                         nil))
                                                  (ReadArrayConst (ReadStruct (Var ty (SyntaxKind _) idxData)
                                                                              (Fin.FS Fin.F1)) i))) (getFins num)
                                  (Var ty (SyntaxKind (Array IdxNum Data)) val))
-                      (Return (Const _ (of_nat 0 0)))).
+                      (Return (Const _ (zToWord 0 0)))).
 
 Definition updateNumDataArrayMask num dataArray IdxNum Data ty (idxData: ty (WriteRqMask
                                                                                (Nat.log2_up IdxNum) num Data)):
@@ -589,14 +589,14 @@ Definition updateNumDataArrayMask num dataArray IdxNum Data ty (idxData: ty (Wri
                                       (UpdateArray newArr
                                                    (CABit Add (ReadStruct
                                                                  (Var ty (SyntaxKind _) idxData)
-                                                                 Fin.F1 :: Const ty (of_nat _ (proj1_sig (Fin.to_nat i))) ::
+                                                                 Fin.F1 :: Const ty (zToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) ::
                                                                  nil))
                                                    (ReadArrayConst (ReadStruct (Var ty (SyntaxKind _) idxData)
                                                                                (Fin.FS Fin.F1)) i))
                                       newArr
                                  ) (getFins num)
                                  (Var ty (SyntaxKind (Array IdxNum Data)) val))
-                      (Return (Const _ (of_nat 0 0)))).
+                      (Return (Const _ (zToWord 0 0)))).
 
 Definition readRegFile num dataArray (read: list string) IdxNum Data :=
   (map (fun x => (x, existT MethodT (Bit (Nat.log2_up IdxNum), Array num Data)
@@ -618,7 +618,7 @@ Definition readSyncRegFile (isAddr: bool) num dataArray (read: list SyncRead) Id
               existT MethodT (Bit (Nat.log2_up IdxNum), Void)
                      (fun ty idx =>
                         WriteReg (readRegName r) (Var ty (SyntaxKind _) idx)
-                                 (Return (Const _ (of_nat 0 0))))))) read)
+                                 (Return (Const _ (zToWord 0 0))))))) read)
       ++
       (map (fun r =>
               (readResName r,
@@ -634,7 +634,7 @@ Definition readSyncRegFile (isAddr: bool) num dataArray (read: list SyncRead) Id
                      (fun ty idx =>
                         LetAction (buildNumDataArray num dataArray IdxNum Data ty idx)
                                   (fun vals => WriteReg (readRegName r) (Var ty (SyntaxKind _) vals)
-                                                        (Return (Const _ (of_nat 0 0))))))) read)
+                                                        (Return (Const _ (zToWord 0 0))))))) read)
       ++
       (map (fun r =>
               (readResName r,
@@ -971,9 +971,9 @@ Definition evalUniBit n1 n2 (op: UniBitOp n1 n2): word n1 -> word n2 :=
   | Inv n => (wnot n)
   | TruncLsb lsb msb => truncLsb 
   | TruncMsb lsb msb => truncMsb
-  | UAnd n =>  fun w => of_bool 1 (wuand n w)
-  | UOr n => fun w => of_bool 1 (wuor n w)
-  | UXor n => fun w => of_bool 1 (wuxor n w)
+  | UAnd n =>  fun w => boolToWord 1 (wuand n w)
+  | UOr n => fun w => boolToWord 1 (wuor n w)
+  | UXor n => fun w => boolToWord 1 (wuxor n w)
   end.
 
 
@@ -983,19 +983,19 @@ Definition evalBinBit n1 n2 n3 (op: BinBitOp n1 n2 n3)
     | Sub n => wsub n
     | Div n => wdiv n
     | Rem n => wmod n
-    | Sll n m => fun x y => wslu _ x (of_nat _ (wordVal _ y))
-    | Srl n m =>  fun x y => wsru _ x (of_nat _ (wordVal _ y))
+    | Sll n m => fun x y => wslu _ x (zToWord _ (wordVal _ y))
+    | Srl n m =>  fun x y => wsru _ x (zToWord _ (wordVal _ y))
     | Sra n m =>  wsra
-    | Concat n1 n2 => concat
+    | Concat n1 n2 => wconcat
   end.
 
 Definition evalCABit n (op: CABitOp) (ls: list (word n)): word n :=
   match op with
-    | Add => fold_left (wadd n) ls (of_nat n 0)
-    | Mul => fold_left (wmul n) ls (of_nat n 1)
-    | Band => fold_left (wand n) ls  (of_nat n ((Nat.pow 2 n) - 1))
-    | Bor => fold_left (wor n) ls (of_nat n 0)
-    | Bxor => fold_left (wxor n) ls (of_nat n 0)
+    | Add => fold_left (wadd n) ls (zToWord n 0)
+    | Mul => fold_left (wmul n) ls (zToWord n 1)
+    | Band => fold_left (wand n) ls  (zToWord n ((Z.pow 2 (Z.of_nat n)) - 1))
+    | Bor => fold_left (wor n) ls (zToWord n 0)
+    | Bxor => fold_left (wxor n) ls (zToWord n 0)
   end.
 
 Definition evalBinBitBool n1 n2 (op: BinBitBoolOp n1 n2)
@@ -1048,7 +1048,7 @@ Section Semantics.
       | ReadStruct n fk fs e i => (@evalExpr _ e) i
       | BuildStruct n fk fs fv => fun i => @evalExpr _ (fv i)
       | ReadArray n k fv i =>
-        match lt_dec ((wordVal _ (@evalExpr _ i))) n with
+        match lt_dec (Z.to_nat (wordVal _ (@evalExpr _ i))) n with
         | left pf => fun fv => fv (Fin.of_nat_lt pf)
         | right _ => fun _ => evalConstT (getDefaultConst k)
         end (@evalExpr _ fv)
@@ -1213,7 +1213,6 @@ Section MethT_dec.
     apply H; reflexivity.
   Qed.
     
-  (*Proof (fun s r x y H H0 => H (projT1_eq H0)).*)
 
   (*
   Determines whether or not the Gallina terms
@@ -1330,7 +1329,7 @@ Section BaseModule.
             rn rb
             (HInRules: In (rn, rb) (getRules m))
             reads u cs
-            (HAction: SemAction o (rb type) reads u cs (of_nat 0 0))
+            (HAction: SemAction o (rb type) reads u cs (zToWord 0 0))
             (HReadsGood: SubList (getKindAttr reads)
                                  (getKindAttr (getRegisters m)))
             (HUpdGood: SubList (getKindAttr u)
@@ -1439,18 +1438,6 @@ Definition TraceInclusion m1 m2 :=
      (nthProp2 WeakInclusion ls1 ls2).
 
 Definition TraceEquiv m1 m2 := TraceInclusion m1 m2 /\ TraceInclusion m2 m1.
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1776,17 +1763,6 @@ Definition separateModRemove (m : Mod) :=
 Definition baseNoSelfCalls (m : Mod) :=
   let '(hides, (rfs, mods)) := separateMod m in
   NoSelfCallBaseModule (inlineAll_All_mod (mergeSeparatedBaseMod mods)).
-
-
-
-
-
-
-
-
-
-
-
 
 
 
