@@ -1,3 +1,4 @@
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv Eqdep.
 Require Export Syntax.
 Require Import RecordUpdate.RecordSet.
 
@@ -283,7 +284,7 @@ Require Import RecordUpdate.RecordSet.
   Definition writeNames (ty: Kind -> Type) k namesVals :=
     map (fun r => 
            (@WriteReg _ _ (fst r) (SyntaxKind k) (snd r)
-                      (Return (Const ty (of_nat 0 0))))) namesVals.
+                      (Return (Const ty (zToWord 0 0))))) namesVals.
 
   (* Complex list action notations *)
   Notation "'GatherActions' actionList 'as' val ; cont" :=

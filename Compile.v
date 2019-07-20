@@ -1,4 +1,5 @@
 Require Import Syntax KamiNotations RecordUpdate.RecordSet Rtl StateMonad.
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv Eqdep.
 
 
 Set Implicit Arguments.
@@ -343,7 +344,7 @@ Definition getRegInit (y: sigT RegInitValT): {x: Kind & option (ConstT x)} :=
                                                        | _ => Void
                                                        end with
                 | SyntaxConst k c => c
-                | _ => (ZToWord 0 0)
+                | _ => (zToWord 0 0)
                 end
          end.
 
