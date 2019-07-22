@@ -900,7 +900,7 @@ Proof.
            specialize (fst_produce_snd _ _ H0) as TMP; dest; specialize (HDisjRegs x);
            contradiction| | |subst; econstructor];
     rewrite HUNewRegs; rewrite map_app,NoDup_app_iff; repeat split; eauto;
-        repeat intro; specialize (HDisjRegs a0); firstorder.
+      repeat intro; specialize (HDisjRegs a0); destruct HDisjRegs; contradiction.
 Qed.
 
 Corollary PSemAction_NoDup_Writes k o (a : ActionT type k) readRegs newRegs calls (fret : type k) :
@@ -1757,7 +1757,7 @@ Proof.
     inv H1.
     specialize (KeyMatching3 _ _ _ H H0 HInRules (eq_refl)) as P1.
     destruct rle; simpl in *; inv P1; subst.
-    exists reads, oldExecs, u, oldUpds, cs, oldCalls, (of_nat 0 0).
+    exists reads, oldExecs, u, oldUpds, cs, oldCalls, (zToWord 0 0).
     repeat split; auto.
     repeat intro; apply (HNoRle _ H1).
   - rewrite HExecs in H1.
@@ -1787,7 +1787,7 @@ Lemma PPlus_inline_Rule_with_action f m o rn rb upds1 upds2 execs calls1 calls2 
   SubList (getKindAttr reads) (getKindAttr (getRegisters m)) ->
   SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) ->
   DisjKey upds2 upds1 ->
-  PSemAction o (inlineSingle f (rb type)) reads upds1 calls1 (of_nat 0 0) ->
+  PSemAction o (inlineSingle f (rb type)) reads upds1 calls1 (zToWord 0 0) ->
   PPlusSubsteps m o upds2 execs calls2 ->
   PPlusSubsteps (inlineSingle_Rule_BaseModule f rn m) o (upds1++upds2) ((Rle rn)::execs) (calls1++calls2).
 Proof.
@@ -2286,18 +2286,25 @@ Proof.
   - econstructor 1; eauto.
   - rewrite HUpds, HExecs, HCalls in *; econstructor 2; eauto.
     apply IHPPlusSubsteps; rewrite map_app, in_app_iff in H2; clear - H2; firstorder fail.
-  - assert (~In (fst f) (map fst cs)) as P1;[rewrite HCalls,map_app,in_app_iff in H2; firstorder fail|].
+  - assert (~In (fst f) (map fst cs)) as P1.
+    rewrite HCalls,map_app,in_app_iff in H2.
+    apply Decidable.not_or in H2.
+    destruct H2; auto.
     specialize (PSemAction_inline_notIn _ HPAction P1) as P2.
     destruct (string_dec gn fn); subst.
     + specialize (InMeth_In_inlined _ _ _ H1 HInMeths); simpl; intro P3; destruct fb; simpl in *.
       destruct string_dec; rewrite HUpds, HExecs, HCalls in *.
       * econstructor 3; simpl; eauto.
       * econstructor 3; simpl; eauto.
-        apply IHPPlusSubsteps; clear - H2; rewrite map_app, in_app_iff in H2; firstorder fail.
+        apply IHPPlusSubsteps; clear - H2; rewrite map_app, in_app_iff in H2.
+        apply Decidable.not_or in H2.
+        destruct H2; auto.
     + specialize (InMeth_In_inlined_neq f _ _ n HInMeths) as P3.
       rewrite HUpds, HExecs, HCalls in *; econstructor 3; eauto.
       apply IHPPlusSubsteps.
-      clear - H2; rewrite map_app, in_app_iff in H2; firstorder fail.
+      clear - H2; rewrite map_app, in_app_iff in H2.
+      apply Decidable.not_or in H2.
+      destruct H2; auto.
 Qed.
       
 Lemma ExtractMethAction m o (g : DefMethT) (f : MethT) upds execs calls :
@@ -5239,7 +5246,7 @@ Lemma PPlus_inlineSingle_BaseModule_with_action f m o rn rb upds execs calls:
     DisjKey upds2 upds1 /\
     SubList (getKindAttr reads) (getKindAttr (getRegisters m)) /\
     SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) /\
-    PSemAction o (inlineSingle f (rb type)) reads upds1 calls1 (of_nat 0 0) /\
+    PSemAction o (inlineSingle f (rb type)) reads upds1 calls1 (zToWord 0 0) /\
     PPlusSubsteps m o upds2 execs calls2.
 Proof.
   intros.
@@ -5294,6 +5301,7 @@ Proof.
     intro k; specialize (H0 k); specialize (H10 k).
     rewrite map_app, in_app_iff in *; firstorder.
 Qed.
+
 
 Lemma MatchingExecCalls_Base_add_fcalls m calls fcalls execs :
   MatchingExecCalls_flat calls execs m ->
@@ -6578,13 +6586,17 @@ Proof.
             ** clear - HDisjMeths.
                intro k; specialize (HDisjMeths k).
                rewrite map_app, in_app_iff in *.
-               firstorder.
+               destruct HDisjMeths.
+               apply Decidable.not_or in H.
+               destruct H. left; auto.
+               right; auto.
             ** inv HWf1; auto.
             ** clear - WfConcat2.
                inv WfConcat2.
                assert (forall f, ~In f (getHidden (ConcatMod m1 m0))
-                                 -> ~In f (getHidden m1)) as P0;
-                 [intros; simpl in *; intro; apply H1; rewrite in_app_iff; firstorder|].
+                                 -> ~In f (getHidden m1)) as P0.
+               intros; simpl in *; intro; apply H1; rewrite in_app_iff.
+               left; auto.
                split.
                --- intros; specialize (H _ H1).
                    clear - H P0. 
@@ -6615,13 +6627,18 @@ Proof.
             ** clear - HDisjMeths.
                intro k; specialize (HDisjMeths k).
                rewrite map_app, in_app_iff in *.
-               firstorder.
+               destruct HDisjMeths.
+               apply Decidable.not_or in H.
+               destruct H.
+               left; auto.
+               right; auto.
             ** inv HWf1; auto.
             ** clear - WfConcat2.
                inv WfConcat2.
                assert (forall f, ~In f (getHidden (ConcatMod m1 m0))
-                                 -> ~In f (getHidden m0)) as P0;
-                 [intros; simpl in *; intro; apply H1; rewrite in_app_iff; firstorder|].
+                                 -> ~In f (getHidden m0)) as P0.
+               intros; simpl in *; intro; apply H1; rewrite in_app_iff.
+               right; auto.
                split.
                --- intros; specialize (H _ H1).
                    clear - H P0. 
@@ -6672,13 +6689,17 @@ Proof.
             ** clear - HDisjMeths.
                intro k; specialize (HDisjMeths k).
                rewrite map_app, in_app_iff in *.
-               firstorder.
+               destruct HDisjMeths.
+               apply Decidable.not_or in H.
+               destruct H. left; auto.
+               right; auto.
             ** inv HWf1; auto.
             ** clear - WfConcat2.
                inv WfConcat2.
                assert (forall f, ~In f (getHidden (ConcatMod m1 m0))
-                                 -> ~In f (getHidden m1)) as P0;
-                 [intros; simpl in *; intro; apply H1; rewrite in_app_iff; firstorder|].
+                                 -> ~In f (getHidden m1)) as P0.
+               intros; simpl in *; intro; apply H1; rewrite in_app_iff.
+               left; auto.
                split.
                --- intros; specialize (H _ H1).
                    clear - H P0. 
@@ -6709,13 +6730,17 @@ Proof.
             ** clear - HDisjMeths.
                intro k; specialize (HDisjMeths k).
                rewrite map_app, in_app_iff in *.
-               firstorder.
+               destruct HDisjMeths.
+               apply Decidable.not_or in H.
+               destruct H. left; auto.
+               right; auto.
             ** inv HWf1; auto.
             ** clear - WfConcat2.
                inv WfConcat2.
                assert (forall f, ~In f (getHidden (ConcatMod m1 m0))
-                                 -> ~In f (getHidden m0)) as P0;
-                 [intros; simpl in *; intro; apply H1; rewrite in_app_iff; firstorder|].
+                                 -> ~In f (getHidden m0)) as P0.
+               intros; simpl in *; intro; apply H1; rewrite in_app_iff.
+               right; auto.
                split.
                --- intros; specialize (H _ H1).
                    clear - H P0. 
@@ -6973,7 +6998,9 @@ Proof.
     inv HWf2.
     simpl in *.
     clear - HDisjMeths H HHideWf.
-    specialize (HDisjMeths h); firstorder.
+    specialize (HDisjMeths h).
+    destruct HDisjMeths. contradiction.
+    contradiction.
 Qed.
 
 Lemma factorHidesWf (m1 m2 : Mod) (hl1 hl2: list string)
@@ -6998,7 +7025,8 @@ Proof.
     + inv H0; inv HWf2.
       rewrite getAllMethods_createHideMod in *.
       specialize (HDisjMeths h); simpl in *; rewrite getAllMethods_createHideMod in *.
-      clear - HHideWf HDisjMeths; firstorder.
+      clear - HHideWf HDisjMeths.
+      destruct HDisjMeths; eauto.
     + eapply IHhl1; auto.
       rewrite WfMod_createHideMod; split; auto.
       specialize (factorHideWf HNeverCall H0) as P0; dest.
@@ -7257,6 +7285,7 @@ Proof.
     apply P0; auto.
 Qed.
 
+
 Lemma RegFileBase_noCalls (rf : RegFileBase) :
   NeverCallMod (BaseRegFile rf).
 Proof.
@@ -7286,6 +7315,7 @@ Proof.
            destruct H0; eauto.
            inv H;[repeat econstructor|eauto].
 Qed.
+
 
 Corollary mergeFile_noCalls (rfl : list RegFileBase) :
   NeverCallMod (mergeSeparatedBaseFile rfl).
