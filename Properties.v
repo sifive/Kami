@@ -492,6 +492,35 @@ Section evalExpr.
     rewrite evalExpr_castBits.
     repeat f_equal.
   Qed.
+
+  Lemma fin_to_nat_bound : forall n (x: Fin.t n), proj1_sig (Fin.to_nat x) < n.
+  Proof.
+    induction x; cbn; try lia.
+    destruct (Fin.to_nat x); cbn in *; lia.
+  Qed.
+
+  Lemma fin_to_word_id : forall n (i : Fin.t n),
+    wordToNat (natToWord (Nat.log2_up n) (proj1_sig (Fin.to_nat i))) = proj1_sig (Fin.to_nat i).
+  Proof.
+    intros.
+    pose proof (log2_up_pow2 n); pose proof (fin_to_nat_bound i).
+    rewrite wordToNat_natToWord_2; lia.
+  Qed.
+
+  Lemma eval_ReadArray_const : forall A n (arr : Array n A @# type) i,
+    evalExpr
+      (ReadArray arr
+        (Var type (SyntaxKind (Bit (Nat.log2_up n)))
+          (natToWord (Nat.log2_up n) (proj1_sig (Fin.to_nat i))))) =
+    evalExpr arr i.
+  Proof.
+    intros.
+    pose proof (log2_up_pow2 n); pose proof (fin_to_nat_bound i).
+    unfold evalExpr at 1.
+    rewrite wordToNat_natToWord_2 by lia.
+    destruct (Compare_dec.lt_dec _ _) as [? | ?]; [| exfalso; auto].
+    erewrite Fin.of_nat_ext, Fin.of_nat_to_nat_inv; eauto.
+  Qed.
 End evalExpr.
 
 

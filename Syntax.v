@@ -857,49 +857,52 @@ Local Ltac Struct_neq :=
 
 Definition Kind_dec (k1: Kind): forall k2, {k1 = k2} + {k1 <> k2}.
 Proof.
-  induction k1; intros; destruct k2; try (right; (abstract congruence)).
-  - left; reflexivity.
-  - destruct (Nat.eq_dec n n0); [left; subst; reflexivity | right; abstract congruence].
+  induction k1; destruct k2; try (right; (intros; abstract congruence)).
+  - left; abstract (reflexivity).
+  - destruct (Nat.eq_dec n n0); [left; abstract (subst; reflexivity) | right; abstract congruence].
   - destruct (Nat.eq_dec n n0).
     + subst.
       induction n0.
       * left.
-        f_equal; extensionality x; apply Fin.case0; exact x.
-      * specialize (IHn0 (fun i => s (Fin.FS i)) (fun i => k (Fin.FS i))
+        abstract (f_equal; extensionality x; apply Fin.case0; exact x).
+      * destruct  (IHn0 (fun i => s (Fin.FS i)) (fun i => k (Fin.FS i))
                          (fun i => H (Fin.FS i)) (fun i => k0 (Fin.FS i))
                          (fun i => s0 (Fin.FS i))).
-        destruct IHn0.
-        -- injection e.
-           intros.
-           repeat (existT_destruct Nat.eq_dec).
-           destruct (string_dec (s Fin.F1) (s0 Fin.F1)).
+        -- destruct (string_dec (s Fin.F1) (s0 Fin.F1)).
            ++ destruct (H Fin.F1 (k0 Fin.F1)).
-              ** left; f_equal; extensionality x; apply (Fin.caseS' x); try assumption;
-                   apply equal_f; assumption.
+              ** left.
+                 abstract (
+                 injection e;
+                 intros;
+                 repeat (existT_destruct Nat.eq_dec);
+                 f_equal; extensionality x; apply (Fin.caseS' x); try assumption;
+                 apply equal_f; assumption).
               ** right.
-                 Struct_neq.
-                 apply (n eq_refl).
+                 abstract (Struct_neq;
+                           apply (n eq_refl)).
            ++ right.
-              Struct_neq.
-              apply (n eq_refl).
+              abstract (Struct_neq;
+                        apply (n eq_refl)).
         -- right.
-           Struct_neq.
-           apply (n eq_refl).
+           abstract (Struct_neq;
+                     apply (n eq_refl)).
     + right.
-      intro.
-      injection H0 as H0.
-      intros.
-      apply (n1 H0).
+      abstract (intro;
+                injection H0 as H0;
+                intros;
+                apply (n1 H0)).
   - destruct (Nat.eq_dec n n0).
-    + subst; destruct (IHk1 k2).
-      * left; subst; reflexivity.
-      * right; intro.
-        injection H as H.
-        apply (n H).
+    + destruct (IHk1 k2).
+      * left.
+        abstract (subst; reflexivity).
+      * right.
+        abstract (subst; intro;
+                  injection H as H;
+                  apply (n1 H)).
     + right.
-      intro.
-      injection H as H.
-      apply (n1 H).
+      abstract (subst; intro;
+                injection H as H;
+                apply (n1 H)).
 Defined.
 
 Definition Signature_dec (s1 s2: Signature): {s1 = s2} + {s1 <> s2}.
