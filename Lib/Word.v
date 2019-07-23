@@ -16,6 +16,7 @@ Section Word.
     (* Word is a record with two fields wordVal and wordBound *)
     Record word := mk {wordVal : Z ;
                        wordBound : wrap_value wordVal = wordVal}.
+    
     Delimit Scope word_scope with word.
     Bind Scope word_scope with word.
 

@@ -62,6 +62,7 @@ Proof.
     econstructor; eauto.
 Qed.
 
+
 Lemma SemAction_PSemAction o k:
   forall (a : ActionT type k) (readRegs newRegs : RegsT) (calls : MethsT) (fret : type k),
     SemAction o a readRegs newRegs calls fret ->
@@ -1361,9 +1362,7 @@ Proof.
   - rewrite HUNewRegs in *.
     rewrite map_app, in_app_iff in *.
     destruct H1; firstorder fail.
-  - subst; rewrite HANewRegs in *;firstorder; simpl in *.
-    subst.
-    assumption.
+  - rewrite HANewRegs in *; inv H0;[simpl in *|subst; auto]; assumption.
   - rewrite HUNewRegs in *.
     rewrite map_app, in_app_iff in *.
     destruct H1; intuition.
@@ -1563,12 +1562,19 @@ Proof.
       specialize (IHl0 HPStep); dest.
       split; [auto| split; [auto| intros]].
       rewrite createHide_Meths in *; simpl in *.
-      destruct H3; [subst |clear - H1 H2 H3; firstorder fail].
-      firstorder fail.
+      destruct H3. subst.
+      apply HHidden. auto.
+      apply H1; auto.
   - induction (getHidden m); simpl; auto; dest.
     + constructor; auto.
-    + assert (sth: PStep (createHide (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) l0) o l) by firstorder fail.
-      assert (sth2: forall v, In a (map fst (getAllMethods m)) -> (getListFullLabel_diff (a, v) l = 0%Z)) by firstorder fail.
+    + assert (sth: PStep (createHide (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) l0) o l).
+      apply IHl0. split; auto. split; auto.
+      intros. apply H1; auto.
+      simpl. right; auto.
+      assert (sth2: forall v, In a (map fst (getAllMethods m)) -> (getListFullLabel_diff (a, v) l = 0%Z)).
+      intros.
+      specialize (H1 a v H2).
+      apply H1. simpl. left. reflexivity.
       constructor; auto.
       rewrite createHide_Meths.
       auto.

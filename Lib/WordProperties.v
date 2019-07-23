@@ -214,6 +214,17 @@ Proof.
   assumption.
 Qed.
 
+Lemma wzero_wor: forall sz w, wor _  w (zToWord sz 0) = w.
+Proof.
+  intros.
+  arithmetizeWord.
+  rewrite <- wordBound.
+  repeat (rewrite Zmod_0_l).
+  
+  admit.
+Admitted.
+
+
 
 Lemma unique_word_0 : forall a : word 0,
     a = zToWord 0 0.
@@ -248,20 +259,29 @@ Proof.
   auto.
 Qed.
 
-Lemma foo : forall (n x : nat) (w1 w2 : word n),
+Lemma truncMsbLtTrue : forall (n x : nat) (w1 w2 : word n),
     (wordVal _ (@truncMsb x _ w1) < wordVal _ (@truncMsb x _ w2))%Z ->
-    (wordVal _ w1 < wordVal _ w2)%Z.
+    wltu _ w1 w2 = true.
 Proof.
   intros.
   arithmetizeWord.
+  simpl in *.
+  rewrite <- wordBound0 in H.
+  rewrite <- wordBound in H.
+  
   admit.
   Admitted.
   
-
-
-
+Lemma truncMsbLtFalse : forall (n x : nat) (w1 w2 : word n),
+    (wordVal _ (@truncMsb x _ w1) < wordVal _ (@truncMsb x _ w2))%Z ->
+    wltu _ w2 w1 = false.
+Proof.
+  intros.
+  arithmetizeWord.
+  simpl in *.
+  rewrite <- wordBound0 in H.
+  rewrite <- wordBound in H.
   
-  
-
-
+  admit.
+  Admitted.
   

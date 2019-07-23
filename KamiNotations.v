@@ -9,6 +9,7 @@ Require Import RecordUpdate.RecordSet.
   | MERegAry (_ : list RegInitT)
   | MERule (_ : Attribute (Action Void))
   | MEMeth (_ : DefMethT).
+  
 
   Inductive InModule :=
   | NilInModule
@@ -57,7 +58,7 @@ Require Import RecordUpdate.RecordSet.
   Notation "k @# ty" := (Expr ty (SyntaxKind k)) (no associativity, at level 98, only parsing).
 
   Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (at level 0, only parsing) : kami_expr_scope. 
-  Notation "$ n" := (Const _ (of_nat _ n)) (at level 9) : kami_expr_scope.
+  Notation "$ n" := (Const _ (zToWord _ n)) (at level 9) : kami_expr_scope.
   Notation "$$ e" := (Const ltac:(assumption) e) (at level 8, only parsing) : kami_expr_scope.
 
   Notation "! v" := (UniBool Neg v) (at level 35): kami_expr_scope.
@@ -106,7 +107,7 @@ Require Import RecordUpdate.RecordSet.
   Infix ">>" := (BinBit (Srl _ _)) (at level 100) : kami_expr_scope.
   Infix ">>>" := (BinBit (Sra _ _)) (at level 100) : kami_expr_scope.
   Notation "{< a , .. , b >}" :=
-    ((BinBit (Concat _ _)) a .. (BinBit (Concat _ _) b (@Const _ (Bit 0) (of_nat 0 0))) ..)
+    ((BinBit (Concat _ _)) a .. (BinBit (Concat _ _) b (@Const _ (Bit 0) (zToWord 0 0))) ..)
       (at level 100, a at level 99): kami_expr_scope.
   Notation "{< a , .. , b >}" :=
     (concat b .. (concat a (of_nat 0 0)) ..)

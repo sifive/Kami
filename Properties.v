@@ -932,7 +932,12 @@ Proof.
       simpl.
       destruct (in_dec string_dec fn (map fst (getAllMethods m1))); simpl; auto.
       apply (in_map fst) in HInMeths.
-      clear - DisjRules DisjMeths HInMeths i; firstorder.
+      clear -  DisjMeths HInMeths i.
+      simpl in *.
+      unfold DisjKey in DisjMeths.
+      specialize (DisjMeths fn).
+      destruct DisjMeths. contradiction.
+      contradiction.
     + eapply IHSubsteps; eauto.
 Qed.
 
@@ -3992,20 +3997,15 @@ Proof.
       * destruct (weq _ (zToWord 1 0) (@truncMsb 1 (n+1) (evalExpr e2))); simpl; auto.
       * destruct (weq _ (zToWord 1 0) (@truncMsb 1 (n+1) (evalExpr e2))); simpl; auto.
         apply word0_neq in n0.
-        simpl in n0.
-        admit.
-        (*
-
-        
-        destruct (evalExpr e1).
-        destruct (evalExpr e2).
-        arithmetizeWord.
-        pre_word_omega.
-        rewrite wordToNat_split2 in *.
-        pose proof (pow2_zero n) as sth0.
-        rewrite Nat.div_small_iff in e by lia.
-        assert (sth: 0 < #(evalExpr e2) / pow2 n) by lia.
-        rewrite Nat.div_str_pos_iff in sth; lia. *)
+        rewrite n0 in n1.
+        assert ((wordVal 1 (truncMsb (evalExpr e1))) < (wordVal 1 (truncMsb (evalExpr e2))))%Z.
+        rewrite e. rewrite n0.
+        simpl. rewrite Zmod_0_l.
+        rewrite Zmod_1_l. lia.
+        rewrite Z.pow_pos_fold. lia.
+        specialize truncMsbLtTrue. intros.
+        specialize (H0 (n+1) 1 (evalExpr e1) (evalExpr e2) H).
+        rewrite e0 in H0. eapply H0.
   - destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e2)) (zToWord 1 0)); simpl; auto.
     + rewrite e.
       destruct (wlt_dec _ (evalExpr e1) (evalExpr e2)); simpl; auto.
@@ -4016,13 +4016,14 @@ Proof.
         ** simpl. inversion e3.
         ** simpl. apply word0_neq in n0.
            simpl in n0.
-           admit.
-        (*pre_word_omega.
-        rewrite wordToNat_split2 in *.
-        pose proof (pow2_zero n) as sth0.
-        rewrite Nat.div_small_iff in e by lia.
-        assert (sth: 0 < #(evalExpr e1) / pow2 n) by lia.
-        rewrite Nat.div_str_pos_iff in sth; lia.*)
+           assert ((wordVal 1 (truncMsb (evalExpr e2))) < (wordVal 1 (truncMsb (evalExpr e1))))%Z.
+           rewrite e. rewrite n0.
+           simpl. rewrite Zmod_0_l.
+        rewrite Zmod_1_l. lia.
+        rewrite Z.pow_pos_fold. lia.
+        specialize truncMsbLtFalse. intros.
+        specialize (H0 (n+1) 1 (evalExpr e2) (evalExpr e1) H).
+        rewrite e0 in H0. auto.
       * destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e1)) (zToWord 1 0)); simpl; auto.
         tauto. destruct weq.
         ** simpl. inversion e3.
@@ -4036,7 +4037,7 @@ Proof.
          simpl. exfalso. apply n2. reflexivity.
       ** destruct weq. simpl. reflexivity.
          simpl. reflexivity.
-Admitted.
+Qed.
 
 Lemma mergeSeparatedBaseFile_noHides (rfl : list RegFileBase) :
   getHidden (mergeSeparatedBaseFile rfl) = nil.

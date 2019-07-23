@@ -2,11 +2,13 @@
   This library contains useful functions for generating Kami
   expressions.
  *)
+
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv Eqdep.
 Require Import Syntax KamiNotations LibStruct.
 Require Import List.
 Require Import EclecticLib.
 Import ListNotations.
-Import recordWord.Word.Notations.
+Import Lib.Word.Notations.
 
 Module EqIndNotations.
   Notation "A || B @ X 'by' E"
@@ -61,11 +63,12 @@ Section utila.
     Definition utila_any
       :  list (Bool @# ty) -> Bool @# ty
       := fold_right (fun x acc => x || acc) ($$false).
-
+             
     (*
       Note: [f] must only return true for exactly one value in
       [xs].
-    *)
+     *)
+    
     Definition utila_find
       (k : Kind)
       (f : k @# ty -> Bool @# ty)
@@ -73,7 +76,7 @@ Section utila.
       :  k @# ty
       := unpack k
            (fold_right
-             (fun x acc => ((ITE (f x) (pack x) ($0)) | acc))
+             (fun x acc => (CABit (Bor) ((ITE (f x) (pack x) ($0)) :: acc :: nil)))
              ($0)
              xs).
 
@@ -120,7 +123,7 @@ Section utila.
            (utila_lookup_table
               entries
               entry_match
-              entry_result).
+              entry_result). 
 
     (* II. Kami Monadic Definitions *)
 
@@ -221,7 +224,8 @@ Section utila.
         := mbind k
              (utila_mfoldr
                (fun (x : k @# ty) (acc : Bit (size k) @# ty)
-                  => ((ITE (f x) (pack x) ($0)) | acc))
+                => 
+               (CABit (Bor) ((ITE (f x) (pack x) ($0)) :: acc :: nil)))
                ($0)
                x_exprs)
              (fun (y : ty (Bit (size k)))
@@ -290,7 +294,7 @@ Section utila.
       := LETE y
          :  Bit (size k)
          <- (utila_expr_foldr
-               (fun x acc => ((ITE (f x) (pack x) ($0)) | acc))
+               (fun x acc => (CABit (Bor) ((ITE (f x) (pack x) ($0)) :: acc :: nil)))
                ($0)
                xs_exprs);
          RetE (unpack k (#y)).
@@ -426,8 +430,8 @@ Section utila.
     Theorem utila_all_correct
       :  forall xs : list (Bool @# type),
         utila_all xs ==> true <-> Forall utila_is_true xs.
-    Proof
-      fun xs
+    Proof.
+      exact (fun xs
       => conj
            (list_ind
               (fun ys => utila_all ys ==> true -> Forall utila_is_true ys)
@@ -450,13 +454,14 @@ Section utila.
                    (H0 : Forall utila_is_true ys)
                    (F : utila_all ys ==> true)
                => andb_true_intro (conj H F))
-              xs).
+              xs)).
+      Qed.
 
     Theorem utila_any_correct
       :  forall xs : list (Bool @# type),
         utila_any xs ==> true <-> Exists utila_is_true xs.
-    Proof
-      fun xs
+    Proof.
+      exact (fun xs
       => conj
            (list_ind
               (fun ys => utila_any ys ==> true -> Exists utila_is_true ys)
@@ -496,7 +501,8 @@ Section utila.
                     (fun z => orb {{y0}} z = true)
                     (orb_true_r {{y0}})
                     F)
-              xs).
+              xs)).
+      Qed.
 
   End ver.
 
@@ -722,7 +728,7 @@ Section utila.
 
     Definition utila_null (k : Kind)
       :  k @# type
-      := unpack k (Var type (SyntaxKind (Bit (size k))) (of_nat (size k) 0)).
+      := unpack k (Var type (SyntaxKind (Bit (size k))) (zToWord (size k) 0)).
 
     Lemma utila_mfind_nil
       :  forall (k : Kind)
@@ -733,15 +739,15 @@ Section utila.
       (fun k f
         => eq_refl {{utila_null k}}
            || X = {{utila_null k}}
-              @X by utila_sem_unit_correct (unpack k (Var type (SyntaxKind (Bit (size k))) (of_nat (size k) 0)))
+              @X by utila_sem_unit_correct (unpack k (Var type (SyntaxKind (Bit (size k))) (zToWord (size k) 0)))
            || [[munit (unpack k (Var type (SyntaxKind (Bit (size k))) X))]] = {{utila_null k}}
               @X by utila_sem_foldr_nil_correct
-                      (fun x acc => (ITE (f x) (pack x) ($0) | acc))
+                      (fun x acc => (CABit (Bor) ((ITE (f x) (pack x) ($0)) :: acc :: nil)))
                       ($0)
            || X = {{utila_null k}}
               @X by utila_sem_bind_correct
                       (utila_mfoldr
-                         (fun x acc => (ITE (f x) (pack x) ($0) | acc))
+                         (fun x acc => (CABit (Bor) ((ITE (f x) (pack x) ($0)) :: acc :: nil)))
                          ($0)
                          [])
                       (fun y => munit (unpack k (Var type (SyntaxKind (Bit (size k))) y)))).
@@ -886,7 +892,7 @@ Section utila.
       (* The clauses used in Kami switch expressions. *)
       Let case (k : Kind) (f : k @# type -> Bool @# type) (x : k @# type) (acc : Bit (size k) @# type)
         :  Bit (size k) @# type
-        := (ITE (f x) (pack x) ($ 0) | acc).
+        := (CABit (Bor) ((ITE (f x) (pack x) ($0)) :: acc :: nil)).
 
       Conjecture unpack_pack
         : forall (k : Kind)
@@ -989,7 +995,7 @@ Open Scope word_scope.
         contradicts the assumption that [x] is in [(y0::ys)]. Hence, we
         conclude that [[[utila_expr_foldr _ _ (y0 :: ys)]] = {{pack x}}].
       *)
-    Lemma utila_expr_find_lm2
+  Lemma utila_expr_find_lm2
         :  forall (k : Kind)
                   (f : k @# type -> Bool @# type)
                   (x : k ## type)
@@ -997,9 +1003,8 @@ Open Scope word_scope.
           (unique (fun x => In x xs /\ {{f #[[x]]}} = true) x) ->
           [[utila_expr_foldr (case f) ($0) xs]] =
           {{pack #[[x]]}}.
-    Proof.
-      Admitted.
-       (* exact (fun (k : Kind)
+      Proof.
+        exact (fun (k : Kind)
             (f : k @# type -> Bool @# type)
             (x : k ## type)
         => list_ind
@@ -1053,7 +1058,7 @@ Open Scope word_scope.
                                   @a by <- wor_wzero _
                                              (if {{f #[[x0]]}}
                                                then {{pack #[[x0]]}}
-                                               else of_nat _ 0)
+                                               else (zToWord _ 0))
                                || _ = (if a : bool then _ else _) ^| _
                                   @a by <- fx0_true 
                                || _ = {{pack #[[a]]}} ^| _
@@ -1086,7 +1091,7 @@ Open Scope word_scope.
                               || _ = _ ^| a
                                  @a by <- eq_0
                               || _ = a
-                                 @a by <- wor_wzero _ {{pack #[[x]]}})
+                                 @a by <- wzero_wor _ {{pack #[[x]]}})
                           (kami_in_dec x xs))
                    (* II.B *)
                    (fun not_eq_x0_x : x0 <> x
@@ -1113,7 +1118,9 @@ Open Scope word_scope.
                                            not_in_x_xs
                                            (proj1 (proj1 H))))
                           (kami_in_dec x xs))
-                   (kami_exprs_eq_dec x0 x))).   *)
+                   (kami_exprs_eq_dec x0 x))).      
+         Qed.
+
 
       Theorem utila_expr_find_correct
         : forall (k : Kind)
@@ -1130,13 +1137,13 @@ Open Scope word_scope.
         replace
           (fun (x0 : Expr type (SyntaxKind k))
                (acc : Expr type (SyntaxKind (Bit (size k))))
-           => (IF f x0 then pack x0 else Const type (of_nat _ 0) | acc))
+           => (CABit (Bor) ((IF f x0 then pack x0 else (Const type (zToWord _ 0))) :: acc :: nil)))
           with (case f).
         (rewrite (utila_expr_find_lm2 f xs H)).
         (apply unpack_pack).
         (unfold case).
         reflexivity.
-      Qed. 
+      Qed.
 
     End utila_expr_find.
 
@@ -1249,7 +1256,7 @@ Open Scope word_scope.
     Qed.
 
     Definition fin_to_bit {ty n} (i: Fin.t n) : Bit (Nat.log2_up n) @# ty :=
-      Const _ (of_nat _ (proj1_sig (Fin.to_nat i))).
+      Const _ (zToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))).
 
     Definition array_forall_except {ty n}
         (f: A @# ty -> Bool @# ty)

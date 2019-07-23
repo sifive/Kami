@@ -1,4 +1,6 @@
 Require Import Syntax KamiNotations.
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt.
+
 Section mod_test.
   Variable a: string.
   Local Notation "^ x" := (a ++ "." ++ x)%string (at level 0).
@@ -54,14 +56,14 @@ Qed.
 
 Local Example testSwitch ty (val: Bit 5 @# ty) (a b: Bool @# ty) : Bool @# ty :=
   (Switch val Retn Bool With {
-            $$ (natToWord 5 5) ::= $$ true ;
-            $$ (natToWord 5 6) ::= $$ false
+            $$ (zToWord 5 5) ::= $$ true ;
+            $$ (zToWord 5 6) ::= $$ false
           })%kami_expr.
 
 Local Example testSwitch2 ty (val: Bit 5 @# ty) (a b: Bool @# ty) : Bool @# ty :=
   (Switch val Of Bit 5 Retn Bool With {
-            $$ (natToWord 5 5) ::= $$ true ;
-            $$ (natToWord 5 6) ::= $$ false
+            $$ (zToWord 5 5) ::= $$ true ;
+            $$ (zToWord 5 6) ::= $$ false
           })%kami_expr.
 
 
@@ -76,8 +78,8 @@ Section unittests.
   Let test_struct
     :=  STRUCT {
             "field0" ::= Const type false;
-            "field1" ::= Const type (natToWord 4 2);
-            "field2" ::= Const type (natToWord 5 3)}%kami_expr%struct_init.
+            "field1" ::= Const type (zToWord 4 2);
+            "field2" ::= Const type (zToWord 5 3)}%kami_expr%struct_init.
 
   Section struct_get_field_default_unittests.
     Let test0
@@ -85,12 +87,12 @@ Section unittests.
       := eq_refl false.
 
     Let test1
-      : test_struct @% "field1" ==> natToWord 4 2
-      := eq_refl (natToWord 4 2).
+      : test_struct @% "field1" ==> zToWord 4 2
+      := eq_refl (zToWord 4 2).
     
     Let test2
-      : test_struct @% "field2" ==> natToWord 5 3
-      := eq_refl (natToWord 5 3).
+      : test_struct @% "field2" ==> zToWord 5 3
+      := eq_refl (zToWord 5 3).
 
   End struct_get_field_default_unittests.
 
@@ -102,14 +104,14 @@ Section unittests.
       := eq_refl true.
 
     Let test_1
-      :  (test_struct @%["field1" <- (Const type (natToWord 4 5))]) @% "field1"
-                                                                    ==> natToWord 4 5
-      := eq_refl (natToWord 4 5).
+      :  (test_struct @%["field1" <- (Const type (zToWord 4 5))]) @% "field1"
+                                                                    ==> zToWord 4 5
+      := eq_refl (zToWord 4 5).
 
     Let test_2
-      :  (test_struct @%["field2" <- (Const type (natToWord 5 5))]) @% "field2"
-                                                                    ==> natToWord 5 5
-      := eq_refl (natToWord 5 5).
+      :  (test_struct @%["field2" <- (Const type (zToWord 5 5))]) @% "field2"
+                                                                    ==> zToWord 5 5
+      := eq_refl (zToWord 5 5).
   End struct_set_field_unittests.
 
   Close Scope kami_expr.
@@ -155,4 +157,4 @@ Local Close Scope kami_expr.
 Local Close Scope kami_action.
 
 Local Definition testFieldUpd (ty: Kind -> Type) := 
-  ((testStructVal (ty := ty)) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
+  ((testStructVal (ty := ty)) @%[ "hello" <- Const ty (zToWord 10 23) ])%kami_expr.
