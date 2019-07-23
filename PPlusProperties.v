@@ -663,7 +663,7 @@ Lemma PSemAction_inline_notIn (f : DefMethT) o k (a : ActionT type k)
   PSemAction o (inlineSingle f a) readRegs newRegs calls fret.
 Proof.
   induction 1; simpl; intros.
-  - destruct string_dec; subst.
+  - destruct (fst f =? meth) eqn:G. rewrite <- (proj1 (String.eqb_eq _ _) G) in *.
     + apply False_ind; apply H0; rewrite HAcalls; simpl; left; reflexivity.
     + econstructor 1; eauto.
       apply IHPSemAction; intro; apply H0; rewrite HAcalls; simpl; right; assumption.
@@ -947,7 +947,7 @@ Lemma PSemAction_inline_In (f : DefMethT) o:
       PSemAction o (inlineSingle f a) (readRegs' ++ readRegs) (newRegs' ++ newRegs) (calls'++calls2) retV2.
 Proof.
   induction a; intros.
-  - simpl; destruct string_dec;[destruct Signature_dec|]; subst.
+  - simpl; destruct (fst f =? meth) eqn:G; [rewrite String.eqb_eq in G|rewrite eqb_neq in G]; [destruct Signature_dec|]; subst.
     + inv H0; EqDep_subst.
       assert (In (fst f, existT SignT (projT1 (snd f)) (evalExpr e, mret)) calls1);
         [case (in_app_or _ _ _ (Permutation_in _ (Permutation_sym (HAcalls)) (in_eq _ _))); auto; intros TMP;apply (in_map fst) in TMP; contradiction|].
@@ -982,7 +982,7 @@ Proof.
       apply False_ind; apply n; reflexivity.
     + inv H0; EqDep_subst.
       specialize (Permutation_in _ (Permutation_sym HAcalls) (in_eq _ _)); intro TMP.
-      rewrite in_app_iff in TMP; destruct TMP as [H0|H0];[apply (collector_correct_fst _ H0) in H3; symmetry in H3; contradiction|].
+      rewrite in_app_iff in TMP; destruct TMP as [H0|H0];[apply (collector_correct_fst _ H0) in H3; symmetry in H3; try contradiction|].
       apply in_split in H0; dest.
       rewrite H0, <-Permutation_middle, Permutation_app_comm in HAcalls; simpl in *.
       apply Permutation_cons_inv in HAcalls.
@@ -1583,11 +1583,10 @@ Proof.
     + intro; contradiction.
     + intros.
       destruct H; subst.
-      * simpl in *.
-        destruct string_dec;[|apply False_ind; apply n; reflexivity].
+      * simpl.
+        rewrite eqb_refl.
         left; reflexivity.
-      * specialize (IHrules H).
-        simpl; destruct string_dec; right; assumption.
+      * simpl; right; auto.
 Qed.
 
 Lemma InRule_In_inlined_neq f rn1 rn2 rb m:
@@ -1601,9 +1600,9 @@ Proof.
     + intro; contradiction.
     + intros.
       destruct H0; subst.
-      * simpl; destruct string_dec;[contradiction|].
-        left; reflexivity.
-      * simpl; destruct string_dec; right; apply (IHrules H H0).
+      * simpl. rewrite <- String.eqb_neq in H; rewrite H.
+        left; auto.
+      * simpl; right; auto.
 Qed.
 
 Lemma PSubsteps_inlineRule_notIn f m o rn l:
@@ -2014,6 +2013,7 @@ Proof.
     + apply False_ind, H; simpl; left; reflexivity.
     + simpl in H; assert (~In rn (map fst l)); auto.
       specialize (IHl H1).
+      rewrite <- eqb_neq in n; rewrite n.
       destruct HInRules; subst;[left; reflexivity|].
       right; apply IHl; auto.
   - rewrite HUpds, HExecs, HCalls; econstructor 3; eauto.
@@ -2043,7 +2043,7 @@ Lemma WfActionT_inline_Rule_inline_action (k : Kind) m (a : ActionT type k) rn (
 Proof.
   induction 1; try econstructor; eauto.
   simpl.
-  destruct string_dec;[destruct Signature_dec|]; subst; econstructor; eauto.
+  destruct String.eqb; [destruct Signature_dec|]; subst; econstructor; eauto.
   econstructor.
   intros.
   specialize (H1 v).
@@ -2060,7 +2060,7 @@ Lemma inlineSingle_Rule_BaseModule_dec ty rule f rn l:
 Proof.
   induction l.
   - intros; auto.
-  - simpl; destruct string_dec; subst; intros.
+  - simpl. destruct String.eqb; subst; intros.
     + destruct H; subst; destruct a; simpl in *.
       * right; exists (s, a); simpl; repeat split; auto.
       * destruct (IHl H); auto.
@@ -2078,16 +2078,17 @@ Lemma inlineSingle_Rule_BaseModule_dec2 f rn rb l:
 Proof.
   induction l;[contradiction|].
   intros; simpl in *.
-  destruct string_dec, a; subst; simpl in *.
+  destruct String.eqb eqn:G, a; subst; simpl in *.
   - destruct H;[inv H|];auto.
-  - destruct H;[inv H; exfalso; apply n|];auto.
+  - rewrite String.eqb_neq in G.
+    destruct H;[inv H; exfalso; apply G|];auto.
 Qed.
 
 Lemma inlineSingle_Rule_preserves_names f rn l:
   (map fst l) = (map fst (inlineSingle_Rule_in_list f rn l)).
 Proof.
   induction l; auto.
-  simpl; destruct string_dec, a; simpl;rewrite IHl; reflexivity.
+  simpl; destruct String.eqb, a; simpl;rewrite IHl; reflexivity.
 Qed.
 
 Lemma WfMod_Rule_inlined m f rn :
@@ -2191,7 +2192,7 @@ Qed.
 Lemma ProjT1_inline_eq (f g : DefMethT):
   (projT1 (snd g)) = (projT1 (snd (inlineSingle_Meth f g))).
 Proof.
-  destruct g, s0; simpl; destruct string_dec; simpl; reflexivity.
+  destruct g, s0; simpl; destruct String.eqb; simpl; reflexivity.
 Qed.
 
 Lemma InMeth_In_inlined f gn gb m:
@@ -2202,10 +2203,9 @@ Proof.
   simpl; induction (getMethods m); intros.
   - contradiction.
   - destruct H0; subst.
-    + simpl; destruct string_dec;[|destruct string_dec]; simpl; auto.
-      * apply False_ind, H; subst; reflexivity.
-      * apply False_ind, n0; reflexivity.
-    + simpl; destruct string_dec;[apply False_ind, H; subst|destruct string_dec;simpl;right];eauto.
+    + simpl; rewrite String.eqb_refl; destruct String.eqb eqn:G; [left; auto |]; simpl; auto.
+    + specialize (IHl H H0). rewrite <- String.eqb_neq, String.eqb_sym in H; rewrite H.
+      rewrite H in *. simpl; right; eauto.
 Qed.
 
 Lemma InMeth_In_inlined_neq f gn1 gn2 gb m:
@@ -2216,8 +2216,7 @@ Proof.
   simpl; induction (getMethods m); intros.
   - contradiction.
   - destruct H0; subst; simpl; auto.
-    + destruct string_dec;[destruct string_dec; contradiction|left; reflexivity].
-    + destruct string_dec; right; apply IHl; auto.
+    + specialize (IHl H); rewrite <- String.eqb_neq in H; rewrite H; auto.
 Qed.
 
 Lemma extract_meths_PPlus gn m o upds execs calls :
@@ -2306,7 +2305,7 @@ Proof.
     specialize (PSemAction_inline_notIn _ HPAction P1) as P2.
     destruct (string_dec gn fn); subst.
     + specialize (InMeth_In_inlined _ _ _ H1 HInMeths); simpl; intro P3; destruct fb; simpl in *.
-      destruct string_dec; rewrite HUpds, HExecs, HCalls in *.
+      destruct String.eqb eqn:G; [rewrite String.eqb_eq in G|rewrite String.eqb_neq in G]; rewrite HUpds, HExecs, HCalls in *.
       * econstructor 3; simpl; eauto.
       * econstructor 3; simpl; eauto.
         apply IHPPlusSubsteps; clear - H2; rewrite map_app, in_app_iff in H2; firstorder fail.
@@ -2422,7 +2421,7 @@ Proof.
       rewrite (separate_calls_by_filter x4 (called_by f)) in H18.
       assert (forall g, In g gexecs -> fst g = gn) as P4; auto.
       specialize (InMeth_In_inlined _ _ _ H5 H9) as P5; destruct s0; simpl in *.
-      destruct string_dec; [clear - H5 e; apply False_ind, H5; subst; reflexivity|].
+      destruct String.eqb eqn:G; [rewrite String.eqb_eq in G; clear - H5 G; apply False_ind, H5; subst; reflexivity|].
       econstructor 3.
       * clear - H18; inv H18; auto.
       * apply P5.
@@ -2689,8 +2688,8 @@ Lemma SameKeys_inline_Meth f gn l:
 Proof.
   induction l.
   - reflexivity.
-  - simpl; destruct string_dec; simpl;[|rewrite IHl; reflexivity].
-    unfold inlineSingle_Meth; destruct a, string_dec; simpl; rewrite IHl; reflexivity.
+  - simpl; destruct String.eqb; simpl;[|rewrite IHl; reflexivity].
+    unfold inlineSingle_Meth; destruct a, String.eqb; simpl; rewrite IHl; reflexivity.
 Qed.
 
 Lemma PPlusSubsteps_inline_Meth f m o gn gb upds execs calls :
@@ -2791,10 +2790,10 @@ Proof.
     clear - H HInMeths.
     induction (getMethods m);[contradiction|].
     destruct HInMeths; subst.
-    + simpl; destruct string_dec;
-        [destruct string_dec;subst;simpl;[left; reflexivity|]|left; reflexivity].
+    + simpl; destruct String.eqb eqn:G; [rewrite String.eqb_eq in G|rewrite String.eqb_neq in G];
+        [destruct String.eqb eqn:G1;subst;simpl;[left; reflexivity|]|left; reflexivity].
       apply False_ind, H; simpl; left; reflexivity.
-    + simpl; destruct string_dec; right; apply IHl; auto; intro; apply H; simpl; right; assumption.
+    + simpl; destruct String.eqb; right; apply IHl; auto; intro; apply H; simpl; right; assumption.
 Qed.
 
 Corollary PPlusStep_inline_Meth_NotInDef f m o gn upds execs calls :
@@ -2821,8 +2820,8 @@ Proof.
     clear - H HInMeths.
     induction (getMethods m);[contradiction|].
     destruct HInMeths; subst.
-    + simpl; destruct string_dec; left; reflexivity.
-    + simpl; destruct string_dec; right; apply IHl; auto.
+    + simpl; destruct String.eqb; left; reflexivity.
+    + simpl; destruct String.eqb; right; apply IHl; auto.
 Qed.
 
 Corollary PPlusStep_inline_Meth_identical f m o gn upds execs calls :
@@ -2851,13 +2850,13 @@ Lemma WfActionT_inline_Meth_inline_action (k : Kind) m (a : ActionT type k) gn (
 Proof.
   induction 1; try econstructor; eauto.
   simpl.
-  destruct string_dec;[destruct Signature_dec|]; subst; econstructor; eauto.
+  destruct String.eqb;[destruct Signature_dec|]; subst; econstructor; eauto.
   econstructor.
   intros.
   specialize (H1 v).
   apply (WfActionT_inline_Meth); auto.
 Qed.
-     
+
 Lemma inlineSingle_Meth_BaseModule_dec meth f gn l:
   In meth (inlineSingle_Meth_in_list f gn l) ->
   In meth l \/
@@ -2867,7 +2866,7 @@ Lemma inlineSingle_Meth_BaseModule_dec meth f gn l:
 Proof.
   induction l.
   - intros; simpl in *; contradiction.
-  - simpl; destruct string_dec; subst; intros.
+  - simpl; destruct String.eqb; subst; intros.
     + destruct H; subst.
       * right; exists a; split; auto.
       * specialize (IHl H).
@@ -2894,7 +2893,7 @@ Proof.
         -- specialize (H1 _ H6 v); apply WfActionT_inline_Meth; auto.
         -- dest.
            destruct x, s0, meth, s1; simpl in *.
-           inv H7; destruct string_dec.
+           inv H7; destruct String.eqb.
            ++ inv H10; EqDep_subst; simpl in *.
               specialize (H1 _ H6 v); simpl in *; apply WfActionT_inline_Meth; assumption.
            ++ inv H10; EqDep_subst.
@@ -2991,8 +2990,8 @@ Lemma Method_list_invariance f gn ls:
 Proof.
   induction ls; auto.
   simpl; intros.
-  destruct string_dec.
-  - apply False_ind, H; rewrite e; auto.
+  destruct String.eqb eqn:G; [rewrite String.eqb_eq in G | rewrite String.eqb_neq in G].
+  - apply False_ind, H; rewrite G; auto.
   - rewrite IHls at 1;[reflexivity|].
     intro; apply H; auto.
 Qed.
@@ -3003,8 +3002,8 @@ Lemma Rule_list_invariance f rn ls:
 Proof.
   induction ls; auto.
   simpl; intros.
-  destruct string_dec.
-  - apply False_ind, H; rewrite e; auto.
+  destruct String.eqb eqn:G.
+  - apply False_ind, H; rewrite String.eqb_eq in G; auto.
   - rewrite IHls at 1;[reflexivity|].
     intro; apply H; auto.
 Qed.
@@ -3021,7 +3020,7 @@ Section transform_nth_right.
   Proof.
     induction ls; destruct i; simpl in *; auto; intros; try Omega.omega.
     - exists a; repeat split; auto.
-      destruct (string_dec (fst a) (fst a)); [| tauto].
+      rewrite String.eqb_refl.
       f_equal.
       inv H.
       apply Method_list_invariance; auto.
@@ -3029,9 +3028,9 @@ Section transform_nth_right.
       specialize (IHls H4 i ltac:(Omega.omega)); dest.
       exists x.
       repeat split; auto.
-      destruct (string_dec (fst x) (fst a)).
+      destruct (String.eqb (fst x) (fst a)) eqn:G.
       apply in_map with (f := fst) in H.
-      + rewrite e in *; tauto.
+      + rewrite String.eqb_eq in G. rewrite G in *; tauto.
       + rewrite H1; auto.
   Qed.
 
@@ -3046,7 +3045,7 @@ Section transform_nth_right.
   Proof.
     induction ls; destruct i; simpl in *; auto; intros; try Omega.omega.
     - exists a; repeat split; auto.
-      destruct (string_dec (fst a) (fst a)); [| tauto].
+      rewrite String.eqb_refl.
       f_equal.
       inv H.
       apply Rule_list_invariance; auto.
@@ -3054,9 +3053,9 @@ Section transform_nth_right.
       specialize (IHls H4 i ltac:(Omega.omega)); dest.
       exists x.
       repeat split; auto.
-      destruct (string_dec (fst x) (fst a)).
+      destruct (String.eqb (fst x) (fst a)) eqn:G.
       apply in_map with (f := fst) in H.
-      + rewrite e in *; tauto.
+      + rewrite String.eqb_eq in G; rewrite G in *; tauto.
       + rewrite H1; auto.
   Qed.
   
@@ -3132,8 +3131,9 @@ Lemma inline_Meth_not_transformed f ls :
 Proof.
   induction ls; destruct i; simpl; auto.
   - destruct H; subst; auto.
-    unfold inlineSingle_Meth; destruct f, string_dec; auto.
-    apply False_ind, n; reflexivity.
+    unfold inlineSingle_Meth; destruct f, String.eqb eqn:G; auto.
+    rewrite String.eqb_neq in G.
+    apply False_ind, G; reflexivity.
   - destruct H; auto.
 Qed.
 
@@ -5001,7 +5001,7 @@ Lemma PSemAction_In_inline (f : DefMethT) o:
 Proof.
   intros retK2 a.
   induction a; subst; simpl in *; intros.
-  - destruct string_dec;[destruct Signature_dec|]; subst; simpl in *.
+  - destruct String.eqb eqn:G;[destruct Signature_dec|]; subst; simpl in *.
     + inv H0; EqDep_subst.
       inv HPSemAction; EqDep_subst.
       specialize (H _ _ _ _ _ HPSemActionCont); dest.
@@ -5028,7 +5028,7 @@ Proof.
         -- reflexivity.
         -- assumption.
       * econstructor; eauto.
-        simpl; reflexivity.
+        rewrite String.eqb_eq in G; rewrite G; auto.
     + inv H0; EqDep_subst.
       specialize (H _ _ _ _ _ HPSemAction); dest.
       exists x, x0, x1, x2, x3, ((fst f, existT SignT s (evalExpr e, mret))::x4), x5.
@@ -5036,9 +5036,11 @@ Proof.
       * rewrite Permutation_app_comm; simpl.
         rewrite H2 in HAcalls.
         rewrite HAcalls.
+        rewrite String.eqb_eq in G; rewrite G.
         constructor; apply Permutation_app_comm.
       * apply (PSemAction_rewrite_calls (Permutation_app_comm _ _)).
         apply (PSemAction_rewrite_calls (Permutation_app_comm _ _)) in H4; simpl in *.
+        rewrite String.eqb_eq in G; rewrite G.
         econstructor; eauto.
     + inv H0; EqDep_subst.
       specialize (H _ _ _ _ _ HPSemAction); dest.
@@ -5210,9 +5212,9 @@ Lemma inlineSingle_Rule_in_list_notKey rn0 rn rb f l:
   In (rn0, rb) l.
 Proof.
   induction l; intros; simpl in *; auto.
-  destruct string_dec, a; simpl in *; subst.
+  destruct String.eqb eqn:G, a; simpl in *; subst.
   - destruct H0.
-    + inversion H0;contradiction.
+    + rewrite String.eqb_eq in G; inversion H0; congruence.
     + right; apply IHl; auto.
   - destruct H0; auto.
 Qed.
@@ -5539,17 +5541,17 @@ Lemma inlineSingle_Meth_in_list_body fb f gn l:
 Proof.
   intros.
   induction l;[contradiction| destruct a].
-  simpl in H0; destruct string_dec.
+  simpl in H0; destruct String.eqb eqn:G.
   - destruct H0; subst; auto.
     + exists s0; simpl.
-      destruct string_dec;[contradiction|simpl in *; inversion H0].
+      destruct (String.eqb (fst f) s) eqn:G1; [elim H; rewrite String.eqb_eq in G,G1; congruence|simpl in *; inversion H0].
       destruct fb; inv H0.
       split; auto.
       destruct s0; simpl in *; reflexivity.
     + specialize (IHl H0); dest.
       exists x; split; auto.
       right; assumption.
-  - destruct H0;[exfalso;inv H0;apply n; reflexivity|auto].
+  - destruct H0;[exfalso;inv H0; rewrite String.eqb_neq in G; apply G; reflexivity|auto].
     specialize (IHl H0); dest.
     exists x; split; auto.
     right; assumption.
@@ -5743,19 +5745,19 @@ Proof.
     |rewrite TMP; clear TMP].
   assumption.
 Qed.
-  
+
 Lemma key_neq_inlineSingle_Meth fn fb f gn l:
   fn <> gn ->
   In (fn, fb) (inlineSingle_Meth_in_list f gn l) ->
   In (fn, fb) l.
 Proof.
   intros;induction l; simpl in *; auto.
-  destruct string_dec.
+  destruct String.eqb eqn:G; [rewrite String.eqb_eq in G | rewrite String.eqb_neq in G].
   - destruct H0, a; simpl in *; subst; auto.
     exfalso; inv H0; apply H; reflexivity.
   - destruct H0; auto.
 Qed.
-      
+
 Lemma PPlusSubsteps_NoExec_PPlusSubsteps_inline_Meth f m o gn upds execs calls :
   NoDup (map fst (getMethods m)) ->
   In f (getMethods m) ->
@@ -5909,12 +5911,11 @@ Lemma  inlineSingle_Meth_in_list_key_match f gn l:
 Proof.
   induction l; simpl; auto.
   intros.
-  destruct string_dec.
+  destruct String.eqb eqn:G; [rewrite String.eqb_eq in G | rewrite String.eqb_neq in G].
   - unfold inlineSingle_Meth.
     destruct a; simpl in *; subst.
-    destruct string_dec.
-    + rewrite IHl; auto.
-    + exfalso; apply n; reflexivity.
+    rewrite String.eqb_refl.
+    rewrite IHl; auto.
   - rewrite IHl; auto.
 Qed.
 
@@ -7321,7 +7322,7 @@ Lemma WfConcatActionT_inlineSingle_Meth {k : Kind} (f: DefMethT) (a : ActionT ty
 Proof.
   intros.
   induction a; unfold inlineSingle; inv H0; EqDep_subst; try econstructor; eauto.
-  destruct string_dec;[destruct Signature_dec|]; subst; simpl in *; econstructor; eauto.
+  destruct String.eqb;[destruct Signature_dec|]; subst; simpl in *; econstructor; eauto.
   econstructor; eauto.
 Qed.
 
@@ -7352,7 +7353,7 @@ Proof.
   destruct H0; subst; eauto.
   specialize (H1 _ (or_introl (eq_refl _))).
   unfold inlineSingle_Meth; destruct a, f; simpl in *.
-  destruct (string_dec s1 s), s0; subst; simpl; eauto.
+  destruct (String.eqb s1 s), s0; subst; simpl; eauto.
   eapply WfConcatActionT_inlineSingle_Meth; eauto.
 Qed.
 

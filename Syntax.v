@@ -1651,8 +1651,8 @@ Section inlineSingle.
   Fixpoint inlineSingle k (a: ActionT ty k): ActionT ty k :=
     match a with
     | MCall g sign arg cont =>
-      match string_dec (fst f) g with
-      | left _ =>
+      match String.eqb (fst f) g with
+      | true =>
         match Signature_dec sign (projT1 (snd f)) with
         | left isEq =>
           LetAction (LetExpr match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with
@@ -1663,7 +1663,7 @@ Section inlineSingle.
                                               end ret))
         | right _ => MCall g sign arg (fun ret => inlineSingle (cont ret))
         end
-      | right _ => MCall g sign arg (fun ret => inlineSingle (cont ret))
+      | false => MCall g sign arg (fun ret => inlineSingle (cont ret))
       end
     | LetExpr _ e cont =>
       LetExpr e (fun ret => inlineSingle (cont ret))
@@ -1694,10 +1694,10 @@ Definition inlineSingle_Rule_map_BaseModule (f : DefMethT) (m : BaseModule) :=
 
 Fixpoint inlineSingle_Rule_in_list (f : DefMethT) (rn : string) (lr : list RuleT) : list RuleT :=
   match lr with
-  | rle'::lr' => match string_dec rn (fst rle') with
-                 | right _ => rle'::(inlineSingle_Rule_in_list f rn lr')
-                 | left _ => (inlineSingle_Rule f rle')::(inlineSingle_Rule_in_list f rn lr')
-                 end
+  | rle'::lr' => match String.eqb rn (fst rle') with
+                 | false => rle'
+                 | true => inlineSingle_Rule f rle'
+                 end ::(inlineSingle_Rule_in_list f rn lr')
   | nil => nil
   end.
 
@@ -1707,7 +1707,7 @@ Definition inlineSingle_Rule_BaseModule (f : DefMethT) (rn : string) (m : BaseMo
 Definition inlineSingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT :=
   let (name, sig_body) := meth in
   (name,
-   if string_dec (fst f) name
+   if String.eqb (fst f) name
    then sig_body
    else
      let (sig, body) := sig_body in
@@ -1718,10 +1718,10 @@ Definition inlineSingle_Meth_map_BaseModule (f : DefMethT) (m : BaseModule) :=
 
 Fixpoint inlineSingle_Meth_in_list (f : DefMethT) (gn : string) (lm : list DefMethT) : list DefMethT :=
   match lm with
-  | meth'::lm' => match string_dec gn (fst meth') with
-                  | right _ => meth'::(inlineSingle_Meth_in_list f gn lm')
-                  | left _ => (inlineSingle_Meth f meth')::(inlineSingle_Meth_in_list f gn lm')
-                  end
+  | meth'::lm' => match String.eqb gn (fst meth') with
+                  | false => meth'
+                  | true => (inlineSingle_Meth f meth')
+                  end ::(inlineSingle_Meth_in_list f gn lm')
   | nil => nil
   end.
 
