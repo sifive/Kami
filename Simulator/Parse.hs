@@ -15,7 +15,6 @@ import Simulator.Value
 --import Simulator.Evaluate
 
 import Data.Char (isSpace)
-import Data.List.Split (wordsBy)
 
 data Tok = Addr Integer | Value BV.BV deriving (Show)
 
