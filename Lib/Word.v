@@ -21,20 +21,8 @@ Section Word.
 
     Open Scope word_scope.
 
-    Theorem Natmod_mod : forall a n, Nat.modulo (Nat.modulo a n) n = Nat.modulo a n.
-    Proof.
-      destruct n.
-      - reflexivity.
-      - rewrite Nat.mod_mod by abstract (intro; discriminate).
-        reflexivity.
-    Defined.
-    
-
-    Definition wordWrap (n : Z) : word :=
-      mk (wrap_value n) (minimize_eq_proof Z.eq_dec (Zdiv.Zmod_mod n _)).
-    
-
-    Definition zToWord := wordWrap.
+    Definition zToWord (n : Z) : word :=
+      mk (wrap_value n) (minimize_eq_proof Z.eq_dec (Zdiv.Zmod_mod n _)).    
 
     Definition boolToZ b : Z :=
       match b with
@@ -42,35 +30,31 @@ Section Word.
       | true => 1
       end.
 
-    Definition boolToWord b := wordWrap (boolToZ b).
+    Definition boolToWord b := zToWord (boolToZ b).
 
-    Definition wadd x y := wordWrap (Z.add (wordVal x) (wordVal y)).
+    Definition wadd x y := zToWord (Z.add (wordVal x) (wordVal y)).
 
-    Definition wsub x y := wordWrap (Z.sub (wordVal x) (wordVal y)).
+    Definition wsub x y := zToWord (Z.sub (wordVal x) (wordVal y)).
 
-    Definition wor x y := wordWrap (Z.lor (wordVal x) (wordVal y)).
+    Definition wor x y := zToWord (Z.lor (wordVal x) (wordVal y)).
 
-    Definition wand x y := wordWrap (Z.land (wordVal x) (wordVal y)).
+    Definition wand x y := zToWord (Z.land (wordVal x) (wordVal y)).
 
-    Definition wxor x y := wordWrap (Z.lxor (wordVal x) (wordVal y)).
+    Definition wxor x y := zToWord (Z.lxor (wordVal x) (wordVal y)).
 
-    Definition wnot x := wordWrap (Z.sub (Z.pow 2 (Z.of_nat width)) (Z.add (wordVal x) 1)).
+    Definition wnot x := zToWord (Z.sub (Z.sub (Z.pow 2 (Z.of_nat width)) (wordVal x)) 1).
 
-    Definition wuand x := Z.eqb (wordVal (wordWrap 1)) (wordVal x).
+    Definition wmax := zToWord (Z.pow 2 (Z.of_nat width) - 1).
 
-    Definition wuor x := negb (Z.eqb (wordVal (wordWrap 0)) (wordVal x)).
+    Definition wuand x := Z.eqb (wordVal wmax) (wordVal x).
+
+    Definition wuor x := negb (Z.eqb (wordVal (zToWord 0)) (wordVal x)).
 
     Fixpoint pos_uxor (p : positive) : bool :=
       match p with
       | xH => true
       | xI p' => negb (pos_uxor p')
       | xO p' => (pos_uxor p')
-      end.
-
-    Definition N_uxor (n : N) : bool :=
-      match n with
-      | N0 => false
-      | Npos p => pos_uxor p
       end.
 
     Definition un_xor (z : Z) : bool :=
@@ -82,15 +66,15 @@ Section Word.
 
     Definition wuxor x := un_xor (wordVal x).
 
-    Definition wmul x y := wordWrap (Z.mul (wordVal x) (wordVal y)).
+    Definition wmul x y := zToWord (Z.mul (wordVal x) (wordVal y)).
 
-    Definition wdiv x y := wordWrap (Z.div (wordVal x) (wordVal y)).
+    Definition wdiv x y := zToWord (Z.div (wordVal x) (wordVal y)).
 
-    Definition wmod x y := wordWrap (Z.modulo (wordVal x) (wordVal y)).
+    Definition wmod x y := zToWord (Z.modulo (wordVal x) (wordVal y)).
 
-    Definition wslu x y := wordWrap (Z.mul (wordVal x) (Z.pow 2 (wordVal y))).
+    Definition wslu x y := zToWord (Z.mul (wordVal x) (Z.pow 2 (wordVal y))).
 
-    Definition wsru x y := wordWrap (Z.div (wordVal x) (Z.pow 2 (wordVal y))).
+    Definition wsru x y := zToWord (Z.div (wordVal x) (Z.pow 2 (wordVal y))).
 
     Definition weqb x y := Z.eqb (wordVal x) (wordVal y).
 
@@ -106,7 +90,7 @@ Section Word.
 
 
   Definition wconcat {msb lsb outSz} (w1 : @word msb) (w2 : @word lsb) :  @word outSz :=
-    zToWord outSz (Z.add (Z.mul (wordVal msb w1) (Z.of_nat (Nat.pow 2 lsb))) (wordVal lsb w2)).
+    zToWord outSz (Z.add (Z.mul (wordVal msb w1) (Z.pow 2 (Z.of_nat lsb))) (wordVal lsb w2)).
 
   Definition get_msb {sz} (w : @word sz) : @word 1 :=
     (@truncMsb 1 sz w).
@@ -114,69 +98,85 @@ Section Word.
   Definition get_lsb {sz} (w : @word sz) : @word 1 :=
     (@truncLsb 1 sz w).
 
-  Definition wordValSigned {sz} (w : @word sz) : @word sz :=
-    (zToWord _ (Z.of_nat (Nat.pow 2 sz) - (wordVal _ w))).
+  Definition wnon_neg {sz} (w : @word sz) : bool :=
+    (Z.ltb (wordVal _ w) (Z.pow 2 (Z.of_nat (sz - 1)))).
+  
+  Definition twosComplement {sz} (w: @word sz) : @word sz :=
+    zToWord _ (Z.sub (Z.pow 2 (Z.of_nat sz)) (wordVal _ w)).
 
-  Definition wsraOne {sz1 sz2} (w1 : @word sz1) (w2 : @word sz2) : @word sz1 :=
-    if (Z.ltb (wordVal _ w1) (Z.of_nat (Nat.pow 2 (sz1 - 1)))) then
-      (zToWord _ (Z.div (wordVal _ w1) (Z.of_nat (Nat.pow 2 sz2)))) else
-      (zToWord _ (Z.add (wordVal sz1 w1) (Z.div (wordVal _ (@wordValSigned sz1 w1)) (Z.of_nat (Nat.pow 2 sz2))))).
+  Definition wordToSignedZ {sz} (w: @word sz) : Z :=
+    if Z.ltb (wordVal _ w) (Z.pow 2 (Z.of_nat (sz - 1)))
+    then wordVal _ w
+    else Z.opp (wordVal _ (twosComplement w)).
 
-
-  Fixpoint wsraFix {sz1 sz2 : nat} (w1 : @word sz1) (w2 : nat) : @word sz1 :=
-    match w2 with
-    | O => w1
-    | S n => @wsraOne sz1 1 (@wsraFix sz1 sz2 w1 n) (zToWord 1 1)
+  Definition signZ (n: Z) :=
+    match n with
+    | Z0 => false
+    | Z.pos _ => false
+    | Z.neg _ => true
     end.
+  
+  Definition signedZToWord {sz} (n: Z) : @word sz :=
+    if signZ n
+    then twosComplement (zToWord _ (Z.opp n))
+    else zToWord _ n.
 
-  Definition wsra {sz1 sz2 : nat} (w1 : @word sz1) (w2 : @word sz2) : @word sz1 :=
-    @wsraFix _ sz2 w1 (Z.to_nat (wordVal _ w2)).
-
+  Definition wsra {sz1 sz2: nat} (w1: @word sz1) (w2 : @word sz2) : @word sz1 :=
+    @signedZToWord sz1 (Z.div (if wnon_neg w1
+                               then wordVal _ w1
+                               else wordToSignedZ w1) (Z.pow 2 (wordVal _ w2))).
+  
   Definition whd sz (w : word (S sz)) := @truncMsb 1 _ w.
 
-  Definition wtail sz (w : word (S sz)) := @truncLsb ((S sz)-1) _ w.
+  Definition wtail sz (w : word (S sz)) := @truncLsb sz _ w.
 
 End Word.
 
 Module Notations.
 
   Notation "^~" := wnot : word_scope.
-  Notation "l ^+ r" := (@wadd _ l r) (at level 50, left associativity) : word_scope.
   Notation "l ^* r" := (@wmul _ l r) (at level 40, left associativity) : word_scope.
-  Notation "l ^- r" := (@wsub _ l r) (at level 50, left associativity) : word_scope.
   Notation "l ^/ r" := (@wdiv _ l r) (at level 50, left associativity) : word_scope.
+  Notation "l ^+ r" := (@wadd _ l r) (at level 50, left associativity) : word_scope.
+  Notation "l ^- r" := (@wsub _ l r) (at level 50, left associativity) : word_scope.
   Notation "l ^% r" := (@wmod _ l r) (at level 50, left associativity) : word_scope.
   Notation "l ^| r" := (@wor _ l r) (at level 50, left associativity) : word_scope.
   Notation "l ^& r" := (@wand _ l r) (at level 40, left associativity) : word_scope.
 
 End Notations.
 
-(*Compute (@wadd 3 (ZToWord 3 (-2%Z)) (ZToWord 3 3)).
+(* Compute (@wadd 3 (ZToWord 3 (-2%Z)) (ZToWord 3 3)). *)
 
-Compute (@truncMsb 1 5 (of_nat 5 31)).
+(* Compute (@truncMsb 1 5 (of_nat 5 31)). *)
 
-Compute (@concat _ _ 4 (of_nat 2 2) (of_nat 2 3)).
+(* Compute (@concat _ _ 4 (of_nat 2 2) (of_nat 2 3)). *)
 
-Compute (@of_bool 1 (@wuxor _ (of_nat 2 3))).
+(* Compute (@of_bool 1 (@wuxor _ (of_nat 2 3))). *)
 
-Compute (@wsru _ (of_nat 8 167) (of_nat 8 1)).
-
-
-Compute (@wsrs _ (of_nat 8 167) (of_nat 8 1)).*)
-
-(*Compute (of_nat 2 (Nat.pow 2 2 - 2 + 1)).
-
-Compute (@get_msb _ (of_nat 3 7)).
-
-Compute (@get_lsb _ (of_nat 3 6)).
-
-Compute (@wordValSigned _ (of_nat 2 3)).
-
-Compute (@wsra 4 1 (of_nat 4 15) (of_nat 1 1)).
-
-Compute (@wsra 2 1 (of_nat 2 3) (of_nat 1 1)).
-
-Compute (@wsra 5 4 (of_nat 5 9) (of_nat 4 4)).*)
+(* Compute (@wsru _ (of_nat 8 167) (of_nat 8 1)). *)
 
 
+(* Compute (@wsrs _ (of_nat 8 167) (of_nat 8 1)).*)
 
+(*Compute (of_nat 2 (Nat.pow 2 2 - 2 + 1)). *)
+
+(* Compute (@get_msb _ (of_nat 3 7)). *)
+
+(* Compute (@get_lsb _ (of_nat 3 6)). *)
+
+(* Compute (@wordValSigned _ (of_nat 2 3)). *)
+
+(* Compute (wnon_neg (zToWord 4 12)). *)
+(* Compute (wordToSignedZ (zToWord 4 12)). *)
+(* Compute (wordVal _ (zToWord 3 3)). *)
+(* Compute (Z.div (wordToSignedZ (zToWord 4 12)) (wordVal _ (zToWord 3 3))). *)
+(* Compute (@signedZToWord 4 (Z.div (wordToSignedZ (zToWord 4 12)) (wordVal _ (zToWord 3 3)))). *)
+
+(* Compute (Z.div (-4) 8). *)
+
+(* Compute (wsra (zToWord 4 15) (zToWord 1 1)). *)
+(* Compute (wsra (zToWord 4 12) (zToWord 3 3)). *)
+
+(* Compute (wsra (zToWord 2 1) (zToWord 3 5)). *)
+
+(* Compute (wsra (zToWord 5 9) (zToWord 4 3)). *)

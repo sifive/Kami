@@ -123,7 +123,7 @@ Ltac rewrite_bitwise := repeat (autorewrite with nat_bitwise_no_hyps).
 Ltac bitblast := repeat f_equal; eapply Z.bits_inj_iff; unfold Z.eqf; intros; rewrite_bitwise.
 
 Lemma boundProofZ (sz : nat) (w : Z):
-  (w mod (2^ Z.of_nat sz))%Z = w -> (w < (2^ Z.of_nat sz))%Z.
+  (w mod (2^ Z.of_nat sz))%Z = w -> (0 <= w < (2^ Z.of_nat sz))%Z.
 Proof.
   intros sth0.
   assert (forall sz', 0 < (2 ^ Z.of_nat sz'))%Z. {
@@ -136,38 +136,26 @@ Proof.
     lia.
     lia. }
   specialize (Z.mod_pos_bound w _ (H sz)) as TMP; destruct TMP.
-  rewrite sth0 in *; assumption.
+  rewrite sth0 in *; split; assumption.
 Qed.
-
-Lemma gt0 (sz : nat) (w : Z) :
-  (w mod 2 ^ Z.of_nat sz >= 0)%Z.
-Proof.
-  destruct w.
-  destruct sz.
-  * simpl. rewrite Zmod_0_l. lia.
-  * simpl. rewrite Zmod_0_l. lia.
-  * simpl. destruct sz.
-    simpl. rewrite Zmod_1_r. lia.
-    rewrite Nat2Z.inj_succ.
-    rewrite <- Z.add_1_l.
-    rewrite Z.pow_add_r.
-    rewrite Z.pow_1_r.
-    admit.
-    lia.
-    lia.
-  * simpl. 
-    admit.
-Admitted.
 
 Ltac discharge_gt_0 :=
   (destruct wordVal;
   lia;
   lia).
 
+Tactic Notation "unique" "pose" "proof" constr(defn) "as" ident(H) :=
+  let T := type of defn in
+  match goal with
+  | [ H : T |- _ ] => fail 1
+  | _ => pose proof defn as H
+  end.
+
 Ltac arithmetizeWord :=
   repeat match goal with
          | w: word _ |- _ => destruct w
          end;
+  unfold wordVal, wordBound in *;
   repeat match goal with
          | H: ?w1 <> ?w2 |- _ => match type of w1 with
                                  | word ?sz => apply neq_wordVal in H
@@ -175,34 +163,19 @@ Ltac arithmetizeWord :=
          | |- ?w1 = ?w2 => match type of w1 with
                            | word ?sz => apply eq_wordVal
                            end; simpl
-         | H: ?w mod 2^(?sz) = ?w |- _ => pose proof (boundProofZ sz _ H);
-                                          pose proof (inhabits H); clear H
-         end; repeat match goal with
-                     | H: inhabited ?P |- _ => destruct H
-                     end.
+         | H: (?w mod (2^(Z.of_nat ?sz)))%Z = ?w |- _ =>
+           let sth := fresh in
+           unique pose proof (boundProofZ sz _ H) as sth
+         end;
+  cbn [Z.modulo Z.pow_pos] in *.
+
 
 Lemma word0_neq: forall w : word 1, w <> (zToWord 1 0) -> w = (zToWord 1 1).
 Proof.
   intros.
   arithmetizeWord.
-  assert (wordVal mod 2 ^ Z.of_nat 1 >= 0)%Z.
-  destruct wordVal.
-  lia.
-  lia.
-  apply Z.le_ge.
-  assert (0 < 2^ Z.of_nat 1)%Z as P0.
-  { lia. }
-  specialize (Z.mod_pos_bound (Z.neg p) _ P0) as TMP; destruct TMP.
-  assumption.    
-  assert (0 mod Z.pow_pos 2 1 = 0)%Z.
-  rewrite Z.pow_pos_fold in *.
-  unfold Z.modulo; auto.
-  rewrite H1 in H.
-  rewrite wordBound in H0.
-  unfold Z.modulo; simpl.
-  assert (wordVal < Z.of_nat 2)%Z.
-  pose (boundProofZ _ _ wordBound).
-  apply l.
+  unfold Z.modulo in *; simpl in *.
+  unfold Z.pow_pos in *; simpl in *.
   lia.
 Qed.
 
@@ -221,12 +194,8 @@ Proof.
   intros.
   arithmetizeWord.
   simpl in *.
-  rewrite Z.mod_1_r.
-  rewrite <- wordBound.
-  destruct wordVal.
-  * reflexivity.
-  * apply Z.mod_1_r.
-  * apply Z.mod_1_r.
+  unfold Z.modulo in *; simpl in *.
+  lia.
 Qed.
 
 Lemma wzero_wplus: forall sz w, wadd _ (zToWord sz 0) w = w.
@@ -242,26 +211,16 @@ Proof.
   induction x0.
   unfold wor.
   arithmetizeWord.
-  rewrite <- wordBound.
-  repeat f_equal.
   rewrite Z.lor_diag.
   auto.
 Qed.
-
+  
 Lemma foo : forall (n x : nat) (w1 w2 : word n),
     (wordVal _ (@truncMsb x _ w1) < wordVal _ (@truncMsb x _ w2))%Z ->
     (wordVal _ w1 < wordVal _ w2)%Z.
 Proof.
   intros.
   arithmetizeWord.
-  admit.
-  Admitted.
-  
-
-
-
-  
-  
-
-
-  
+  simpl in *.
+  assert (wordVal0 / 2^Z.of_nat (n-x) < 2 ^ Z.of_nat x)%Z.
+Admitted.
