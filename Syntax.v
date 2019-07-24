@@ -129,8 +129,8 @@ Section Phoas.
                         Expr (SyntaxKind k)
   | BuildArray n k: (Fin.t n -> Expr (SyntaxKind k)) -> Expr (SyntaxKind (Array n k)).
 
-  Definition UpdateArray n k (e: Expr (SyntaxKind (Array n k)))
-             (i: Expr (SyntaxKind (Bit (Nat.log2_up n))))
+  Definition UpdateArray n m k (e: Expr (SyntaxKind (Array n k)))
+             (i: Expr (SyntaxKind (Bit m)))
              (v: Expr (SyntaxKind k)) :=
     BuildArray (fun i' : Fin.t n =>
                   ITE (Eq i (Const (natToWord _ (proj1_sig (Fin.to_nat i'))))) v
