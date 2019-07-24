@@ -1020,9 +1020,9 @@ Definition evalBinBit n1 n2 n3 (op: BinBitOp n1 n2 n3)
     | Sub n => @wminus_simple n
     | Div n => @wdivN n
     | Rem n => @wremN n
-    | Sll n m => (fun x y => wlshift x (wordToNat y))
-    | Srl n m => (fun x y => wrshift x (wordToNat y))
-    | Sra n m => (fun x y => wrshifta x (wordToNat y))
+    | Sll n m => (fun x y => wlshift' x (wordToNat y))
+    | Srl n m => (fun x y => wrshift' x (wordToNat y))
+    | Sra n m => (fun x y => wrshifta' x (wordToNat y))
     | Concat n1 n2 => fun x y => (Word.combine y x)
   end.
 
