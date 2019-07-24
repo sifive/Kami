@@ -121,8 +121,8 @@ Section Phoas.
   | BuildStruct n (fk: Fin.t n -> Kind) (fs: Fin.t n -> string)
                 (fv: forall i, Expr (SyntaxKind (fk i))):
       Expr (SyntaxKind (Struct fk fs))
-  | ReadArray n k: Expr (SyntaxKind (Array n k)) ->
-                   Expr (SyntaxKind (Bit (Nat.log2_up n))) ->
+  | ReadArray n m k: Expr (SyntaxKind (Array n k)) ->
+                   Expr (SyntaxKind (Bit m)) ->
                    Expr (SyntaxKind k)
   | ReadArrayConst n k: Expr (SyntaxKind (Array n k)) ->
                         Fin.t n ->
@@ -1087,7 +1087,7 @@ Section Semantics.
       | Eq _ e1 e2 => getBool (isEq _ (@evalExpr _ e1) (@evalExpr _ e2))
       | ReadStruct n fk fs e i => (@evalExpr _ e) i
       | BuildStruct n fk fs fv => fun i => @evalExpr _ (fv i)
-      | ReadArray n k fv i =>
+      | ReadArray n m k fv i =>
         match lt_dec (wordToNat (@evalExpr _ i)) n with
         | left pf => fun fv => fv (Fin.of_nat_lt pf)
         | right _ => fun _ => evalConstT (getDefaultConst k)

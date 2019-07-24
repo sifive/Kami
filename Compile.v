@@ -56,7 +56,7 @@ Section Compile.
       | Eq k e1 e2 => RtlEq (@convertExprToRtl _ e1) (@convertExprToRtl _ e2)
       | ReadStruct n fk fs e i => @RtlReadStruct n fk fs (@convertExprToRtl _ e) i
       | BuildStruct n fk fs fv => @RtlBuildStruct n fk fs (fun i => @convertExprToRtl _ (fv i))
-      | ReadArray n k arr idx => @RtlReadArray n k (@convertExprToRtl _ arr) (@convertExprToRtl _ idx)
+      | ReadArray n m k arr idx => @RtlReadArray n m k (@convertExprToRtl _ arr) (@convertExprToRtl _ idx)
       | ReadArrayConst n k arr idx => @RtlReadArrayConst n k (@convertExprToRtl _ arr) idx
       | BuildArray n k farr => @RtlBuildArray n k (fun i => @convertExprToRtl _ (farr i))
       | ITE k' x x0' x1' =>
