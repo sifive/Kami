@@ -129,8 +129,8 @@ Section Phoas.
                         Expr (SyntaxKind k)
   | BuildArray n k: (Fin.t n -> Expr (SyntaxKind k)) -> Expr (SyntaxKind (Array n k)).
 
-  Definition UpdateArray n k (e: Expr (SyntaxKind (Array n k)))
-             (i: Expr (SyntaxKind (Bit (Nat.log2_up n))))
+  Definition UpdateArray n m k (e: Expr (SyntaxKind (Array n k)))
+             (i: Expr (SyntaxKind (Bit m)))
              (v: Expr (SyntaxKind k)) :=
     BuildArray (fun i' : Fin.t n =>
                   ITE (Eq i (Const (natToWord _ (proj1_sig (Fin.to_nat i'))))) v
@@ -1824,11 +1824,43 @@ Definition baseNoSelfCalls (m : Mod) :=
 
 
 
+Definition struct_foldr
+  (T : Type)
+  (ty : Kind -> Type)
+  (n : nat)
+  (get_kind : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (f : Fin.t (S n) -> string -> Kind -> T -> T)
+  (init : T)
+  :  T
+  := nat_rect
+       (fun m : nat => m < (S n) -> T)
+       (fun H : 0 < (S n)
+         => let index : Fin.t (S n)
+              := Fin.of_nat_lt H in
+            f index (get_name index) (get_kind index) init)
+       (fun (m : nat)
+         (F : m < (S n) -> T)
+         (H : S m < (S n))
+         => let H0
+              :  m < (S n)
+              := PeanoNat.Nat.lt_lt_succ_r m n
+                   (Lt.lt_S_n m n H) in
+            let index
+              :  Fin.t (S n)
+              := Fin.of_nat_lt H in
+            (f index (get_name index) (get_kind index) (F H0)))
+       n
+       (PeanoNat.Nat.lt_succ_diag_r n).
 
-
-
-
-
+Definition struct_get_names
+  (ty : Kind -> Type)
+  (n : nat)
+  (get_kind : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (_ : ConstT (Struct get_kind get_name))
+  :  list string
+  := struct_foldr ty get_kind get_name (fun _ name _ acc => name :: acc) nil.
 
 Definition struct_get_field_index
   (ty: Kind -> Type)
@@ -1838,29 +1870,12 @@ Definition struct_get_field_index
   (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
   (name : string)
   :  option (Fin.t (S n))
-  := nat_rect
-       (fun m : nat => m < (S n) -> option (Fin.t (S n)))
-       (fun H : 0 < (S n)
-         => let index : Fin.t (S n)
-              := Fin.of_nat_lt H in
-            if (string_dec name (get_name index))
+  := struct_foldr ty get_kind get_name
+       (fun index field_name _ acc
+         => if string_dec name field_name
               then Some index
-              else None)
-       (fun (m : nat)
-         (F : m < (S n) -> option (Fin.t (S n)))
-         (H : S m < (S n))
-         => let H0
-              :  m < (S n)
-              := PeanoNat.Nat.lt_lt_succ_r m n
-                   (Lt.lt_S_n m n H) in
-            let index
-              :  Fin.t (S n)
-              := Fin.of_nat_lt H in
-            if (string_dec name (get_name index))
-              then Some index
-              else F H0)
-       n
-       (PeanoNat.Nat.lt_succ_diag_r n).
+              else acc)
+       None.
 
 Ltac struct_get_field_ltac packet name :=
   let val := eval cbv in (struct_get_field_index packet name) in
