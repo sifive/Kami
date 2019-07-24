@@ -121,8 +121,8 @@ Section Phoas.
   | BuildStruct n (fk: Fin.t n -> Kind) (fs: Fin.t n -> string)
                 (fv: forall i, Expr (SyntaxKind (fk i))):
       Expr (SyntaxKind (Struct fk fs))
-  | ReadArray n k: Expr (SyntaxKind (Array n k)) ->
-                   Expr (SyntaxKind (Bit (Nat.log2_up n))) ->
+  | ReadArray n m k: Expr (SyntaxKind (Array n k)) ->
+                   Expr (SyntaxKind (Bit m)) ->
                    Expr (SyntaxKind k)
   | ReadArrayConst n k: Expr (SyntaxKind (Array n k)) ->
                         Fin.t n ->
@@ -857,49 +857,52 @@ Local Ltac Struct_neq :=
 
 Definition Kind_dec (k1: Kind): forall k2, {k1 = k2} + {k1 <> k2}.
 Proof.
-  induction k1; intros; destruct k2; try (right; (abstract congruence)).
-  - left; reflexivity.
-  - destruct (Nat.eq_dec n n0); [left; subst; reflexivity | right; abstract congruence].
+  induction k1; destruct k2; try (right; (intros; abstract congruence)).
+  - left; abstract (reflexivity).
+  - destruct (Nat.eq_dec n n0); [left; abstract (subst; reflexivity) | right; abstract congruence].
   - destruct (Nat.eq_dec n n0).
     + subst.
       induction n0.
       * left.
-        f_equal; extensionality x; apply Fin.case0; exact x.
-      * specialize (IHn0 (fun i => s (Fin.FS i)) (fun i => k (Fin.FS i))
+        abstract (f_equal; extensionality x; apply Fin.case0; exact x).
+      * destruct  (IHn0 (fun i => s (Fin.FS i)) (fun i => k (Fin.FS i))
                          (fun i => H (Fin.FS i)) (fun i => k0 (Fin.FS i))
                          (fun i => s0 (Fin.FS i))).
-        destruct IHn0.
-        -- injection e.
-           intros.
-           repeat (existT_destruct Nat.eq_dec).
-           destruct (string_dec (s Fin.F1) (s0 Fin.F1)).
+        -- destruct (string_dec (s Fin.F1) (s0 Fin.F1)).
            ++ destruct (H Fin.F1 (k0 Fin.F1)).
-              ** left; f_equal; extensionality x; apply (Fin.caseS' x); try assumption;
-                   apply equal_f; assumption.
+              ** left.
+                 abstract (
+                 injection e;
+                 intros;
+                 repeat (existT_destruct Nat.eq_dec);
+                 f_equal; extensionality x; apply (Fin.caseS' x); try assumption;
+                 apply equal_f; assumption).
               ** right.
-                 Struct_neq.
-                 apply (n eq_refl).
+                 abstract (Struct_neq;
+                           apply (n eq_refl)).
            ++ right.
-              Struct_neq.
-              apply (n eq_refl).
+              abstract (Struct_neq;
+                        apply (n eq_refl)).
         -- right.
-           Struct_neq.
-           apply (n eq_refl).
+           abstract (Struct_neq;
+                     apply (n eq_refl)).
     + right.
-      intro.
-      injection H0 as H0.
-      intros.
-      apply (n1 H0).
+      abstract (intro;
+                injection H0 as H0;
+                intros;
+                apply (n1 H0)).
   - destruct (Nat.eq_dec n n0).
-    + subst; destruct (IHk1 k2).
-      * left; subst; reflexivity.
-      * right; intro.
-        injection H as H.
-        apply (n H).
+    + destruct (IHk1 k2).
+      * left.
+        abstract (subst; reflexivity).
+      * right.
+        abstract (subst; intro;
+                  injection H as H;
+                  apply (n1 H)).
     + right.
-      intro.
-      injection H as H.
-      apply (n1 H).
+      abstract (subst; intro;
+                injection H as H;
+                apply (n1 H)).
 Defined.
 
 Definition Signature_dec (s1 s2: Signature): {s1 = s2} + {s1 <> s2}.
@@ -1084,7 +1087,7 @@ Section Semantics.
       | Eq _ e1 e2 => getBool (isEq _ (@evalExpr _ e1) (@evalExpr _ e2))
       | ReadStruct n fk fs e i => (@evalExpr _ e) i
       | BuildStruct n fk fs fv => fun i => @evalExpr _ (fv i)
-      | ReadArray n k fv i =>
+      | ReadArray n m k fv i =>
         match lt_dec (wordToNat (@evalExpr _ i)) n with
         | left pf => fun fv => fv (Fin.of_nat_lt pf)
         | right _ => fun _ => evalConstT (getDefaultConst k)
@@ -1651,8 +1654,8 @@ Section inlineSingle.
   Fixpoint inlineSingle k (a: ActionT ty k): ActionT ty k :=
     match a with
     | MCall g sign arg cont =>
-      match string_dec (fst f) g with
-      | left _ =>
+      match String.eqb (fst f) g with
+      | true =>
         match Signature_dec sign (projT1 (snd f)) with
         | left isEq =>
           LetAction (LetExpr match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with
@@ -1663,7 +1666,7 @@ Section inlineSingle.
                                               end ret))
         | right _ => MCall g sign arg (fun ret => inlineSingle (cont ret))
         end
-      | right _ => MCall g sign arg (fun ret => inlineSingle (cont ret))
+      | false => MCall g sign arg (fun ret => inlineSingle (cont ret))
       end
     | LetExpr _ e cont =>
       LetExpr e (fun ret => inlineSingle (cont ret))
@@ -1694,10 +1697,10 @@ Definition inlineSingle_Rule_map_BaseModule (f : DefMethT) (m : BaseModule) :=
 
 Fixpoint inlineSingle_Rule_in_list (f : DefMethT) (rn : string) (lr : list RuleT) : list RuleT :=
   match lr with
-  | rle'::lr' => match string_dec rn (fst rle') with
-                 | right _ => rle'::(inlineSingle_Rule_in_list f rn lr')
-                 | left _ => (inlineSingle_Rule f rle')::(inlineSingle_Rule_in_list f rn lr')
-                 end
+  | rle'::lr' => match String.eqb rn (fst rle') with
+                 | false => rle'
+                 | true => inlineSingle_Rule f rle'
+                 end ::(inlineSingle_Rule_in_list f rn lr')
   | nil => nil
   end.
 
@@ -1707,7 +1710,7 @@ Definition inlineSingle_Rule_BaseModule (f : DefMethT) (rn : string) (m : BaseMo
 Definition inlineSingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT :=
   let (name, sig_body) := meth in
   (name,
-   if string_dec (fst f) name
+   if String.eqb (fst f) name
    then sig_body
    else
      let (sig, body) := sig_body in
@@ -1718,10 +1721,10 @@ Definition inlineSingle_Meth_map_BaseModule (f : DefMethT) (m : BaseModule) :=
 
 Fixpoint inlineSingle_Meth_in_list (f : DefMethT) (gn : string) (lm : list DefMethT) : list DefMethT :=
   match lm with
-  | meth'::lm' => match string_dec gn (fst meth') with
-                  | right _ => meth'::(inlineSingle_Meth_in_list f gn lm')
-                  | left _ => (inlineSingle_Meth f meth')::(inlineSingle_Meth_in_list f gn lm')
-                  end
+  | meth'::lm' => match String.eqb gn (fst meth') with
+                  | false => meth'
+                  | true => (inlineSingle_Meth f meth')
+                  end ::(inlineSingle_Meth_in_list f gn lm')
   | nil => nil
   end.
 

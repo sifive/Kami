@@ -29,8 +29,8 @@ Inductive RtlExpr: Kind -> Type :=
 | RtlBuildStruct n (fk: Fin.t n -> Kind) (fs: Fin.t n -> string)
                  (fv: forall i, RtlExpr (fk i)):
     RtlExpr (Struct fk fs)
-| RtlReadArray n k: RtlExpr (Array n k) ->
-                    RtlExpr (Bit (Nat.log2_up n)) ->
+| RtlReadArray n m k: RtlExpr (Array n k) ->
+                    RtlExpr (Bit m) ->
                     RtlExpr k
 | RtlReadArrayConst n k: RtlExpr (Array n k) ->
                          Fin.t n ->

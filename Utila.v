@@ -1223,6 +1223,12 @@ Section utila.
       eapply Forall2_nth_error in Hall; eauto; subst; auto.
     Qed.
 
+    Corollary in_array_to_list {ty} : forall n (arr : ArrTy ty n) i,
+      In (ReadArrayConst arr i) (array_to_list arr).
+    Proof.
+      intros; eauto using nth_error_In, array_to_list_nth.
+    Qed.
+
     Definition array_forall {ty n} (f: A @# ty -> Bool @# ty) (xs: ArrTy ty n) : Bool @# ty :=
       utila_all (map f (array_to_list xs)).
 
