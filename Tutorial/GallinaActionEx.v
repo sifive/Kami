@@ -1,4 +1,6 @@
 Require Import Kami.All. Import Word.Notations.
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv.
+
 
 Section Ex.
   (* The usual boiler plate *)

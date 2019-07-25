@@ -191,14 +191,10 @@ Lemma wzero_wor: forall sz w, wor _  w (zToWord sz 0) = w.
 Proof.
   intros.
   arithmetizeWord.
-  rewrite <- wordBound.
-  repeat (rewrite Zmod_0_l).
-  
-  admit.
-Admitted.
-
-
-
+  rewrite Z.lor_0_r.
+  assumption.
+Qed.
+ 
 Lemma unique_word_0 : forall a : word 0,
     a = zToWord 0 0.
 Proof.
@@ -233,6 +229,12 @@ Proof.
   intros.
   arithmetizeWord.
   simpl in *.
+  unfold wltu.
+  simpl in *.
+  rewrite <- wordBound0.
+  rewrite <- wordBound.
+  
+
   
   admit.
   Admitted.
@@ -241,11 +243,13 @@ Lemma truncMsbLtFalse : forall (n x : nat) (w1 w2 : word n),
     (wordVal _ (@truncMsb x _ w1) < wordVal _ (@truncMsb x _ w2))%Z ->
     wltu _ w2 w1 = false.
 Proof.
-  intros.
+   intros.
   arithmetizeWord.
   simpl in *.
-  rewrite <- wordBound0 in H.
-  rewrite <- wordBound in H.
-  assert (wordVal0 / 2^Z.of_nat (n-x) < 2 ^ Z.of_nat x)%Z.
-Admitted.
+  unfold wltu.
+  simpl in *.
+  rewrite <- wordBound0.
+  rewrite <- wordBound.
+  admit.
+  Admitted.
 

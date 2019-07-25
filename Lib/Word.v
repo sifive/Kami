@@ -31,6 +31,8 @@ Section Word.
       | true => 1
       end.
 
+    Definition NToWord (n : N) := zToWord (Z.of_N n).
+
     Definition boolToWord b := zToWord (boolToZ b).
 
     Definition wadd x y := zToWord (Z.add (wordVal x) (wordVal y)).
@@ -181,3 +183,5 @@ End Notations.
 (* Compute (wsra (zToWord 2 1) (zToWord 3 5)). *)
 
 (* Compute (wsra (zToWord 5 9) (zToWord 4 3)). *)
+
+(* Compute (NToWord 2 6). *)

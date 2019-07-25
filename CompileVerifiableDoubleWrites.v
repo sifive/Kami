@@ -1,4 +1,5 @@
 Require Import SyntaxDoubleWrites Syntax CompileVerifiable StateMonad Properties All.
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
@@ -112,8 +113,8 @@ Section DoubleWritesProof.
       eapply H. apply H0. apply HSemCompActionT. apply H2.
     (* Write *)
     - inv H0; simpl in *; EqDep_subst.
-      assert (val_a = evalExpr (Const type WO)) as P0.
-      {rewrite (shatter_word_0 val_a); auto. }
+      assert (val_a = evalExpr (Const type (zToWord 0 0))) as P0.
+      {specialize (unique_word_0 val_a). intros. auto. }
       subst.
       inversion HSemCompActionT_a; EqDep_subst.
       destruct regMap_a.

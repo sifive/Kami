@@ -487,7 +487,7 @@ Section evalExpr.
     rewrite evalExpr_castBits.
     simpl.
     unfold zToWord at 2.
-    unfold wordWrap.
+    unfold zToWord.
     arithmetizeWord.
     rewrite wzero_wplus.
     destruct weq; auto.

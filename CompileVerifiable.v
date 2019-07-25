@@ -1,5 +1,5 @@
 Require Import Syntax StateMonad Properties All.
-Import Word.Notations.
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
@@ -49,7 +49,7 @@ Section Compile.
       | ReadReg r k' cont =>
         @CompRead r k' (VarRegMap readMap) _ (fun v => @compileAction _ (cont v) pred writeMap)
       | WriteReg r k' expr cont =>
-        CompLetFull (CompRet ($$ WO)%kami_expr
+        CompLetFull (CompRet ($$ (zToWord 0 0))%kami_expr
                              (UpdRegMap r pred expr writeMap)) (fun _ v => @compileAction _ cont pred (VarRegMap v))
       | LetAction k' a' cont =>
         CompLetFull (@compileAction k' a' pred writeMap)
@@ -68,9 +68,9 @@ Section Compile.
     Definition compileActions (readMap : regMapTy) (acts: list (ActionT ty Void)) :=
       fold_left (fun acc a =>
                    CompLetFull acc (fun _ writeMap =>
-                                      (CompLetFull (CompRet ($$ WO)%kami_expr (CompactRegMap (VarRegMap writeMap)))
+                                      (CompLetFull (CompRet ($$ (zToWord 0 0))%kami_expr (CompactRegMap (VarRegMap writeMap)))
                                       (fun _ v => @compileAction v _ a ($$ true)%kami_expr (VarRegMap v))))) acts
-                (CompRet ($$ WO)%kami_expr (VarRegMap readMap)).
+                (CompRet ($$ (zToWord 0 0))%kami_expr (VarRegMap readMap)).
 
     Definition compileRules (readMap : regMapTy) (rules: list RuleT) :=
       compileActions readMap (map (fun a => snd a ty) rules).
@@ -186,11 +186,10 @@ End Semantics.
 Section Properties.
 
   Lemma unifyWO (x : word 0):
-    x = (evalExpr (Const type WO)).
+    x = (evalExpr (Const type (zToWord 0 0))).
   Proof.
     simpl.
-    rewrite (shatter_word_0 x).
-    reflexivity.
+    apply unique_word_0.
   Qed.
 
   Lemma getKindAttr_fst {A B : Type} {P : B -> Type}  {Q : B -> Type} (l1 : list (A * {x : B & P x})):
@@ -616,7 +615,7 @@ Section Properties.
       rewrite rev_app_distr, rev_involutive in *; simpl in *.
       rewrite (unifyWO retl) in H.
       inv H; simpl in *; EqDep_subst.
-      rewrite (unifyWO WO) in HSemCompActionT_cont.
+      rewrite (unifyWO (zToWord 0 0)) in HSemCompActionT_cont.
       inv HSemCompActionT_cont; simpl in *; EqDep_subst.
       rewrite (unifyWO val_a0) in HSemCompActionT_a0.
       inv HSemCompActionT_a0; EqDep_subst.
@@ -647,7 +646,7 @@ Section Properties.
       apply Eqdep.EqdepTheory.inj_pair2 in H4; subst; simpl in *.
       destruct regMap_a.
       specialize (IHrules _ _ _ _ HSemCompActionT_a); subst.
-      rewrite (unifyWO WO) in HSemCompActionT_cont.
+      rewrite (unifyWO (zToWord 0 0)) in HSemCompActionT_cont.
       inv HSemCompActionT_cont; simpl in *; EqDep_subst.
       rewrite (unifyWO val_a0) in HSemCompActionT_a0.
       inv HSemCompActionT_a0; simpl in *; EqDep_subst.
@@ -769,7 +768,7 @@ Section Properties.
       assert (SubList rules (getRules m)) as P0.
       { repeat intro; apply H; right; auto. }
       destruct regMap_a.
-      rewrite (unifyWO WO) in HSemCompActionT_cont.
+      rewrite (unifyWO (zToWord 0 0)) in HSemCompActionT_cont.
       inv HSemCompActionT_cont; simpl in *; EqDep_subst.
       rewrite (unifyWO val_a0) in HSemCompActionT_a0.
       inv HSemCompActionT_a0; simpl in *; EqDep_subst.
@@ -886,3 +885,4 @@ Section Properties.
   Qed.
       
 End Properties.
+

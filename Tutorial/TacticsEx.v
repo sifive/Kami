@@ -1,5 +1,8 @@
 Require Import Kami.All.
 Import Word.Notations.
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt.
+
+Open Scope word_scope.
 
 Section Named.
   Variable sz: nat.
@@ -48,11 +51,11 @@ Section Named.
     { counterImpl: word sz ;
       isSending: bool ;
       implEq : impl = (@^"counter", existT _ (SyntaxKind (Bit sz)) counterImpl)
-                        :: (@^"counter1", existT _ (SyntaxKind (Bit sz)) $0)
+                        :: (@^"counter1", existT _ (SyntaxKind (Bit sz)) (zToWord _ 0))
                         :: (@^"isSending", existT _ (SyntaxKind Bool) isSending) :: nil ;
       specEq : spec = (@^"counter", existT _ (SyntaxKind (Bit sz))
-                                           (if isSending then counterImpl else counterImpl ^+ $1))
-                        :: (@^"counter1", existT  _ (SyntaxKind (Bit sz)) $0)
+                                           (if isSending then counterImpl else counterImpl ^+ (zToWord _ 1)))
+                        :: (@^"counter1", existT  _ (SyntaxKind (Bit sz)) (zToWord _ 0))
                         :: nil
     }.
 
@@ -69,7 +72,7 @@ Section Named.
       the implementation are not combinable by automatically searching for at least one register with the two actions write to *)
     discharge_simulation Incrementer_invariant; discharge_CommonRegisterAuto.
     - simplify_simulatingRule @^"send_and_inc"; subst.
-      + rewrite (word0 mret); auto.
+      + auto. 
       + simpl. discharge_string_dec.
         repeat (econstructor; eauto; simpl; subst).
         rewrite wzero_wplus; auto.

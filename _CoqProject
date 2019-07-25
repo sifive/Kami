@@ -1,1 +1,1 @@
--R . Kami -R ../bbv/theories bbv -R ../coq-record-update/src RecordUpdate
+-R . Kami  -R ../coq-record-update/src RecordUpdate 
