@@ -38,19 +38,19 @@ Section ty.
     | LetExpr k e cont =>
       match k return Expr boolTy k -> (fullType boolTy k -> ActionT boolTy lret) -> bool with
       | SyntaxKind k' => fun e cont => goodDfAction (cont (goodDfExpr e))
-      | NativeKind t c => fun e cont => goodDfAction (cont c)
+      | NativeKind t c => fun e cont => false
       end e cont
     | LetAction k a cont => 
       goodDfAction a && (goodDfAction (cont true))
     | ReadNondet k cont =>
       match k return (fullType boolTy k -> ActionT boolTy lret) -> bool with
-      | SyntaxKind k' => fun cont => goodDfAction (cont true)
-      | NativeKind t c => fun cont => goodDfAction (cont c)
+      | SyntaxKind k' => fun cont => goodDfAction (cont false)
+      | NativeKind t c => fun cont => false
       end cont
     | ReadReg name k cont =>
       match k return (fullType boolTy k -> ActionT boolTy lret) -> bool with
       | SyntaxKind k' => fun cont => goodDfAction (cont true)
-      | NativeKind t c => fun cont => goodDfAction (cont c)
+      | NativeKind t c => fun cont => false
       end cont
     | WriteReg name k e cont =>
       goodDfAction cont
