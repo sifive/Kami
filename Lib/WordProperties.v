@@ -118,7 +118,7 @@ Hint Rewrite
      Z.testbit_0_l
   : Z_bitwise_no_hyps.
 
-Ltac rewrite_bitwise := repeat (autorewrite with nat_bitwise_no_hyps).
+Ltac rewrite_bitwise := repeat (autorewrite with Z_bitwise_no_hyps).
 
 Ltac bitblast := repeat f_equal; eapply Z.bits_inj_iff; unfold Z.eqf; intros; rewrite_bitwise.
 
@@ -141,8 +141,8 @@ Qed.
 
 Ltac discharge_gt_0 :=
   (destruct wordVal;
-  lia;
-  lia).
+   lia;
+   lia).
 
 Tactic Notation "unique" "pose" "proof" constr(defn) "as" ident(H) :=
   let T := type of defn in
@@ -194,7 +194,7 @@ Proof.
   rewrite Z.lor_0_r.
   assumption.
 Qed.
- 
+
 Lemma unique_word_0 : forall a : word 0,
     a = zToWord 0 0.
 Proof.
@@ -222,6 +222,16 @@ Proof.
   auto.
 Qed.
 
+Lemma Z_lt_div: forall (a b c : Z), (c > 0)%Z -> (a/c < b/c)%Z -> (a < b)%Z.
+Proof.
+  intros.
+  destruct (Z_ge_lt_dec a b); auto.
+  apply (Z_div_ge _ _ _ H) in g.
+  exfalso; lia.
+Qed.
+
+
+
 Lemma truncMsbLtTrue : forall (n x : nat) (w1 w2 : word n),
     (wordVal _ (@truncMsb x _ w1) < wordVal _ (@truncMsb x _ w2))%Z ->
     wltu _ w1 w2 = true.
@@ -230,26 +240,88 @@ Proof.
   arithmetizeWord.
   simpl in *.
   unfold wltu.
+  
+  destruct (zerop (n - x)).
   simpl in *.
-  rewrite <- wordBound0.
-  rewrite <- wordBound.
+  rewrite e in *; simpl in *.
+  repeat rewrite Z.div_1_r in *.
+  rewrite Nat.sub_0_le in e.
+  specialize (Z.pow_le_mono_r_iff 2 (Z.of_nat n) (Z.of_nat x)) as P0.
+  assert (1 < 2)%Z as TMP1; [lia|].
+  specialize (Nat2Z.is_nonneg x) as TMP2.
+  rewrite Nat2Z.inj_le in e.
+  destruct P0; auto.
+  specialize (H2 e).
+  rewrite Z.ltb_lt.
+  do 2 (rewrite Zmod_small in H); try lia.
   
+  assert (2^(Z.of_nat (n - x)) > 0)%Z as P1.
+  { apply Z.lt_gt, Z.pow_pos_nonneg;[lia|].
+    apply Nat2Z.is_nonneg. }
+  
+  assert (Z.of_nat n = Z.of_nat x + Z.of_nat (n - x))%Z.
+  { rewrite <- Nat2Z.inj_add.
+    apply inj_eq.
+    apply le_plus_minus.
+    apply Z.gt_lt in P1.
+    lia. }
+  
+  specialize (Z.pow_nonneg 2 (Z.of_nat (n - x))); intros.
+  assert (0 <= 2)%Z.
+  {
+    lia.
+  }
+  specialize (H3 H4).
+  assert (2 ^ (Z.of_nat n) = ((2 ^ (Z.of_nat x)) * (2 ^ Z.of_nat (n- x))))%Z.
+  { rewrite <- Z.pow_add_r.
+    rewrite <- H2.
+    reflexivity.
+    lia.
+    lia. }
+  assert (0 <= wordVal0 / 2 ^ Z.of_nat (n - x) < 2 ^ Z.of_nat x)%Z.
+  { rewrite H5 in H1.
+    destruct H1.
+    apply Zdiv_lt_upper_bound in H6.
+    split.
+    apply Z.div_pos.
+    auto.
+    lia.
+    auto.
+    apply Z.pow_pos_nonneg.
+    lia.
+    lia. }
+  assert (0 <= wordVal / 2 ^ Z.of_nat (n - x) < 2 ^ Z.of_nat x)%Z.
+  {
+    rewrite H5 in H0.
+    destruct H0.
+    apply Zdiv_lt_upper_bound in H7.
+    split.
+    apply Z.div_pos.
+    auto.
 
-  
-  admit.
-  Admitted.
-  
+    lia.
+    auto.
+    apply Z.pow_pos_nonneg.
+    lia.
+    lia. }
+  apply Z.mod_small in H6.
+  rewrite H6 in H.
+  apply Z.mod_small in H7.
+  rewrite H7 in H.
+  rewrite Z.ltb_lt.
+  apply(Z_lt_div _ _ _ P1 H).
+Qed.
+
+
 Lemma truncMsbLtFalse : forall (n x : nat) (w1 w2 : word n),
     (wordVal _ (@truncMsb x _ w1) < wordVal _ (@truncMsb x _ w2))%Z ->
     wltu _ w2 w1 = false.
 Proof.
-   intros.
-  arithmetizeWord.
-  simpl in *.
-  unfold wltu.
-  simpl in *.
-  rewrite <- wordBound0.
-  rewrite <- wordBound.
-  admit.
-  Admitted.
-
+  intros.
+  specialize (truncMsbLtTrue _ _ _ _ H).
+  intros.
+  unfold wltu in *.
+  rewrite Z.ltb_lt in *.
+  rewrite Z.ltb_nlt.
+  lia.
+Qed.
