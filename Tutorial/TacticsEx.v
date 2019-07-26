@@ -49,7 +49,8 @@ Section Named.
       isSending: bool ;
       implEq : impl = (@^"counter", existT _ (SyntaxKind (Bit sz)) counterImpl)
                         :: (@^"counter1", existT _ (SyntaxKind (Bit sz)) $0)
-                        :: (@^"isSending", existT _ (SyntaxKind Bool) isSending) :: nil ;
+                        :: (@^"isSending", existT _ (SyntaxKind Bool) isSending)
+                        :: nil ;
       specEq : spec = (@^"counter", existT _ (SyntaxKind (Bit sz))
                                            (if isSending then counterImpl else counterImpl ^+ $1))
                         :: (@^"counter1", existT  _ (SyntaxKind (Bit sz)) $0)
@@ -67,7 +68,9 @@ Section Named.
       The latter is simplified using simplify_nilStep.
       discharge_CommonRegisterAuto discharges the goals that require that two methods or a method and rule of
       the implementation are not combinable by automatically searching for at least one register with the two actions write to *)
-    discharge_simulation Incrementer_invariant; discharge_CommonRegisterAuto.
+    discharge_simulation Incrementer_invariant. discharge_CommonRegisterAuto.
+    Print Ltac simplify_simulatingRule.
+    Print Ltac discharge_SemAction.
     - simplify_simulatingRule @^"send_and_inc"; subst.
       + rewrite (word0 mret); auto.
       + simpl. discharge_string_dec.
@@ -77,6 +80,7 @@ Section Named.
       econstructor; simpl; eauto; subst.
       rewrite ?negb_true_iff in *; subst.
       rewrite wzero_wplus; simpl; auto.
+      Print Ltac discharge_simulation.
 
       (* Note that while this example does not create spurious existentials, usually, there is a plethora of existentials created that can be instantiated with arbitrary values as they do not affect the proof. These goals are discharged with the following two commands*)
       Unshelve.
