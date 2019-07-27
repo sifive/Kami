@@ -507,20 +507,37 @@ Section evalExpr.
     rewrite wordToNat_natToWord_2; lia.
   Qed.
 
-  Lemma eval_ReadArray_const : forall A n (arr : Array n A @# type) i,
+  Lemma eval_ReadArray_in_bounds : forall A n (arr : Array n A @# type) i m,
+    n <= pow2 m ->
     evalExpr
       (ReadArray arr
-        (Var type (SyntaxKind (Bit (Nat.log2_up n)))
-          (natToWord (Nat.log2_up n) (proj1_sig (Fin.to_nat i))))) =
+        (Var type (SyntaxKind (Bit m))
+          (natToWord m (proj1_sig (Fin.to_nat i))))) =
     evalExpr arr i.
   Proof.
     intros.
-    pose proof (log2_up_pow2 n); pose proof (fin_to_nat_bound i).
+    pose proof (fin_to_nat_bound i).
     unfold evalExpr at 1.
     rewrite wordToNat_natToWord_2 by lia.
     destruct (Compare_dec.lt_dec _ _) as [? | ?]; [| exfalso; auto].
     erewrite Fin.of_nat_ext, Fin.of_nat_to_nat_inv; eauto.
   Qed.
+
+  Corollary eval_ReadArray_in_bounds_log : forall A n (arr : Array n A @# type) i,
+    evalExpr
+      (ReadArray arr
+        (Var type (SyntaxKind (Bit (Nat.log2_up n)))
+          (natToWord (Nat.log2_up n) (proj1_sig (Fin.to_nat i))))) =
+    evalExpr arr i.
+  Proof. intros; apply eval_ReadArray_in_bounds, log2_up_pow2. Qed.
+
+  Corollary eval_ReadArray_in_bounds_pow : forall A n (arr : Array (pow2 n) A @# type) i,
+    evalExpr
+      (ReadArray arr
+        (Var type (SyntaxKind (Bit n))
+          (natToWord n (proj1_sig (Fin.to_nat i))))) =
+    evalExpr arr i.
+  Proof. intros; apply eval_ReadArray_in_bounds; auto. Qed.
 End evalExpr.
 
 
