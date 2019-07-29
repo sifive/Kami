@@ -240,7 +240,6 @@ Proof.
   arithmetizeWord.
   simpl in *.
   unfold wltu.
-  
   destruct (zerop (n - x)).
   simpl in *.
   rewrite e in *; simpl in *.
@@ -254,18 +253,15 @@ Proof.
   specialize (H2 e).
   rewrite Z.ltb_lt.
   do 2 (rewrite Zmod_small in H); try lia.
-  
   assert (2^(Z.of_nat (n - x)) > 0)%Z as P1.
   { apply Z.lt_gt, Z.pow_pos_nonneg;[lia|].
     apply Nat2Z.is_nonneg. }
-  
   assert (Z.of_nat n = Z.of_nat x + Z.of_nat (n - x))%Z.
   { rewrite <- Nat2Z.inj_add.
     apply inj_eq.
     apply le_plus_minus.
     apply Z.gt_lt in P1.
     lia. }
-  
   specialize (Z.pow_nonneg 2 (Z.of_nat (n - x))); intros.
   assert (0 <= 2)%Z.
   {
@@ -325,3 +321,15 @@ Proof.
   rewrite Z.ltb_nlt.
   lia.
 Qed.
+
+Lemma wzero_wones: forall sz, sz >= 1 ->
+                              zToWord sz 0 <> wmax sz.
+Proof.
+  intros.
+  unfold not.
+  unfold wmax.
+  intros.
+  inversion H0.
+  rewrite Zmod_0_l in H2.
+  admit.
+Admitted.
