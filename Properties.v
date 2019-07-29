@@ -497,7 +497,58 @@ Section evalExpr.
     rewrite evalExpr_castBits.
     repeat f_equal.
 Qed.
+
+  Lemma fin_to_nat_bound : forall n (x: Fin.t n), proj1_sig (Fin.to_nat x) < n.
+  Proof.
+    induction x; cbn; try lia.
+    destruct (Fin.to_nat x); cbn in *; lia.
+  Qed.
+
+  Lemma fin_to_word_id : forall n (i : Fin.t n),
+    wordVal _ (zToWord (Nat.log2_up n) (Z.of_nat (proj1_sig (Fin.to_nat i)))) = (Z.of_nat (proj1_sig (Fin.to_nat i))).
+  Proof.
+    intros.
+    rewrite wordToZ_zToWord. reflexivity.
+    pose proof (log2_up_pow2 n); pose proof (fin_to_nat_bound i).
+    split.
+    lia.
+    rewrite <- Zpow_of_nat.
+    rewrite <- Nat2Z.inj_lt; omega.
+  Qed.
+
   
+  Lemma eval_ReadArray_in_bounds : forall A n (arr : Array n A @# type) i m,
+    n <= Nat.pow 2 m ->
+    evalExpr
+      (ReadArray arr
+        (Var type (SyntaxKind (Bit m))
+          (zToWord m (Z.of_nat (proj1_sig (Fin.to_nat i)))))) =
+    evalExpr arr i.
+  Proof.
+    intros.
+    pose proof (fin_to_nat_bound i).
+    simpl.
+    rewrite Z.mod_small; [| split; try lia; rewrite <- Zpow_of_nat, <- Nat2Z.inj_lt; lia].
+    rewrite Nat2Z.id.
+    destruct lt_dec;[|exfalso; lia].
+    erewrite Fin.of_nat_ext, Fin.of_nat_to_nat_inv; auto.
+  Qed.       
+
+  Corollary eval_ReadArray_in_bounds_log : forall A n (arr : Array n A @# type) i,
+    evalExpr
+      (ReadArray arr
+        (Var type (SyntaxKind (Bit (Nat.log2_up n)))
+          (zToWord (Nat.log2_up n) (Z.of_nat (proj1_sig (Fin.to_nat i)))))) =
+    evalExpr arr i.
+  Proof. intros; apply eval_ReadArray_in_bounds, log2_up_pow2. Qed.
+
+  Corollary eval_ReadArray_in_bounds_pow : forall A n (arr : Array (Nat.pow 2 n) A @# type) i,
+    evalExpr
+      (ReadArray arr
+        (Var type (SyntaxKind (Bit n))
+          (zToWord n (Z.of_nat (proj1_sig (Fin.to_nat i)))))) =
+    evalExpr arr i.
+  Proof. intros; apply eval_ReadArray_in_bounds; auto. Qed.
 End evalExpr.
 
 
@@ -531,6 +582,7 @@ Opaque getNumFromCalls.
 Lemma getNumFromCalls_app f l1:
   forall l2,
   getNumFromCalls f (l1++l2) = (getNumFromCalls f l1 + getNumFromCalls f l2)%Z.
+
 Proof.
   induction l1.
   - simpl; reflexivity.
@@ -4724,6 +4776,40 @@ Section SimulationGen.
         destruct (@notMethMeth _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ HInMeths HAction HInMeths0 HAction0) as [k [in1 in2]].
         specialize (HDisjRegs k).
         tauto.
+  Qed.
+
+  Lemma InvertStep o l:
+    l <> nil ->
+    Step imp o l ->
+    (exists r a reads upds calls,
+        l = (upds, (Rle r, calls)) :: nil /\
+        In (r, a) (getRules imp) /\
+        SemAction o (a type) reads upds calls (zToWord 0 0)) \/
+    (exists f sign arg ret a reads upds calls,
+        l = (upds, (Meth (f, existT SignT sign (arg, ret)), calls)) :: nil /\
+        In (f, existT MethodT sign a) (getMethods imp) /\
+        SemAction o (a type arg) reads upds calls ret).
+  Proof.
+    intros ? H.
+    inv H.
+    pose proof (SubstepsSingle HSubsteps).
+    destruct l; simpl.
+    - left; tauto.
+    - simpl in H.
+      assert (sth: Datatypes.length l = 0) by lia.
+      rewrite length_zero_iff_nil in sth; subst; clear H0.
+      destruct p.
+      destruct p.
+      destruct r0.
+      + left.
+        inv HSubsteps; inv HLabel.
+        exists rn0, rb, reads, u, cs.
+        repeat split; auto.
+      + right.
+        inv HSubsteps; inv HLabel.
+        destruct fb.
+        exists fn, x, argV, retV, m, reads, u, cs.
+        repeat split; auto.
   Qed.
         
   Theorem simulationGen:

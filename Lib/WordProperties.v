@@ -322,14 +322,22 @@ Proof.
   lia.
 Qed.
 
-Lemma wzero_wones: forall sz, sz >= 1 ->
-                              zToWord sz 0 <> wmax sz.
+
+Lemma wordToZ_zToWord: forall (sz : nat) (w : Z),
+    (0 <= w < Z.pow 2 (Z.of_nat sz))%Z -> wordVal _ (zToWord sz w) = w.
 Proof.
   intros.
-  unfold not.
-  unfold wmax.
-  intros.
-  inversion H0.
-  rewrite Zmod_0_l in H2.
-  admit.
-Admitted.
+  arithmetizeWord.
+  simpl in *.
+  apply Z.mod_small.
+  auto.
+Qed.
+
+Lemma Zpow_of_nat : forall n, Z.of_nat (2 ^ n) = (2 ^ Z.of_nat n)%Z.
+  Proof.
+      induction n; auto.
+      rewrite Nat2Z.inj_succ, <- Z.add_1_l.
+      rewrite Z.pow_add_r; try lia.
+      rewrite <-IHn.
+      rewrite Nat.pow_succ_r', Nat2Z.inj_mul; auto.
+ Qed.

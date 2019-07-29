@@ -119,16 +119,16 @@ Section Phoas.
   | BuildStruct n (fk: Fin.t n -> Kind) (fs: Fin.t n -> string)
                 (fv: forall i, Expr (SyntaxKind (fk i))):
       Expr (SyntaxKind (Struct fk fs))
-  | ReadArray n k: Expr (SyntaxKind (Array n k)) ->
-                   Expr (SyntaxKind (Bit (Nat.log2_up n))) ->
+  | ReadArray n m k: Expr (SyntaxKind (Array n k)) ->
+                   Expr (SyntaxKind (Bit m)) ->
                    Expr (SyntaxKind k)
   | ReadArrayConst n k: Expr (SyntaxKind (Array n k)) ->
                         Fin.t n ->
                         Expr (SyntaxKind k)
   | BuildArray n k: (Fin.t n -> Expr (SyntaxKind k)) -> Expr (SyntaxKind (Array n k)).
 
-  Definition UpdateArray n k (e: Expr (SyntaxKind (Array n k)))
-             (i: Expr (SyntaxKind (Bit (Nat.log2_up n))))
+  Definition UpdateArray n m k (e: Expr (SyntaxKind (Array n k)))
+             (i: Expr (SyntaxKind (Bit m)))
              (v: Expr (SyntaxKind k)) :=
     BuildArray (fun i' : Fin.t n =>
                   ITE (Eq i (Const (zToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i')))))) v
@@ -855,49 +855,52 @@ Local Ltac Struct_neq :=
 
 Definition Kind_dec (k1: Kind): forall k2, {k1 = k2} + {k1 <> k2}.
 Proof.
-  induction k1; intros; destruct k2; try (right; (abstract congruence)).
-  - left; reflexivity.
-  - destruct (Nat.eq_dec n n0); [left; subst; reflexivity | right; abstract congruence].
+  induction k1; destruct k2; try (right; (intros; abstract congruence)).
+  - left; abstract (reflexivity).
+  - destruct (Nat.eq_dec n n0); [left; abstract (subst; reflexivity) | right; abstract congruence].
   - destruct (Nat.eq_dec n n0).
     + subst.
       induction n0.
       * left.
-        f_equal; extensionality x; apply Fin.case0; exact x.
-      * specialize (IHn0 (fun i => s (Fin.FS i)) (fun i => k (Fin.FS i))
+        abstract (f_equal; extensionality x; apply Fin.case0; exact x).
+      * destruct  (IHn0 (fun i => s (Fin.FS i)) (fun i => k (Fin.FS i))
                          (fun i => H (Fin.FS i)) (fun i => k0 (Fin.FS i))
                          (fun i => s0 (Fin.FS i))).
-        destruct IHn0.
-        -- injection e.
-           intros.
-           repeat (existT_destruct Nat.eq_dec).
-           destruct (string_dec (s Fin.F1) (s0 Fin.F1)).
+        -- destruct (string_dec (s Fin.F1) (s0 Fin.F1)).
            ++ destruct (H Fin.F1 (k0 Fin.F1)).
-              ** left; f_equal; extensionality x; apply (Fin.caseS' x); try assumption;
-                   apply equal_f; assumption.
+              ** left.
+                 abstract (
+                 injection e;
+                 intros;
+                 repeat (existT_destruct Nat.eq_dec);
+                 f_equal; extensionality x; apply (Fin.caseS' x); try assumption;
+                 apply equal_f; assumption).
               ** right.
-                 Struct_neq.
-                 apply (n eq_refl).
+                 abstract (Struct_neq;
+                           apply (n eq_refl)).
            ++ right.
-              Struct_neq.
-              apply (n eq_refl).
+              abstract (Struct_neq;
+                        apply (n eq_refl)).
         -- right.
-           Struct_neq.
-           apply (n eq_refl).
+           abstract (Struct_neq;
+                     apply (n eq_refl)).
     + right.
-      intro.
-      injection H0 as H0.
-      intros.
-      apply (n1 H0).
+      abstract (intro;
+                injection H0 as H0;
+                intros;
+                apply (n1 H0)).
   - destruct (Nat.eq_dec n n0).
-    + subst; destruct (IHk1 k2).
-      * left; subst; reflexivity.
-      * right; intro.
-        injection H as H.
-        apply (n H).
+    + destruct (IHk1 k2).
+      * left.
+        abstract (subst; reflexivity).
+      * right.
+        abstract (subst; intro;
+                  injection H as H;
+                  apply (n1 H)).
     + right.
-      intro.
-      injection H as H.
-      apply (n1 H).
+      abstract (subst; intro;
+                injection H as H;
+                apply (n1 H)).
 Defined.
 
 Definition Signature_dec (s1 s2: Signature): {s1 = s2} + {s1 <> s2}.
@@ -987,7 +990,7 @@ Definition evalBinBit n1 n2 n3 (op: BinBitOp n1 n2 n3)
     | Srl n m =>  fun x y => wsru _ x (zToWord _ (wordVal _ y))
     | Sra n m =>  wsra
     | Concat n1 n2 => wconcat
-  end.
+ end.
 
 Definition evalCABit n (op: CABitOp) (ls: list (word n)): word n :=
   match op with
@@ -1047,9 +1050,9 @@ Section Semantics.
       | Eq _ e1 e2 => getBool (isEq _ (@evalExpr _ e1) (@evalExpr _ e2))
       | ReadStruct n fk fs e i => (@evalExpr _ e) i
       | BuildStruct n fk fs fv => fun i => @evalExpr _ (fv i)
-      | ReadArray n k fv i =>
+      | ReadArray n m k fv i =>
         match lt_dec (Z.to_nat (wordVal _ (@evalExpr _ i))) n with
-        | left pf => fun fv => fv (Fin.of_nat_lt pf)
+       | left pf => fun fv => fv (Fin.of_nat_lt pf)
         | right _ => fun _ => evalConstT (getDefaultConst k)
         end (@evalExpr _ fv)
       | ReadArrayConst n k fv i =>
@@ -1601,8 +1604,8 @@ Section inlineSingle.
   Fixpoint inlineSingle k (a: ActionT ty k): ActionT ty k :=
     match a with
     | MCall g sign arg cont =>
-      match string_dec (fst f) g with
-      | left _ =>
+      match String.eqb (fst f) g with
+      | true =>
         match Signature_dec sign (projT1 (snd f)) with
         | left isEq =>
           LetAction (LetExpr match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with
@@ -1613,7 +1616,7 @@ Section inlineSingle.
                                               end ret))
         | right _ => MCall g sign arg (fun ret => inlineSingle (cont ret))
         end
-      | right _ => MCall g sign arg (fun ret => inlineSingle (cont ret))
+      | false => MCall g sign arg (fun ret => inlineSingle (cont ret))
       end
     | LetExpr _ e cont =>
       LetExpr e (fun ret => inlineSingle (cont ret))
@@ -1644,10 +1647,10 @@ Definition inlineSingle_Rule_map_BaseModule (f : DefMethT) (m : BaseModule) :=
 
 Fixpoint inlineSingle_Rule_in_list (f : DefMethT) (rn : string) (lr : list RuleT) : list RuleT :=
   match lr with
-  | rle'::lr' => match string_dec rn (fst rle') with
-                 | right _ => rle'::(inlineSingle_Rule_in_list f rn lr')
-                 | left _ => (inlineSingle_Rule f rle')::(inlineSingle_Rule_in_list f rn lr')
-                 end
+  | rle'::lr' => match String.eqb rn (fst rle') with
+                 | false => rle'
+                 | true => inlineSingle_Rule f rle'
+                 end ::(inlineSingle_Rule_in_list f rn lr')
   | nil => nil
   end.
 
@@ -1657,7 +1660,7 @@ Definition inlineSingle_Rule_BaseModule (f : DefMethT) (rn : string) (m : BaseMo
 Definition inlineSingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT :=
   let (name, sig_body) := meth in
   (name,
-   if string_dec (fst f) name
+   if String.eqb (fst f) name
    then sig_body
    else
      let (sig, body) := sig_body in
@@ -1668,10 +1671,10 @@ Definition inlineSingle_Meth_map_BaseModule (f : DefMethT) (m : BaseModule) :=
 
 Fixpoint inlineSingle_Meth_in_list (f : DefMethT) (gn : string) (lm : list DefMethT) : list DefMethT :=
   match lm with
-  | meth'::lm' => match string_dec gn (fst meth') with
-                  | right _ => meth'::(inlineSingle_Meth_in_list f gn lm')
-                  | left _ => (inlineSingle_Meth f meth')::(inlineSingle_Meth_in_list f gn lm')
-                  end
+  | meth'::lm' => match String.eqb gn (fst meth') with
+                  | false => meth'
+                  | true => (inlineSingle_Meth f meth')
+                  end ::(inlineSingle_Meth_in_list f gn lm')
   | nil => nil
   end.
 
@@ -1764,7 +1767,43 @@ Definition baseNoSelfCalls (m : Mod) :=
   let '(hides, (rfs, mods)) := separateMod m in
   NoSelfCallBaseModule (inlineAll_All_mod (mergeSeparatedBaseMod mods)).
 
+Definition struct_foldr
+  (T : Type)
+  (ty : Kind -> Type)
+  (n : nat)
+  (get_kind : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (f : Fin.t (S n) -> string -> Kind -> T -> T)
+  (init : T)
+  :  T
+  := nat_rect
+       (fun m : nat => m < (S n) -> T)
+       (fun H : 0 < (S n)
+         => let index : Fin.t (S n)
+              := Fin.of_nat_lt H in
+            f index (get_name index) (get_kind index) init)
+       (fun (m : nat)
+         (F : m < (S n) -> T)
+         (H : S m < (S n))
+         => let H0
+              :  m < (S n)
+              := PeanoNat.Nat.lt_lt_succ_r m n
+                   (Lt.lt_S_n m n H) in
+            let index
+              :  Fin.t (S n)
+              := Fin.of_nat_lt H in
+            (f index (get_name index) (get_kind index) (F H0)))
+       n
+       (PeanoNat.Nat.lt_succ_diag_r n).
 
+Definition struct_get_names
+  (ty : Kind -> Type)
+  (n : nat)
+  (get_kind : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (_ : ConstT (Struct get_kind get_name))
+  :  list string
+  := struct_foldr ty get_kind get_name (fun _ name _ acc => name :: acc) nil.
 
 Definition struct_get_field_index
   (ty: Kind -> Type)
@@ -1774,29 +1813,12 @@ Definition struct_get_field_index
   (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
   (name : string)
   :  option (Fin.t (S n))
-  := nat_rect
-       (fun m : nat => m < (S n) -> option (Fin.t (S n)))
-       (fun H : 0 < (S n)
-         => let index : Fin.t (S n)
-              := Fin.of_nat_lt H in
-            if (string_dec name (get_name index))
+  := struct_foldr ty get_kind get_name
+       (fun index field_name _ acc
+         => if string_dec name field_name
               then Some index
-              else None)
-       (fun (m : nat)
-         (F : m < (S n) -> option (Fin.t (S n)))
-         (H : S m < (S n))
-         => let H0
-              :  m < (S n)
-              := PeanoNat.Nat.lt_lt_succ_r m n
-                   (Lt.lt_S_n m n H) in
-            let index
-              :  Fin.t (S n)
-              := Fin.of_nat_lt H in
-            if (string_dec name (get_name index))
-              then Some index
-              else F H0)
-       n
-       (PeanoNat.Nat.lt_succ_diag_r n).
+              else acc)
+       None.
 
 Ltac struct_get_field_ltac packet name :=
   let val := eval cbv in (struct_get_field_index packet name) in
@@ -2029,3 +2051,4 @@ Definition struct_set_field
    + Compiler verification (difficult)
    + PUAR: Linux/Certikos
  *)
+
