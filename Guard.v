@@ -58,7 +58,7 @@ Section ty.
       goodDfExpr p && goodDfAction a1 && goodDfAction a2 &&
                  goodDfAction (cont true)
     | Sys _ cont => goodDfAction cont
-    | Return e => goodDfExpr e
+    | Return e => (* goodDfExpr e *) true
     end.
 
   Local Open Scope kami_expr.
