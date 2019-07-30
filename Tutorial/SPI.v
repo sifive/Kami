@@ -4,6 +4,7 @@ Axiom one : forall {T}, (T -> Prop) -> list T -> Prop.
 Axiom kleene : forall {T}, (list T -> Prop) -> list T -> Prop.
 Axiom plus : forall {T}, (list T -> Prop) -> list T -> Prop.
 Axiom app : forall {T}, (list T -> Prop) -> (list T -> Prop) -> list T -> Prop.
+Lemma app_empty_r {T} (P Q : list T -> Prop) t : P t -> Q nil -> app P Q t. Admitted.
 Axiom either : forall {T}, (list T -> Prop) -> (list T -> Prop) -> list T -> Prop.
 Axiom maybe : forall {T}, (list T -> Prop) -> list T -> Prop.
 Local Notation "x ^*" := (kleene x) (at level 50).
@@ -102,6 +103,12 @@ End TracePredicate.
 Require Import Kami.All.
 
 Definition bits {w} : word w -> list bool. Admitted.
+Lemma length_bits w x : List.length (@bits w x) = w. Admitted.
+Lemma bits_nil x : @bits 0 x = nil.
+Proof.
+  pose proof length_bits x as H.
+  destruct (bits x); [trivial | inversion H].
+Qed.
 Definition x : nat. exact O. Qed.
 
 Section Named.
@@ -149,7 +156,8 @@ Section Named.
     with Method "write" (data : Bit 8) : Bool := (
       Write @^"hack_for_sequential_semantics" : Bit 0 <- $$(WO);
       Read tx_fifo_len <- @^"tx_fifo_len";
-      If (#tx_fifo_len == $$@natToWord 4 0) then (
+      Read rx_fifo_len <- @^"rx_fifo_len";
+      If ((#tx_fifo_len == $$@natToWord 4 0) && ! (#rx_fifo_len < $$@natToWord 4 8)) then (
         Write @^"tx_fifo" : Bit 8 <- #data;
         Write @^"tx_fifo_len" <- $$@natToWord 4 8;
         Write @^"rx_fifo_len" <- $$@natToWord 4 0;
@@ -205,11 +213,11 @@ Section Named.
 
   Definition enforce_regs (regs:RegsT) tx_fifo tx_fifo_len rx_fifo rx_fifo_len sck := regs =
     [(@^"hack_for_sequential_semantics", existT _ (SyntaxKind (Bit 0)) WO);
-                (@^"tx_fifo", existT _ (SyntaxKind (Bit 8)) tx_fifo);
-                (@^"tx_fifo_len", existT _ (SyntaxKind (Bit 4)) tx_fifo_len);
-                (@^"rx_fifo", existT _ (SyntaxKind (Bit 8)) rx_fifo);
-                (@^"rx_fifo_len", existT _ (SyntaxKind (Bit 4)) rx_fifo_len);
-                (@^"sck", existT _ (SyntaxKind Bool) sck) ].
+     (@^"tx_fifo", existT _ (SyntaxKind (Bit 8)) tx_fifo);
+     (@^"tx_fifo_len", existT _ (SyntaxKind (Bit 4)) tx_fifo_len);
+     (@^"rx_fifo", existT _ (SyntaxKind (Bit 8)) rx_fifo);
+     (@^"rx_fifo_len", existT _ (SyntaxKind (Bit 4)) rx_fifo_len);
+     (@^"sck", existT _ (SyntaxKind Bool) sck) ].
 
   (* Local Coercion SyntaxKind : Kind >-> FullKind. *)
   Record idle (regs : RegsT) (t : list (list FullLabel)) : Prop := {
@@ -225,7 +233,12 @@ Section Named.
     tx_fifo_len : _ ;
     rx_fifo : _ ;
     rx_fifo_len : _ ;
-    _ : TracePredicate.interleave (kleene nop) (app spec (cmd_write tx false)) t; (* WIP *)
+    _ : TracePredicate.interleave (kleene nop) (spec +++ (
+          cmd_write tx false +++
+          (fun t =>
+            mosis (List.skipn (wordToNat tx_fifo_len) (bits tx)) t /\
+            True (* RX HERE *)
+          ))) t;
     _ : tx = tx_fifo; (* only during first tick *)
     _ : enforce_regs regs tx_fifo tx_fifo_len rx_fifo rx_fifo_len false;
   }.
@@ -238,118 +251,152 @@ Section Named.
     { admit. }
     subst.
 
-    destruct IHTrace as [IHTrace|IHTrace]; [|admit].
-    destruct IHTrace.
-    cbv [enforce_regs] in *.
-
-    unshelve (idtac;
-    let pf := open_constr:(InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep) in
-    destruct pf);
-    [abstract discharge_wf|..];
-    repeat match goal with
-      | H: Trace _ _ |- _ => clear H
-      | _ => progress intros
-      | _ => progress clean_hyp_step
-      | _ => progress cbn [SPI getMethods baseModule makeModule makeModule' type evalExpr isEq evalConstT Kind_rect List.app map fst snd projT1 projT2] in *
-      | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; symmetry in H; destruct H
-    end.
-
-    10: {
-      match goal with
-      | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; [symmetry in H; destruct H|..]
-      end.
-      constructor. econstructor.
-
-      2: cbv [enforce_regs] in *;
+    destruct IHTrace as [IHTrace|IHTrace].
+    { destruct IHTrace.
+      cbv [enforce_regs] in *.
+  
+      unshelve (idtac;
+      let pf := open_constr:(InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep) in
+      destruct pf);
+      [abstract discharge_wf|..];
       repeat match goal with
-      | _ => progress discharge_string_dec
-      | _ => progress cbn [fst snd]
-      | |- context G [match ?x with _ => _ end] =>
-         let X := eval hnf in x in
-         progress change x with X
-      | _ => progress (f_equal; [])
-      | |- ?l = ?r =>
-          let l := eval hnf in l in
-          let r := eval hnf in r in
-          progress change (l = r)
-      | _ => exact eq_refl
+        | H: Trace _ _ |- _ => clear H
+        | _ => progress intros
+        | _ => progress clean_hyp_step
+        | _ => progress cbn [SPI getMethods baseModule makeModule makeModule' type evalExpr isEq evalConstT Kind_rect List.app map fst snd projT1 projT2] in *
+        | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; symmetry in H; destruct H
       end.
-      2:cbn [evalBinBit evalUniBool].
-
-      {
-        cbv [spec].
-        simple refine (TracePredicate.interleave_rkleene_cons _ _ _ _).
-        2:eassumption.
-        match goal with |- ?f ?x => enough (sck false x) by admit end.
-        cbv [sck iocycle].
-        eexists _, _, _.
-        repeat f_equal; eauto.
-        1,2: admit. (* bbv... *)
+  
+      10: {
+        match goal with
+        | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; [symmetry in H; destruct H|..]
+        end.
+        constructor. econstructor.
+  
+        2: cbv [enforce_regs] in *;
+        repeat match goal with
+        | _ => progress discharge_string_dec
+        | _ => progress cbn [fst snd]
+        | |- context G [match ?x with _ => _ end] =>
+           let X := eval hnf in x in
+           progress change x with X
+        | _ => progress (f_equal; [])
+        | |- ?l = ?r =>
+            let l := eval hnf in l in
+            let r := eval hnf in r in
+            progress change (l = r)
+        | _ => exact eq_refl
+        end.
+        2:cbn [evalBinBit evalUniBool].
+  
+        {
+          cbv [spec].
+          simple refine (TracePredicate.interleave_rkleene_cons _ _ _ _).
+          2:eassumption.
+          match goal with |- ?f ?x => enough (sck false x) by admit end.
+          cbv [sck iocycle].
+          eexists _, _, _.
+          repeat f_equal; eauto.
+          1,2: admit. (* bbv... *)
+        }
+  
+        idtac.
+        all : cbn [map fst].
+        1,2: admit. (* NoDup *)
       }
-
-      idtac.
-      all : cbn [map fst].
-      1,2: admit. (* NoDup *)
-    }
-
-
-    10: {
-      match goal with
-      | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; [symmetry in H; destruct H|..]
-      end.
-      right. econstructor; try trivial.
-
-      2: cbv [enforce_regs] in *;
-      repeat match goal with
-      | _ => progress discharge_string_dec
-      | _ => progress cbn [fst snd]
-      | |- context G [match ?x with _ => _ end] =>
-         let X := eval hnf in x in
-         progress change x with X
-      | _ => progress (f_equal; [])
-      | |- ?l = ?r =>
-          let l := eval hnf in l in
-          let r := eval hnf in r in
-          progress change (l = r)
-      | _ => exact eq_refl
-      end; fail.
-
-      {
-        cbv [spec].
-        eapply TracePredicate.interleave_rcons.
-        { cbv [cmd_write]. eexists.
+  
+  
+      10: {
+        match goal with
+        | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; [symmetry in H; destruct H|..]
+        end.
+        right. econstructor; try trivial.
+  
+        2: cbv [enforce_regs] in *;
+        repeat match goal with
+        | _ => progress discharge_string_dec
+        | _ => progress cbn [fst snd]
+        | |- context G [match ?x with _ => _ end] =>
+           let X := eval hnf in x in
+           progress change x with X
+        | _ => progress (f_equal; [])
+        | |- ?l = ?r =>
+            let l := eval hnf in l in
+            let r := eval hnf in r in
+            progress change (l = r)
+        | _ => exact eq_refl
+        end; fail.
+  
+        {
+          cbv [spec].
+          eapply TracePredicate.interleave_rcons; try eassumption; [].
+          unshelve erewrite (_ : skipn (wordToNat $8) (bits arg) = nil). admit.
+          cbn [mosis TracePredicate.flat_map fold_right map].
+          eapply app_empty_r; eauto.
+          cbv [cmd_write]. eexists.
           repeat f_equal. }
-        eassumption. }
+  
+        1,2 : match goal with |- NoDup _ => admit end.
+        }
+  
+      10: {
+        match goal with
+        | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; [symmetry in H; destruct H|..]
+        end.
+        left. econstructor.
+  
+        2: cbv [enforce_regs] in *;
+        repeat match goal with
+        | _ => progress discharge_string_dec
+        | _ => progress cbn [fst snd]
+        | |- context G [match ?x with _ => _ end] =>
+           let X := eval hnf in x in
+           progress change x with X
+        | _ => progress (f_equal; [])
+        | |- ?l = ?r =>
+            let l := eval hnf in l in
+            let r := eval hnf in r in
+            progress change (l = r)
+        | _ => exact eq_refl
+        end; fail.
+  
+        { simple refine (TracePredicate.interleave_lkleene_cons _ _ _ _); eauto.
+          lazymatch goal with |- kleene ?p ?x => enough (p x) by admit end.
+          right. eexists _. eexists _.
+          repeat f_equal; eauto using f_equal2. }
+  
+        1,2: admit. }
+      all : admit. }
 
-      1,2 : match goal with |- NoDup _ => admit end.
-      }
-
-    10: {
-      match goal with
-      | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; [symmetry in H; destruct H|..]
-      end.
-      left. econstructor.
-
-      2: cbv [enforce_regs] in *;
+    { destruct IHTrace.
+      cbv [enforce_regs] in *.
+  
+      unshelve (idtac;
+      let pf := open_constr:(InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep) in
+      destruct pf);
+      [abstract discharge_wf|..];
       repeat match goal with
-      | _ => progress discharge_string_dec
-      | _ => progress cbn [fst snd]
-      | |- context G [match ?x with _ => _ end] =>
-         let X := eval hnf in x in
-         progress change x with X
-      | _ => progress (f_equal; [])
-      | |- ?l = ?r =>
-          let l := eval hnf in l in
-          let r := eval hnf in r in
-          progress change (l = r)
-      | _ => exact eq_refl
-      end; fail.
+        | H: Trace _ _ |- _ => clear H
+        | _ => progress intros
+        | _ => progress clean_hyp_step
+        | _ => progress cbn [SPI getMethods baseModule makeModule makeModule' type evalExpr isEq evalConstT Kind_rect List.app map fst snd projT1 projT2] in *
+        | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; symmetry in H; destruct H
+      end.
 
-      { simple refine (TracePredicate.interleave_lkleene_cons _ _ _ _); eauto.
-        lazymatch goal with |- kleene ?p ?x => enough (p x) by admit end.
-        right. eexists _. eexists _.
-        repeat f_equal; eauto using f_equal2. }
-  Abort.
+  1,2,3,4,5,6,7,8,9,10:shelve.
+  all : let T := type of HUpdRegs in idtac T.
+  all : clear HStep; clear H.
+
+  4: {
+    right. esplit; trivial.
+    eapply TracePredicate.interleave_rapp; try eassumption.
+
+  4: {
+    right. esplit.
+    { eapply TracePredicate.interleave_lkleene_cons; try eassumption.
+      lazymatch goal with |- kleene ?p ?x => enough (p x) by admit end.
+
+
 End Named.
 
   (* Notation "( x , y , .. , z )" := (existT _ .. (existT _ x y) .. z) : core_scope. *)
