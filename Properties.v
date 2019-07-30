@@ -4519,7 +4519,7 @@ Section LemmaNoSelfCall.
     NoCallActionT ls a ->
     forall o reads u cs ret,
       SemAction o a reads u cs ret ->
-      forall f, In (fst f) ls ->
+      forall f, In ((fst f), projT1 (snd f)) (getKindAttr ls) ->
                 getNumFromCalls f cs = 0%Z.
   Proof.
     intro.
@@ -4577,7 +4577,7 @@ Section LemmaNoSelfCall.
     intros.
     destruct H.
     unfold NoSelfCallRulesBaseModule, NoSelfCallMethsBaseModule in *.
-    specialize (H _ H0); simpl in *.
+    specialize (H _ type H0); simpl in *.
     eapply NoSelfCallAction; eauto.
   Qed.
 
@@ -4592,7 +4592,7 @@ Section LemmaNoSelfCall.
     intros.
     destruct H.
     unfold NoSelfCallRulesBaseModule, NoSelfCallMethsBaseModule in *.
-    specialize (H3 _ H0 arg); simpl in *.
+    specialize (H3 _ type H0 arg); simpl in *.
     eapply NoSelfCallAction; eauto.
   Qed.
 End LemmaNoSelfCall.

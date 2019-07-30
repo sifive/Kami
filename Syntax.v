@@ -806,16 +806,17 @@ Coercion getModWf: BaseModuleWf >-> ModWf.
 Coercion getModWfOrd: BaseModuleWfOrd >-> ModWfOrd.
 
 Section NoCallActionT.
-  Variable ls: list string.
+  Variable ls: list DefMethT.
+  Variable ty : Kind -> Type.
   
-  Inductive NoCallActionT: forall k, ActionT type k -> Prop :=
-  | NoCallMCall meth s e lretT c: ~ In meth ls -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (MCall meth s e c)
-  | NoCallLetExpr k (e: Expr type k) lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetExpr e c)
-  | NoCallLetAction k (a: ActionT type k) lretT c: NoCallActionT a -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetAction a c)
+  Inductive NoCallActionT: forall k , ActionT ty k -> Prop :=
+  | NoCallMCall meth s e lretT c: ~ In (meth, s) (getKindAttr ls) -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (MCall meth s e c)
+  | NoCallLetExpr k (e: Expr ty k) lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetExpr e c)
+  | NoCallLetAction k (a: ActionT ty k) lretT c: NoCallActionT a -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetAction a c)
   | NoCallReadNondet k lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (ReadNondet k c)
   | NoCallReadReg r k lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (ReadReg r k c)
-  | NoCallWriteReg r k (e: Expr type k) lretT c: NoCallActionT c  -> @NoCallActionT lretT (WriteReg r e c)
-  | NoCallIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, NoCallActionT (c v)) -> NoCallActionT atrue -> NoCallActionT afalse -> @NoCallActionT lretT (IfElse p atrue afalse c)
+  | NoCallWriteReg r k (e: Expr ty k) lretT c: NoCallActionT c  -> @NoCallActionT lretT (WriteReg r e c)
+  | NoCallIfElse p k (atrue: ActionT ty k) afalse lretT c: (forall v, NoCallActionT (c v)) -> NoCallActionT atrue -> NoCallActionT afalse -> @NoCallActionT lretT (IfElse p atrue afalse c)
   | NoCallSys ls lretT c: NoCallActionT c -> @NoCallActionT lretT (Sys ls c)
   | NoCallReturn lretT e: @NoCallActionT lretT (Return e).
 End NoCallActionT.
@@ -824,15 +825,15 @@ Section NoSelfCallBaseModule.
   Variable m: BaseModule.
   
   Definition NoSelfCallRuleBaseModule (rule : Attribute (Action Void)) :=
-    NoCallActionT (map fst (getMethods m)) (snd rule type).
+    forall ty, NoCallActionT (getMethods m) (snd rule ty).
   
   Definition NoSelfCallRulesBaseModule :=
-    forall rule, In rule (getRules m) ->
-                 NoCallActionT (map fst (getMethods m)) (snd rule type).
+    forall rule ty, In rule (getRules m) ->
+                    NoCallActionT (getMethods m) (snd rule ty).
   
   Definition NoSelfCallMethsBaseModule :=
-    forall meth, In meth (getMethods m) ->
-                 forall (arg: type (fst (projT1 (snd meth)))), NoCallActionT (map fst (getMethods m)) (projT2 (snd meth) type arg).
+    forall meth ty, In meth (getMethods m) ->
+                 forall (arg: ty (fst (projT1 (snd meth)))), NoCallActionT (getMethods m) (projT2 (snd meth) ty arg).
 
   Definition NoSelfCallBaseModule :=
     NoSelfCallRulesBaseModule /\ NoSelfCallMethsBaseModule.

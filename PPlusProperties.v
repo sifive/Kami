@@ -11,24 +11,28 @@ Local Notation PPT_calls := (fun x => snd (snd x)).
 
 Local Open Scope Z_scope.
 
-Section NeverCallBaseModule.
-  Inductive NeverCallActionT: forall k, ActionT type k -> Prop :=
+Section NeverCallAction.
+  Variable ty : Kind -> Type.
+  Inductive NeverCallActionT: forall k, ActionT ty k -> Prop :=
   | NeverCallMCall meth s e lretT c: False -> @NeverCallActionT lretT (MCall meth s e c)
-  | NeverCallLetExpr k (e: Expr type k) lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (LetExpr e c)
-  | NeverCallLetAction k (a: ActionT type k) lretT c: NeverCallActionT a -> (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (LetAction a c)
+  | NeverCallLetExpr k (e: Expr ty k) lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (LetExpr e c)
+  | NeverCallLetAction k (a: ActionT ty k) lretT c: NeverCallActionT a -> (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (LetAction a c)
   | NeverCallReadNondet k lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (ReadNondet k c)
   | NeverCallReadReg r k lretT c: (forall v, NeverCallActionT (c v)) -> @NeverCallActionT lretT (ReadReg r k c)
-  | NeverCallWriteReg r k (e: Expr type k) lretT c: NeverCallActionT c  -> @NeverCallActionT lretT (WriteReg r e c)
-  | NeverCallIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, NeverCallActionT (c v)) -> NeverCallActionT atrue -> NeverCallActionT afalse -> @NeverCallActionT lretT (IfElse p atrue afalse c)
+  | NeverCallWriteReg r k (e: Expr ty k) lretT c: NeverCallActionT c  -> @NeverCallActionT lretT (WriteReg r e c)
+  | NeverCallIfElse p k (atrue: ActionT ty k) afalse lretT c: (forall v, NeverCallActionT (c v)) -> NeverCallActionT atrue -> NeverCallActionT afalse -> @NeverCallActionT lretT (IfElse p atrue afalse c)
   | NeverCallSys ls lretT c: NeverCallActionT c -> @NeverCallActionT lretT (Sys ls c)
   | NeverCallReturn lretT e: @NeverCallActionT lretT (Return e).
+End NeverCallAction.
+
+Section NeverCallBaseModule.
 
   Variable m : BaseModule.
   
   Definition NeverCallBaseModule :=
-    (forall rule, In rule (getRules m) -> NeverCallActionT (snd rule type)) /\
-    (forall meth, In meth (getMethods m) ->
-                  forall v, NeverCallActionT (projT2 (snd meth) type v)).
+    (forall rule ty, In rule (getRules m) -> NeverCallActionT (snd rule ty)) /\
+    (forall meth ty, In meth (getMethods m) ->
+                  forall v, NeverCallActionT (projT2 (snd meth) ty v)).
 End NeverCallBaseModule.
 
 
@@ -4778,7 +4782,7 @@ Lemma NoSelfCallBaseModule_removeHides (m : BaseModule) (l : list string) :
 Proof.
   unfold NoSelfCallBaseModule; intros; inv H; split.
   - repeat intro.
-    specialize (H0 _ H).
+    specialize (H0 _ ty H).
     induction H0; econstructor; eauto.
     simpl; intro.
     apply H0.
@@ -4787,7 +4791,7 @@ Proof.
     exists x; auto.
   - repeat intro.
     simpl in *; rewrite filter_In in H; inv H.
-    specialize (H1 _ H2 arg).
+    specialize (H1 _ ty H2 arg).
     induction H1; econstructor; eauto.
     intro; apply H.
     rewrite in_map_iff in *; inv H5; inv H6.
@@ -4801,7 +4805,7 @@ Lemma NoSelfCallBaseModule_removeMeth (m : BaseModule) (f : string) :
 Proof.
   intros; inv H.
   split; repeat intro.
-  - specialize (H0 _ H).
+  - specialize (H0 _ ty H).
     induction H0; econstructor; eauto.
     intro; apply H0.
     rewrite in_map_iff in *.
@@ -4811,7 +4815,7 @@ Proof.
     destruct string_dec; simpl in *;[discriminate|auto].
   - assert (In meth (getMethods m)).
     + simpl in *; rewrite filter_In in H; inv H; auto.
-    + specialize (H1 _ H2 arg).
+    + specialize (H1 _ ty H2 arg).
       induction H1; econstructor; eauto.
       intro; apply H1.
       rewrite in_map_iff in *; inv H5; inv H6.
@@ -6557,7 +6561,7 @@ Proof.
     + specialize (H _ H2).
       induction HNeverCall.
       -- inv HNCBaseModule.
-         specialize (H3 _ H2).
+         specialize (H3 _ type H2).
          induction H; inv H3; EqDep_subst; econstructor; eauto.
          tauto.
       -- eapply IHHNeverCall; eauto.
@@ -6651,7 +6655,7 @@ Proof.
     + specialize (H1 _ H2 v).
       induction HNeverCall.
       -- inv HNCBaseModule.
-         specialize (H4 _ H2 v).
+         specialize (H4 _ type H2 v).
          induction H1; inv H4; EqDep_subst; econstructor; eauto.
          tauto.
       -- eapply IHHNeverCall; eauto.
@@ -6820,13 +6824,13 @@ Proof.
   - subst.
     rewrite getNumCalls_cons, IHSubsteps; simpl.
     inv HNeverCallBase.
-    specialize (H0 _ HInRules); simpl in *.
+    specialize (H0 _ type HInRules); simpl in *.
     rewrite (action_noCalls H0 HAction); simpl.
     reflexivity.
   - subst.
     rewrite getNumCalls_cons, IHSubsteps; simpl.
     inv HNeverCallBase.
-    specialize (H1 _ HInMeths argV).
+    specialize (H1 _ type HInMeths argV).
     rewrite (action_noCalls H1 HAction); simpl.
     reflexivity.
 Qed.
@@ -6963,7 +6967,7 @@ Proof.
       * induction HNeverCall; simpl in *; eauto.
         -- inv HNCBaseModule.
            specialize (H _ H1).
-           specialize (H2 _ H1).
+           specialize (H2 _ type H1).
            clear - H H2.
            induction H; inv H2; EqDep_subst; econstructor; eauto.
            tauto.
@@ -6976,7 +6980,7 @@ Proof.
       * induction HNeverCall; simpl in *; eauto.
         -- inv HNCBaseModule.
            specialize (H0 _ H1 v).
-           specialize (H3 _ H1 v).
+           specialize (H3 _ type H1 v).
            clear - H0 H3.
            induction H0; inv H3; EqDep_subst; econstructor; eauto.
            tauto.
