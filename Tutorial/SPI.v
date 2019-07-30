@@ -12,27 +12,6 @@ Local Infix "+++" := app (at level 60).
 
 Module List. Section __.
   Context {T : Type}.
-    (* Module interleave.
-    Inductive interleave : list T -> list T -> list T -> Prop :=
-    | nil                                      : interleave     nil    nil    nil
-    | left  x xs ys zs (_:interleave xs ys zs) : interleave (cons x xs) ys (cons x zs)
-    | right y xs ys zs (_:interleave xs ys zs) : interleave (cons y xs) ys (cons y zs).
-    End interleave.
-  Notation interleave := interleave.interleave. *)
-
-  (*
-  Definition interleave_body interleave (zs xs ys : list T) : Prop :=
-    match xs,ys with
-    | [],_ => ys = zs
-    | _,[] => xs = zs
-    | x::xs,y::ys =>
-        match zs with
-        | [] => False
-        | cons z zs => (z = x /\ interleave zs xs ys) \/ (z = y /\ interleave zs xs ys)
-        end
-    end. 
-  *)
-
   Definition interleave_body interleave (zs xs ys : list T) : Prop :=
     match zs with
     | nil => xs = nil /\ zs = nil
@@ -70,7 +49,30 @@ Module TracePredicate.
   Definition interleave {T} (P Q : list T -> Prop) :=
     fun zs => exists xs ys, List.interleave xs ys zs /\ P xs /\ Q ys.
 
-  Lemma interleave_rapp {T} {P Q : list T -> Prop} z zs
+  Lemma interleave_rapp {T} {P QQ Q : list T -> Prop} z zs
+    (H : Q z) (HH : interleave P QQ zs) : interleave P (QQ +++ Q) (z++zs).
+  Proof.
+    destruct HH as (?&?&?&?&?).
+    eexists _, _; split.
+    eapply List.interleave_rapp; eauto.
+    split; eauto.
+  Admitted.
+  
+  Lemma interleave_lapp {T} {PP P Q : list T -> Prop} z zs
+    (H : P z) (HH : interleave PP Q zs) : interleave (PP +++ P) Q (z++zs).
+  Proof.
+    destruct HH as (?&?&?&?&?).
+    eexists _, _; split.
+    eapply List.interleave_lapp; eauto.
+    split; eauto.
+  Admitted.
+
+  Definition interleave_rcons {T} {P QQ Q} (z:T) zs H HH : interleave _ _ (cons _ _) :=
+    @interleave_rapp T P QQ Q [z] zs H HH.
+  Definition interleave_lcons {T} {PP P Q} (z:T) zs H HH : interleave _ _ (cons _ _):=
+    @interleave_lapp T PP P Q [z] zs H HH.
+
+  Lemma interleave_rkleene {T} {P Q : list T -> Prop} z zs
     (H : Q^* z) (HH : interleave P (Q^* ) zs) : interleave P (Q^* ) (z++zs).
   Proof.
     destruct HH as (?&?&?&?&?).
@@ -79,7 +81,7 @@ Module TracePredicate.
     split; eauto.
   Admitted.
   
-  Lemma interleave_lapp {T} {P Q : list T -> Prop} z zs
+  Lemma interleave_lkleene {T} {P Q : list T -> Prop} z zs
     (H : P^* z) (HH : interleave (P^* ) Q zs) : interleave (P^* ) Q (z++zs).
   Proof.
     destruct HH as (?&?&?&?&?).
@@ -88,10 +90,10 @@ Module TracePredicate.
     split; eauto.
   Admitted.
 
-  Definition interleave_rcons {T} {P Q} (z:T) zs H HH : interleave _ _ (cons _ _) :=
-    @interleave_rapp T P Q [z] zs H HH.
-  Definition interleave_lcons {T} {P Q} (z:T) zs H HH : interleave _ _ (cons _ _):=
-    @interleave_lapp T P Q [z] zs H HH.
+  Definition interleave_rkleene_cons {T} {P Q} (z:T) zs H HH : interleave _ _ (cons _ _) :=
+    @interleave_rkleene T P Q [z] zs H HH.
+  Definition interleave_lkleene_cons {T} {P Q} (z:T) zs H HH : interleave _ _ (cons _ _):=
+    @interleave_lkleene T P Q [z] zs H HH.
   
   Definition at_next_edge {T} clk data : list T -> Prop :=
     (fun x => clk false x)^+ +++ (fun x => clk true x /\ data x).
@@ -199,7 +201,7 @@ Section Named.
     maybe (cmd_read rx false).
 
   Definition transaction t := exists tx rx, exchange tx rx t.
-  Definition spec := TracePredicate.interleave nop (kleene (fun t => sck false t \/ transaction t)).
+  Definition spec := kleene (fun t => sck false t \/ transaction t).
 
   Definition enforce_regs (regs:RegsT) tx_fifo tx_fifo_len rx_fifo rx_fifo_len sck := regs =
     [(@^"hack_for_sequential_semantics", existT _ (SyntaxKind (Bit 0)) WO);
@@ -213,7 +215,7 @@ Section Named.
   Record idle (regs : RegsT) (t : list (list FullLabel)) : Prop := {
     tx_fifo : _ ;
     rx_fifo : _ ;
-    _ : spec t;
+    _ : TracePredicate.interleave (kleene nop) spec t;
     _ : enforce_regs regs tx_fifo (natToWord 4 0) rx_fifo (natToWord 4 15) false;
   }.
 
@@ -223,7 +225,7 @@ Section Named.
     tx_fifo_len : _ ;
     rx_fifo : _ ;
     rx_fifo_len : _ ;
-    _ : (app spec (cmd_write tx false)) t; (* WIP *)
+    _ : TracePredicate.interleave (kleene nop) (app spec (cmd_write tx false)) t; (* WIP *)
     _ : tx = tx_fifo; (* only during first tick *)
     _ : enforce_regs regs tx_fifo tx_fifo_len rx_fifo rx_fifo_len false;
   }.
@@ -276,7 +278,7 @@ Section Named.
 
       {
         cbv [spec].
-        simple refine (TracePredicate.interleave_rcons _ _ _ _).
+        simple refine (TracePredicate.interleave_rkleene_cons _ _ _ _).
         2:eassumption.
         match goal with |- ?f ?x => enough (sck false x) by admit end.
         cbv [sck iocycle].
@@ -295,7 +297,7 @@ Section Named.
       match goal with
       | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; [symmetry in H; destruct H|..]
       end.
-      constructor. econstructor.
+      right. econstructor; try trivial.
 
       2: cbv [enforce_regs] in *;
       repeat match goal with
@@ -310,12 +312,44 @@ Section Named.
           let r := eval hnf in r in
           progress change (l = r)
       | _ => exact eq_refl
+      end; fail.
+
+      {
+        cbv [spec].
+        eapply TracePredicate.interleave_rcons.
+        { cbv [cmd_write]. eexists.
+          repeat f_equal. }
+        eassumption. }
+
+      1,2 : match goal with |- NoDup _ => admit end.
+      }
+
+    10: {
+      match goal with
+      | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; [symmetry in H; destruct H|..]
       end.
+      left. econstructor.
 
+      2: cbv [enforce_regs] in *;
+      repeat match goal with
+      | _ => progress discharge_string_dec
+      | _ => progress cbn [fst snd]
+      | |- context G [match ?x with _ => _ end] =>
+         let X := eval hnf in x in
+         progress change x with X
+      | _ => progress (f_equal; [])
+      | |- ?l = ?r =>
+          let l := eval hnf in l in
+          let r := eval hnf in r in
+          progress change (l = r)
+      | _ => exact eq_refl
+      end; fail.
 
-
-
-
+      { simple refine (TracePredicate.interleave_lkleene_cons _ _ _ _); eauto.
+        lazymatch goal with |- kleene ?p ?x => enough (p x) by admit end.
+        right. eexists _. eexists _.
+        repeat f_equal; eauto using f_equal2. }
+  Abort.
 End Named.
 
   (* Notation "( x , y , .. , z )" := (existT _ .. (existT _ x y) .. z) : core_scope. *)
