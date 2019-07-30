@@ -1435,7 +1435,7 @@ Notation regInit := (fun (o': RegT) (r: RegInitT)  => fst o' = fst r /\
 
 Fixpoint findReg (s: string) (u: RegsT) :=
   match u with
-  | x :: xs => if string_dec s (fst x)
+  | x :: xs => if String.eqb s (fst x)
                then Some (snd x)
                else findReg s xs
   | nil => None
@@ -1600,7 +1600,7 @@ Definition getFlat m := BaseMod (getAllRegisters m) (getAllRules m) (getAllMetho
 
 Definition flatten m := createHide (getFlat m) (getHidden m).
 
-Definition autoHide (m: Mod) := createHideMod m (filter (fun i => getBool (in_dec string_dec i (getCallsPerMod m)))
+Definition autoHide (m: Mod) := createHideMod m (filter (fun i => existsb (String.eqb i) (getCallsPerMod m))
                                                         (map fst (getAllMethods m))).
 
 Fixpoint separateBaseMod (m: Mod): (list RegFileBase * list BaseModule) :=
@@ -1778,17 +1778,15 @@ Definition flatten_inline_everything m :=
 
 Definition removeHides (m: BaseModule) s :=
   BaseMod (getRegisters m) (getRules m)
-          (filter (fun df => negb (getBool (in_dec string_dec (fst df) s))) (getMethods m)).
+          (filter (fun df => negb (existsb (String.eqb (fst df)) s)) (getMethods m)).
 
 Definition flatten_inline_remove m :=
   removeHides (inlineAll_All_mod m) (getHidden m).
-  
-
 
 (* Last Set of Utility Functions *)
 
 Definition hiddenBy (meths : list DefMethT) (h : string) : bool :=
-  (getBool (in_dec string_dec h (map fst meths))).
+  (existsb (String.eqb h) (map fst meths)).
 
 Definition getAllBaseMethods (lb : list BaseModule) : (list DefMethT) :=
   (concat (map getMethods lb)).
@@ -1816,19 +1814,6 @@ Definition separateModRemove (m : Mod) :=
 Definition baseNoSelfCalls (m : Mod) :=
   let '(hides, (rfs, mods)) := separateMod m in
   NoSelfCallBaseModule (inlineAll_All_mod (mergeSeparatedBaseMod mods)).
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Definition struct_get_field_index
   (ty: Kind -> Type)

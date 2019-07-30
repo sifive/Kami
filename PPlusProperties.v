@@ -11,6 +11,21 @@ Local Notation PPT_calls := (fun x => snd (snd x)).
 
 Local Open Scope Z_scope.
 
+(*TODO move somewhere else*)
+
+Lemma existsb_nexists_str str l :
+   existsb (String.eqb str) l = false <->
+   ~ In str l.
+ Proof.
+   split; repeat intro.
+   - assert (exists x, In x l /\ (String.eqb str) x = true) as P0.
+     { exists str; split; auto. apply String.eqb_refl. }
+     rewrite <- existsb_exists in P0; rewrite P0 in *; discriminate.
+   - remember (existsb _ _) as exb; symmetry in Heqexb; destruct exb; auto.
+     exfalso; rewrite existsb_exists in Heqexb; dest.
+     rewrite String.eqb_eq in *; subst; auto.
+ Qed.
+
 Section NeverCallBaseModule.
   Inductive NeverCallActionT: forall k, ActionT type k -> Prop :=
   | NeverCallMCall meth s e lretT c: False -> @NeverCallActionT lretT (MCall meth s e c)
@@ -24,7 +39,7 @@ Section NeverCallBaseModule.
   | NeverCallReturn lretT e: @NeverCallActionT lretT (Return e).
 
   Variable m : BaseModule.
-  
+
   Definition NeverCallBaseModule :=
     (forall rule, In rule (getRules m) -> NeverCallActionT (snd rule type)) /\
     (forall meth, In meth (getMethods m) ->
@@ -4301,7 +4316,7 @@ Definition flatten_inline_remove_ModWf (m : ModWf) :=
   (Build_ModWf (flatten_inline_remove_Wf m)).
 
 Definition removeMeth (m : BaseModule) (s : string) :=
-  (BaseMod (getRegisters m) (getRules m) ((filter (fun df => (negb (getBool (string_dec s (fst df)))))) (getMethods m))).
+  (BaseMod (getRegisters m) (getRules m) ((filter (fun df => (negb (String.eqb s (fst df))))) (getMethods m))).
 
 Lemma Substeps_removeMeth (f : string) (m : BaseModule) (o : RegsT) (l : list FullLabel):
   Substeps m o l ->
@@ -4341,7 +4356,7 @@ Proof.
         rewrite filter_In.
         split; auto.
         simpl.
-        destruct (string_dec); auto.
+        rewrite <- String.eqb_neq in n; rewrite n; auto.
     + apply IHSubsteps; intros.
       * specialize (H0 v).
         rewrite getNumCalls_cons in H0; simpl in H0.
@@ -4399,16 +4414,15 @@ Proof.
     + eapply Substeps_HideMeth; eauto.
     + intros f0 P1.
       specialize (HMatching f0); simpl in *.
-      destruct (string_dec f (fst f0)); subst.
+      destruct (String.eqb f (fst f0)) eqn:G; [rewrite String.eqb_eq in G|rewrite String.eqb_neq in G]; subst.
       * destruct f0; simpl in *; rewrite H0.
         apply getNumExecs_nonneg.
       * rewrite (in_map_iff) in P1; inv P1; inv H.
-        assert (In x (filter (fun df : string * {x : Signature & MethodT x} =>
-                                negb (getBool (string_dec f (fst df)))) (getMethods m))).
+        assert (In x (filter (fun df : string * sigT MethodT =>
+                                negb (String.eqb f (fst df))) (getMethods m))).
         -- rewrite filter_In; split; auto.
-           destruct (string_dec f (fst x)); simpl; auto.
-           exfalso.
-           rewrite H1 in e; tauto.
+           rewrite <- H1 in G.
+           rewrite <- String.eqb_neq in G. rewrite G; auto.
         -- apply (in_map fst) in H; rewrite H1 in H.
            eauto.
   - intros.
@@ -4416,8 +4430,7 @@ Proof.
     assert (~In f (map fst (getMethods (removeMeth m f)))).
     + intro; rewrite in_map_iff in H1; inv H1; inv H2.
       simpl in H3; rewrite filter_In in H3; inv H3.
-      destruct string_dec; simpl in *;[discriminate|].
-      apply n; reflexivity.
+      rewrite eqb_refl in H2; discriminate.
     + rewrite in_map_iff in H; inv H; inv H2.
       rewrite (NotInDef_ZeroExecs_Substeps (fst x, v) H1 HSubsteps); simpl; reflexivity.
 Qed.
@@ -4441,11 +4454,12 @@ Proof.
     rewrite filter_true_list.
     + apply Step_substitute in HStep; auto.
     + intros.
-      destruct (string_dec).
+      destruct String.eqb eqn:G; [| rewrite String.eqb_neq in G].
       * exfalso.
-        apply (in_map fst) in H; rewrite <- e in H.
+        rewrite String.eqb_eq in G.
+        apply (in_map fst) in H; rewrite <- G in H.
         tauto.
-      * simpl; reflexivity.
+      * auto.
 Qed.
 
 Lemma Trace_HideMeth_removeMeth_noCalls (f : string) (m : BaseModule) (o : RegsT) (ls : list (list FullLabel)) (wfMod : WfMod m) :
@@ -4539,7 +4553,7 @@ Proof.
     unfold removeMeth; simpl.
     rewrite filter_true_list.
     + apply (Trace_flatten_same1 m H0).
-    + intros; destruct string_dec; subst.
+    + intros; destruct String.eqb eqn:G; [rewrite String.eqb_eq in G |] ; subst.
       * exfalso; apply n; apply (in_map fst) in H1; assumption.
       * simpl; reflexivity.
 Qed.
@@ -4572,9 +4586,9 @@ Proof.
       inv P1; inv H0.
       exists x; split; auto.
       rewrite filter_In; split; auto.
-      destruct string_dec; simpl; auto.
+      destruct String.eqb eqn:G; simpl; auto.
       exfalso; apply n.
-      rewrite e; auto.
+      rewrite <- String.eqb_eq; congruence.
     + apply HMatching; auto.
 Qed.
 
@@ -4650,9 +4664,7 @@ Proof.
       rewrite in_map_iff in P1.
       inv P1; inv H4.
       rewrite filter_In in H6; inv H6.
-      destruct string_dec; simpl in *.
-      * discriminate.
-      * apply n0; reflexivity.
+      rewrite String.eqb_refl in H5; discriminate.
     + apply P2.
 Qed.
 
@@ -4660,9 +4672,12 @@ Lemma removeMeth_removeHides m f :
   (getMethods (removeMeth m f)) = (getMethods (removeHides m [f])).
 Proof.
   simpl.
-  induction (getMethods m); simpl; auto.
-  - destruct string_dec; simpl; auto.
-    rewrite IHl; reflexivity.
+  induction (getMethods m). simpl; auto.
+  simpl.
+  rewrite IHl.
+  rewrite (String.eqb_sym).
+  rewrite orb_false_r.
+  reflexivity.
 Qed.
 
 Lemma removeHides_cons m f l:
@@ -4670,15 +4685,13 @@ Lemma removeHides_cons m f l:
 Proof.
   simpl.
   induction (getMethods m); simpl; auto.
-  destruct string_dec; subst; simpl.
+  destruct String.eqb eqn:G; [rewrite String.eqb_eq in G|]; subst; simpl.
   - repeat rewrite IHl0; simpl.
-    destruct (in_dec string_dec (fst a) l); simpl in *; auto.
-    destruct (string_dec); simpl; auto.
-    exfalso; auto.
+    destruct (existsb (String.eqb (fst a)) l) eqn:G; simpl in *; auto.
+    rewrite String.eqb_refl; simpl; reflexivity.
   - repeat rewrite IHl0; simpl.
-    destruct (in_dec string_dec (fst a) l); simpl in *; auto.
-    destruct string_dec; auto.
-    exfalso; auto.
+    destruct (existsb (String.eqb (fst a)) l) eqn:G1; simpl. reflexivity.
+    rewrite G; simpl; reflexivity.
 Qed.
 
 Lemma removeMeth_removeHides_cons m f l:
@@ -4808,7 +4821,7 @@ Proof.
     inv H4; inv H5.
     exists x; split; auto.
     simpl in H6; rewrite filter_In in H6; inv H6.
-    destruct string_dec; simpl in *;[discriminate|auto].
+    destruct String.eqb; simpl in *;[discriminate|auto].
   - assert (In meth (getMethods m)).
     + simpl in *; rewrite filter_In in H; inv H; auto.
     + specialize (H1 _ H2 arg).
@@ -4818,7 +4831,7 @@ Proof.
       exists x; split; auto.
       simpl in *; rewrite filter_In in H7.
       inv H7; auto.
-Qed.  
+Qed.
 
 Lemma removeHides_removeMeth_TraceInclusion m l a :
   TraceInclusion (removeMeth (removeHides_ModWf m l) a) (removeHides_ModWf m (a::l)).
@@ -4871,7 +4884,7 @@ Proof.
       * apply HStep.
       * rewrite createHide_Meths in H1; simpl in *; auto.
   - apply WeakInclusions_WeakInclusion; apply WeakInclusionsRefl.
-Qed.  
+Qed.
 
 Lemma removeMeth_removeHides_cons_In m f l:
   In f l ->
@@ -4879,8 +4892,9 @@ Lemma removeMeth_removeHides_cons_In m f l:
 Proof.
   intros; simpl.
   induction (getMethods m); simpl; auto.
-  - destruct in_dec; simpl; auto.
-    destruct string_dec; subst; simpl;[contradiction|].
+  - destruct existsb eqn:G; simpl; auto.
+    destruct String.eqb eqn:G1; [rewrite String.eqb_eq in G1|]; subst; simpl.
+    rewrite existsb_nexists_str in G; contradiction.
     rewrite IHl0 at 1; reflexivity.
 Qed.
 
@@ -4921,7 +4935,9 @@ Proof.
         inv subList; inv H0.
         exists x; split; auto.
         rewrite filter_In; split; auto.
-        destruct in_dec; simpl; auto.
+        destruct existsb eqn:G; simpl; auto.
+        rewrite existsb_exists in G; dest.
+        rewrite String.eqb_eq in H1; congruence.
       * specialize (removeMeth_HideMeth_TraceInclusion (removeHides_ModWf m l) (NoSelfCallBaseModule_removeHides l H) (f:= a) P5) as P6.
       eauto using TraceInclusion_trans.
 Qed.
@@ -7096,10 +7112,10 @@ Proof.
     rewrite in_map_iff in *; dest.
     exists x; split; subst; auto.
     rewrite filter_In; split; auto.
-    destruct string_dec; simpl in *; auto.
+    destruct String.eqb eqn:G; [rewrite String.eqb_eq in G|]; simpl in *; auto.
   - split; simpl in *; rewrite in_map_iff in *; dest.
     + rewrite filter_In in H0; dest.
-      destruct string_dec; subst; auto.
+      destruct String.eqb eqn:G; [| rewrite String.eqb_neq in G]; subst; auto.
       discriminate.
     + exists x; split; auto; rewrite filter_In in *; dest; assumption.
 Qed.
@@ -7196,8 +7212,7 @@ Lemma removeMeth_removes (m : BaseModule) (f : string):
 Proof.
   rewrite in_map_iff; intro; dest.
   simpl in *; rewrite filter_In in *; dest.
-  destruct string_dec; simpl in *; auto.
-  discriminate.
+  subst; rewrite String.eqb_refl in H1; discriminate.
 Qed.
 
 Lemma removeHides_removes (m : BaseModule) (hl : list string):
@@ -7500,12 +7515,14 @@ Proof.
     clear - H.
     unfold hiddenByBase, hiddenBy in *.
     rewrite filter_In in *; dest.
-    destruct in_dec; simpl in *;[discriminate|].
-    intro; apply n; clear n H0 H.
+    destruct existsb eqn:G; simpl in *;[discriminate|].
+    rewrite existsb_nexists_str in G; auto.
     induction l; simpl in *; auto.
-    unfold getAllBaseMethods; simpl.
+    unfold getAllBaseMethods in G; simpl in G.
     rewrite map_app, in_app_iff in *.
-    destruct H1;[left|right];auto.
+    intros [|].
+    elim G; tauto.
+    apply IHl; tauto.
 Qed.
 
 Definition mergeSeparatedDistributed_ModWf (m : ModWf) : ModWf :=
@@ -7527,10 +7544,10 @@ Proof.
     rewrite in_map_iff in *; dest.
     exists x0; split; auto.
     rewrite filter_In; split; auto.
-    destruct in_dec; simpl in *; auto.
-    exfalso.
-    clear - H H0 H2 i; specialize (H x); subst.
-    firstorder. 
+    destruct existsb eqn:G; simpl in *; auto.
+    rewrite existsb_exists in G; dest.
+    rewrite String.eqb_eq in H5.
+    elim (H x); congruence.
   - clear - H1.
     inv H1; rewrite createHide_Rules, createHide_Meths, createHide_Regs in *.
     constructor; simpl; auto.
@@ -7598,11 +7615,12 @@ Proof.
   { repeat intro.
     rewrite filter_In in H0; dest.
     unfold hiddenByBase, getAllBaseMethods, hiddenBy in H2.
-    destruct in_dec; [discriminate|].
-    clear - n H1.
+    destruct existsb eqn:G; [discriminate|].
+    clear - G H1.
+    rewrite existsb_nexists_str in G.
     induction l0; simpl in *; auto.
     rewrite map_app, in_app_iff in *.
-    apply Decidable.not_or in n; dest.
+    apply Decidable.not_or in G; dest.
     destruct H1; auto.
   }
   specialize (factorHides_TraceInclusion_app
@@ -7685,11 +7703,12 @@ Proof.
   { repeat intro.
     rewrite filter_In in H0; dest.
     unfold hiddenByBase, getAllBaseMethods, hiddenBy in H2.
-    destruct in_dec; [discriminate|].
-    clear - n H1.
+    destruct existsb eqn:G; [discriminate|].
+    clear - G H1.
+    rewrite existsb_nexists_str in G.
     induction l0; simpl in *; auto.
     rewrite map_app, in_app_iff in *.
-    apply Decidable.not_or in n; dest.
+    apply Decidable.not_or in G; dest.
     destruct H1; auto.
   }
   specialize (distributeHides_app_TraceInclusion

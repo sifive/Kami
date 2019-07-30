@@ -1,13 +1,18 @@
 Require Import Lib.EclecticLib Syntax Properties KamiNotations.
 
 Lemma string_dec_refl {A} : forall (s: string) (T E: A),
-  (if string_dec s s then T else E) = T.
-Proof. intros; destruct (string_dec _ _); easy. Qed.
+  (if String.eqb s s then T else E) = T.
+Proof.
+  intros; rewrite String.eqb_refl; auto.
+Qed.
 
 Lemma string_dec_neq {A} : forall (s1 s2: string) (T E: A),
   s1 <> s2 ->
-  (if string_dec s1 s2 then T else E) = E.
-Proof. intros; destruct (string_dec _ _); easy. Qed.
+  (if String.eqb s1 s2 then T else E) = E.
+Proof.
+  intros.
+  rewrite <- String.eqb_neq in H; rewrite H; auto.
+Qed.
 
 Ltac discharge_string_dec :=
   repeat (rewrite string_dec_refl || rewrite string_dec_neq by (intros ?; discharge_append)).
@@ -47,14 +52,6 @@ Ltac simplify_simulatingRule name :=
 Ltac simplify_nilStep :=
   left; split; auto; simpl in *;
   discharge_string_dec.
-
-
-
-
-
-
-
-
 
 Local Ltac discharge_init :=
   repeat econstructor;

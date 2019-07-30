@@ -5,6 +5,21 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+(* Definition in_decb{X}(eqb : X -> X -> bool) : X -> list X -> bool :=
+  fun x => existsb (eqb x).
+
+Lemma in_decb_In{X} : forall eqb : X -> X -> bool,
+  (forall x y, eqb x y = true <-> x = y) -> forall x xs, in_decb eqb x xs = true <-> In x xs.
+Proof.
+  intros; unfold in_decb;
+  rewrite existsb_exists.
+  split.
+  intros [y [Hy1 Hy2]].
+  rewrite H in Hy2; congruence.
+  intro.
+  exists x; split; [auto | rewrite H; auto].
+Qed. *)
+
 Section nth_Fin.
   Variable A: Type.
   Fixpoint nth_Fin (ls: list A): Fin.t (length ls) -> A :=
