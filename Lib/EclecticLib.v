@@ -5,6 +5,23 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+Section Tree.
+  Inductive Tree (A: Type): Type :=
+  | Leaf (_: list A)
+  | Node (_: list (Tree A)).
+
+  Fixpoint flattenTree A (t: Tree A): list A :=
+    match t with
+    | Leaf xs => xs
+    | Node xs =>
+      (fix fold xs :=
+         match xs with
+         | nil => nil
+         | x :: xs => flattenTree x ++ fold xs
+         end) xs
+    end.
+End Tree.
+
 (* Definition in_decb{X}(eqb : X -> X -> bool) : X -> list X -> bool :=
   fun x => existsb (eqb x).
 
