@@ -322,6 +322,18 @@ Proof.
   lia.
 Qed.
 
+Lemma wzero_wones: forall sz, sz >= 1 ->
+                              zToWord sz 0 <> wmax sz.
+Proof.
+  intros.
+  unfold not.
+  unfold wmax.
+  intros.
+  inversion H0.
+  rewrite Zmod_0_l in H2.
+  admit.
+Admitted.
+
 
 Lemma wordToZ_zToWord: forall (sz : nat) (w : Z),
     (0 <= w < Z.pow 2 (Z.of_nat sz))%Z -> wordVal _ (zToWord sz w) = w.

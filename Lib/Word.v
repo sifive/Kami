@@ -11,7 +11,7 @@ Section Word.
   Section fixedWidth.
     Variable width : nat.
 
-    Let wrap_value n := Z.modulo n (Z.pow 2 (Z.of_nat width)).
+    Local Notation wrap_value n := (Z.modulo n (Z.pow 2 (Z.of_nat width))).
 
     (* Word is a record with two fields wordVal and wordBound *)
     Record word := mk {wordVal : Z ;
