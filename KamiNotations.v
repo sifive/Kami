@@ -13,6 +13,17 @@ Require Import RecordUpdate.RecordSet.
   | NilInModule
   | ConsInModule (_ : ModuleElt) (_ : InModule).
 
+  Definition RList (regs : list ModuleElt) :=
+    MERegAry
+      (fold_right
+        (fun elem acc
+          => match elem with
+             | MERegister reg => cons reg acc
+             | _ => acc
+             end)
+        nil
+        regs).
+
   Fixpoint makeModule' (im : InModule) :=
     match im with
     | NilInModule => (nil, nil, nil)
@@ -324,6 +335,18 @@ Require Import RecordUpdate.RecordSet.
   Notation "'RegisterU' name : type" :=
     (MERegister (name%string, existT RegInitValT (SyntaxKind type) None))
       (at level 13, name at level 99) : kami_scope.
+
+  Notation "'Registers' [ r1 ; .. ; rn }" :=
+    (MERegAry
+      (fold_right
+        (fun elem acc
+          => match elem with
+             | MERegister reg => reg :: acc
+             | _ => acc
+             end)
+        nil
+        (cons r1 .. (cons rn nil) ..)))
+      (at level 13) : kami_scope.
 
   Notation "'Method' name () : retT := c" :=
     (MEMeth (name%string, existT MethodT (Void, retT)

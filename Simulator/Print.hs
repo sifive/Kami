@@ -54,7 +54,7 @@ sysIO T.Finish = do
     exitSuccess
 sysIO (T.DispString msg) = do
     interactive <- interactive_mode
-    when (not interactive) $ hPutStr stdout $ msg
+    when (not interactive) $ hPutStr stdout $ format_string $ msg
 sysIO (T.DispExpr _ e ff) = do
     interactive <- interactive_mode
     when (not interactive) $ hPutStr stdout $ printVal ff $ eval e

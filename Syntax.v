@@ -121,16 +121,16 @@ Section Phoas.
   | BuildStruct n (fk: Fin.t n -> Kind) (fs: Fin.t n -> string)
                 (fv: forall i, Expr (SyntaxKind (fk i))):
       Expr (SyntaxKind (Struct fk fs))
-  | ReadArray n k: Expr (SyntaxKind (Array n k)) ->
-                   Expr (SyntaxKind (Bit (Nat.log2_up n))) ->
+  | ReadArray n m k: Expr (SyntaxKind (Array n k)) ->
+                   Expr (SyntaxKind (Bit m)) ->
                    Expr (SyntaxKind k)
   | ReadArrayConst n k: Expr (SyntaxKind (Array n k)) ->
                         Fin.t n ->
                         Expr (SyntaxKind k)
   | BuildArray n k: (Fin.t n -> Expr (SyntaxKind k)) -> Expr (SyntaxKind (Array n k)).
 
-  Definition UpdateArray n k (e: Expr (SyntaxKind (Array n k)))
-             (i: Expr (SyntaxKind (Bit (Nat.log2_up n))))
+  Definition UpdateArray n m k (e: Expr (SyntaxKind (Array n k)))
+             (i: Expr (SyntaxKind (Bit m)))
              (v: Expr (SyntaxKind k)) :=
     BuildArray (fun i' : Fin.t n =>
                   ITE (Eq i (Const (natToWord _ (proj1_sig (Fin.to_nat i'))))) v
@@ -1023,9 +1023,9 @@ Definition evalBinBit n1 n2 n3 (op: BinBitOp n1 n2 n3)
     | Sub n => @wminus_simple n
     | Div n => @wdivN n
     | Rem n => @wremN n
-    | Sll n m => (fun x y => wlshift x (wordToNat y))
-    | Srl n m => (fun x y => wrshift x (wordToNat y))
-    | Sra n m => (fun x y => wrshifta x (wordToNat y))
+    | Sll n m => (fun x y => wlshift' x (wordToNat y))
+    | Srl n m => (fun x y => wrshift' x (wordToNat y))
+    | Sra n m => (fun x y => wrshifta' x (wordToNat y))
     | Concat n1 n2 => fun x y => (Word.combine y x)
   end.
 
@@ -1087,7 +1087,7 @@ Section Semantics.
       | Eq _ e1 e2 => getBool (isEq _ (@evalExpr _ e1) (@evalExpr _ e2))
       | ReadStruct n fk fs e i => (@evalExpr _ e) i
       | BuildStruct n fk fs fv => fun i => @evalExpr _ (fv i)
-      | ReadArray n k fv i =>
+      | ReadArray n m k fv i =>
         match lt_dec (wordToNat (@evalExpr _ i)) n with
         | left pf => fun fv => fv (Fin.of_nat_lt pf)
         | right _ => fun _ => evalConstT (getDefaultConst k)
@@ -1815,24 +1815,33 @@ Definition baseNoSelfCalls (m : Mod) :=
   let '(hides, (rfs, mods)) := separateMod m in
   NoSelfCallBaseModule (inlineAll_All_mod (mergeSeparatedBaseMod mods)).
 
-Definition struct_get_field_index
-  (ty: Kind -> Type)
+
+
+
+
+
+
+
+
+
+
+Definition struct_foldr
+  (T : Type)
+  (ty : Kind -> Type)
   (n : nat)
   (get_kind : Fin.t (S n) -> Kind)
   (get_name : Fin.t (S n) -> string)
-  (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
-  (name : string)
-  :  option (Fin.t (S n))
+  (f : Fin.t (S n) -> string -> Kind -> T -> T)
+  (init : T)
+  :  T
   := nat_rect
-       (fun m : nat => m < (S n) -> option (Fin.t (S n)))
+       (fun m : nat => m < (S n) -> T)
        (fun H : 0 < (S n)
          => let index : Fin.t (S n)
               := Fin.of_nat_lt H in
-            if (string_dec name (get_name index))
-              then Some index
-              else None)
+            f index (get_name index) (get_kind index) init)
        (fun (m : nat)
-         (F : m < (S n) -> option (Fin.t (S n)))
+         (F : m < (S n) -> T)
          (H : S m < (S n))
          => let H0
               :  m < (S n)
@@ -1841,11 +1850,33 @@ Definition struct_get_field_index
             let index
               :  Fin.t (S n)
               := Fin.of_nat_lt H in
-            if (string_dec name (get_name index))
-              then Some index
-              else F H0)
+            (f index (get_name index) (get_kind index) (F H0)))
        n
        (PeanoNat.Nat.lt_succ_diag_r n).
+
+Definition struct_get_names
+  (ty : Kind -> Type)
+  (n : nat)
+  (get_kind : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (_ : ConstT (Struct get_kind get_name))
+  :  list string
+  := struct_foldr ty get_kind get_name (fun _ name _ acc => name :: acc) nil.
+
+Definition struct_get_field_index
+  (ty: Kind -> Type)
+  (n : nat)
+  (get_kind : Fin.t (S n) -> Kind)
+  (get_name : Fin.t (S n) -> string)
+  (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
+  (name : string)
+  :  option (Fin.t (S n))
+  := struct_foldr ty get_kind get_name
+       (fun index field_name _ acc
+         => if string_dec name field_name
+              then Some index
+              else acc)
+       None.
 
 Ltac struct_get_field_ltac packet name :=
   let val := eval cbv in (struct_get_field_index packet name) in

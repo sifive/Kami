@@ -86,7 +86,7 @@ instance Eval (T.Expr ty) Val where
         Just v -> v
         Nothing -> error ("Field " ++ names i ++ " not found.")
     eval (T.BuildStruct n _ names exprs) = StructVal $ map (\i -> (names i, eval $ exprs i)) (T.getFins n)
-    eval (T.ReadArray n k a v) = 
+    eval (T.ReadArray n m k a v) = 
         let i = fromIntegral $ BV.nat $ bvCoerce $ eval v in
             if i < n then (arrayCoerce $ eval a) V.! i else defVal k
     eval (T.ReadArrayConst n _ a i) = (arrayCoerce $ eval a) V.! (T.to_nat n i)
