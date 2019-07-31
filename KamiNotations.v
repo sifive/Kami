@@ -1,5 +1,18 @@
 Require Import Syntax Lib.EclecticLib.
 Require Import RecordUpdate.RecordSet.
+Require Import Wf.
+Require Import Wf_nat.
+Require Import BinNums.
+
+Definition natToHexStr (n : nat) : string :=
+  match (BinNat.N.of_nat n) with
+  | N0     => "0"
+  | Npos p => of_pos p ""
+  end.
+
+Definition AddIndexToName name idx := (name ++ "_" ++ natToHexStr idx)%string.
+
+Definition AddIndicesToNames name idxs := List.map (fun x => AddIndexToName name x) idxs.
 
 (* Notation for normal mods *)
 Inductive ModuleElt: Type :=
@@ -419,4 +432,76 @@ Section mod_test.
                            }.
 End mod_test.
 
+Require Import Vector.
+Import VectorNotations.
+Require Import List.
+Import ListNotations.
 
+Definition nat_string
+  (radix : nat) (* radix minus 2 *)
+  (encoding : Vector.t string (S (S radix)))
+  (n : nat)
+  :  string
+  := Fix_F
+       (fun n => string)
+       (fun n (F : forall r, r < n -> string)
+         => let digit_string
+              := Vector.nth encoding
+                   (of_nat_lt
+                     (Nat.mod_upper_bound n (S (S radix)) (Nat.neq_succ_0 (S radix)))) in
+            nat_rec
+              (fun q => q = Nat.div n (S (S radix)) -> string)
+              (fun _ => digit_string)
+              (fun q _ (H : S q = Nat.div n (S (S radix)))
+                => String.append
+                     (F (S q)
+                       (eq_ind_r
+                         (fun x => x < n)
+                         (Nat.div_lt n (S (S radix))
+                           (or_ind
+                             (fun H0 : 0 < n => H0)
+                             (fun H0 : 0 = n
+                               => False_ind (0 < n)
+                                    (let H2 : Nat.div n (S (S radix)) = 0
+                                       := eq_ind
+                                            0
+                                            (fun x => Nat.div x (S (S radix)) = 0)
+                                            (Nat.div_0_l (S (S radix)) (Nat.neq_succ_0 (S radix)))
+                                            n
+                                            H0 in
+                                     let H1 : S q = 0
+                                       := eq_ind_r (fun x => x = 0) H2 H in
+                                     Nat.neq_succ_0 q H1))
+                             ((proj1 (Nat.lt_eq_cases 0 n))
+                               (Nat.le_0_l n)))
+                           (le_n_S 1 (S radix) (le_n_S 0 radix (Nat.le_0_l radix)))                           ) 
+                         H))
+                     digit_string)
+              (Nat.div n (S (S radix)))
+              eq_refl)%nat
+       (lt_wf n).
+
+Local Open Scope vector.
+Local Open Scope string.
+
+Local Definition binary_encoding
+  :  Vector.t string 2
+  := ["0"; "1"].
+
+Local Definition decimal_encoding
+  :  Vector.t string 10
+  := ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"].
+
+Local Definition hex_encoding
+  :  Vector.t string 16
+  := ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"; "A"; "B"; "C"; "D"; "E"; "F"].
+
+Close Scope vector.
+
+Definition nat_binary_string := nat_string binary_encoding.
+
+Definition nat_decimal_string := nat_string decimal_encoding.
+
+Definition nat_hex_string := nat_string hex_encoding.
+
+Local Close Scope list.
