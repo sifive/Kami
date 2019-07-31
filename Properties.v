@@ -4519,7 +4519,7 @@ Section LemmaNoSelfCall.
     NoCallActionT ls a ->
     forall o reads u cs ret,
       SemAction o a reads u cs ret ->
-      forall f, In ((fst f), projT1 (snd f)) (getKindAttr ls) ->
+      forall f, In (fst f) ls ->
                 getNumFromCalls f cs = 0%Z.
   Proof.
     intro.

@@ -1571,91 +1571,67 @@ Section Properties.
     destruct isAddr; auto.
   Qed.
 
-  Lemma RegFileMethods_inline_invar (rf : RegFileBase) (f : DefMethT) :
-    forall g,
-      In g (getMethods rf) ->
+  Lemma NeverCall_inline_invar (f g : DefMethT) :
+      (forall ty arg, NeverCallActionT (projT2 (snd g) ty arg)) ->
       inlineSingle_Meth f g = g.
   Proof.
-    intros; destruct rf; simpl in *.
-    inv H.
-    - unfold inlineSingle_Meth; simpl.
-      destruct String.eqb, rfIsWrMask; unfold writeRegFileFn; auto.
-    - destruct rfRead.
-      + induction reads; simpl in *; [contradiction|].
-        inv H0; simpl.
-        * destruct String.eqb; auto.
-        * apply IHreads; auto.
-      + induction reads, isAddr; unfold readSyncRegFile in *; simpl in *;[contradiction| contradiction| |]; inv H0.
-        * unfold inlineSingle_Meth.
-          destruct String.eqb; auto.
-        * rewrite in_app_iff in *; simpl in *.
-          inv H; eauto.
-          inv H0; eauto.
-          unfold inlineSingle_Meth.
-          destruct String.eqb; auto.
-        * unfold inlineSingle_Meth.
-          destruct String.eqb; auto.
-        * rewrite in_app_iff in *; simpl in *.
-          inv H; eauto.
-          inv H0; eauto.
-          unfold inlineSingle_Meth.
-          destruct String.eqb; auto.
+    intros.
+    eapply inlineSingle_Meth_NoCalls_ident with (l := [f]); eauto using NeverCall_NoCalls.
+    left; reflexivity.
   Qed.
   
   Lemma inlineAll_Meths_RegFile_flat1 :
-    forall (rf : RegFileBase) (l l' : list DefMethT) (HSubList : SubList l' (getMethods rf)) n (Hlen : n < length l),
+    forall (l l' : list DefMethT) (HNeverCall : forall meth ty,
+                                      In meth l' ->
+                                      (forall arg, NeverCallActionT (projT2 (snd meth) ty arg)))
+           n (Hlen : n < length l),
       inlineSingle_Meths_pos (l ++ l') n = inlineSingle_Meths_pos l n ++ l'.
   Proof.
     intros; unfold inlineSingle_Meths_pos.
-    remember (nth_error (l ++ l') n) as plc.
-    destruct plc.
-    - rewrite nth_error_app1 in Heqplc; auto.
-      rewrite <-Heqplc; rewrite map_app.
+    remember (nth_error _ _ ) as err0.
+    destruct err0.
+    - rewrite nth_error_app1 in Heqerr0; auto.
+      rewrite <- Heqerr0; rewrite map_app.
       induction l'; auto; simpl.
-      specialize (HSubList _ (in_eq _ _)) as P0.
-      rewrite (RegFileMethods_inline_invar _ _ _ P0).
-      assert (SubList l' (getMethods rf)) as P1.
-      { repeat intro; apply HSubList; right; assumption. }
-      specialize (IHl' P1).
-      apply app_inv_head in IHl'; rewrite IHl'.
-      reflexivity.
-    - symmetry in Heqplc.
-      rewrite nth_error_None, app_length in Heqplc.
-      assert (length l <= n) as P0.
-      { lia. }
-      rewrite <- nth_error_None in P0.
-      rewrite P0.
-      reflexivity.
-  Qed.
+      rewrite NeverCall_inline_invar.
+      + repeat apply f_equal2; auto.
+        eapply app_inv_head, IHl'; intros.
+        apply HNeverCall.
+        right; assumption.
+      + intros; apply HNeverCall; left; reflexivity.
+    - exfalso.
+      symmetry in Heqerr0.
+      rewrite nth_error_None, app_length in *; lia.
+  Qed.    
 
   Lemma inlineAll_Meths_RegFile_flat2 :
-    forall (rf : RegFileBase) (l l' : list DefMethT)
-           (HSubList : SubList l' (getMethods rf)) n
+    forall (l l' : list DefMethT)
+           (HNeverCall : forall meth ty,
+               In meth l' ->
+               (forall arg, NeverCallActionT (projT2 (snd meth) ty arg))) n
            (Hlen : length l <= n) f (HSome : nth_error l' (n - length l) = Some f),
       inlineSingle_Meths_pos (l ++ l') n = (map (inlineSingle_Meth f) l) ++ l'.
   Proof.
     intros; unfold inlineSingle_Meths_pos.
-    remember (nth_error (l ++ l') n) as plc.
-    destruct plc.
-    - rewrite nth_error_app2 in Heqplc; auto.
-      rewrite <- Heqplc in HSome; inv HSome.
+    remember (nth_error (l ++ l') n) as err0.
+    destruct err0.
+    - rewrite nth_error_app2 in Heqerr0; auto.
+      rewrite <- Heqerr0 in HSome; inv HSome.
       rewrite map_app.
-      enough (forall f' l'', SubList l'' (getMethods rf) -> map (inlineSingle_Meth f') l'' = l'').
-      { rewrite (H f l'); auto. }
-      clear.
-      intros; induction l''; simpl; auto.
-      specialize (H _ (in_eq _ _)) as P0.
-      rewrite (RegFileMethods_inline_invar _ _ _ P0).
-      rewrite IHl''; auto.
-      repeat intro; apply H; right; assumption.
-    - symmetry in Heqplc.
-      rewrite nth_error_None, app_length in Heqplc.
-      assert (length l' <= n - length l) as P0.
-      { lia. }
-      rewrite <- nth_error_None in P0.
-      rewrite P0 in HSome; discriminate.
+      enough (forall f', In f' l' -> map (inlineSingle_Meth f') l' = l').
+      { rewrite (H f); auto. symmetry in Heqerr0; eapply nth_error_In; eauto. }
+      intros.
+      rewrite <- map_id; apply map_ext_in; intros.
+      apply NeverCall_inline_invar; eauto.
+    - exfalso.
+      symmetry in Heqerr0; rewrite nth_error_None, app_length in *.
+      specialize (nth_error_Some l' (n - length l)) as P0.
+      rewrite HSome in *.
+      assert (n - length l < length l') as P1.
+      { rewrite <- P0; intros; discriminate. }
+      clear - P1 Heqerr0 Hlen. lia.
   Qed.
-
+  
   Lemma inlineSingle_Meths_pos_length l n :
     length (inlineSingle_Meths_pos l n) = length l.
   Proof.
@@ -1669,25 +1645,28 @@ Section Properties.
     setoid_rewrite <- (map_length fst).
     rewrite <- SameKeys_inlineSome_Meths; reflexivity.
   Qed.
-  
+
   Lemma inlineAll_Meths_RegFile_fold_flat1 n :
-    forall (rf : RegFileBase) (l l' : list DefMethT)
-           (HSubList : SubList l' (getMethods rf)) (Hlen : n <= length l),
+    forall (l l' : list DefMethT)
+           (HNeverCall : forall meth ty,
+               In meth l' ->
+               (forall arg, NeverCallActionT (projT2 (snd meth) ty arg)))
+           (Hlen : n <= length l),
       fold_left inlineSingle_Meths_pos (seq 0 n) (l ++ l') = fold_left inlineSingle_Meths_pos (seq 0 n) l ++ l'.
   Proof.
-    intros; repeat rewrite <-fold_left_rev_right.
+    intros; repeat rewrite <- fold_left_rev_right.
     induction n.
     - simpl; auto.
     - rewrite seq_eq, rev_app_distr; simpl.
       rewrite IHn; [|lia].
-      + rewrite (inlineAll_Meths_RegFile_flat1 rf); auto.
-        assert (forall xs, length (fold_right (fun y x => inlineSingle_Meths_pos x y) l xs) = length l) as P0.
-        { clear.
-          induction xs; simpl; auto.
-          rewrite inlineSingle_Meths_pos_length; assumption. }
-        rewrite P0; lia.
+      rewrite (inlineAll_Meths_RegFile_flat1); auto.
+      assert (forall xs, length (fold_right (fun y x => inlineSingle_Meths_pos x y) l xs) = length l) as P0.
+      { clear.
+        induction xs; simpl; auto.
+        rewrite inlineSingle_Meths_pos_length; assumption. }
+      rewrite P0; lia.
   Qed.
-  
+      
   Lemma seq_app s e :
     forall m (Hm_lte_e : m <= e),
       seq s e = seq s m ++ seq (s + m) (e - m).
@@ -1716,10 +1695,13 @@ Section Properties.
     rewrite map_length.
     reflexivity.
   Qed.
-  
+
   Lemma inlineAll_Meths_RegFile_fold_flat2 n :
-    forall (rf : RegFileBase) (l l' : list DefMethT)
-           (HSubList : SubList l' (getMethods rf)) (Hlen : 0 < n - length l),
+    forall (l l' : list DefMethT)
+           (HNeverCall : forall meth ty,
+               In meth l' ->
+               (forall arg, NeverCallActionT (projT2 (snd meth) ty arg)))
+           (Hlen : 0 < n - length l),
       fold_left inlineSingle_Meths_pos (seq (length l) (n - (length l))) (l ++ l')
       = fold_left (inlineSingle_Flat_pos l') (seq 0 (n - length l)) l ++ l'.
   Proof.
@@ -1739,7 +1721,7 @@ Section Properties.
              assert (length l <= n) as P1.
              { lia. }
              rewrite <-(inlineSingle_Flat_pos_lengths (seq 0 (n - Datatypes.length l)) l l') in Heqnth_err, P1.
-             rewrite (inlineAll_Meths_RegFile_flat2 _ _ HSubList P1 Heqnth_err).
+             erewrite inlineAll_Meths_RegFile_flat2; eauto.
              unfold inlineSingle_Flat_pos at 2.
              rewrite inlineSingle_Flat_pos_lengths in Heqnth_err.
              rewrite Heqnth_err.
@@ -1764,7 +1746,7 @@ Section Properties.
           remember (nth_error l' (length l - length l)) as nth_err.
           destruct nth_err.
           -- symmetry in Heqnth_err.
-             rewrite (inlineAll_Meths_RegFile_flat2 _ _ HSubList (Nat.le_refl _) Heqnth_err).
+             erewrite inlineAll_Meths_RegFile_flat2; eauto.
              unfold inlineSingle_Flat_pos.
              remember (nth_error l' 0) as nth_err2.
              destruct nth_err2.
@@ -1794,8 +1776,10 @@ Section Properties.
   Qed.
 
   Lemma inlineAll_Meths_RegFile_fold_flat :
-    forall (rf : RegFileBase) (l l' : list DefMethT)
-           (HSubList : SubList l' (getMethods rf)),
+    forall (l l' : list DefMethT)
+           (HNeverCall : forall meth ty,
+               In meth l' ->
+               (forall arg, NeverCallActionT (projT2 (snd meth) ty arg))),
       fold_left inlineSingle_Meths_pos (seq 0 (length (l ++ l'))) (l ++ l')
       = fold_left (inlineSingle_Flat_pos l') (seq 0 (length l'))
                   (fold_left inlineSingle_Meths_pos (seq 0 (length l)) l) ++ l'.
@@ -1803,7 +1787,7 @@ Section Properties.
     intros.
     specialize (Nat.le_add_r (length l) (length l')) as P0.
     rewrite app_length, (seq_app _ P0), fold_left_app, Nat.add_0_l.
-    rewrite (inlineAll_Meths_RegFile_fold_flat1 _ _ HSubList (Nat.le_refl _ )).
+    rewrite inlineAll_Meths_RegFile_fold_flat1; auto.
     destruct (zerop (length l')).
     - rewrite e; rewrite minus_plus; simpl.
       rewrite length_zero_iff_nil in e; rewrite e, app_nil_r; reflexivity.
@@ -1811,7 +1795,7 @@ Section Properties.
       { rewrite minus_plus; assumption. }
       rewrite <- (inlineSome_Meths_pos_length l (seq 0 (Datatypes.length l))) at 1 2 3.
       rewrite <- (inlineSome_Meths_pos_length l (seq 0 (Datatypes.length l))) in H.
-      rewrite (inlineAll_Meths_RegFile_fold_flat2 _ _ _ HSubList H).
+      rewrite inlineAll_Meths_RegFile_fold_flat2; auto.
       rewrite (inlineSome_Meths_pos_length l (seq 0 (Datatypes.length l))) in *.
       rewrite minus_plus.
       rewrite <- (inlineSome_Meths_pos_length l (seq 0 (Datatypes.length l)) ).
@@ -1827,8 +1811,10 @@ Section Properties.
   Qed.
   
   Lemma inlineAll_NoCall_Meths_RegFile_fold_flat :
-    forall (rf : RegFileBase) (l l' : list DefMethT)
-           (HSubList : SubList l' (getMethods rf))
+    forall (l l' : list DefMethT)
+           (HNeverCall : forall meth ty,
+               In meth l' ->
+               (forall arg, NeverCallActionT (projT2 (snd meth) ty arg)))
            (HDisjMeths : DisjKey l l')
            (HNoCall : forall meth ty,
                In meth l -> 
@@ -1839,19 +1825,16 @@ Section Properties.
       (forall meth ty,
           In meth (map (inline_Meths l' (seq 0 (length l'))) l) ->
           (forall arg,
-              NoCallActionT (map fst ((map (inline_Meths l' (seq 0 (length l'))) l) ++ l')) (projT2 (snd meth) ty arg))).
+              NoCallActionT (map fst ((map (inline_Meths l' (seq 0 (length l'))) l))) (projT2 (snd meth) ty arg))).
   Proof.
     intros; split.
-    - unfold inlineAll_Meths; rewrite (inlineAll_Meths_RegFile_fold_flat rf); auto.
+    - unfold inlineAll_Meths; rewrite inlineAll_Meths_RegFile_fold_flat; auto.
       rewrite (inlineSome_Meths_pos_NoCalls_ident l l); eauto; [| apply SubList_refl].
       rewrite inline_Meths_eq_inlineSome; auto.
     - intros.
       rewrite in_map_iff in H; dest; subst; destruct x, s0.
       specialize (HNoCall _ ty H0 arg); simpl in *.
-      eapply NeverCall_inlineSome_pos.
-      * intros.
-        specialize (RegFileBase_noCalls rf) as TMP; inv TMP; unfold NeverCallBaseModule in *; dest.
-        apply H2; eauto.
+      eapply NeverCall_inlineSome_pos; auto.
       * rewrite SameKeys_inlineSome_Meths_map; assumption.
   Qed.
 
@@ -1921,8 +1904,10 @@ Section Properties.
   Qed.
   
   Lemma inlineAll_NoCall_Rules_RegFile_fold_flat :
-    forall (rf : RegFileBase) (l l' : list DefMethT) (lr : list RuleT)
-           (HSubList : SubList l' (getMethods rf))
+    forall (l l' : list DefMethT) (lr : list RuleT)
+           (HNeverCall : forall meth ty,
+               In meth l' ->
+               (forall arg, NeverCallActionT (projT2 (snd meth) ty arg)))
            (HDisjMeths : DisjKey l l')
            (HNoCall : forall rule ty,
                In rule lr ->
@@ -1938,13 +1923,10 @@ Section Properties.
       erewrite inlineSome_Rules_pos_NoCalls_ident; eauto using SubList_refl.
       apply inlineAll_Rules_in.
     - intros; rewrite in_map_iff in *; dest; subst; destruct x; simpl in *.
-      specialize (RegFileBase_noCalls rf) as TMP; inv TMP; unfold NeverCallBaseModule in *; dest.
       apply NeverCall_inlineSome_pos; auto.
       apply (HNoCall _ _ H0).
   Qed.
 
-  
-  
   Lemma NoSelfCall_inline_invar  k (a : ActionT type k) :
     forall (meth : DefMethT) (l : list DefMethT) (HIn : In (fst meth) (map fst l))
            (HNoCalls : NoCallActionT (map fst l) a),
