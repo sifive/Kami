@@ -208,8 +208,7 @@ Section Named.
     (fun t => mosis (bits tx) t /\ mosis (bits rx) t) +++
     maybe (cmd_read rx false).
 
-  Definition transaction t := exists tx rx, exchange tx rx t.
-  Definition spec := kleene (fun t => sck false t \/ transaction t).
+  Definition spec := kleene (fun t => sck false t \/ exists tx rx, exchange tx rx t).
 
   Definition enforce_regs (regs:RegsT) tx_fifo tx_fifo_len rx_fifo rx_fifo_len sck := regs =
     [(@^"hack_for_sequential_semantics", existT _ (SyntaxKind (Bit 0)) WO);
@@ -408,14 +407,38 @@ Section Named.
       | _ => exact eq_refl
       end.
 
-    replace (skipn (wordToNat $8) (bits arg)) with (@nil bool); cycle 1. {
-      clear.
-      (* HERE *)
-      pose proof length_bits arg.
-      admit.
-    }
+    eapply TracePredicate.interleave_rcons; eauto.
+
+    { eapply app_empty_r; cycle 1.
+      { split; trivial.
+        replace (skipn (wordToNat $8) (bits arg)) with (@nil bool); cycle 1. {
+          clear.
+          pose proof length_bits arg as HA.
+          pose proof firstn_skipn (@wordToNat 4 $8) (bits arg) as HB.
+          pose proof firstn_all (bits arg) as HC.
+          rewrite HA in HC.
+          setoid_rewrite HC in HB.
+          eapply (f_equal (@List.length _)) in HB.
+          rewrite app_length in HB.
+          destruct (skipn (wordToNat $8) (bits arg)); trivial; cbn in *; Lia.lia.
+        }
+        cbv [mosis].
+        cbn [TracePredicate.flat_map map fold_right].
+        exact eq_refl. }
+      { cbv [cmd_write]. eexists.
+        repeat f_equal. } }
+    cbv [spec exchange].
+    admit. (* finalize cycle *)
+
+    1,2: admit. (* NoDup *) }
+
+  
+    
+    
 
 
+    
+    
     eapply andb_prop in H4; destruct H4.
     rewrite andb_true_l in H.
 
