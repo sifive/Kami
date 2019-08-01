@@ -137,19 +137,21 @@ Section Named.
       Call miso : Bit 1 <- "GetMISO"();
       Call "PutSCK"(#sck : Bool);
       Call "PutMOSI"((UniBit (TruncMsb 7 1) #tx_fifo) : Bit 1);
-
-      If ((*!*)#tx_fifo_len == $$@natToWord 4 0) then Retv else (If (#sck) then (
-        Write @^"tx_fifo" : Bit 8 <- UniBit (TruncLsb 8 1) (BinBit (Concat 8 1) #tx_fifo $$(@ConstBit 1 $x));
-        Write @^"tx_fifo_len" <- #tx_fifo_len + $1;
-        Write @^"sck" : Bool <- !#sck;
-      Retv ); Retv);
-
-      If (#rx_fifo_len < $$@natToWord 4 8) then (If ((*!*)#sck) then Retv else (
-        Write @^"rx_fifo" : Bit 8 <- UniBit (TruncLsb 8 1) (BinBit (Concat 8 1) #rx_fifo #miso);
-        Write @^"rx_fifo_len" <- #rx_fifo_len - $1;
-        Write @^"sck" : Bool <- !#sck;
-      Retv ); Retv);
-
+      
+      If (#sck) then (
+        If (*!*) #tx_fifo_len == $$@natToWord 4 0 then Retv else (
+          Write @^"tx_fifo" : Bit 8 <- UniBit (TruncLsb 8 1) (BinBit (Concat 8 1) #tx_fifo $$(@ConstBit 1 $x));
+          Write @^"tx_fifo_len" <- #tx_fifo_len + $1;
+          Write @^"sck" : Bool <- !#sck;
+          Retv );
+          Retv
+      ) else (
+        If (#rx_fifo_len < $$@natToWord 4 8) then (
+          Write @^"rx_fifo" : Bit 8 <- UniBit (TruncLsb 8 1) (BinBit (Concat 8 1) #rx_fifo #miso);
+          Write @^"rx_fifo_len" <- #rx_fifo_len - $1;
+          Write @^"sck" : Bool <- !#sck;
+          Retv);
+        Retv);
       Retv
     )
     
@@ -246,19 +248,15 @@ Section Named.
 
   Goal forall s t, Trace SPI s t -> invariant s t.
   Proof.
-    induction 1.
+    induction 1; subst.
     { admit. }
-    subst.
 
-    destruct IHTrace as [IHTrace|IHTrace].
-    { destruct IHTrace.
-      cbv [enforce_regs] in *.
-  
+    destruct IHTrace as [IHTrace|IHTrace]; destruct IHTrace; cbv [enforce_regs] in *;
       unshelve (idtac;
       let pf := open_constr:(InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep) in
       destruct pf);
-      [abstract discharge_wf|..];
       repeat match goal with
+        | _ => abstract discharge_wf
         | H: Trace _ _ |- _ => clear H
         | _ => progress intros
         | _ => progress clean_hyp_step
