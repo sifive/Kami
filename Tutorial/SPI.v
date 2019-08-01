@@ -388,14 +388,38 @@ Section Named.
   all : clear HStep; clear H.
 
   4: {
+    match goal with
+    | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; [symmetry in H; destruct H|..]
+    end.
     right. esplit; trivial.
-    eapply TracePredicate.interleave_rapp; try eassumption.
 
-  4: {
-    right. esplit.
-    { eapply TracePredicate.interleave_lkleene_cons; try eassumption.
-      lazymatch goal with |- kleene ?p ?x => enough (p x) by admit end.
+    2: cbv [enforce_regs] in *;
+      repeat match goal with
+      | _ => progress discharge_string_dec
+      | _ => progress cbn [fst snd]
+      | |- context G [match ?x with _ => _ end] =>
+         let X := eval hnf in x in
+         progress change x with X
+      | _ => progress (f_equal; [])
+      | |- ?l = ?r =>
+          let l := eval hnf in l in
+          let r := eval hnf in r in
+          progress change (l = r)
+      | _ => exact eq_refl
+      end.
 
+    replace (skipn (wordToNat $8) (bits arg)) with (@nil bool); cycle 1. {
+      clear.
+      (* HERE *)
+      pose proof length_bits arg.
+      admit.
+    }
+
+
+    eapply andb_prop in H4; destruct H4.
+    rewrite andb_true_l in H.
+
+Abort.
 
 End Named.
 
