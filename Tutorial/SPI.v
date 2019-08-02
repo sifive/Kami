@@ -248,21 +248,30 @@ Section Named.
 
   Goal forall s t, Trace SPI s t -> invariant s t.
   Proof.
-    induction 1; subst.
+    induction 1 as [A B C D | A B C regs E _ IHTrace HStep K I]; subst.
     { admit. }
 
-    destruct IHTrace as [IHTrace|IHTrace]; destruct IHTrace; cbv [enforce_regs] in *;
-      unshelve (idtac;
-      let pf := open_constr:(InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep) in
-      destruct pf);
+    unshelve epose proof InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep as HHS;
+      clear HStep; [abstract discharge_wf|..|rename HHS into HStep].
+    1,2,3: admit.
+
+    all : destruct IHTrace as [[]|[]]; cbv [enforce_regs] in *;
       repeat match goal with
-        | _ => abstract discharge_wf
-        | H: Trace _ _ |- _ => clear H
         | _ => progress intros
         | _ => progress clean_hyp_step
         | _ => progress cbn [SPI getMethods baseModule makeModule makeModule' type evalExpr isEq evalConstT Kind_rect List.app map fst snd projT1 projT2] in *
         | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; symmetry in H; destruct H
-      end.
+             end.
+    Fail
+    match goal with
+        | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H
+    end;
+    eapply eq_sym in K.
+    match goal with
+        | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H
+    end.
+    eapply eq_sym in K.
+    
   
       10: {
         match goal with
