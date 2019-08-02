@@ -98,6 +98,7 @@ Module TracePredicate.
   
   Definition at_next_edge {T} clk data : list T -> Prop :=
     (fun x => clk false x)^+ +++ (fun x => clk true x /\ data x).
+  (* TODO: how do I actually prove this in a loop *)
 End TracePredicate.
 
 Require Import Kami.All.
@@ -139,18 +140,18 @@ Section Named.
       Call "PutMOSI"((UniBit (TruncMsb 7 1) #tx_fifo) : Bit 1);
       
       If (#sck) then (
-        If (*!*) #tx_fifo_len == $$@natToWord 4 0 then Retv else (
+        If (*!*) #tx_fifo_len == $$@natToWord 4 0 then Retv (*1*) else (
           Write @^"tx_fifo" : Bit 8 <- UniBit (TruncLsb 8 1) (BinBit (Concat 8 1) #tx_fifo $$(@ConstBit 1 $x));
           Write @^"tx_fifo_len" <- #tx_fifo_len + $1;
           Write @^"sck" : Bool <- !#sck;
           Retv );
-          Retv
+          Retv (*2*)
       ) else (
         If (#rx_fifo_len < $$@natToWord 4 8) then (
           Write @^"rx_fifo" : Bit 8 <- UniBit (TruncLsb 8 1) (BinBit (Concat 8 1) #rx_fifo #miso);
           Write @^"rx_fifo_len" <- #rx_fifo_len - $1;
           Write @^"sck" : Bool <- !#sck;
-          Retv);
+          Retv (*3*) ) (*else 4*);
         Retv);
       Retv
     )
@@ -163,9 +164,9 @@ Section Named.
         Write @^"tx_fifo" : Bit 8 <- #data;
         Write @^"tx_fifo_len" <- $$@natToWord 4 8;
         Write @^"rx_fifo_len" <- $$@natToWord 4 0;
-        Ret $$false
+        Ret $$false (*5*)
       ) else (
-        Ret $$true
+        Ret $$true (*6*)
       ) as b;
       Ret #b
     )
@@ -178,9 +179,9 @@ Section Named.
         LET data : Bit 8 <- #rx_fifo;
         LET err : Bool <- $$false;
         Write @^"rx_fifo_len" <- $$@natToWord 4 15;
-        Ret #err (* TODO: return (data, err) *)
+        Ret #err (* TODO: return (data, err) *) (*7*)
       ) else (
-        Ret $$true
+        Ret $$true (*8*)
       ) as r;
       Ret #r
     )
@@ -229,7 +230,9 @@ Section Named.
   }.
 
   Record active (regs : RegsT) (t : list (list FullLabel)) : Prop := {
+    ck : _;
     tx : _;
+    rx : _;
     tx_fifo : _ ;
     tx_fifo_len : _ ;
     rx_fifo : _ ;
@@ -238,48 +241,17 @@ Section Named.
           cmd_write tx false +++
           (fun t =>
             mosis (List.skipn (wordToNat tx_fifo_len) (bits tx)) t /\
-            True (* RX HERE *)
+            misos rx t
           ))) t;
-    _ : tx = tx_fifo; (* only during first tick *)
-    _ : enforce_regs regs tx_fifo tx_fifo_len rx_fifo rx_fifo_len false;
+    _ : List.firstn (wordToNat tx_fifo_len) (bits tx) = List.skipn (8-wordToNat tx_fifo_len) (bits tx_fifo);
+    _ : List.firstn (wordToNat rx_fifo_len) (bits rx_fifo) = rx;
+    _ : enforce_regs regs tx_fifo tx_fifo_len rx_fifo rx_fifo_len ck;
   }.
 
-  Definition invariant s t := idle s t \/ active s t.
-
-  Goal forall s t, Trace SPI s t -> invariant s t.
-  Proof.
-    induction 1 as [A B C D | A B C regs E _ IHTrace HStep K I]; subst.
-    { admit. }
-
-    unshelve epose proof InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep as HHS;
-      clear HStep; [abstract discharge_wf|..|rename HHS into HStep].
-    1,2,3: admit.
-
-    all : destruct IHTrace as [[]|[]]; cbv [enforce_regs] in *;
-      repeat match goal with
-        | _ => progress intros
-        | _ => progress clean_hyp_step
-        | _ => progress cbn [SPI getMethods baseModule makeModule makeModule' type evalExpr isEq evalConstT Kind_rect List.app map fst snd projT1 projT2] in *
-        | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; symmetry in H; destruct H
-             end.
-    Fail
-    match goal with
-        | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H
-    end;
-    eapply eq_sym in K.
-    match goal with
-        | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H
-    end.
-    eapply eq_sym in K.
-    
+  Definition invariant s t := active s t.
   
-      10: {
-        match goal with
-        | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; [symmetry in H; destruct H|..]
-        end.
-        constructor. econstructor.
-  
-        2: cbv [enforce_regs] in *;
+  Ltac expand := (* Goal: invariant *)
+    ((esplit; trivial); [..|solve[cbv [enforce_regs] in *;
         repeat match goal with
         | _ => progress discharge_string_dec
         | _ => progress cbn [fst snd]
@@ -292,10 +264,33 @@ Section Named.
             let r := eval hnf in r in
             progress change (l = r)
         | _ => exact eq_refl
-        end.
-        2:cbn [evalBinBit evalUniBool].
+               end]]; subst).
+
+  Goal forall s t, Trace SPI s t -> invariant s t.
+  Proof.
+    induction 1 as [A B C D | A t C regs E _ IHTrace HStep K I]; subst.
+    { admit. }
+
+    unshelve epose proof InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep as HHS;
+      clear HStep; [abstract discharge_wf|..|rename HHS into HStep].
+    1,2,3: admit.
+    destruct IHTrace as [sck tx tx_fifo tx_fifo_len rx_fifo rx_fifo_len IH TODO1 Henforce]; cbv [enforce_regs] in *;
+      repeat match goal with
+        | _ => progress intros
+        | _ => progress clean_hyp_step
+        | _ => progress discharge_string_dec
+        | _ => progress cbn [SPI getMethods baseModule makeModule makeModule' type evalExpr isEq evalConstT Kind_rect List.app map fst snd projT1 projT2 invariant doUpdRegs findReg] in *
+        | _ => progress cbv [invariant] in *
+        | K: UpdRegs _ _ _ |- _ => unshelve ( repeat erewrite (NoDup_UpdRegs _ _ K) in * ); clear K
+        | |- NoDup _ => admit
+      end.
+
+    { (*1*)
+      expand.
+      replace rv1 with (wzero 4) in * by admit.
+      change (wordToNat (wzero 4)) with 0; cbn [skipn].
   
-        {
+        { 
           cbv [spec].
           simple refine (TracePredicate.interleave_rkleene_cons _ _ _ _).
           2:eassumption.
@@ -310,9 +305,9 @@ Section Named.
         all : cbn [map fst].
         1,2: admit. (* NoDup *)
       }
-  
-  
-      10: {
+ *)
+    
+      4: {
         match goal with
         | H: UpdRegs _ _ _ |- _ => apply NoDup_UpdRegs in H; [symmetry in H; destruct H|..]
         end.
