@@ -148,36 +148,8 @@ Module Notations.
 
 End Notations.
 
-(* Compute (@wadd 3 (ZToWord 3 (-2%Z)) (ZToWord 3 3)). *)
-
-(* Compute (@truncMsb 1 5 (of_nat 5 31)). *)
-
-(* Compute (@concat _ _ 4 (of_nat 2 2) (of_nat 2 3)). *)
-
-(* Compute (@of_bool 1 (@wuxor _ (of_nat 2 3))). *)
-
-(* Compute (@wsru _ (of_nat 8 167) (of_nat 8 1)). *)
-
-
-(* Compute (@wsrs _ (of_nat 8 167) (of_nat 8 1)).*)
-
-(*Compute (of_nat 2 (Nat.pow 2 2 - 2 + 1)). *)
-
-(* Compute (@get_msb _ (of_nat 3 7)). *)
-
-(* Compute (@get_lsb _ (of_nat 3 6)). *)
-
-(* Compute (@wordValSigned _ (of_nat 2 3)). *)
-
-(* Compute (wnon_neg (zToWord 4 12)). *)
-(* Compute (wordToSignedZ (zToWord 4 12)). *)
-(* Compute (wordVal _ (zToWord 3 3)). *)
-(* Compute (Z.div (wordToSignedZ (zToWord 4 12)) (wordVal _ (zToWord 3 3))). *)
-(* Compute (@signedZToWord 4 (Z.div (wordToSignedZ (zToWord 4 12)) (wordVal _ (zToWord 3 3)))). *)
-
-(* Compute (Z.div (-4) 8). *)
-
 (* Compute (wsra (zToWord 4 15) (zToWord 1 1)). *)
+
 (* Compute (wsra (zToWord 4 12) (zToWord 3 3)). *)
 
 (* Compute (wsra (zToWord 2 1) (zToWord 3 5)). *)
@@ -185,3 +157,7 @@ End Notations.
 (* Compute (wsra (zToWord 5 9) (zToWord 4 3)). *)
 
 (* Compute (NToWord 2 6). *)
+
+(* Compute (@wconcat 2 2 4 (zToWord 2 2) (zToWord 2 3)). *)
+
+(* Compute (@truncLsb 2 4 (@wconcat 2 2 4 (zToWord 2 2) (zToWord 2 3))).*)
