@@ -6485,6 +6485,193 @@ Section Properties.
                rewrite nth_error_map_iff in H0; dest.
                rewrite H0 in Heqerr1; discriminate.
     Qed.
+
+    Lemma inlineEeach_SingleRf_inlineEach (rf : RegFileBase) :
+      forall n k (a : ActionT type k),
+        (forall o uml retV,
+            ESemAction o (apply_nth (EgetRegFileMapMethods type k rf) (Action_EAction a) n) uml retV
+            -> ESemAction o (Action_EAction (apply_nth (map (fun f => @inlineSingle type f k) (getRegFileMethods rf)) a n)) uml retV).
+    Proof.
+      unfold getRegFileMethods, EgetRegFileMapMethods; destruct rf, rfRead; simpl.
+      - unfold apply_nth in *; destruct n; simpl in *; intros.
+        + specialize (inline_WrInlines _ _ H); auto.
+        + unfold readRegFile.
+          remember (nth_error _ _) as err0.
+          remember (nth_error (map _ (map _ reads)) n) as err1.
+          symmetry in Heqerr0, Heqerr1.
+          destruct err1.
+          * rewrite nth_error_map_iff in Heqerr1; dest.
+            rewrite <- H1.
+            destruct err0.
+            -- rewrite nth_error_map_iff in Heqerr0; dest.
+               rewrite nth_error_map_iff in H0; dest.
+               rewrite <- H4.
+               rewrite <- H3 in H.
+               assert (rfRead
+                      {|
+                        rfIsWrMask := rfIsWrMask;
+                        rfNum := rfNum;
+                        rfDataArray := rfDataArray;
+                        rfRead := Async reads;
+                        rfWrite := rfWrite;
+                        rfIdxNum := rfIdxNum;
+                        rfData := rfData;
+                        rfInit := rfInit |} = Async reads) as P0.
+               { auto. }
+               specialize (inline_AsyncReadInlines _ _ P0 _  (nth_error_In _ _ H2) H) as P1.
+               unfold getAsyncReads in P1; simpl in *.
+               rewrite H0 in H2; inv H2; assumption.
+            -- exfalso.
+               repeat rewrite <- nth_error_map_None_iff in Heqerr0.
+               rewrite nth_error_map_iff in H0; dest.
+               rewrite H0 in Heqerr0; inv Heqerr0.
+          * rewrite <- nth_error_map_None_iff in Heqerr1.
+            destruct err0;[|assumption].
+            exfalso.
+            rewrite <- nth_error_map_None_iff in Heqerr1.
+            rewrite nth_error_map_iff in Heqerr0; dest.
+            rewrite H0 in Heqerr1; discriminate.
+      - unfold apply_nth in *; destruct n; simpl in *; intros.
+        + specialize (inline_WrInlines _ _ H); auto.
+        + unfold readSyncRegFile.
+                   remember (nth_error _ _) as err0.
+          remember (nth_error (map _ (if isAddr then _ else _ )) _) as err1.
+          symmetry in Heqerr0, Heqerr1.
+          destruct (le_lt_dec (length reads) n), isAddr; rewrite map_app in *.
+          * rewrite nth_error_app2 in Heqerr1; repeat rewrite map_length in *;[| assumption].
+            rewrite nth_error_app2 in Heqerr0; repeat rewrite map_length in *; [| assumption].
+            destruct err1.
+            -- rewrite nth_error_map_iff in Heqerr1; dest.
+               rewrite <- H1.
+               destruct err0.
+               ++ rewrite nth_error_map_iff in Heqerr0; dest.
+                  rewrite nth_error_map_iff in H0; dest.
+                  rewrite <- H4.
+                  rewrite <- H3 in H.
+                  assert (rfRead
+                            {|
+                              rfIsWrMask := rfIsWrMask;
+                              rfNum := rfNum;
+                              rfDataArray := rfDataArray;
+                              rfRead := Sync true reads;
+                              rfWrite := rfWrite;
+                              rfIdxNum := rfIdxNum;
+                              rfData := rfData;
+                              rfInit := rfInit |} = Sync true reads) as P0.
+                  { auto. }
+                  specialize (inline_SyncResInlines _ _ _ P0 (nth_error_In _ _ H2) H) as P1.
+                  simpl in *.
+                  rewrite H0 in H2; inv H2; simpl; assumption.
+               ++ exfalso.
+                  rewrite <- nth_error_map_None_iff in Heqerr0.
+                  rewrite nth_error_map_iff in H0; dest.
+                  rewrite H0 in Heqerr0; inv Heqerr0.
+            -- rewrite <- nth_error_map_None_iff in Heqerr1.
+               destruct err0;[|assumption].
+               exfalso.
+               rewrite nth_error_map_iff in Heqerr0; dest.
+               rewrite <- nth_error_map_None_iff in Heqerr1.
+               rewrite H0 in Heqerr1; discriminate.
+          * rewrite nth_error_app2 in Heqerr1; repeat rewrite map_length in *;[| assumption].
+            rewrite nth_error_app2 in Heqerr0; rewrite map_length in *; [| assumption].
+            destruct err1.
+            -- rewrite nth_error_map_iff in Heqerr1; dest.
+               rewrite <- H1.
+               destruct err0.
+               ++ rewrite nth_error_map_iff in Heqerr0; dest.
+                  rewrite nth_error_map_iff in H0; dest.
+                  rewrite <- H4.
+                  rewrite <- H3 in H. 
+                  assert (rfRead
+                            {|
+                              rfIsWrMask := rfIsWrMask;
+                              rfNum := rfNum;
+                              rfDataArray := rfDataArray;
+                              rfRead := Sync false reads;
+                              rfWrite := rfWrite;
+                              rfIdxNum := rfIdxNum;
+                              rfData := rfData;
+                              rfInit := rfInit |} = Sync false reads) as P0.
+                  { auto. }
+                  specialize (inline_SyncResInlines _ _ _ P0 (nth_error_In _ _ H2) H) as P1.
+                  rewrite H0 in H2; inv H2; simpl; assumption.
+               ++ exfalso.
+                  repeat rewrite <- nth_error_map_None_iff in Heqerr0.
+                  rewrite nth_error_map_iff in H0; dest.
+                  rewrite H0 in Heqerr0; inv Heqerr0.
+            -- rewrite <- nth_error_map_None_iff in Heqerr1.
+               destruct err0;[|assumption].
+               exfalso.
+               rewrite nth_error_map_iff in Heqerr0; dest.
+               rewrite <- nth_error_map_None_iff in Heqerr1; dest.
+               rewrite H0 in Heqerr1; discriminate.
+          * rewrite nth_error_app1 in Heqerr1;[| repeat rewrite map_length in *; assumption].
+            rewrite nth_error_app1 in Heqerr0; repeat rewrite map_length in *; [| assumption].
+            destruct err1.
+            -- rewrite nth_error_map_iff in Heqerr1; dest.
+               rewrite <- H1.
+               destruct err0.
+               ++ rewrite nth_error_map_iff in Heqerr0; dest.
+                  rewrite nth_error_map_iff in H0; dest.
+                  rewrite <- H4.
+                  rewrite <- H3 in H. 
+                  assert (rfRead
+                            {|
+                              rfIsWrMask := rfIsWrMask;
+                              rfNum := rfNum;
+                              rfDataArray := rfDataArray;
+                              rfRead := Sync true reads;
+                              rfWrite := rfWrite;
+                              rfIdxNum := rfIdxNum;
+                              rfData := rfData;
+                              rfInit := rfInit |} = Sync true reads) as P0.
+                  { auto. }
+                  specialize (inline_SyncReqInlines _ _ _ P0 (nth_error_In _ _ H2) H) as P1.
+                  rewrite H0 in H2; inv H2; simpl; assumption.
+               ++ exfalso.
+                  rewrite <- nth_error_map_None_iff in Heqerr0.
+                  rewrite nth_error_map_iff in H0; dest.
+                  rewrite H0 in Heqerr0; inv Heqerr0.
+            -- rewrite <- nth_error_map_None_iff in Heqerr1.
+               destruct err0;[|assumption].
+               exfalso.
+               rewrite nth_error_map_iff in Heqerr0; dest.
+               rewrite <- nth_error_map_None_iff in Heqerr1.
+               rewrite H0 in Heqerr1; discriminate.
+          * rewrite nth_error_app1 in Heqerr1;[| repeat rewrite map_length in *; assumption].
+            rewrite nth_error_app1 in Heqerr0; repeat rewrite map_length in *; [| assumption].
+            destruct err1.
+            -- rewrite nth_error_map_iff in Heqerr1; dest.
+               rewrite <- H1.
+               destruct err0.
+               ++ rewrite nth_error_map_iff in Heqerr0; dest.
+                  rewrite nth_error_map_iff in H0; dest.
+                  rewrite <- H4.
+                  rewrite <- H3 in H. 
+                  assert (rfRead
+                            {|
+                              rfIsWrMask := rfIsWrMask;
+                              rfNum := rfNum;
+                              rfDataArray := rfDataArray;
+                              rfRead := Sync false reads;
+                              rfWrite := rfWrite;
+                              rfIdxNum := rfIdxNum;
+                              rfData := rfData;
+                              rfInit := rfInit |} = Sync false reads) as P0.
+                  { auto. }
+                  specialize (inline_SyncReqInlines _ _ _ P0 (nth_error_In _ _ H2) H) as P1.
+                  rewrite H0 in H2; inv H2; simpl; assumption.
+               ++ exfalso.
+                  rewrite <- nth_error_map_None_iff in Heqerr0.
+                  rewrite nth_error_map_iff in H0; dest.
+                  rewrite H0 in Heqerr0; inv Heqerr0.
+            -- rewrite <- nth_error_map_None_iff in Heqerr1.
+               destruct err0;[|assumption].
+               exfalso.
+               rewrite nth_error_map_iff in Heqerr0; dest.
+               rewrite <- nth_error_map_None_iff in Heqerr1; dest.
+               rewrite H0 in Heqerr1; discriminate.
+    Qed.
     
     Lemma inlineEach_Singlelist_inlineEeach (lrf : list RegFileBase):
       forall n k (a : ActionT type k),
@@ -6512,7 +6699,33 @@ Section Properties.
             assumption.
           * erewrite <-EgetRegFileMapMethods_getRegFileMethods_len in l; eauto.
     Qed.
-
+    
+    Lemma inlineEeach_Singlelist_inlineEach (lrf : list RegFileBase):
+      forall n k (a : ActionT type k),
+        (forall o uml retV,  ESemAction o (apply_nth (EeachRfMethodInliners _ k lrf) (Action_EAction a) n) uml retV
+                             ->ESemAction o (Action_EAction (apply_nth (eachRfMethodInliners _ k lrf) a n)) uml retV).
+    Proof.
+      induction lrf; intros.
+      - unfold eachRfMethodInliners, EeachRfMethodInliners in *; simpl in *.
+        unfold apply_nth in *.
+        rewrite nth_error_nil_None; rewrite nth_error_nil_None in H.
+        assumption.
+      - unfold eachRfMethodInliners, EeachRfMethodInliners in *.
+        destruct (le_lt_dec (length (getRegFileMethods a)) n).
+        + unfold apply_nth in *; simpl in *.
+          rewrite nth_error_app2; try rewrite map_length in *; auto.
+          rewrite app_comm_cons, nth_error_app2 in H.
+          * fold (EgetRegFileMapMethods type k a) in H.
+            rewrite EgetRegFileMapMethods_getRegFileMethods_len in H.
+            apply IHlrf; auto.
+          * erewrite <- EgetRegFileMapMethods_getRegFileMethods_len in l; eauto.
+        + unfold apply_nth in *; simpl in *.
+          rewrite nth_error_app1; try rewrite map_length in *; auto.
+          rewrite app_comm_cons, nth_error_app1 in H.
+          * eapply inlineEeach_SingleRf_inlineEach.
+            assumption.
+          * erewrite <-EgetRegFileMapMethods_getRegFileMethods_len in l; eauto.
+    Qed.
 
     Lemma inlineEeach_Single_Congruence (rf : RegFileBase) :
       forall n k (ea1 ea2 : EActionT type k),
@@ -6586,7 +6799,18 @@ Section Properties.
       - eapply inlineEach_Singlelist_inlineEeach.
       - eapply IHxs; assumption.
     Qed.
-        
+
+    Lemma inlineEeach_Somelist_inlineEach (lrf : list RegFileBase) xs :
+      forall  k (a : ActionT type k),
+        (forall o uml retV, ESemAction o (fold_left (apply_nth (EeachRfMethodInliners _ k lrf)) xs (Action_EAction a)) uml retV
+                            -> ESemAction o (Action_EAction (fold_left (apply_nth (eachRfMethodInliners _ k lrf)) xs a)) uml retV).
+    Proof.
+      induction xs; simpl in *; auto; intros.
+      eapply inlineEeach_Some_Congruence in H.
+      - eapply IHxs; apply H.
+      - eapply inlineEeach_Singlelist_inlineEach.
+    Qed.
+    
 End Properties.
 
 
