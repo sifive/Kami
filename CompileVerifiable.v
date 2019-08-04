@@ -412,9 +412,6 @@ Section Compile.
       | None => meths2
       end.
 
-    Definition inlineRf_Meths_Flat (rf : RegFileBase) (l : list DefMethT) :=
-      fold_left (inlineSingle_Flat_pos (getMethods (BaseRegFile rf))) (seq 0 (length (getMethods (BaseRegFile rf)))) l.
-
     Definition inlineSingle_pos k meths (a : ActionT ty k) n :=
       match nth_error meths n with
       | Some f => inlineSingle f a
@@ -428,27 +425,27 @@ Section Compile.
                                                        ++ map (getSyncRes rf isAddr) read
                              end).
 
-    Definition eachRfMethodInliners k (rf : RegFileBase) : list (EActionT k -> EActionT k) :=
+    Definition EgetRegFileMapMethods k (rf : RegFileBase) : list (EActionT k -> EActionT k) :=
       (inlineWriteFile rf :: match (rfRead rf) with
                              | Async read => map (fun x => @inlineAsyncReadFile x rf k) read
                              | Sync isAddr read => map (fun x => @inlineSyncReqFile x rf k) read
                                                        ++ map (fun x => @inlineSyncResFile x rf k) read
                              end).
+    
+Definition EeachRfMethodInliners k (lrf : list RegFileBase) : list (EActionT k -> EActionT k) :=
+      concat (map (fun rf => EgetRegFileMapMethods k rf) lrf).
 
+    Definition eachRfMethodInliners k (lrf : list RegFileBase) : list (ActionT ty k -> ActionT ty k) :=
+      (concat (map (fun rf => (map (fun f => @inlineSingle ty f k) (getRegFileMethods rf))) lrf)).
+    
     Definition apply_nth {A : Type} (lf : list (A -> A)) (a : A) (n : nat) :=
       match nth_error lf n with
       | Some f => f a
       | None => a
       end.
     
-    Definition preCompileSingleRegFile k (ea : EActionT k) (rf : RegFileBase) : EActionT k :=
-      fold_left (apply_nth (eachRfMethodInliners k rf)) (seq 0 (length (eachRfMethodInliners k rf))) ea.
-
-    Fixpoint preCompileAllRegFile k (ea : EActionT k) (lrf : list RegFileBase) : EActionT k :=
-      match lrf with
-      | rf :: lrf' => preCompileAllRegFile (preCompileSingleRegFile ea rf) lrf'
-      | nil => ea
-      end.
+    Definition preCompileRegFiles k (ea : EActionT k) (lrf : list RegFileBase) : EActionT k :=
+      fold_left (apply_nth (EeachRfMethodInliners k lrf)) (seq 0 (length (EeachRfMethodInliners k lrf))) ea.
     
     Definition compileActions (readMap : regMapTy) (acts: list (ActionT ty Void)) :=
       fold_left (fun acc a =>
@@ -463,7 +460,7 @@ Section Compile.
                    CompLetFull acc (fun _ writeMap =>
                                       (CompLetFull (CompRet ($$ WO)%kami_expr
                                                             (CompactRegMap (VarRegMap writeMap)))
-                                                   (fun _ v => @EcompileAction v _ (preCompileAllRegFile (Action_EAction a) lrf) ($$ true)%kami_expr (VarRegMap v))))) acts
+                                                   (fun _ v => @EcompileAction v _ (preCompileRegFiles (Action_EAction a) lrf) ($$ true)%kami_expr (VarRegMap v))))) acts
                 (CompRet ($$ WO)%kami_expr (VarRegMap readMap)).
 
     Definition compileRules (readMap : regMapTy) (rules: list RuleT) :=
@@ -1030,9 +1027,12 @@ Section Properties.
           unfold inlineSingle_pos at 3; rewrite <- Heqnth_err.
           reflexivity.
   Qed.
+
+  Definition listRfMethods (lrf : list RegFileBase) : (list DefMethT) :=
+    (concat (map (fun rf => getRegFileMethods rf) lrf)).
   
-  Definition inlineRf_Rules_Flat (rf : RegFileBase) (l : list RuleT) :=
-    map (inline_Rules (getRegFileMethods rf) (seq 0 (length (getRegFileMethods rf)))) l.
+  Definition inlineRf_Rules_Flat (lrf : list RegFileBase) (l : list RuleT) :=
+    map (inline_Rules (listRfMethods lrf) (seq 0 (length (listRfMethods lrf)))) l.
   
   Corollary inlineAll_Rules_in (lm : list DefMethT) :
     forall lr,
@@ -1042,9 +1042,18 @@ Section Properties.
   Qed.
   
   
-  Definition flatInlineSingleRfNSC (m : BaseModule) (rf : RegFileBase) :=
-    BaseMod (getRegisters m  ++ getRegFileRegisters rf) (inlineRf_Rules_Flat rf (getRules m)) ((inlineRf_Meths_Flat rf (getMethods m)) ++ (getRegFileMethods rf)).
-      
+  Definition inlineRf_Meths_Flat (lrf : list RegFileBase) (l : list DefMethT) :=
+    map (inline_Meths (listRfMethods lrf) (seq 0 (length (listRfMethods lrf)))) l.
+
+  Definition flatInlineSingleRfNSC (m : BaseModule) (lrf : list RegFileBase) :=
+    BaseMod (getRegisters m  ++ (concat (map (fun rf => getRegFileRegisters rf) lrf)))
+            (inlineRf_Rules_Flat lrf (getRules m))
+            ((inlineRf_Meths_Flat lrf (getMethods m)) ++ (concat (map (fun rf => getRegFileMethods rf) lrf))).
+
+  
+  (* TODO: prove congruence of inline_Rules to fold_left (apply_nth (EeachRfMethodInliners k lrf)) xs) 
+     Show equivalence of (flatInlineSingleRfNSC (inlineAll_All_mod (mergeRemoveBaseModule m))) to inlineAll_All_mod (mergeSeparatedRemoved m)*)
+  
   Definition inlineSingle_Rule_pos (meths : list DefMethT) n (rule : RuleT) :=
     match nth_error meths n with
     | Some f => (inlineSingle_Rule f rule)
@@ -1802,6 +1811,89 @@ Section Properties.
       reflexivity.
   Qed.
 
+  Lemma inline_NeverCall k ty (a : ActionT ty k) :
+    forall (f : DefMethT) ls,
+      (forall v, NeverCallActionT (projT2 (snd f) ty v)) ->
+      ~In (fst f) ls ->
+      NoCallActionT ls (inlineSingle f a) ->
+      NoCallActionT ls a.
+  Proof.
+    induction a; intros; simpl in *;
+      [remember (String.eqb _ _ ) as strb; symmetry in Heqstrb; destruct strb;[rewrite String.eqb_eq in *; destruct Signature_dec|]; subst
+      | | | | | | | | ]; (inv H2 || inv H1); EqDep_subst; constructor; intros; eauto.
+  Qed.
+  
+  Lemma inlineSingle_pos_NeverCall k ty (a : ActionT ty k) n:
+    forall (l : list DefMethT) (ls : list string),
+      (forall meth ty,
+          In meth l ->
+          (forall arg, NeverCallActionT (projT2 (snd meth) ty arg))) ->
+      (forall k, ~In k (map fst l) \/ ~In k ls) ->
+      NoCallActionT ls (inlineSingle_pos l a n) ->
+      NoCallActionT ls a.
+  Proof.
+    unfold inlineSingle_pos; intros; remember (nth_error _ _) as nth_err0; symmetry in Heqnth_err0; destruct nth_err0; auto.
+    apply nth_error_In in Heqnth_err0.
+    eapply inline_NeverCall; eauto.
+    apply (in_map fst) in Heqnth_err0.
+    destruct (H0 (fst d)); auto.
+  Qed.
+
+  Lemma inlineSome_pos_NeverCall xs :
+    forall k ty (a : ActionT ty k)
+           (l : list DefMethT) (ls : list string),
+      (forall meth ty,
+          In meth l ->
+          (forall arg, NeverCallActionT (projT2 (snd meth) ty arg))) ->
+      (forall k, ~In k (map fst l) \/ ~In k ls) ->
+      NoCallActionT ls (fold_left (inlineSingle_pos l) xs a) ->
+      NoCallActionT ls a.
+  Proof.
+    induction xs; simpl; intros; auto.
+    eapply inlineSingle_pos_NeverCall; eauto.
+  Qed.
+  
+  Lemma NoCall_Meths_reduction xs :
+    forall (l l' : list DefMethT)
+           (HDisjKeys : DisjKey l l')
+           (HNeverCall : forall meth ty,
+               In meth l' ->
+               (forall arg, NeverCallActionT (projT2 (snd meth) ty arg))),
+      (forall meth ty,
+          In meth (fold_left (inlineSingle_Flat_pos l') xs l) ->
+          (forall arg, NoCallActionT (map fst l) (projT2 (snd meth) ty arg))) ->
+      (forall meth ty,
+          In meth l ->
+          (forall arg, NoCallActionT (map fst l) (projT2 (snd meth) ty arg))).
+  Proof.
+    intros.
+    rewrite inline_Meths_eq_inlineSome in *; auto.
+    destruct meth, s0; simpl in *.
+    specialize (H _ ty (in_map (inline_Meths l' xs) _ _ H0) arg); unfold inline_Meths in *; simpl in *.
+    eapply inlineSome_pos_NeverCall; eauto.
+    apply DisjKey_Commutative in HDisjKeys; intro k; specialize (HDisjKeys k); assumption.
+  Qed.   
+
+  Lemma NoCall_Rules_reduction :
+    forall (l : list DefMethT) (lr : list RuleT) (ls : list string)
+           (DisjKeys : forall k, ~In k (map fst l) \/ ~In k ls)
+           (HNeverCall : forall meth ty,
+               In meth l ->
+               (forall arg, NeverCallActionT (projT2 (snd meth) ty arg))),
+      (forall rule ty,
+          In rule (inlineAll_Rules l lr) ->
+          NoCallActionT ls (snd rule ty)) ->
+      (forall rule ty,
+          In rule lr ->
+          NoCallActionT ls (snd rule ty)).
+  Proof.
+    intros; destruct rule; simpl in *.
+    rewrite inlineAll_Rules_in in *.
+    eapply inlineSome_pos_NeverCall; eauto.
+    specialize (H _ ty (in_map (inline_Rules l _) _ _ H0)); unfold inline_Rules in *;
+      simpl in *; apply H.
+  Qed.
+
   Lemma SameKeys_inlineSome_Meths_map xs :
     forall (l l' : list DefMethT),
       (map fst (map (inline_Meths l' xs) l)) = map fst l.
@@ -1927,6 +2019,7 @@ Section Properties.
       apply (HNoCall _ _ H0).
   Qed.
 
+  (*
   Lemma NoSelfCall_inline_invar  k (a : ActionT type k) :
     forall (meth : DefMethT) (l : list DefMethT) (HIn : In (fst meth) (map fst l))
            (HNoCalls : NoCallActionT (map fst l) a),
@@ -1980,7 +2073,7 @@ Section Properties.
   Proof.
     intros; eapply NoSelfCall_inline_invar; eauto.
   Qed.
-
+*)
   Lemma inlineSingle_pos_app_l (l1 l2 : list DefMethT) ty k (a : ActionT ty k) :
     forall n,
       n < length l1 ->
@@ -2058,7 +2151,7 @@ Section Properties.
   Qed.
   
   (**** HERE ****)
-
+(*
   Lemma inlineSingle_Meths_posmap_invar1 xs :
     forall fn1 fn2 x1 x2 m1 m2 l (g : DefMethT -> DefMethT),
       fold_left (inlineSingle_Meths_posmap l) xs g (fn1, existT MethodT x1 m1)
@@ -2253,7 +2346,8 @@ Section Properties.
       unfold inlineRf_Rules_Flat, inlineAll_Meths in *.
       admit.
   Admitted.
-        
+ *)
+  
   Lemma NoSelfCall_nil (m : BaseModule) :
     getMethods m = nil ->
     NoSelfCallBaseModule m.
@@ -4459,7 +4553,7 @@ Section Properties.
           econstructor 17; eauto.
     Qed.
 
-    Corollary inlineWrites_conguence {k : Kind} (ea1 ea2 : EActionT type k) :
+    Corollary inlineWrites_congruence {k : Kind} (ea1 ea2 : EActionT type k) :
       (forall o uml retv,
           ESemAction o ea1 uml retv ->
           ESemAction o ea2 uml retv) ->
@@ -5012,7 +5106,7 @@ Section Properties.
           econstructor 17; eauto.
     Qed.
 
-    Corollary inlineAsyncRead_conguence {k : Kind} (ea1 ea2 : EActionT type k) :
+    Corollary inlineAsyncRead_congruence {k : Kind} (ea1 ea2 : EActionT type k) :
       (forall o uml retv,
           ESemAction o ea1 uml retv ->
           ESemAction o ea2 uml retv) ->
@@ -5517,7 +5611,7 @@ Section Properties.
           econstructor 17; eauto.
     Qed.
 
-    Corollary inlineSyncReq_conguence {k : Kind} (ea1 ea2 : EActionT type k) :
+    Corollary inlineSyncReq_congruence {k : Kind} (ea1 ea2 : EActionT type k) :
       (forall o uml retv,
           ESemAction o ea1 uml retv ->
           ESemAction o ea2 uml retv) ->
@@ -6046,7 +6140,7 @@ Section Properties.
           econstructor 17; eauto.
     Qed.
 
-    Corollary inlineSyncRes_conguence {k : Kind} (ea1 ea2 : EActionT type k) :
+    Corollary inlineSyncRes_congruence {k : Kind} (ea1 ea2 : EActionT type k) :
       (forall o uml retv,
           ESemAction o ea1 uml retv ->
           ESemAction o ea2 uml retv) ->
@@ -6173,5 +6267,326 @@ Section Properties.
     Qed.
 
     End SyncResInline.
-      
+
+
+    Lemma nth_error_map_None_iff :
+      forall {A B : Type} (f : A -> B) (l : list A) (n : nat),
+        nth_error l n = None <-> nth_error (map f l) n = None.
+    Proof.
+      intros; split; intros; rewrite nth_error_None, map_length in *; assumption.
+    Qed.
+    
+    Lemma nth_error_map_Some1 :
+      forall {A B : Type} (f : A -> B) (l : list A) (b : B) (n : nat),
+        nth_error (map f l) n = Some b -> exists a, nth_error l n = Some a /\ (f a = b).
+    Proof.
+      intros.
+      specialize (nth_error_map f (fun b => nth_error (map f l) n = Some b) n l) as P0.
+      rewrite H in P0.
+      remember (nth_error l _) as err0; symmetry in Heqerr0; destruct err0.
+      - exists a; split; auto.
+        destruct P0 as [P0 P1].
+        specialize (P0 eq_refl); inv P0; reflexivity.
+      - exfalso.
+        rewrite nth_error_None in Heqerr0.
+        enough (Some b <> None).
+        { eapply H0; rewrite <- H.
+          rewrite nth_error_None, map_length; assumption. }
+        intro; discriminate.
+    Qed.
+
+    Lemma nth_error_map_Some2 :
+      forall {A B : Type} (f : A -> B) (l : list A) (b : B) (n : nat),
+      (exists a, nth_error l n = Some a /\ (f a = b)) -> nth_error (map f l) n = Some b.
+    Proof.
+      intros; dest.
+      rewrite <- H0; eapply map_nth_error; eauto.
+    Qed.
+
+    Lemma nth_error_map_iff :
+      forall {A B : Type} (f : A -> B) (l : list A) (b : B) (n : nat),
+        nth_error (map f l) n = Some b <-> (exists a, nth_error l n = Some a /\ (f a = b)).
+    Proof.
+      repeat red; intros; dest; eauto using nth_error_map_Some1, nth_error_map_Some2.
+    Qed.
+
+    Lemma nth_error_nil_None :
+      forall {A : Type} (n : nat),
+        nth_error (nil : list A) n = None.
+    Proof.
+      intros; rewrite nth_error_None; simpl; lia.
+    Qed.
+    
+    Lemma inlineEach_inlineSingle_pos (lrf : list RegFileBase):
+      forall k ty (a : ActionT ty k) n,
+        inlineSingle_pos (listRfMethods lrf) a n = apply_nth (eachRfMethodInliners ty k lrf) a n.
+    Proof.
+      induction lrf; simpl; intros.
+      unfold listRfMethods, eachRfMethodInliners; simpl.
+      unfold inlineSingle_pos, apply_nth.
+      remember (nth_error _ _) as err0; remember (nth_error (nil : list (_ -> _)) _ ) as err1.
+      symmetry in Heqerr0, Heqerr1.
+      destruct err0; [apply nth_error_In in Heqerr0; inv Heqerr0|].
+      destruct err1; [apply nth_error_In in Heqerr1; inv Heqerr1| reflexivity].
+      unfold listRfMethods, eachRfMethodInliners, inlineSingle_pos, apply_nth in *; simpl.
+      destruct (le_lt_dec (length (getRegFileMethods a)) n).
+      - repeat rewrite nth_error_app2; try rewrite map_length; auto.
+      - repeat rewrite nth_error_app1; try rewrite map_length; auto.
+        remember (nth_error _ _) as err0; remember (nth_error (map _ _) _) as err1.
+        symmetry in Heqerr0, Heqerr1.
+        destruct err0.
+        + eapply (map_nth_error (fun f => inlineSingle f (k:=k))) in Heqerr0.
+          rewrite Heqerr1 in Heqerr0; rewrite Heqerr0; reflexivity.
+        + rewrite (nth_error_map_None_iff (fun f => @inlineSingle ty f k)) in Heqerr0.
+          setoid_rewrite Heqerr0 in Heqerr1; rewrite <- Heqerr1; reflexivity.
+    Qed.
+
+    Lemma inlineEach_inlineSome_pos xs :
+      forall (lrf : list RegFileBase) k ty (a : ActionT ty k),
+        fold_left (inlineSingle_pos (listRfMethods lrf)) xs a = fold_left (apply_nth (eachRfMethodInliners ty k lrf)) xs a.
+    Proof.
+      induction xs; simpl; auto; intros.
+      rewrite inlineEach_inlineSingle_pos, IHxs; reflexivity.
+    Qed.
+
+    Lemma EgetRegFileMapMethods_getRegFileMethods_len k ty (rf : RegFileBase) :
+      length (EgetRegFileMapMethods ty k rf) = length (getRegFileMethods rf).
+    Proof.
+      unfold EgetRegFileMapMethods, getRegFileMethods.
+      destruct rf, rfRead; simpl.
+      - induction reads; simpl; auto.
+        rewrite <- IHreads.
+        do 2 apply f_equal.
+        do 2 rewrite map_length; reflexivity.
+      - apply f_equal.
+        destruct isAddr; simpl; repeat rewrite app_length; repeat rewrite map_length; reflexivity.
+    Qed.
+
+    Lemma inlineEach_SingleRf_inlineEeach (rf : RegFileBase) :
+      forall n k (a : ActionT type k),
+        (forall o uml retV,
+            ESemAction o (Action_EAction (apply_nth (map (fun f => @inlineSingle type f k) (getRegFileMethods rf)) a n)) uml retV ->
+            ESemAction o (apply_nth (EgetRegFileMapMethods type k rf) (Action_EAction a) n) uml retV).
+    Proof.
+      unfold getRegFileMethods, EgetRegFileMapMethods; destruct rf, rfRead; simpl.
+      - unfold apply_nth in *; destruct n; simpl in *; intros.
+        + eapply WrInline_inlines; auto.
+        + unfold readRegFile in H.
+          remember (nth_error _ _) as err0.
+          remember (nth_error (map (fun x => _) reads) n) as err1.
+          symmetry in Heqerr0, Heqerr1.
+          destruct err1.
+          * rewrite nth_error_map_iff in Heqerr1; dest.
+            rewrite <- H1.
+            destruct err0.
+            -- rewrite nth_error_map_iff in Heqerr0; dest.
+               rewrite nth_error_map_iff in H2; dest.
+               rewrite <- H4 in H3.
+               eapply AsyncReadInline_inlines; simpl; eauto using nth_error_In.
+               rewrite H0 in H2; inv H2; simpl; assumption.
+            -- exfalso.
+               repeat rewrite <- nth_error_map_None_iff in Heqerr0.
+               rewrite H0 in Heqerr0; inv Heqerr0.
+          * rewrite <- nth_error_map_None_iff in Heqerr1.
+            destruct err0;[|assumption].
+            exfalso.
+            rewrite nth_error_map_iff in Heqerr0; dest.
+            rewrite nth_error_map_iff in H0; dest.
+            rewrite H0 in Heqerr1; discriminate.
+      - unfold apply_nth in *; destruct n; simpl in *; intros.
+        + eapply WrInline_inlines; auto.
+        + unfold readSyncRegFile in H.
+          remember (nth_error _ _) as err0.
+          remember (nth_error ((map _ _ ) ++ (map _ _ )) _) as err1.
+          symmetry in Heqerr0, Heqerr1.
+          destruct (le_lt_dec (length reads) n), isAddr.
+          * rewrite nth_error_app2 in Heqerr1; rewrite map_length in *;[| assumption].
+            rewrite map_app in Heqerr0.
+            rewrite nth_error_app2 in Heqerr0; repeat rewrite map_length in *; [| assumption].
+            destruct err1.
+            -- rewrite nth_error_map_iff in Heqerr1; dest.
+               rewrite <- H1.
+               destruct err0.
+               ++ rewrite nth_error_map_iff in Heqerr0; dest.
+                  rewrite nth_error_map_iff in H2; dest.
+                  rewrite <- H4 in H3.
+                  eapply SyncResInline_inlines; simpl; eauto using nth_error_In.
+                  rewrite H0 in H2; inv H2; simpl; assumption.
+               ++ exfalso.
+                  repeat rewrite <- nth_error_map_None_iff in Heqerr0.
+                  rewrite H0 in Heqerr0; inv Heqerr0.
+            -- rewrite <- nth_error_map_None_iff in Heqerr1.
+               destruct err0;[|assumption].
+               exfalso.
+               rewrite nth_error_map_iff in Heqerr0; dest.
+               rewrite nth_error_map_iff in H0; dest.
+               rewrite H0 in Heqerr1; discriminate.
+          * rewrite nth_error_app2 in Heqerr1; rewrite map_length in *;[| assumption].
+            rewrite map_app in Heqerr0.
+            rewrite nth_error_app2 in Heqerr0; repeat rewrite map_length in *; [| assumption].
+            destruct err1.
+            -- rewrite nth_error_map_iff in Heqerr1; dest.
+               rewrite <- H1.
+               destruct err0.
+               ++ rewrite nth_error_map_iff in Heqerr0; dest.
+                  rewrite nth_error_map_iff in H2; dest.
+                  rewrite <- H4 in H3.
+                  eapply SyncResInline_inlines; simpl; eauto using nth_error_In.
+                  rewrite H0 in H2; inv H2; simpl; assumption.
+               ++ exfalso.
+                  repeat rewrite <- nth_error_map_None_iff in Heqerr0.
+                  rewrite H0 in Heqerr0; inv Heqerr0.
+            -- rewrite <- nth_error_map_None_iff in Heqerr1.
+               destruct err0;[|assumption].
+               exfalso.
+               rewrite nth_error_map_iff in Heqerr0; dest.
+               rewrite nth_error_map_iff in H0; dest.
+               rewrite H0 in Heqerr1; discriminate.
+          * rewrite nth_error_app1 in Heqerr1;[| rewrite map_length in *; assumption].
+            rewrite map_app in Heqerr0.
+            rewrite nth_error_app1 in Heqerr0; repeat rewrite map_length in *; [| assumption].
+            destruct err1.
+            -- rewrite nth_error_map_iff in Heqerr1; dest.
+               rewrite <- H1.
+               destruct err0.
+               ++ rewrite nth_error_map_iff in Heqerr0; dest.
+                  rewrite nth_error_map_iff in H2; dest.
+                  rewrite <- H4 in H3.
+                  eapply SyncReqInline_inlines; simpl; eauto using nth_error_In.
+                  rewrite H0 in H2; inv H2; simpl; assumption.
+               ++ exfalso.
+                  repeat rewrite <- nth_error_map_None_iff in Heqerr0.
+                  rewrite H0 in Heqerr0; inv Heqerr0.
+            -- rewrite <- nth_error_map_None_iff in Heqerr1.
+               destruct err0;[|assumption].
+               exfalso.
+               rewrite nth_error_map_iff in Heqerr0; dest.
+               rewrite nth_error_map_iff in H0; dest.
+               rewrite H0 in Heqerr1; discriminate.
+          * rewrite nth_error_app1 in Heqerr1;[| rewrite map_length in *; assumption].
+            rewrite map_app in Heqerr0.
+            rewrite nth_error_app1 in Heqerr0; repeat rewrite map_length in *; [| assumption].
+            destruct err1.
+            -- rewrite nth_error_map_iff in Heqerr1; dest.
+               rewrite <- H1.
+               destruct err0.
+               ++ rewrite nth_error_map_iff in Heqerr0; dest.
+                  rewrite nth_error_map_iff in H2; dest.
+                  rewrite <- H4 in H3.
+                  eapply SyncReqInline_inlines; simpl; eauto using nth_error_In.
+                  rewrite H0 in H2; inv H2; simpl; assumption.
+               ++ exfalso.
+                  repeat rewrite <- nth_error_map_None_iff in Heqerr0.
+                  rewrite H0 in Heqerr0; inv Heqerr0.
+            -- rewrite <- nth_error_map_None_iff in Heqerr1.
+               destruct err0;[|assumption].
+               exfalso.
+               rewrite nth_error_map_iff in Heqerr0; dest.
+               rewrite nth_error_map_iff in H0; dest.
+               rewrite H0 in Heqerr1; discriminate.
+    Qed.
+    
+    Lemma inlineEach_Singlelist_inlineEeach (lrf : list RegFileBase):
+      forall n k (a : ActionT type k),
+        (forall o uml retV, ESemAction o (Action_EAction (apply_nth (eachRfMethodInliners _ k lrf) a n)) uml retV
+                            -> ESemAction o (apply_nth (EeachRfMethodInliners _ k lrf) (Action_EAction a) n) uml retV).
+    Proof.
+      induction lrf; intros.
+      - unfold eachRfMethodInliners, EeachRfMethodInliners in *; simpl in *.
+        unfold apply_nth in *.
+        rewrite nth_error_nil_None; rewrite nth_error_nil_None in H.
+        assumption.
+      - unfold eachRfMethodInliners, EeachRfMethodInliners in *.
+        destruct (le_lt_dec (length (getRegFileMethods a)) n).
+        + unfold apply_nth in *; simpl in *.
+          rewrite nth_error_app2 in H; try rewrite map_length in *; auto.
+          rewrite app_comm_cons; rewrite nth_error_app2.
+          * fold (EgetRegFileMapMethods type k a).
+            rewrite EgetRegFileMapMethods_getRegFileMethods_len.
+            apply IHlrf; auto.
+          * erewrite <-EgetRegFileMapMethods_getRegFileMethods_len in l; eauto.
+        + unfold apply_nth in *; simpl in *.
+          rewrite nth_error_app1 in H; try rewrite map_length in *; auto.
+          rewrite app_comm_cons; rewrite nth_error_app1.
+          * eapply inlineEach_SingleRf_inlineEeach.
+            assumption.
+          * erewrite <-EgetRegFileMapMethods_getRegFileMethods_len in l; eauto.
+    Qed.
+
+
+    Lemma inlineEeach_Single_Congruence (rf : RegFileBase) :
+      forall n k (ea1 ea2 : EActionT type k),
+        (forall o uml retV, ESemAction o ea1 uml retV -> ESemAction o ea2 uml retV) ->
+        (forall o uml retV,
+            ESemAction o (apply_nth (EgetRegFileMapMethods type k rf) ea1 n) uml retV ->
+            ESemAction o (apply_nth (EgetRegFileMapMethods type k rf) ea2 n) uml retV).
+    Proof.
+      unfold EgetRegFileMapMethods; destruct rf, rfRead; simpl.
+      - unfold apply_nth in *; destruct n; simpl in *; intros.
+        + eapply inlineWrites_congruence; eauto.
+        + remember (nth_error _ _) as err0.
+          symmetry in Heqerr0; destruct err0; eauto.
+          rewrite nth_error_map_iff in Heqerr0; dest.
+          rewrite <- H2 in *.
+          eapply inlineAsyncRead_congruence; simpl; eauto using nth_error_In.
+      - unfold apply_nth in *; destruct n; simpl in *; intros.
+        + eapply inlineWrites_congruence; eauto.
+        + remember (nth_error _ _) as err0.
+          symmetry in Heqerr0.
+          destruct (le_lt_dec (length reads) n).
+          * rewrite nth_error_app2 in Heqerr0; rewrite map_length in *; [| assumption].
+            destruct err0; eauto.
+            rewrite nth_error_map_iff in Heqerr0; dest.
+            rewrite <- H2 in *.
+            eapply inlineSyncRes_congruence; simpl in *; eauto using nth_error_In.
+          * rewrite nth_error_app1 in Heqerr0;[| rewrite map_length; assumption].
+            destruct err0; eauto.
+            rewrite nth_error_map_iff in Heqerr0; dest.
+            rewrite <- H2 in *.
+            eapply inlineSyncReq_congruence; simpl in *; eauto using nth_error_In.
+    Qed.
+
+    Lemma inlineEeach_SingleList_Congruence (lrf : list RegFileBase) :
+      forall n k (ea1 ea2 : EActionT type k),
+        (forall o uml retV, ESemAction o ea1 uml retV -> ESemAction o ea2 uml retV) ->
+        (forall o uml retV,
+            ESemAction o (apply_nth (EeachRfMethodInliners type k lrf) ea1 n) uml retV
+            -> ESemAction o (apply_nth (EeachRfMethodInliners type k lrf) ea2 n) uml retV).
+    Proof.
+      induction lrf; unfold EeachRfMethodInliners; simpl; intros.
+      - unfold apply_nth in *.
+        rewrite nth_error_nil_None in *; auto.
+      - unfold apply_nth in *; rewrite app_comm_cons in *.
+        destruct (le_lt_dec (length (EgetRegFileMapMethods type k a)) n).
+        + rewrite nth_error_app2 in *; eauto.
+        + rewrite nth_error_app1 in *; eauto.
+          eapply inlineEeach_Single_Congruence; eauto.
+    Qed.
+          
+    Lemma inlineEeach_Some_Congruence xs :
+      forall (lrf : list RegFileBase) k (ea1 ea2 : EActionT type k),
+        (forall o uml retV, ESemAction o ea1 uml retV -> ESemAction o ea2 uml retV) ->
+        (forall o uml retV,
+            ESemAction o (fold_left (apply_nth (EeachRfMethodInliners type k lrf)) xs ea1) uml retV ->
+            ESemAction o (fold_left (apply_nth (EeachRfMethodInliners type k lrf)) xs ea2) uml retV).
+    Proof.
+      induction xs; simpl; eauto; intros.
+      eapply IHxs.
+      - eapply inlineEeach_SingleList_Congruence; eauto.
+      - assumption.
+    Qed.
+        
+    Lemma inlineEach_Somelist_inlineEeach (lrf : list RegFileBase) xs :
+      forall  k (a : ActionT type k),
+        (forall o uml retV, ESemAction o (Action_EAction (fold_left (apply_nth (eachRfMethodInliners _ k lrf)) xs a)) uml retV
+                                       -> ESemAction o (fold_left (apply_nth (EeachRfMethodInliners _ k lrf)) xs (Action_EAction a)) uml retV).
+    Proof.
+      induction xs; simpl in *; auto; intros.
+      eapply inlineEeach_Some_Congruence.
+      - eapply inlineEach_Singlelist_inlineEeach.
+      - eapply IHxs; assumption.
+    Qed.
+        
 End Properties.
+
+

@@ -806,11 +806,11 @@ Coercion getModWf: BaseModuleWf >-> ModWf.
 Coercion getModWfOrd: BaseModuleWfOrd >-> ModWfOrd.
 
 Section NoCallActionT.
-  Variable ls: list DefMethT.
+  Variable ls: list string.
   Variable ty : Kind -> Type.
   
   Inductive NoCallActionT: forall k , ActionT ty k -> Prop :=
-  | NoCallMCall meth s e lretT c: ~ In (meth, s) (getKindAttr ls) -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (MCall meth s e c)
+  | NoCallMCall meth s e lretT c: ~ In meth ls -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (MCall meth s e c)
   | NoCallLetExpr k (e: Expr ty k) lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetExpr e c)
   | NoCallLetAction k (a: ActionT ty k) lretT c: NoCallActionT a -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetAction a c)
   | NoCallReadNondet k lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (ReadNondet k c)
@@ -825,15 +825,15 @@ Section NoSelfCallBaseModule.
   Variable m: BaseModule.
   
   Definition NoSelfCallRuleBaseModule (rule : Attribute (Action Void)) :=
-    forall ty, NoCallActionT (getMethods m) (snd rule ty).
+    forall ty, NoCallActionT (map fst (getMethods m)) (snd rule ty).
   
   Definition NoSelfCallRulesBaseModule :=
     forall rule ty, In rule (getRules m) ->
-                    NoCallActionT (getMethods m) (snd rule ty).
+                    NoCallActionT (map fst (getMethods m)) (snd rule ty).
   
   Definition NoSelfCallMethsBaseModule :=
     forall meth ty, In meth (getMethods m) ->
-                 forall (arg: ty (fst (projT1 (snd meth)))), NoCallActionT (getMethods m) (projT2 (snd meth) ty arg).
+                 forall (arg: ty (fst (projT1 (snd meth)))), NoCallActionT (map fst (getMethods m)) (projT2 (snd meth) ty arg).
 
   Definition NoSelfCallBaseModule :=
     NoSelfCallRulesBaseModule /\ NoSelfCallMethsBaseModule.
