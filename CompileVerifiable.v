@@ -157,7 +157,7 @@ Section Compile.
           match String.eqb _write g with
           | true =>
             if _isWrMask then
-              match Signature_dec sign (WriteRqMask (Nat.log2_up _idxNum) _num _Data, Void) with
+              match Signature_dec' sign (WriteRqMask (Nat.log2_up _idxNum) _num _Data, Void) with
               | left isEq =>
                 let inValue := (match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with | eq_refl => arg end) in
                 ELetExpr ($$ WO)%kami_expr
@@ -168,7 +168,7 @@ Section Compile.
               | right _ => EMCall g sign arg (fun ret => inlineWriteFile rf (cont ret))
               end
             else
-              match Signature_dec sign (WriteRq (Nat.log2_up _idxNum) (Array _num _Data), Void) with
+              match Signature_dec' sign (WriteRq (Nat.log2_up _idxNum) (Array _num _Data), Void) with
               | left isEq =>
                 let inValue := (match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with | eq_refl => arg end) in
                 ELetExpr ($$ WO)%kami_expr
@@ -210,7 +210,7 @@ Section Compile.
             | EMCall g sign arg cont =>
               match String.eqb read g with
               | true =>
-                match Signature_dec sign (Bit (Nat.log2_up _idxNum), Array _num _Data) with
+                match Signature_dec' sign (Bit (Nat.log2_up _idxNum), Array _num _Data) with
                 | left isEq =>
                   let inValue := (match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with | eq_refl => arg end) in
                   EAsyncRead _idxNum _dataArray inValue (fun array => inlineAsyncReadFile  read rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with
@@ -282,7 +282,7 @@ Section Compile.
             | EMCall g sign arg cont =>
               match String.eqb _readResName g with
               | true =>
-                match Signature_dec sign (Void, Array _num _Data) with
+                match Signature_dec' sign (Void, Array _num _Data) with
                 | left isEq =>
                   ESyncReadRes _idxNum _readRegName _dataArray isAddr (fun array => inlineSyncResFile read rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with | eq_refl => cont end array))
                 | right _ => EMCall g sign arg (fun ret => inlineSyncResFile read rf (cont ret))
@@ -326,7 +326,7 @@ Section Compile.
             | EMCall g sign arg cont =>
               match String.eqb _readReqName g with
               | true =>
-                match Signature_dec sign (Bit (Nat.log2_up _idxNum), Void) with
+                match Signature_dec' sign (Bit (Nat.log2_up _idxNum), Void) with
                 | left isEq =>
                   let inValue := (match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with | eq_refl => arg end) in
                   ELetExpr ($$ WO)%kami_expr
@@ -1021,7 +1021,7 @@ Section Properties.
       NoCallActionT ls (inlineSingle f a).
   Proof.
     induction a; intros; simpl; eauto; try (inv H1; EqDep_subst; econstructor; eauto).
-    - destruct String.eqb; [destruct Signature_dec|]; subst; inv H1; EqDep_subst;
+    - destruct String.eqb; [destruct Signature_dec'|]; subst; inv H1; EqDep_subst;
         econstructor; eauto.
       econstructor; eauto; simpl; intro.
       apply NeverCall_NoCalls; eauto.
@@ -1037,7 +1037,7 @@ Section Properties.
   Proof.
     induction a; simpl; auto; intros.
     - remember (String.eqb _ _) as strb; symmetry in Heqstrb.
-      destruct strb;[destruct Signature_dec|]; subst.
+      destruct strb;[destruct Signature_dec'|]; subst.
       + exfalso; rewrite String.eqb_eq in *; inv H1; EqDep_subst; contradiction.
       + exfalso; rewrite String.eqb_eq in *; inv H1; EqDep_subst; contradiction.
       + inv H1; EqDep_subst.
@@ -3884,7 +3884,7 @@ Section Properties.
         inv H1;[discriminate | | | ]; remember (String.eqb _ _) as strb; destruct strb;
           symmetry in Heqstrb; inv HUmlCons; try rewrite String.eqb_eq in Heqstrb;
             try rewrite String.eqb_neq in Heqstrb; subst;
-            try (destruct rfIsWrMask, Signature_dec); subst; simpl in *; try congruence;
+            try (destruct rfIsWrMask, Signature_dec'); subst; simpl in *; try congruence;
               EqDep_subst.
         + econstructor; eauto.
         + econstructor; eauto.
@@ -3988,7 +3988,7 @@ Section Properties.
       induction ea; simpl in *; intro rf; remember rf as rf'; destruct rf'; intros.
       - remember (String.eqb _ _) as strb; symmetry in Heqstrb.
         destruct strb; try rewrite String.eqb_eq in *; try rewrite String.eqb_neq in *;
-          [destruct rfIsWrMask; destruct Signature_dec |].
+          [destruct rfIsWrMask; destruct Signature_dec' |].
         + revert Heqrf'.
           inv H0; simpl in *; EqDep_subst.
           inv HESemAction; simpl in *; EqDep_subst.
@@ -4236,7 +4236,7 @@ Section Properties.
     Proof.
       induction a; intros; auto; simpl; destruct rf; subst; simpl in *.
       - destruct String.eqb, rfIsWrMask;
-          [destruct Signature_dec| destruct Signature_dec | | ]; simpl in *.
+          [destruct Signature_dec' | destruct Signature_dec' | | ]; simpl in *.
         + inv H0; EqDep_subst.
           inv HESemAction; EqDep_subst.
           inv HESemAction0; EqDep_subst.
@@ -4308,7 +4308,7 @@ Section Properties.
     Proof.
       induction a; intros; auto; simpl; destruct rf; subst; simpl in *.
       - destruct String.eqb, rfIsWrMask;
-          [destruct Signature_dec| destruct Signature_dec | | ]; simpl in *.
+          [destruct Signature_dec' | destruct Signature_dec' | | ]; simpl in *.
         + inv H0; EqDep_subst.
           inv HESemAction; EqDep_subst; inv H8.
           econstructor; simpl; auto.
@@ -4452,7 +4452,7 @@ Section Properties.
       - inv H0; EqDep_subst.
         remember (String.eqb _ _) as strb; symmetry in Heqstrb; revert Heqstrb.
         inv H1;[discriminate | | | ]; intro; destruct strb; try rewrite String.eqb_eq in *;
-          inv HUmlCons; try (destruct Signature_dec); subst;
+          inv HUmlCons; try (destruct Signature_dec'); subst;
             try (simpl in *; congruence); EqDep_subst.
         + econstructor; eauto.
         + econstructor; eauto.
@@ -4520,7 +4520,7 @@ Section Properties.
           try rewrite existsb_nexists_str in *; try rewrite String.eqb_eq in *;
             revert Heqrf' HIsAsync; subst; try congruence.
       - remember (String.eqb _ _) as strb; symmetry in Heqstrb;
-          destruct strb; [destruct Signature_dec |].
+          destruct strb; [destruct Signature_dec' |].
         + inv H0; EqDep_subst.
           intros.
           assert (Syntax.rfRead rf = Async reads) as P0.
@@ -4794,7 +4794,7 @@ Section Properties.
           try rewrite existsb_exists in *; try rewrite existsb_nexists_str in *;
             dest; try rewrite String.eqb_eq in *; subst; try congruence.
       - remember (String.eqb _ _) as strb; symmetry in Heqstrb; destruct strb;
-          [rewrite String.eqb_eq in *; destruct Signature_dec
+          [rewrite String.eqb_eq in *; destruct Signature_dec'
           |rewrite String.eqb_neq in *]; simpl in *.
         + inv H0; EqDep_subst.
           inv HESemAction; EqDep_subst.
@@ -4838,7 +4838,7 @@ Section Properties.
           try rewrite existsb_exists in *; try rewrite existsb_nexists_str in *;
             dest; try rewrite String.eqb_eq in *; subst; try congruence.
       - remember (String.eqb _ _) as strb; symmetry in Heqstrb; destruct strb;
-          [rewrite String.eqb_eq in *; destruct Signature_dec
+          [rewrite String.eqb_eq in *; destruct Signature_dec'
           |rewrite String.eqb_neq in *]; simpl in *.
         + inv H0; EqDep_subst.
           econstructor; simpl; auto.
@@ -4893,7 +4893,7 @@ Section Properties.
         inv H1;[discriminate | | | ]; remember (String.eqb _ _ ) as strb;
           symmetry in Heqstrb; destruct strb; try rewrite String.eqb_eq in *;
             try rewrite String.eqb_neq in *; inv HUmlCons;
-          try (destruct Signature_dec); subst; unfold getSyncReq in *; destruct isAddr0; 
+          try (destruct Signature_dec'); subst; unfold getSyncReq in *; destruct isAddr0; 
             try (simpl in *; congruence); EqDep_subst.
         + econstructor; eauto.
         + econstructor; eauto.
@@ -4985,7 +4985,7 @@ Section Properties.
           remember (existsb _ _ ) as exb; symmetry in Heqexb; destruct exb;
             try rewrite existsb_nexists_sync in *; try congruence; revert Heqrf' Heqread' HIsSync.
       - remember (String.eqb _ _) as strb; symmetry in Heqstrb; destruct strb;
-          [rewrite String.eqb_eq in *; subst; destruct Signature_dec
+          [rewrite String.eqb_eq in *; subst; destruct Signature_dec'
           |rewrite String.eqb_neq in *].
         +inv H0; EqDep_subst.
           inv HESemAction; EqDep_subst; intros.
@@ -5302,9 +5302,9 @@ Section Properties.
             try rewrite existsb_nexists_sync in *; try congruence; revert Heqrf' Heqread' HIsSync.
       - simpl in *; intros; remember (String.eqb _ _) as strb; symmetry in Heqstrb.
         unfold getSyncReq in *; simpl in *; destruct isAddr, strb;
-          [simpl in Heqstrb; rewrite Heqstrb in *; destruct Signature_dec
+          [simpl in Heqstrb; rewrite Heqstrb in *; destruct Signature_dec'
           |rewrite String.eqb_neq in *
-          |simpl in Heqstrb; rewrite Heqstrb; destruct Signature_dec
+          |simpl in Heqstrb; rewrite Heqstrb; destruct Signature_dec'
           |simpl in Heqstrb; rewrite Heqstrb in *]; simpl in *.
         + inv H0; EqDep_subst.
           inv HESemAction; EqDep_subst.
@@ -5377,7 +5377,7 @@ Section Properties.
             try rewrite existsb_nexists_sync in *; try congruence.
       - simpl in *; intros; remember (String.eqb _ _) as strb; symmetry in Heqstrb.
         destruct isAddr, strb; simpl in *; rewrite Heqstrb;
-        [destruct Signature_dec | | destruct Signature_dec| ]; simpl in *.
+        [destruct Signature_dec' | | destruct Signature_dec' | ]; simpl in *.
         + inv H0; EqDep_subst.
           inv HESemAction; EqDep_subst; [ |discriminate].
           * econstructor; auto.
@@ -5466,7 +5466,7 @@ Section Properties.
         inv H1;[discriminate | | | ]; remember (String.eqb _ _ ) as strb;
           symmetry in Heqstrb; destruct strb; try rewrite String.eqb_eq in *;
             try rewrite String.eqb_neq in *; inv HUmlCons;
-          try (destruct Signature_dec); subst; unfold getSyncReq in *; destruct isAddr0; 
+          try (destruct Signature_dec'); subst; unfold getSyncReq in *; destruct isAddr0; 
             try (simpl in *; congruence); EqDep_subst.
         + econstructor; eauto.
         + econstructor; eauto.
@@ -5541,7 +5541,7 @@ Section Properties.
           remember (existsb _ _ ) as exb; symmetry in Heqexb; destruct exb;
             try rewrite existsb_nexists_sync in *; try congruence; revert Heqrf' Heqread' HIsSync.
       - remember (String.eqb _ _) as strb; symmetry in Heqstrb; destruct strb;
-          [rewrite String.eqb_eq in *; subst; destruct Signature_dec
+          [rewrite String.eqb_eq in *; subst; destruct Signature_dec'
           |rewrite String.eqb_neq in *].
         +inv H0; EqDep_subst; intros.
          * assert (Syntax.rfRead rf = Sync true reads) as P0.
@@ -5831,7 +5831,7 @@ Section Properties.
             try rewrite existsb_nexists_sync in *; try congruence; revert Heqrf' Heqread' HIsSync.
       - simpl in *; intros; remember (String.eqb _ _) as strb; symmetry in Heqstrb.
         unfold getSyncReq in *; simpl in *; destruct isAddr, strb; simpl in *; rewrite Heqstrb;
-          [destruct Signature_dec | |destruct Signature_dec| ].
+          [destruct Signature_dec' | |destruct Signature_dec' | ].
         + inv H0; EqDep_subst.
           inv HESemAction; EqDep_subst.
           inv HESemAction0; EqDep_subst.
@@ -5888,7 +5888,7 @@ Section Properties.
             try rewrite existsb_nexists_sync in *; try congruence.
       - simpl in *; intros; remember (String.eqb _ _) as strb; symmetry in Heqstrb.
         destruct isAddr, strb; simpl in *; rewrite Heqstrb;
-        [destruct Signature_dec | | destruct Signature_dec| ]; simpl in *.
+        [destruct Signature_dec' | | destruct Signature_dec' | ]; simpl in *.
         + inv H0; EqDep_subst; [ |discriminate].
           * econstructor; auto.
             -- instantiate (2 := nil).

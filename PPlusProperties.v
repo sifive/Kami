@@ -962,7 +962,7 @@ Lemma PSemAction_inline_In (f : DefMethT) o:
       PSemAction o (inlineSingle f a) (readRegs' ++ readRegs) (newRegs' ++ newRegs) (calls'++calls2) retV2.
 Proof.
   induction a; intros.
-  - simpl; destruct (fst f =? meth) eqn:G; [rewrite String.eqb_eq in G|rewrite eqb_neq in G]; [destruct Signature_dec|]; subst.
+  - simpl; destruct (fst f =? meth) eqn:G; [rewrite String.eqb_eq in G|rewrite eqb_neq in G]; [destruct Signature_dec' | ]; subst.
     + inv H0; EqDep_subst.
       assert (In (fst f, existT SignT (projT1 (snd f)) (evalExpr e, mret)) calls1);
         [case (in_app_or _ _ _ (Permutation_in _ (Permutation_sym (HAcalls)) (in_eq _ _))); auto; intros TMP;apply (in_map fst) in TMP; contradiction|].
@@ -2058,7 +2058,7 @@ Lemma WfActionT_inline_Rule_inline_action (k : Kind) m (a : ActionT type k) rn (
 Proof.
   induction 1; try econstructor; eauto.
   simpl.
-  destruct String.eqb; [destruct Signature_dec|]; subst; econstructor; eauto.
+  destruct String.eqb; [destruct Signature_dec'|]; subst; econstructor; eauto.
   econstructor.
   intros.
   specialize (H1 v).
@@ -2865,7 +2865,7 @@ Lemma WfActionT_inline_Meth_inline_action (k : Kind) m (a : ActionT type k) gn (
 Proof.
   induction 1; try econstructor; eauto.
   simpl.
-  destruct String.eqb;[destruct Signature_dec|]; subst; econstructor; eauto.
+  destruct String.eqb;[destruct Signature_dec'|]; subst; econstructor; eauto.
   econstructor.
   intros.
   specialize (H1 v).
@@ -5017,7 +5017,7 @@ Lemma PSemAction_In_inline (f : DefMethT) o:
 Proof.
   intros retK2 a.
   induction a; subst; simpl in *; intros.
-  - destruct String.eqb eqn:G;[destruct Signature_dec|]; subst; simpl in *.
+  - destruct String.eqb eqn:G;[destruct Signature_dec'|]; subst; simpl in *.
     + inv H0; EqDep_subst.
       inv HPSemAction; EqDep_subst.
       specialize (H _ _ _ _ _ HPSemActionCont); dest.
@@ -7337,7 +7337,7 @@ Lemma WfConcatActionT_inlineSingle_Meth {k : Kind} (f: DefMethT) (a : ActionT ty
 Proof.
   intros.
   induction a; unfold inlineSingle; inv H0; EqDep_subst; try econstructor; eauto.
-  destruct String.eqb;[destruct Signature_dec|]; subst; simpl in *; econstructor; eauto.
+  destruct String.eqb;[destruct Signature_dec'|]; subst; simpl in *; econstructor; eauto.
   econstructor; eauto.
 Qed.
 

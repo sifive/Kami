@@ -205,6 +205,42 @@ Section nth_Fin_map2.
   Defined.
 End nth_Fin_map2.
 
+Section Fin.
+
+Fixpoint Fin_forallb{n} : (Fin.t n -> bool) -> bool :=
+  match n return (Fin.t n -> bool) -> bool with
+  | 0 => fun _ => true
+  | S m => fun p => p Fin.F1 && Fin_forallb (fun i => p (Fin.FS i))
+  end.
+
+Lemma Fin_forallb_correct{n} : forall p : Fin.t n -> bool,
+  Fin_forallb p = true <-> forall i, p i = true.
+Proof.
+  induction n; intros; split; intros.
+  apply (Fin.case0 (fun i => p i = true)).
+  reflexivity.
+  simpl in H.
+  fin_dep_destruct i.
+  destruct (p F1); [auto|discriminate].
+  apply (IHn (fun j => p (FS j))).
+  destruct (p F1); [auto|discriminate].
+  simpl.
+  apply andb_true_intro; split.
+  apply H.
+  apply IHn.
+  intro; apply H.
+Qed.
+
+Definition Fin_cast : forall {m n}, Fin.t m -> m = n -> Fin.t n :=
+  fun m n i pf => match pf in _ = y return Fin.t y with
+                  | eq_refl => i
+                  end.
+
+End Fin.
+
+
+
+
 Lemma inversionPair A B (a1 a2: A) (b1 b2: B):
   (a1, b1) = (a2, b2) ->
   a1 = a2 /\ b1 = b2.
@@ -1894,3 +1930,34 @@ Section Forall.
     apply IHForall2; omega.
   Qed.
 End Forall.
+
+Section Silly.
+
+(*used to avoid ill-typed term error messages*)
+	
+Lemma silly_lemma_true : forall {Y} (b : bool) f g pf, b = true ->
+  match b as b' return b = b' -> Y with
+  | true => f
+  | false => g
+  end eq_refl = f pf.
+Proof.
+  intros.
+  destruct b.
+  rewrite (hedberg bool_dec eq_refl pf); reflexivity.
+  discriminate.
+Qed.
+
+Lemma silly_lemma_false : forall {Y} (b : bool) f g pf, b = false ->
+  match b as b' return b = b' -> Y with
+  | true => f
+  | false => g
+  end eq_refl = g pf.
+Proof.
+  intros.
+  destruct b.
+  discriminate.
+  rewrite (hedberg bool_dec eq_refl pf); reflexivity.
+Qed.
+
+End Silly.
+

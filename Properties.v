@@ -327,6 +327,7 @@ Proof.
   - apply (match n eq_refl with end).
 Qed.
 
+(*
 Lemma Signature_eq: forall sig, Signature_dec sig sig = left eq_refl.
 Proof.
   intros; destruct (Signature_dec sig sig).
@@ -335,6 +336,7 @@ Proof.
     apply Signature_dec.
   - apply (match n eq_refl with end).
 Qed.
+*)
 
 Section InverseSemAction.
   Variable o: RegsT.
