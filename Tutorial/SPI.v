@@ -103,6 +103,122 @@ End TracePredicate.
 
 Require Import Kami.All.
 
+Module ExecutableSpec.
+  Inductive p :=
+  | yield (sck mosi : bool) (_ : forall miso : bool, p)
+  | ret (_ : word 8).
+
+  Fixpoint xchg {n : nat} : forall (tx : word 8) (rx : word 8), p :=
+    match n with
+    | O => fun _ rx => ret rx
+    | S n => fun tx rx =>
+        let sck := false in
+        let mosi := wmsb tx false in
+        let tx := WS false (split1 7 1 tx) in
+        yield sck mosi (fun miso =>
+        let rx := WS miso (split1 7 1 rx) in
+        let sck := true in
+        yield sck mosi (fun _ =>
+        @xchg n tx rx
+        ))
+    end.
+
+  Module behavior.
+    Inductive behavior : forall (c : p) (r : word 8) (trace : list (bool*bool*bool)), Type :=
+    | yield sck mosi miso k r t
+        (_ : behavior (k miso) r t)
+        : behavior (yield sck mosi k) r ((sck,mosi,miso)::t)
+    | ret r : behavior (ret r) r nil.
+  End behavior.
+End ExecutableSpec.
+
+(*
+module spi;
+  // defunctionalized continuation control flow
+  reg [3:0] i = 4'd8; // as above, 15 = start, 9 = after read
+  reg sck=1'b0;
+  // captured variables
+  reg [7:0] tx_fifo;
+  reg [7:0] rx_fifo;
+  // output hold
+  reg mosi=1'b0;
+  /* reg sck; */
+
+  task automatic cycle;
+    input miso;
+    output sck_out, mosi_out;
+  begin:cycle
+    if (i==4'd15 || i < 4'd8 &&  sck) begin
+      mosi = tx_fifo[7];
+      tx_fifo = {tx_fifo[6:0], 1'bx};
+      sck = 1'b0;
+      i = i + 4'd1;
+    end else if (i < 4'd8 && !sck) begin
+      rx_fifo = {rx_fifo[6:0], miso};
+      sck = 1'b1;
+    end else sck = 1'b0;
+    sck_out = sck; mosi_out = mosi;
+  end endtask
+
+  task automatic write;
+    input [7:0] data;
+    output err;
+  begin:write
+    if (!(i < 4'd8)) begin
+      tx_fifo = data;
+      i = 4'd15;
+      err = 0;
+    end else begin
+      err = 1;
+    end
+  end endtask
+
+  task automatic read;
+    output [7:0] data;
+    output err;
+  begin:write
+  if (i == 4'd8) begin
+      data = rx_fifo;
+      i = 9;
+      err = 0;
+    end else begin
+      err = 1;
+    end
+  end endtask
+
+endmodule
+
+module spi_test;
+  spi spi();
+
+  initial begin : initial_
+    integer i;
+    reg err;
+
+    reg miso, sck, mosi;
+    miso = 0; sck = 0; mosi = 0;
+
+    $dumpfile("spi.vcd");
+    $dumpvars(1, spi.tx_fifo, spi.i, mosi, sck, miso, spi.rx_fifo);
+
+    spi.write(8'ha5, err);
+    $display("%b", err);
+    for (i = 0; i < 20; i = i + 1) begin : for_
+      #1
+      spi.cycle(miso,
+        sck, mosi);
+      miso = mosi;
+      $display("%x %x %x", miso, sck, mosi);
+    end
+    begin:_
+      reg [7:0] read_result; reg read_err;
+      spi.read(read_result, read_err);
+      $display("%x %x", read_result, read_err);
+    end
+  end
+endmodule
+*)
+
 Definition bits {w} : word w -> list bool. Admitted.
 Lemma length_bits w x : List.length (@bits w x) = w. Admitted.
 Lemma bits_nil x : @bits 0 x = nil.
