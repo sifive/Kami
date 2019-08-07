@@ -103,35 +103,6 @@ End TracePredicate.
 
 Require Import Kami.All.
 
-Module ExecutableSpec.
-  Inductive p :=
-  | yield (sck mosi : bool) (_ : forall miso : bool, p)
-  | ret (_ : word 8).
-
-  Fixpoint xchg {n : nat} : forall (tx : word 8) (rx : word 8), p :=
-    match n with
-    | O => fun _ rx => ret rx
-    | S n => fun tx rx =>
-        let sck := false in
-        let mosi := wmsb tx false in
-        let tx := WS false (split1 7 1 tx) in
-        yield sck mosi (fun miso =>
-        let rx := WS miso (split1 7 1 rx) in
-        let sck := true in
-        yield sck mosi (fun _ =>
-        @xchg n tx rx
-        ))
-    end.
-
-  Module behavior.
-    Inductive behavior : forall (c : p) (r : word 8) (trace : list (bool*bool*bool)), Type :=
-    | yield sck mosi miso k r t
-        (_ : behavior (k miso) r t)
-        : behavior (yield sck mosi k) r ((sck,mosi,miso)::t)
-    | ret r : behavior (ret r) r nil.
-  End behavior.
-End ExecutableSpec.
-
 (*
 module spi;
   // defunctionalized continuation control flow
@@ -311,23 +282,61 @@ Section Named.
       [("GetMISO", existT SignT (Void, Bit 1) (wzero 0, WS miso WO));
       ("PutSCK",   existT SignT (Bool, Void)  (sck, wzero 0));
       ("PutMOSI",  existT SignT (Bit 1, Void) (WS mosi WO, wzero 0))]))]].
-  
-  Definition nop x := (exists arg, cmd_write arg true x) \/ (exists ret, cmd_read ret true x).
 
-  Definition sck clk t := exists miso mosi, iocycle miso clk mosi t.
+  Definition nop x := (exists arg, cmd_write arg true x) \/ (exists ret, cmd_read ret true x).
+  
+  Inductive p :=
+  | yield (sck mosi : bool) (_ : forall miso : bool, p)
+  | ret (_ : word 8).
+
+  Fixpoint xchg_prog (n : nat) : forall (tx : word 8) (rx : word 8), p :=
+    match n with
+    | O => fun _ rx => ret rx
+    | S n => fun tx rx =>
+        let sck := false in
+        let mosi := wmsb tx false in
+        let tx := WS false (split1 7 1 tx) in
+        yield sck mosi (fun miso =>
+        let rx := WS miso (split1 7 1 rx) in
+        let sck := true in
+        yield sck mosi (fun _ =>
+        @xchg_prog n tx rx
+        ))
+    end.
+
+  Fixpoint interp (e : p) : word 8 -> list _ -> Prop :=
+    match e with
+    | yield sck mosi k => fun w t =>
+        exists miso, (iocycle miso sck mosi +++ interp (k miso) w) t
+    | ret w => fun w' t => w' = w /\ t = nil
+    end.
+
+  Definition xchg tx rx := interp (xchg_prog 8 tx (wzero 8)) rx.
+
+  (*
+  Inductive behavior : forall (c : p) (r : word 8), list _ -> Prop  :=
+  | yield_behavior sck mosi miso k r t
+      (_ : behavior (k miso) r t)
+      : behavior (yield sck mosi k) r ((sck,mosi,miso)::t)
+  | ret_behavior r : behavior (ret r) r nil.
+  *)
+
+  (*
   Definition mosi mosi t := exists sck miso, iocycle miso sck mosi t.
   Definition miso miso t := exists sck mosi, iocycle miso sck mosi t.
   
   (* these are probably not useful because interleaving.. *)
   Definition mosis := TracePredicate.flat_map (fun x => TracePredicate.at_next_edge sck (mosi x)).
   Definition misos := TracePredicate.flat_map (fun x => TracePredicate.at_next_edge sck (miso x)).
+  *)
 
-  Definition exchange tx rx :=
-    cmd_write tx false +++
-    (fun t => mosis (bits tx) t /\ mosis (bits rx) t) +++
-    maybe (cmd_read rx false).
+  Definition silent t := exists miso mosi, iocycle miso false mosi t.
 
-  Definition spec := kleene (fun t => sck false t \/ exists tx rx, exchange tx rx t).
+  Definition spec := TracePredicate.interleave (kleene nop) (kleene (fun t =>
+    silent t \/
+    exists tx rx, (cmd_write tx false +++
+                   xchg tx rx +++
+                   maybe (cmd_read rx false)) t)).
 
   Definition enforce_regs (regs:RegsT) tx_fifo tx_fifo_len rx_fifo rx_fifo_len sck := regs =
     [(@^"hack_for_sequential_semantics", existT _ (SyntaxKind (Bit 0)) WO);
@@ -344,6 +353,7 @@ Section Named.
     _ : TracePredicate.interleave (kleene nop) spec t;
     _ : enforce_regs regs tx_fifo (natToWord 4 0) rx_fifo (natToWord 4 15) false;
   }.
+  Definition TODO {T : Type} : T. Admitted.
 
   Record active (regs : RegsT) (t : list (list FullLabel)) : Prop := {
     ck : _;
@@ -353,16 +363,17 @@ Section Named.
     tx_fifo_len : _ ;
     rx_fifo : _ ;
     rx_fifo_len : _ ;
-    _ : TracePredicate.interleave (kleene nop) (spec +++ (
-          cmd_write tx false +++
-          (fun t =>
-            mosis (List.skipn (wordToNat tx_fifo_len) (bits tx)) t /\
-            misos rx t
-          ))) t;
+    _ : TracePredicate.interleave (kleene nop) (kleene spec +++ TODO) t;
     _ : List.firstn (wordToNat tx_fifo_len) (bits tx) = List.skipn (8-wordToNat tx_fifo_len) (bits tx_fifo);
     _ : List.firstn (wordToNat rx_fifo_len) (bits rx_fifo) = rx;
     _ : enforce_regs regs tx_fifo tx_fifo_len rx_fifo rx_fifo_len ck;
   }.
+
+  (*     cmd_write tx false +++
+          (fun t =>
+            mosis (List.skipn (wordToNat tx_fifo_len) (bits tx)) t /\
+            misos rx t
+          ))) t; *)
 
   Definition invariant s t := active s t.
   
