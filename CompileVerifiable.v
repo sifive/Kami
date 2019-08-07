@@ -6649,7 +6649,7 @@ Section Properties.
       rewrite in_map_iff; exists x; split; auto.
   Qed.
   
-  Lemma foo rules  (b : BaseModule) (lrf : list RegFileBase) : 
+  Lemma CompileRules_Congruence rules  (b : BaseModule) (lrf : list RegFileBase) : 
     let m := inlineAll_All_mod (mergeSeparatedSingle b lrf) in
     forall  o upds calls retl
            (HConsist : getKindAttr o = getKindAttr (getRegisters m))
@@ -6789,7 +6789,7 @@ Section Properties.
         erewrite inlineSome_Rules_pos_NoCalls_ident; eauto.
         rewrite SameKeys_inlineSome_Flat; apply SubList_refl.
       - setoid_rewrite <- (rev_involutive rules).
-        eapply foo.
+        eapply CompileRules_Congruence.
         + apply (Trace_sameRegs HTrace).
         + simpl; unfold inlineAll_Meths.
           rewrite inlineAll_Meths_RegFile_fold_flat; simpl.
