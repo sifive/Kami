@@ -54,14 +54,17 @@ stripChar :: T.Text -> Maybe (Char,T.Text)
 stripChar txt = do
     (c,rest) <- T.uncons txt
     assert (c == '\'')
-    let (chr,rest') = T.breakOn "'" rest
-    return $ if T.head chr == '\\' then case T.index chr 1 of
-    --    'n' -> ('\n', T.tail rest')
-    --    't' -> ('\t', T.tail rest')
-        '\\' -> ('\\', T.tail rest')
-        '\'' -> ('\'', T.tail rest')
-
-        else (T.head chr, T.tail rest')
+    (c',rest') <- T.uncons rest
+    case c' of
+        -- escape char
+        '\\' -> do
+            (c'',rest'') <- T.uncons rest'
+            case c'' of
+                -- tail removes the final single quote char
+                '\'' -> return ('\'', T.tail rest'')
+                '\\' -> return ('\\', T.tail rest'')
+                --add more escape chars here as needed
+        _ -> return (c', T.tail rest')
 
 toks :: T.Text -> [Tok]
 toks txt

@@ -327,6 +327,7 @@ Proof.
   - apply (match n eq_refl with end).
 Qed.
 
+(*
 Lemma Signature_eq: forall sig, Signature_dec sig sig = left eq_refl.
 Proof.
   intros; destruct (Signature_dec sig sig).
@@ -335,6 +336,7 @@ Proof.
     apply Signature_dec.
   - apply (match n eq_refl with end).
 Qed.
+*)
 
 Section InverseSemAction.
   Variable o: RegsT.
@@ -4816,15 +4818,15 @@ Lemma findRegs_Some u:
 Proof.
   induction u; simpl; split; auto; intros; auto; try (tauto || discriminate).
   - destruct H0; subst; simpl.
-    + destruct (string_dec s s); simpl; tauto.
+    + rewrite String.eqb_refl; simpl; tauto.
     + destruct a; simpl in *.
       inv H.
       specialize (IHu H4).
-      destruct (string_dec s s0); subst; simpl; auto; subst.
+      destruct (String.eqb s s0) eqn:G; [rewrite String.eqb_eq in G|]; subst; simpl; auto; subst.
       * apply (in_map fst) in H0; simpl in *; tauto.
       * rewrite <- IHu; auto.
   - destruct a; simpl in *.
-    destruct (string_dec s s0); simpl in *.
+    destruct (String.eqb s s0) eqn:G; [rewrite String.eqb_eq in G|] ; simpl in *.
     inv H0; auto.
     inv H.
     specialize (IHu H4).
@@ -4847,13 +4849,14 @@ Proof.
   induction u; simpl; split; auto; destruct a; simpl; intros.
   - destruct (string_dec s s0); subst.
     + firstorder fail.
-    + rewrite <- IHu.
+    + rewrite <- String.eqb_neq in n; rewrite n.
+      rewrite <- IHu.
       firstorder fail.
-  - destruct (string_dec s s0); subst.
+  - destruct (String.eqb s s0) eqn:G; [rewrite String.eqb_eq in G|]; subst.
     + discriminate.
     + rewrite <- IHu in H.
       intro.
-      destruct H0; subst; firstorder fail.
+      rewrite String.eqb_neq in G; firstorder.
 Qed.
 
 Lemma NoDup_app A (l1: list (string * A)):
@@ -5016,9 +5019,9 @@ Lemma findRegs_Some' u:
     In (s, v) u.
 Proof.
   induction u; simpl; auto; intros; auto; try (tauto || discriminate).
-  destruct (string_dec s (fst a)); subst; simpl in *.
+  destruct (String.eqb s (fst a)) eqn:G; [rewrite String.eqb_eq in G|]; subst; simpl in *.
   - inv H; auto.
-    destruct a; auto.
+    destruct a; auto. 
   - specialize (IHu _ _ H).
     right; auto.
 Qed.

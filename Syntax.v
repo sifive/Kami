@@ -856,6 +856,7 @@ Local Ltac Struct_neq :=
                       repeat (existT_destruct Nat.eq_dec)
   end.
 
+(*
 Definition Kind_dec (k1: Kind): forall k2, {k1 = k2} + {k1 <> k2}.
 Proof.
   induction k1; destruct k2; try (right; (intros; abstract congruence)).
@@ -905,7 +906,82 @@ Proof.
                 injection H as H;
                 apply (n1 H)).
 Defined.
+*)
 
+Fixpoint Kind_decb(k1 k2 : Kind) : bool.
+Proof.
+  refine (
+    match k1,k2 with
+    | Bool, Bool => true
+    | Bit n, Bit m => Nat.eqb n m
+    | Array n k, Array m k' => Nat.eqb n m && Kind_decb k k'
+    | Struct n ks fs, Struct m ks' fs' => _
+    | _,_ => false
+    end).
+  destruct (Nat.eqb n m) eqn:G.
+  exact (Fin_forallb (fun i => Kind_decb (ks i) (ks' (Fin_cast i (proj1 (Nat.eqb_eq n m) G)))) && Fin_forallb (fun i => String.eqb (fs i) (fs' (Fin_cast i (proj1 (Nat.eqb_eq n m) G))))).
+  exact false.
+Defined.
+
+
+
+Lemma Kind_decb_refl : forall k, Kind_decb k k = true.
+Proof.
+  induction k; simpl; auto.
+  - apply Nat.eqb_refl.
+  - rewrite silly_lemma_true with (pf := (Nat.eqb_refl _)) by apply Nat.eqb_refl.
+    rewrite andb_true_iff; split; rewrite Fin_forallb_correct; intros.
+    + rewrite (hedberg Nat.eq_dec _ eq_refl); simpl; apply H.
+    + rewrite (hedberg Nat.eq_dec _ eq_refl); simpl; apply String.eqb_refl.
+  - rewrite andb_true_iff; split; auto.
+    apply Nat.eqb_refl.
+Qed.
+
+Lemma Kind_decb_eq : forall k1 k2, Kind_decb k1 k2 = true <-> k1 = k2.
+Proof.
+  induction k1; intros; destruct k2; split; intro; try (reflexivity || discriminate).
+  - simpl in H; rewrite Nat.eqb_eq in H; congruence.
+  - inversion H; simpl; apply Nat.eqb_refl.
+  - destruct (n =? n0)%nat eqn:G.
+    + simpl in H0.
+      rewrite (@silly_lemma_true bool (n =? n0)%nat _ _ G) in H0 by auto.
+      pose proof G.
+      rewrite Nat.eqb_eq in H1 by auto.
+      rewrite andb_true_iff in H0; destruct H0 as [G1 G2]; rewrite Fin_forallb_correct in G1,G2; subst.
+      rewrite (hedberg Nat.eq_dec _ eq_refl) in G1,G2; simpl in *.
+      setoid_rewrite H in G1.
+      setoid_rewrite String.eqb_eq in G2.
+      f_equal; extensionality i; auto.
+    + simpl in H0.
+      rewrite silly_lemma_false in H0; try discriminate; auto.
+  - rewrite H0; apply Kind_decb_refl.
+  - simpl in H; rewrite andb_true_iff in H.
+    destruct H as [H1 H2]; rewrite Nat.eqb_eq in H1; rewrite IHk1 in H2; congruence.
+  - simpl.
+    rewrite andb_true_iff; inversion H; split.
+    + apply Nat.eqb_refl.
+    + rewrite <- H2, IHk1; reflexivity.
+Qed.
+
+Lemma Kind_dec : forall k1 k2 : Kind, {k1 = k2} + {k1 <> k2}.
+Proof.
+  intros.
+  destruct (Kind_decb k1 k2) eqn:G.
+  rewrite Kind_decb_eq in G; auto.
+  right; intro.
+  rewrite <- Kind_decb_eq in H.
+  rewrite H in G; discriminate.
+Qed.
+
+Definition Signature_decb : Signature -> Signature -> bool :=
+  fun '(k,l) '(k',l') => Kind_decb k k' && Kind_decb l l'.
+
+Lemma Signature_decb_eq : forall s1 s2, Signature_decb s1 s2 = true <-> s1 = s2.
+Proof.
+  intros [] []; simpl; rewrite andb_true_iff; repeat rewrite Kind_decb_eq; firstorder congruence.
+Qed.
+
+(*
 Definition Signature_dec (s1 s2: Signature): {s1 = s2} + {s1 <> s2}.
   refine match s1, s2 with
          | (k11, k12), (k21, k22) => match Kind_dec k11 k21, Kind_dec k12 k22 with
@@ -919,6 +995,17 @@ Definition Signature_dec (s1 s2: Signature): {s1 = s2} + {s1 <> s2}.
   - exact (f_equal snd x).
   - exact (f_equal fst x).
   - exact (f_equal fst x).
+Defined.
+
+*)
+
+Definition Signature_dec' (s1 s2 : Signature) : {s1 = s2} + {s1 <> s2}.
+Proof.
+  intros; destruct (Signature_decb s1 s2) eqn:G.
+  left; rewrite <- Signature_decb_eq; auto.
+  right; intro.
+  rewrite <- Signature_decb_eq in H.
+  rewrite H in G; discriminate.
 Defined.
 
 Lemma isEq k: forall (e1: type k) (e2: type k),
@@ -1236,10 +1323,10 @@ Section MethT_dec.
   Lemma method_values_eq
   :  forall (s : Signature) (x y : SignT s), existT SignT s x = existT SignT s y -> x = y.
   Proof.
-    intros. inv H. apply (Eqdep_dec.inj_pair2_eq_dec Signature Signature_dec SignT) in H1. auto.
+    intros. inv H.
+    apply (Eqdep_dec.inj_pair2_eq_dec Signature Signature_dec' SignT) in H1. auto.
   Qed.
-     
-  
+
   (*
   Asserts that the values passed to and returned
   by two method calls differ if their signatures
@@ -1286,8 +1373,6 @@ Section MethT_dec.
                   (fun H0 : existT SignT s x = existT SignT s y
                    => H (method_values_eq H0)))
             (method_denotation_values_dec x y).
-
-  
   (*
   Determines whether or not the values passed to,
   and returned by, two method calls are equal.
@@ -1306,7 +1391,7 @@ Section MethT_dec.
                                                             r H)
                                                 (fun (H : s <> r) (_ : SignT r)
                                                  => right (method_values_neq H))
-                                                (Signature_dec s r))).
+                                                (Signature_dec' s r))).
 
   Lemma MethT_dec: forall s1 s2: MethT, {s1 = s2} + {s1 <> s2}.
   Proof.
@@ -1436,7 +1521,7 @@ Notation regInit := (fun (o': RegT) (r: RegInitT)  => fst o' = fst r /\
 
 Fixpoint findReg (s: string) (u: RegsT) :=
   match u with
-  | x :: xs => if string_dec s (fst x)
+  | x :: xs => if String.eqb s (fst x)
                then Some (snd x)
                else findReg s xs
   | nil => None
@@ -1601,7 +1686,7 @@ Definition getFlat m := BaseMod (getAllRegisters m) (getAllRules m) (getAllMetho
 
 Definition flatten m := createHide (getFlat m) (getHidden m).
 
-Definition autoHide (m: Mod) := createHideMod m (filter (fun i => getBool (in_dec string_dec i (getCallsPerMod m)))
+Definition autoHide (m: Mod) := createHideMod m (filter (fun i => existsb (String.eqb i) (getCallsPerMod m))
                                                         (map fst (getAllMethods m))).
 
 Fixpoint separateBaseMod (m: Mod): (list RegFileBase * list BaseModule) :=
@@ -1657,7 +1742,7 @@ Section inlineSingle.
     | MCall g sign arg cont =>
       match String.eqb (fst f) g with
       | true =>
-        match Signature_dec sign (projT1 (snd f)) with
+        match Signature_dec' sign (projT1 (snd f)) with
         | left isEq =>
           LetAction (LetExpr match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with
                              | eq_refl => arg
@@ -1779,17 +1864,15 @@ Definition flatten_inline_everything m :=
 
 Definition removeHides (m: BaseModule) s :=
   BaseMod (getRegisters m) (getRules m)
-          (filter (fun df => negb (getBool (in_dec string_dec (fst df) s))) (getMethods m)).
+          (filter (fun df => negb (existsb (String.eqb (fst df)) s)) (getMethods m)).
 
 Definition flatten_inline_remove m :=
   removeHides (inlineAll_All_mod m) (getHidden m).
-  
-
 
 (* Last Set of Utility Functions *)
 
 Definition hiddenBy (meths : list DefMethT) (h : string) : bool :=
-  (getBool (in_dec string_dec h (map fst meths))).
+  (existsb (String.eqb h) (map fst meths)).
 
 Definition getAllBaseMethods (lb : list BaseModule) : (list DefMethT) :=
   (concat (map getMethods lb)).
@@ -1817,6 +1900,9 @@ Definition separateModRemove (m : Mod) :=
 Definition baseNoSelfCalls (m : Mod) :=
   let '(hides, (rfs, mods)) := separateMod m in
   NoSelfCallBaseModule (inlineAll_All_mod (mergeSeparatedBaseMod mods)).
+
+
+
 
 
 
@@ -2048,25 +2134,20 @@ Definition struct_get_field
   (get_name : Fin.t (S n) -> string)
   (packet : Expr ty (SyntaxKind (Struct get_value get_name)))
   (name : string)
-  (kind : Kind)
-  :  option (Expr ty (SyntaxKind kind))
-  := struct_get_field_aux packet name >>-
-       sigT_rect
-         (fun _ => option (Expr ty (SyntaxKind kind)))
-         (fun field_kind field_value
-           => sumbool_rect
-                (fun _ => option (Expr ty (SyntaxKind kind)))
-                (fun H : field_kind = kind
-                  => Some (
-                       eq_rect
-                         field_kind
-                         (fun k => Expr ty (SyntaxKind k))
-                         field_value
-                         kind
-                         H))
-                (fun _ : field_kind <> kind
-                  => None)
-                (Kind_dec field_kind kind)).
+  (k : Kind)
+  :  option (Expr ty (SyntaxKind k)).
+Proof.
+refine (let y := @struct_get_field_aux ty n get_value get_name packet name in
+        match y with
+        | None => None
+        | Some (existT x y) => _
+        end).
+destruct (Kind_decb x k) eqn:G.
+- apply Kind_decb_eq in G.
+  subst.
+  exact (Some y).
+- exact None.
+Defined.
 
 Definition struct_get_field_default
   (ty: Kind -> Type)
@@ -2094,17 +2175,20 @@ Definition struct_set_field
   (name : string)
   (kind : Kind)
   (value : Expr ty (SyntaxKind kind))
-  :  option (Expr ty (SyntaxKind (Struct get_kind get_name)))
-  := struct_get_field_index packet name >>-
-       fun index
-         => sumbool_rect
-              (fun _ => option (Expr ty (SyntaxKind (Struct get_kind get_name))))
-              (fun H : get_kind index = kind
-                => Some
-                     (UpdateStruct packet index
-                       (eq_rect_r (fun k => Expr ty (SyntaxKind k)) value H)))
-             (fun _ => None)
-             (Kind_dec (get_kind index) kind).
+  :  option (Expr ty (SyntaxKind (Struct get_kind get_name))).
+Proof.
+  refine (let y := struct_get_field_index packet name in
+          match y with
+          | None => None
+          | Some i => _
+          end).
+  destruct (Kind_decb (get_kind i) kind) eqn:G.
+  - apply Kind_decb_eq in G.
+    subst.
+    exact (Some (UpdateStruct packet i value)).
+  - exact None.
+Defined.
+
 (* TODO
    + Compiler verification (difficult)
    + PUAR: Linux/Certikos
