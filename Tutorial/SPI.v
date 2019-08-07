@@ -346,37 +346,6 @@ Section Named.
      (@^"rx_fifo_len", existT _ (SyntaxKind (Bit 4)) rx_fifo_len);
      (@^"sck", existT _ (SyntaxKind Bool) sck) ].
 
-  (* Local Coercion SyntaxKind : Kind >-> FullKind. *)
-  Record idle (regs : RegsT) (t : list (list FullLabel)) : Prop := {
-    tx_fifo : _ ;
-    rx_fifo : _ ;
-    _ : TracePredicate.interleave (kleene nop) spec t;
-    _ : enforce_regs regs tx_fifo (natToWord 4 0) rx_fifo (natToWord 4 15) false;
-  }.
-  Definition TODO {T : Type} : T. Admitted.
-
-  Record active (regs : RegsT) (t : list (list FullLabel)) : Prop := {
-    ck : _;
-    tx : _;
-    rx : _;
-    tx_fifo : _ ;
-    tx_fifo_len : _ ;
-    rx_fifo : _ ;
-    rx_fifo_len : _ ;
-    _ : TracePredicate.interleave (kleene nop) (kleene spec +++ TODO) t;
-    _ : List.firstn (wordToNat tx_fifo_len) (bits tx) = List.skipn (8-wordToNat tx_fifo_len) (bits tx_fifo);
-    _ : List.firstn (wordToNat rx_fifo_len) (bits rx_fifo) = rx;
-    _ : enforce_regs regs tx_fifo tx_fifo_len rx_fifo rx_fifo_len ck;
-  }.
-
-  (*     cmd_write tx false +++
-          (fun t =>
-            mosis (List.skipn (wordToNat tx_fifo_len) (bits tx)) t /\
-            misos rx t
-          ))) t; *)
-
-  Definition invariant s t := active s t.
-  
   Ltac expand := (* Goal: invariant *)
     ((esplit; trivial); [..|solve[cbv [enforce_regs] in *;
         repeat match goal with
@@ -393,7 +362,14 @@ Section Named.
         | _ => exact eq_refl
                end]]; subst).
 
-  Goal forall s t, Trace SPI s t -> invariant s t.
+  (* draining case only *)
+  Goal forall s past,
+    Trace SPI s past ->
+    forall tx tx_len rx rx_len sck,
+    enforce_regs s tx tx_len rx rx_len sck ->
+    wordToNat tx_len <> 0 ->
+    forall frx future, TracePredicate.interleave (kleene nop) (interp (xchg_prog (wordToNat tx_len) tx rx) frx) future ->
+    TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) frx) (future ++ past).
   Proof.
     induction 1 as [A B C D | A t C regs E _ IHTrace HStep K I]; subst.
     { admit. }
@@ -401,6 +377,20 @@ Section Named.
     unshelve epose proof InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep as HHS;
       clear HStep; [abstract discharge_wf|..|rename HHS into HStep].
     1,2,3: admit.
+
+    repeat match goal with
+      | _ => progress intros
+      | _ => progress clean_hyp_step
+      | _ => progress discharge_string_dec
+      | _ => progress cbn [SPI getMethods baseModule makeModule makeModule' type evalExpr isEq evalConstT Kind_rect List.app map fst snd projT1 projT2 invariant doUpdRegs findReg] in *
+      | _ => progress cbv [invariant] in *
+      | K: UpdRegs _ _ _ |- _ => unshelve ( repeat erewrite (NoDup_UpdRegs _ _ K) in * ); clear K
+      | |- NoDup _ => admit
+    end.
+
+
+
+    (* 
     destruct IHTrace as [sck tx tx_fifo tx_fifo_len rx_fifo rx_fifo_len IH TODO1 Henforce]; cbv [enforce_regs] in *;
       repeat match goal with
         | _ => progress intros
@@ -570,6 +560,7 @@ Section Named.
     
     eapply andb_prop in H4; destruct H4.
     rewrite andb_true_l in H.
+   *)
 
 Abort.
 
