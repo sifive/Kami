@@ -57,8 +57,6 @@ Section Compile.
                         (Data : Kind) (isAddr : bool) (cont : EActionT lretT) : EActionT lretT
   | ESyncReadRes (idxNum num : nat) (readReg dataArray : string) (Data : Kind) (isAddr : bool)
                         (cont : fullType ty (SyntaxKind (Array num Data)) -> EActionT lretT) : EActionT lretT.
-
-  (* Injection of ActionT into EActionT *)
   
   Fixpoint Action_EAction (lretT : Kind) (a : ActionT ty lretT) :  EActionT lretT :=
     match a in ActionT _ _ with
@@ -1050,10 +1048,6 @@ Section Properties.
             (inlineRf_Rules_Flat lrf (getRules m))
             ((inlineRf_Meths_Flat lrf (getMethods m)) ++ (concat (map (fun rf => getRegFileMethods rf) lrf))).
 
-  
-  (* TODO: prove congruence of inline_Rules to fold_left (apply_nth (EeachRfMethodInliners k lrf)) xs) 
-     Show equivalence of (flatInlineSingleRfNSC (inlineAll_All_mod (mergeRemoveBaseModule m))) to inlineAll_All_mod (mergeSeparatedRemoved m)*)
-  
   Definition inlineSingle_Rule_pos (meths : list DefMethT) n (rule : RuleT) :=
     match nth_error meths n with
     | Some f => (inlineSingle_Rule f rule)
@@ -2019,61 +2013,6 @@ Section Properties.
       apply (HNoCall _ _ H0).
   Qed.
 
-  (*
-  Lemma NoSelfCall_inline_invar  k (a : ActionT type k) :
-    forall (meth : DefMethT) (l : list DefMethT) (HIn : In (fst meth) (map fst l))
-           (HNoCalls : NoCallActionT (map fst l) a),
-      inlineSingle meth a = a.
-  Proof.
-    induction a; simpl; intros; inv HNoCalls; EqDep_subst; eauto.
-    - remember (String.eqb _ _) as strb; destruct strb.
-      + symmetry in Heqstrb; rewrite String.eqb_eq in *; subst; contradiction.
-      + enough ((fun ret  => inlineSingle meth0 (a ret)) = (fun ret => (a ret))).
-        { setoid_rewrite H0; reflexivity. }
-        apply functional_extensionality.
-        intros; eapply H; eauto.
-    - enough ((fun ret  => inlineSingle meth (a ret)) = (fun ret => (a ret))).
-      { setoid_rewrite H0; reflexivity. }
-      apply functional_extensionality.
-      intros; eapply H; eauto.
-    - enough ((fun ret  => inlineSingle meth (a0 ret)) = (fun ret => (a0 ret))).
-      { erewrite IHa; eauto.
-        setoid_rewrite H0; reflexivity. }
-      apply functional_extensionality.
-      intros; eapply H; eauto.
-    - enough ((fun ret  => inlineSingle meth (a ret)) = (fun ret => (a ret))).
-      { setoid_rewrite H0; reflexivity. }
-      apply functional_extensionality.
-      intros; eapply H; eauto.
-    - enough ((fun ret  => inlineSingle meth (a ret)) = (fun ret => (a ret))).
-      { setoid_rewrite H0; reflexivity. }
-      apply functional_extensionality.
-      intros; eapply H; eauto.
-    - erewrite IHa; eauto.
-    - enough ((fun ret  => inlineSingle meth (a3 ret)) = (fun ret => (a3 ret))).
-      { setoid_rewrite H0; erewrite IHa1, IHa2; eauto. }
-      apply functional_extensionality.
-      intros; eapply H; eauto.
-    - erewrite IHa; eauto.
-  Qed.
-
-  Lemma NoSelfCall_inlineSingle_Meth_invar (meth1 meth2 : DefMethT) :
-    forall (l : list DefMethT) (HIn : In (fst meth1) (map fst l))
-           (HNoMethCalls : forall arg : type (fst (projT1 (snd meth2))),
-               NoCallActionT (map fst l) (projT2 (snd meth2) type arg)) arg,
-      inlineSingle meth1 (projT2 (snd meth2) type arg) = (projT2 (snd meth2) type arg).
-  Proof.
-    intros; eapply NoSelfCall_inline_invar; eauto.
-  Qed.
-
-  Lemma NoSelfCall_inlineSingle_Rule_invar (rule : RuleT) :
-    forall (meth : DefMethT) (l : list DefMethT) (HIn : In (fst meth) (map fst l))
-           (HNoRuleCalls : NoCallActionT (map fst l) (snd rule type)),
-      inlineSingle meth (snd rule type) = (snd rule type).
-  Proof.
-    intros; eapply NoSelfCall_inline_invar; eauto.
-  Qed.
-*)
   Lemma inlineSingle_pos_app_l (l1 l2 : list DefMethT) ty k (a : ActionT ty k) :
     forall n,
       n < length l1 ->
@@ -2149,204 +2088,6 @@ Section Properties.
     induction xs; simpl; auto; intros.
     rewrite IHxs, SameKeys_inlineSingle_Flat; reflexivity.
   Qed.
-  
-  (**** HERE ****)
-(*
-  Lemma inlineSingle_Meths_posmap_invar1 xs :
-    forall fn1 fn2 x1 x2 m1 m2 l (g : DefMethT -> DefMethT),
-      fold_left (inlineSingle_Meths_posmap l) xs g (fn1, existT MethodT x1 m1)
-      = (fn2, existT MethodT x2 m2) ->
-      (forall fn1' fn2' x1' x2' m1' m2', g (fn1', existT MethodT x1' m1') = (fn2', existT MethodT x2' m2') -> fn1' = fn2' /\ x1' = x2') ->
-      fn1 = fn2 /\ x1 = x2.
-  Proof.
-    intro; induction xs; simpl; intros.
-    - eapply H0; eauto.
-    - eapply IHxs with (g := (inlineSingle_Meths_posmap l g a)); eauto.
-      intros.
-      unfold inlineSingle_Meths_posmap in H1.
-      destruct nth_error; eauto.
-      remember (g (_, _) ) as g_val.
-      destruct g_val, s0.
-      specialize (H0 _ _ _ _ _ _ (eq_sym Heqg_val)); dest; subst.
-      unfold inlineSingle_Meth in H1; destruct String.eqb; inv H1; eauto.
-  Qed.
-
-  Lemma inlineSingle_Meths_posmap_invar1' xs :
-    forall fn x (m1 : MethodT x) l (g : DefMethT -> DefMethT)
-           (HIn : In (fn, existT MethodT x m1) l)
-           (HNoCall : forall (meth : DefMethT) ty,
-               In meth l ->
-               (forall arg, NoCallActionT (map fst l) (projT2 (snd meth) ty arg))),
-      (forall fn' x' (m1' : MethodT x'),
-          In (fn', existT MethodT x' m1') l ->
-          exists (m2' : MethodT x'),
-            (forall arg, m1' type arg = m2' type arg) /\
-            g (fn', existT MethodT x' m1') = (fn', existT MethodT x' m2')) ->
-      exists (m2 : MethodT x),
-        (forall arg, m1 type arg = m2 type arg) /\
-        fold_left (inlineSingle_Meths_posmap l) xs g (fn, existT MethodT x m1)
-        = (fn, existT MethodT x m2).
-  Proof.
-    intro; induction xs; simpl; intros.
-    - eapply H; eauto.
-    - eapply IHxs with (g := (inlineSingle_Meths_posmap l g a)); eauto.
-      intros.
-      specialize (H _ _ _ H0) as TMP; dest.
-      unfold inlineSingle_Meths_posmap.
-      remember (nth_error _ _ ) as nth_err0.
-      destruct nth_err0; eauto.
-      unfold inlineSingle_Meth; rewrite H2.
-      remember (String.eqb (fst (g d)) fn') as s.
-      destruct s; eauto.
-      exists (fun ty arg => inlineSingle (g d) (x0 ty arg)); split; auto; intros.
-      destruct d, s0; simpl in *.
-      symmetry in Heqnth_err0; apply nth_error_In in Heqnth_err0.
-      specialize (H _ _ _ Heqnth_err0); dest.
-      rewrite <- H1, H3.
-      symmetry; eapply NoSelfCall_inline_invar.
-      + simpl in *; apply (in_map fst _ _ Heqnth_err0).
-      + specialize (HNoCall _ type H0); simpl in *; eauto.
-  Qed.
-  
-  Lemma flattenInlinedRf1 :
-    forall m o l (rf : RegFileBase)
-           (HNoCall : NoSelfCallBaseModule m)
-           (HDisjKeys : DisjKey (getMethods m) (getMethods rf)),
-      Substeps (inlineAll_All_mod (ConcatMod m (BaseRegFile rf))) o l ->
-      Substeps (flatInlineSingleRfNSC m rf) o l.
-  Proof.
-    induction 3; subst; simpl in *.
-    - econstructor; eauto.
-    - unfold flatInlineSingleRfNSC, inlineRf_Rules_Flat; simpl.
-      rewrite app_nil_r, inlineAll_Rules_in in HInRules.
-      rewrite in_map_iff in HInRules; dest; destruct x; simpl in *; inv H0.
-      econstructor 2 with (u := u) (reads := reads); auto; simpl.
-      + instantiate (1 :=  (fun ty => (fold_left (inlineSingle_pos (getRegFileMethods rf)) (seq 0 (length (getRegFileMethods rf)))) (a ty))).
-        rewrite in_map_iff; unfold inline_Rules; exists (rn, a); split; auto.
-      + unfold inlineAll_Meths in HAction at 1;
-          rewrite (inlineAll_Meths_RegFile_fold_flat rf) in HAction; [|apply SubList_refl].
-        rewrite inlineAll_Meths_same_len, app_length, inlineSome_pos_app in HAction; auto.
-        * enough (forall xs,
-                     fold_left
-                       (inlineSingle_pos
-                          (fold_left (inlineSingle_Flat_pos (getRegFileMethods rf))
-                                     (seq 0 (Datatypes.length (getRegFileMethods rf)))
-                                     (fold_left inlineSingle_Meths_pos
-                                                (seq 0 (Datatypes.length (getMethods m))) 
-                                                (getMethods m)))) xs (a type)
-                     = (a type)) as P0.
-          { setoid_rewrite P0 in HAction; assumption. }
-          unfold NoSelfCallBaseModule, NoSelfCallRulesBaseModule in *; dest.
-          specialize (H0 _ type H1); simpl in *.
-          clear - H0; intros.
-          induction xs; simpl; auto.
-          unfold inlineSingle_pos at 2.
-          remember (nth_error _ _) as nth_err0; destruct nth_err0; auto.
-          apply eq_sym, nth_error_In in Heqnth_err0.
-          apply (in_map fst) in Heqnth_err0.
-          rewrite SameKeys_inlineSome_Flat, <- SameKeys_inlineSome_Meths in Heqnth_err0.
-          rewrite (NotCalled_NotInlined _ Heqnth_err0 H0).
-          assumption.
-        * setoid_rewrite <- (map_length fst) at 2.
-          rewrite SameKeys_inlineSome_Flat, <- SameKeys_inlineSome_Meths, map_length.
-          reflexivity.
-    - unfold flatInlineSingleRfNSC, inlineRf_Rules_Flat.
-      unfold inlineAll_Meths in HInMeths.
-      rewrite (inlineAll_Meths_RegFile_fold_flat rf), in_app_iff in HInMeths.
-      inv HInMeths.
-      + rewrite inline_Meths_eq_inlineSome in H0.
-        * rewrite in_map_iff in H0; dest; destruct x; simpl in *; inv H0; destruct s0; simpl.
-          rewrite inlineSome_map, in_map_iff in H1; dest; destruct x0, s0; simpl in *.
-          unfold NoSelfCallBaseModule, NoSelfCallMethsBaseModule in HNoCall; dest; clear H.
-          specialize (inlineSingle_Meths_posmap_invar1'
-                        (seq 0 (length (getMethods m))) s m1 _ (fun x => x) H1 H3) as P0.
-          assert (forall (fn' : string) (x' : Signature) (m1' : MethodT x'),
-                      In (fn', existT MethodT x' m1') (getMethods m) ->
-                      exists m2' : MethodT x',
-                        (forall arg : fullType type (SyntaxKind (fst x')), m1' type arg = m2' type arg) /\(fun x : DefMethT => x) (fn', existT MethodT x' m1') = (fn', existT MethodT x' m2')) as P1.
-          { clear. intros. exists m1'; split; auto. }
-          specialize (P0 P1); clear P1; dest.
-          setoid_rewrite H4 in H0.
-          inv H0; EqDep_subst.
-          econstructor 3 with (reads := reads) (u := u)
-                              (fb := existT (fun x => forall x0 : Kind -> Type, fullType x0 (SyntaxKind (fst x)) -> ActionT x0 (snd x)) x
-                                            (fun ty arg => fold_left (inlineSingle_pos (getRegFileMethods rf)) (seq 0 (length (getRegFileMethods rf))) (m1 ty arg))); simpl in *;
-            eauto.
-          -- rewrite in_app_iff; left.
-             unfold inlineRf_Meths_Flat.
-             rewrite inline_Meths_eq_inlineSome, in_map_iff; auto.
-             exists (fn, existT MethodT x m1); split; auto.
-          -- rewrite H; assumption.
-        * intro k.
-          rewrite <- SameKeys_inlineSome_Meths.
-          specialize (HDisjKeys k); assumption.
-      + econstructor 3; simpl; eauto.
-        rewrite in_app_iff; right; assumption.
-      + apply SubList_refl.
-  Qed.
-
-  Lemma inline_Rules_app lm1 lm2:
-    (fun r => inline_Rules (lm1 ++ lm2) (seq 0 (length (lm1 ++ lm2))) r) =
-    (fun r => inline_Rules lm2 (seq 0 (length lm2)) (inline_Rules lm1 (seq 0 (length lm1)) r)).
-  Proof.
-    apply functional_extensionality; intro.
-    unfold inline_Rules; destruct x.
-    apply f_equal.
-    rewrite app_length.
-    apply functional_extensionality_dep; intro.
-    rewrite inlineSome_pos_app; auto.
-  Qed.
-  
-  Lemma flattenInlinedRf2 :
-    forall m o l (rf : RegFileBase)
-           (HNoCall : NoSelfCallBaseModule m)
-           (HDisjKeys : DisjKey (getMethods m) (getMethods rf)),
-      Substeps (flatInlineSingleRfNSC m rf) o l ->
-      Substeps (inlineAll_All_mod (ConcatMod m (BaseRegFile rf))) o l.
-  Proof.
-    induction 3; subst; simpl in *.
-    - econstructor 1; eauto.
-    - unfold inlineAll_All_mod, inlineRf_Rules_Flat, inlineAll_Meths in *.
-      rewrite in_map_iff in HInRules; dest; destruct x.
-      unfold inline_Rules in H0; inv H0.
-      econstructor 2 with (reads := reads); simpl; auto;[rewrite app_nil_r | | assumption].
-      + rewrite inlineAll_Rules_in.
-        instantiate (1 := (fun ty => fold_left (inlineSingle_pos
-                                       (inlineAll_Meths (getMethods m ++ getRegFileMethods rf)))
-                                          (seq 0 (Datatypes.length (inlineAll_Meths (getMethods m ++ getRegFileMethods rf)))) (a ty))).
-        unfold inlineAll_Meths; rewrite (inlineAll_Meths_RegFile_fold_flat rf);
-          [|apply SubList_refl].
-        rewrite in_map_iff; exists (rn, a); split; auto.
-      + unfold inlineAll_Meths.
-        simpl; rewrite (inlineAll_Meths_RegFile_fold_flat rf);[| apply SubList_refl].
-        enough (forall xs,
-                   (fold_left
-          (inlineSingle_pos
-             (fold_left (inlineSingle_Flat_pos (getRegFileMethods rf))
-                (seq 0 (Datatypes.length (getRegFileMethods rf)))
-                (fold_left inlineSingle_Meths_pos (seq 0 (Datatypes.length (getMethods m)))
-                   (getMethods m))))  xs (a type)) = (a type)) as P0.
-        { rewrite app_length.
-          rewrite inlineSome_pos_app; auto.
-          setoid_rewrite P0; assumption. }
-        clear - HNoCall H1.
-        induction xs; simpl; auto.
-        unfold inlineSingle_pos at 2.
-        remember (nth_error _ _) as nth_err0.
-        destruct nth_err0.
-        * rewrite (NoSelfCall_inline_invar _ (getMethods m)); auto.
-          -- symmetry in Heqnth_err0.
-             apply nth_error_In, (in_map fst) in Heqnth_err0.
-             rewrite SameKeys_inlineSome_Flat, <- SameKeys_inlineSome_Meths in Heqnth_err0.
-             assumption.
-          -- unfold NoSelfCallBaseModule, NoSelfCallRulesBaseModule in HNoCall; dest.
-             apply (H _ type H1).
-        * apply IHxs.
-    - unfold inlineAll_All_mod; simpl; rewrite app_nil_r.
-      unfold inlineRf_Rules_Flat, inlineAll_Meths in *.
-      admit.
-  Admitted.
- *)
   
   Lemma NoSelfCall_nil (m : BaseModule) :
     getMethods m = nil ->
@@ -3773,8 +3514,7 @@ Section Properties.
     forall rules upds calls retl ls
            (HoInitNoDups : NoDup (map fst o))
            (HTrace : Trace m o ls)
-           (HNoSelfCalls : NoSelfCallBaseModule m)
-           (*HNoMeths : (getMethods m) = nil*),
+           (HNoSelfCalls : NoSelfCallBaseModule m),
       SubList rules (getRules m) ->
       @SemCompActionT Void (compileRules type (o, nil) (rev rules)) (o, upds) calls retl ->
       (forall u, In u upds -> (NoDup (map fst u)) /\ SubList (getKindAttr u) (getKindAttr o)) /\
@@ -3921,13 +3661,6 @@ Section Properties.
     eapply EquivLoop; eauto.
   Qed.
 
-  (*
-  Definition inlineAll_RegFile {k : Kind} (a : ActionT type k) (rf : RegFileBase) :=
-    fold_left (fun a' m  => inlineSingle m a') (getMethods rf) a.
-
-  Definition inlineAll_RegFiles {k : Kind} (a : ActionT type k) (rfl : list RegFileBase) :=
-    fold_left (fun a' rf => inlineAll_RegFile a' rf) rfl a.
-*)
   Lemma fst_getKindAttr {A B : Type} {P : B -> Type} (l : list (A * {x : B & P x})) :
     map fst (getKindAttr l) = map fst l.
   Proof.
@@ -6810,7 +6543,269 @@ Section Properties.
       - eapply IHxs; apply H.
       - eapply inlineEeach_Singlelist_inlineEach.
     Qed.
+
+    Lemma SubList_map_iff  {A B : Type} (f : A -> B) (l' : list B) :
+      forall (l : list A),
+        SubList l' (map f l) <->
+        exists l'',
+          SubList l'' l /\
+          (map f l'' = l').
+    Proof.
+      intros; split.
+      - induction l'; simpl; intros.
+        + exists nil; simpl; split; repeat intro; auto.
+          destruct l; auto.
+          exfalso; inv H0.
+        + unfold SubList in *; simpl in *.
+          specialize (IHl' (ltac : (eauto))); dest.
+          specialize (H _ (or_introl eq_refl)); rewrite in_map_iff in H; dest.
+          exists (x0 :: x); split; intros; [inv H3; auto|].
+          simpl; apply f_equal2; assumption.
+      - repeat intro; dest.
+        rewrite <- H1 in H0.
+        rewrite in_map_iff in *; dest.
+        specialize (H _ H2).
+        exists x1; split; assumption.
+    Qed.
     
+
+  Lemma ESameOldLoop o:
+    forall rules old upds calls retl lrf,
+      @SemCompActionT Void (compileRulesRf type (o, nil) (rev rules) lrf) (old, upds) calls retl ->
+      o = old.
+  Proof.
+    induction rules; simpl in *; intros.
+    - rewrite (unifyWO retl) in H.
+      inv H; EqDep_subst.
+      inv HRegMapWf.
+      inv H.
+      reflexivity.
+    - unfold compileRulesRf, compileActionsRf in *; simpl in *.
+      setoid_rewrite <- fold_left_rev_right in IHrules.
+      rewrite map_app, <- fold_left_rev_right, map_rev in *.
+      simpl in *.
+      rewrite rev_app_distr, rev_involutive in *; simpl in *.
+      rewrite (unifyWO retl) in H.
+      inv H; EqDep_subst.
+      apply Eqdep.EqdepTheory.inj_pair2 in H4; subst; simpl in *.
+      destruct regMap_a.
+      specialize (IHrules _ _ _ _ _ HSemCompActionT_a); subst.
+      rewrite (unifyWO WO) in HSemCompActionT_cont.
+      inv HSemCompActionT_cont; simpl in *; EqDep_subst.
+      rewrite (unifyWO val_a0) in HSemCompActionT_a0.
+      inv HSemCompActionT_a0; simpl in *; EqDep_subst.
+      destruct regMap_a; inv HRegMapWf; inv H; inv HSemRegMap.
+      apply (ESameOldAction _ _ _ _ (SemVarRegMap _) HSemCompActionT_cont0).
+  Qed.
+
+  Lemma WfBaseMod_inlineSingle (m : BaseModule) (HWfMod : WfBaseModule m) k (a : ActionT type k):
+    forall  (f : DefMethT),
+      In f (getMethods m) ->
+      WfActionT m a ->
+      WfActionT m (inlineSingle f a).
+  Proof. 
+    induction a; simpl; intros; (inv H1||inv H0); EqDep_subst; try (econstructor; eauto).
+    unfold WfBaseModule in *; dest.
+    destruct String.eqb; [destruct Signature_dec; subst|]; repeat (econstructor; eauto).
+  Qed.
+  
+  Lemma WfBaseMod_inlineSingle_map (m : BaseModule) (HWfMod : WfBaseModule m) k (a : ActionT type k) (n : nat):
+    forall  (lf : list DefMethT),
+      SubList lf (getMethods m) ->
+      WfActionT m a ->
+      WfActionT m (apply_nth (map (fun f => @inlineSingle type f k) lf) a n).
+  Proof.
+    intros.
+    unfold apply_nth; remember (nth_error _ _) as err0; symmetry in Heqerr0; destruct err0; auto.
+    apply nth_error_In in Heqerr0; rewrite in_map_iff in Heqerr0; dest.
+    rewrite <- H1.
+    apply WfBaseMod_inlineSingle; auto.
+  Qed.
+  
+  Lemma WfBaseMod_inlineSome_map (m : BaseModule) (HWfMod : WfBaseModule m) xs:
+    forall  (lf : list DefMethT) k (a : ActionT type k),
+      SubList lf (getMethods m) ->
+      WfActionT m a ->
+      WfActionT m (fold_left (apply_nth (map (fun f => @inlineSingle type f k) lf)) xs a).
+  Proof.
+    induction xs; simpl; intros; eauto.
+    apply IHxs; auto.
+    apply WfBaseMod_inlineSingle_map; assumption.
+  Qed.
+  
+  Definition mergeSeparatedSingle (b : BaseModule) (lrf : list RegFileBase) : Mod :=
+    ConcatMod (Base b) (mergeSeparatedBaseFile lrf).
+
+  Lemma WfExpand k (a : ActionT type k):
+    forall  (m1 m2 : BaseModule),
+      SubList (getRegisters m1) (getRegisters m2) ->
+      WfActionT m1 a ->
+      WfActionT m2 a.
+  Proof.
+    induction a; intros; (inv H1||inv H0); EqDep_subst; econstructor; eauto.
+    - rewrite in_map_iff in H7; dest; inv H1; specialize (H0 _ H2).
+      rewrite in_map_iff; exists x; split; auto.
+    - rewrite in_map_iff in H7; dest; inv H0; specialize (H _ H1).
+      rewrite in_map_iff; exists x; split; auto.
+  Qed.
+  
+  Lemma foo rules  (b : BaseModule) (lrf : list RegFileBase) : 
+    let m := inlineAll_All_mod (mergeSeparatedSingle b lrf) in
+    forall  o upds calls retl
+           (HConsist : getKindAttr o = getKindAttr (getRegisters m))
+           (HSubList1 : SubList (listRfMethods lrf) (getMethods m))
+           (HSubList2 : SubList rules (getRules b))
+           (HWfMod : WfMod (mergeSeparatedSingle b lrf)),
+      SemCompActionT (compileRulesRf type (o, []) (rev rules) lrf) (o, upds) calls retl ->
+      SemCompActionT
+        (compileRules type (o, []) (map (inline_Rules (getAllMethods (mergeSeparatedBaseFile lrf))
+                                                      (seq 0 (Datatypes.length (getAllMethods (mergeSeparatedBaseFile lrf))))) (rev rules))) (o, upds) calls retl.
+  Proof.
+    unfold compileRulesRf, compileRules, compileActionsRf, compileActions.
+    setoid_rewrite <-fold_left_rev_right at 2 3; repeat setoid_rewrite <-map_rev; repeat rewrite rev_involutive.
+    induction rules; simpl; intros; auto.
+    rewrite (unifyWO retl) in H3; inv H3; simpl in *; EqDep_subst.
+    rewrite (unifyWO WO) in HSemCompActionT_cont;
+        inv HSemCompActionT_cont; simpl in *; EqDep_subst.
+    destruct regMap_a, regMap_a0.
+    rewrite (unifyWO val_a0) in HSemCompActionT_a0;
+      inv HSemCompActionT_a0; simpl in *; EqDep_subst.
+    specialize (ESameOldAction _ _ _ _ (SemVarRegMap _) HSemCompActionT_cont0) as TMP; subst.
+    unfold WfRegMapExpr in *; dest.
+    inv H3; inv HSemRegMap.
+    rewrite <- (app_nil_l calls_cont0).
+    assert (SubList rules (getRules b)) as P0.
+      { repeat intro; apply H1; right; assumption. }
+      repeat (econstructor; eauto); try (apply H4; auto); destruct a; simpl.
+      unfold preCompileRegFiles in *; simpl in *.
+      assert (allMeths_merge_listRf : forall lrf', getAllMethods (mergeSeparatedBaseFile lrf') = listRfMethods lrf').
+      { clear.
+        induction lrf'; simpl; unfold listRfMethods; simpl; eauto.
+        rewrite IHlrf'; reflexivity. }
+      rewrite allMeths_merge_listRf, inlineEach_inlineSome_pos, <- Extension_Compiles_iff.
+      assert (NoDup (map fst o)) as P1.
+      { unfold mergeSeparatedSingle in H2; inv H2.
+        rewrite (getKindAttr_map_fst _ _ H), map_app, NoDup_app_iff; repeat split.
+        - inv HWf1; unfold WfBaseModule in HWfBaseModule; dest; assumption.
+        - clear - HWf2.
+          induction lrf; simpl in *; [constructor|].
+          inv HWf2; inv HWf1; unfold WfBaseModule in *; dest.
+          rewrite map_app, NoDup_app_iff; repeat split; auto.
+          + repeat intro.
+            specialize (HDisjRegs a0); clear - HDisjRegs H4 H5; inv HDisjRegs; contradiction.
+          + repeat intro.
+            specialize (HDisjRegs a0); clear - HDisjRegs H4 H5; inv HDisjRegs; contradiction.
+        - repeat intro.
+          specialize (HDisjRegs a0); clear - HDisjRegs H2 H3; inv HDisjRegs; contradiction.
+        - repeat intro.
+          specialize (HDisjRegs a0); clear - HDisjRegs H2 H3; inv HDisjRegs; contradiction.
+      }
+      specialize (PriorityUpds_exist _ P1 ([]::upds0) (ltac:(eapply H4; eauto))
+                                     (ltac:(eapply H4; eauto))) as TMP; dest.
+      eapply ECompCongruence with (old := o) (o := x); auto.
+      - intros; eapply H4; eauto.
+      - symmetry; eapply prevPrevRegsTrue; eauto.
+      - unfold WfRegMapExpr; split.
+        + econstructor.
+        + assumption.
+      - instantiate (1 := inlineAll_All_mod (mergeSeparatedSingle b lrf)); simpl.
+        rewrite <- (prevPrevRegsTrue H3); assumption.
+      - unfold WfBaseModule in H2; dest.
+        unfold eachRfMethodInliners.
+        rewrite <- map_map, <- concat_map.
+        apply WfBaseMod_inlineSome_map; auto.
+        + specialize (flatten_inline_everything_Wf (Build_ModWf H2)) as P2.
+          unfold flatten_inline_everything in P2; rewrite WfMod_createHide in P2; dest; simpl in *; inv H6; assumption.
+        +unfold mergeSeparatedSingle in H2; inv H2; inv HWf1.
+         unfold WfBaseModule in *; dest.
+         specialize (H2 _ (H1 _ (or_introl eq_refl))); simpl in H2.
+         eapply WfExpand; eauto.
+         unfold inlineAll_All_mod; simpl; apply SubList_app_r, SubList_refl.
+      - apply inlineEeach_Somelist_inlineEach.
+      - rewrite (unifyWO retl); simpl.
+        assert (forall lrf, length (listRfMethods lrf) = length (EeachRfMethodInliners type Void lrf)).
+        { clear.
+          unfold listRfMethods, EeachRfMethodInliners.
+          repeat rewrite <- flat_map_concat_map.
+          induction lrf; auto.
+          unfold getRegFileMethods; destruct a; simpl.
+          repeat rewrite app_length; rewrite <- IHlrf; clear.
+          apply f_equal; apply f_equal2; auto.
+          destruct rfRead.
+          - unfold readRegFile.
+            repeat rewrite map_length; reflexivity.
+          - unfold readSyncRegFile; destruct isAddr; repeat rewrite app_length;
+              repeat rewrite map_length; reflexivity. }
+        setoid_rewrite H5.
+        assumption.
+  Qed.
+  
+    Lemma EEquivLoop (b : BaseModule) (lrf : list RegFileBase) o :
+      let m := inlineAll_All_mod (mergeSeparatedSingle b lrf) in
+      forall rules upds calls retl ls
+             (HWfMod : WfMod (mergeSeparatedSingle b lrf))
+             (HTrace : Trace m o ls)
+             (HNoSelfCalls : NoSelfCallBaseModule m)
+             (HNoSelfCallsBase : NoSelfCallBaseModule b),
+        SubList rules (getRules b) ->
+        @SemCompActionT Void (compileRulesRf type (o, nil) rules lrf) (o, upds) calls retl ->
+        (forall u, In u upds -> (NoDup (map fst u)) /\ SubList (getKindAttr u) (getKindAttr o)) /\
+        exists o' (ls' : list (list FullLabel)),
+          PriorityUpds o upds o' /\
+          upds = (map getLabelUpds ls') /\
+          calls = concat (map getLabelCalls (rev ls')) /\
+          Trace m o' (ls' ++ ls).
+    Proof.
+      intros.
+      specialize (mergeFile_noCalls lrf) as P0.
+      assert (
+          forall (meth : DefMethT) (ty : Kind -> Type),
+            In meth (getAllMethods (mergeSeparatedBaseFile lrf)) -> forall arg : ty (fst (projT1 (snd meth))), NeverCallActionT (projT2 (snd meth) ty arg)).
+      { revert P0; clear.
+        induction lrf; simpl; intros; [contradiction|].
+        rewrite in_app_iff in H; inv H.
+        - specialize (RegFileBase_noCalls a) as P1.
+          inv P1; inv HNCBaseModule; eauto.
+        - inv P0.
+          eapply IHlrf; eauto. }
+      eapply EquivLoop'; eauto; simpl.
+      - rewrite map_app, NoDup_app_iff; repeat split; auto; inv HWfMod.
+        + inv HWf1; inv HWfBaseModule; dest; assumption.
+        + clear - HWf2; induction lrf; simpl; [constructor| inv HWf2].
+          rewrite map_app, NoDup_app_iff; repeat split; eauto.
+          * inv HWf1; inv HWfBaseModule; dest; assumption.
+          * repeat intro; specialize (HDisjRegs a0); clear - HDisjRegs H H0; inv HDisjRegs; contradiction.
+          * repeat intro; specialize (HDisjRegs a0); clear - HDisjRegs H H0; inv HDisjRegs; contradiction.
+        + repeat intro; specialize (HDisjRegs a); clear - HDisjRegs H2 H3; inv HDisjRegs; contradiction.
+        + repeat intro; specialize (HDisjRegs a); clear - HDisjRegs H2 H3; inv HDisjRegs; contradiction.
+      - unfold inlineAll_All_mod, inlineAll_All, inlineAll_Meths; simpl.
+        rewrite inlineAll_Meths_RegFile_fold_flat, inlineAll_Rules_NoCalls, inlineAll_Rules_in; eauto; simpl in *.
+        instantiate (1 := map (inline_Rules (getAllMethods (mergeSeparatedBaseFile lrf)) (seq 0 (Datatypes.length (getAllMethods (mergeSeparatedBaseFile lrf))))) rules).
+        rewrite getAllRules_mergeBaseFile, app_nil_r.
+        inv HNoSelfCallsBase; unfold NoSelfCallMethsBaseModule, NoSelfCallRulesBaseModule in *.
+        apply SubList_map.
+        erewrite inlineSome_Meths_pos_NoCalls_ident; eauto using SubList_refl.
+        unfold inlineAll_Rules.
+        erewrite inlineSome_Rules_pos_NoCalls_ident; eauto.
+        rewrite SameKeys_inlineSome_Flat; apply SubList_refl.
+      - setoid_rewrite <- (rev_involutive rules).
+        eapply foo.
+        + apply (Trace_sameRegs HTrace).
+        + simpl; unfold inlineAll_Meths.
+          rewrite inlineAll_Meths_RegFile_fold_flat; simpl.
+          * repeat intro; rewrite in_app_iff; right.
+            clear - H2.
+            unfold listRfMethods in *; simpl in *.
+            induction lrf; simpl in *; auto.
+            rewrite in_app_iff in *; inv H2; auto.
+          * assumption.
+        + repeat intro.
+          rewrite <-in_rev in H2; apply H; assumption.
+        + assumption.
+        + rewrite rev_involutive.
+          apply H0.
+    Qed.
+        
 End Properties.
 
 
