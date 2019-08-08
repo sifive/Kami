@@ -292,32 +292,39 @@ Section Named.
   Definition nop x := (exists arg, cmd_write arg true x) \/ (exists ret, cmd_read ret true x).
   
   Inductive p :=
-  | yield (sck mosi : bool) (_ : forall miso : bool, p)
+  | getmiso (_ : forall miso : bool, p)
+  | putsck (_ : bool) (_ : p)
+  | putmosi (_ : bool) (_ : p)
+
+  | yield (_ : p)
   | ret (_ : word 8).
 
   Fixpoint xchg_prog (n : nat) : forall (tx : word 8) (rx : word 8), p :=
     match n with
     | O => fun _ rx => ret rx
     | S n => fun tx rx =>
-        let sck := false in
-        let mosi := wmsb tx false in
-        let tx := WS false (split1 7 1 tx) in
-        yield sck mosi (fun miso =>
-        let rx := WS miso (split1 7 1 rx) in
-        let sck := true in
-        yield sck mosi (fun _ =>
-        @xchg_prog n tx rx
-        ))
+      let mosi := wmsb tx false in
+      let tx := WS false (split1 7 1 tx) in
+      putsck false (
+      putmosi mosi (
+      yield (
+      getmiso (fun miso =>
+      let rx := WS miso (split1 7 1 rx) in
+      putsck true (
+      putmosi mosi (
+      yield (
+      @xchg_prog n tx rx
+      )))))))
     end.
 
-  Fixpoint interp (e : p) : word 8 -> list _ -> Prop :=
+  Fixpoint interp (e : p) : list MethT -> word 8 -> list (list FullLabel) -> Prop :=
     match e with
-    | yield sck mosi k => fun w t =>
-        exists miso, (iocycle miso sck mosi +++ interp (k miso) w) t
-    | ret w => fun w' t => w' = w /\ t = nil
+    | getmiso k => fun l w t => exists miso, interp (k miso) (l++[("GetMISO", existT SignT (Void, Bit 1) (wzero 0, WS miso WO))]) w t
+    | putsck sck k => fun l w t => interp k (l++[("PutSCK", existT SignT (Bool, Void) (sck, wzero 0))]) w t
+    | putmosi mosi k => fun l w t => interp k (l++[("PutMOSI", existT SignT (Bit 1, Void) (WS mosi WO, wzero 0))]) w t
+    | yield k => fun l w t => exists r, (eq [[(r, (Rle (name ++ "_cycle"), l))]] +++ interp k nil w) t
+    | ret w => fun l' w' t => w' = w /\ t = nil
     end.
-
-  Definition xchg tx rx := interp (xchg_prog 8 tx (wzero 8)) rx.
 
   (*
   Inductive behavior : forall (c : p) (r : word 8), list _ -> Prop  :=
@@ -341,7 +348,7 @@ Section Named.
   Definition spec := TracePredicate.interleave (kleene nop) (kleene (fun t =>
     silent t \/
     exists tx rx, (cmd_write tx false +++
-                   xchg tx rx +++
+                   interp (xchg_prog 8 tx (wzero 8)) nil rx +++
                    maybe (cmd_read rx false)) t)).
 
   Definition enforce_regs (regs:RegsT) tx_fifo tx_fifo_len rx_fifo rx_fifo_len sck := regs =
@@ -374,8 +381,8 @@ Section Named.
     exists tx tx_len rx rx_len sck,
     enforce_regs s tx tx_len rx rx_len sck /\
     wordToNat tx_len <> 0 /\
-    (forall frx future, TracePredicate.interleave (kleene nop) (interp (xchg_prog (wordToNat tx_len) tx rx) frx +++ kleene spec ) future ->
-    TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) frx) (future ++ past)).
+    (forall frx future, TracePredicate.interleave (kleene nop) (interp (xchg_prog (wordToNat tx_len) tx rx) nil frx +++ kleene spec ) future ->
+    TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) nil frx) (future ++ past)).
   Proof.
     intros s past.
     pose proof eq_refl s as MARKER.
@@ -431,8 +438,9 @@ Section Named.
       progress rewrite ?app_assoc, ?app_nil_r.
       eapply H10.
 
-      remember (wordToNat tx_len) as i; destruct i; repeat rewrite Heqi in *; try solve [congruence].
-      eapply TracePredicate.interleave_kleene_l_app_r.
+      remember (wordToNat tx_len) as i; destruct i; repeat rewrite <-Heqi in *; try solve [congruence].
+      cbn [interp xchg_prog].
+      (* eapply TracePredicate.interleave_kleene_l_app_r. *)
 
 
     (* 
