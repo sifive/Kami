@@ -95,6 +95,12 @@ Module TracePredicate.
     @interleave_rkleene T P Q [z] zs H HH.
   Definition interleave_lkleene_cons {T} {P Q} (z:T) zs H HH : interleave _ _ (cons _ _):=
     @interleave_lkleene T P Q [z] zs H HH.
+
+  Lemma interleave_kleene_l_app_r {T} (A B C : list T -> Prop) (bs cs : list T)
+    (HB : TracePredicate.interleave (kleene A) B bs)
+    (HC : TracePredicate.interleave (kleene A) C cs)
+    : TracePredicate.interleave (kleene A) (B +++ C) (cs ++ bs).
+  Admitted.
   
   Definition at_next_edge {T} clk data : list T -> Prop :=
     (fun x => clk false x)^+ +++ (fun x => clk true x /\ data x).
@@ -365,14 +371,16 @@ Section Named.
   (* draining case only *)
   Goal forall s past,
     Trace SPI s past ->
-    forall tx tx_len rx rx_len sck,
-    enforce_regs s tx tx_len rx rx_len sck ->
-    wordToNat tx_len <> 0 ->
-    forall frx future, TracePredicate.interleave (kleene nop) (interp (xchg_prog (wordToNat tx_len) tx rx) frx) future ->
-    TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) frx) (future ++ past).
+    exists tx tx_len rx rx_len sck,
+    enforce_regs s tx tx_len rx rx_len sck /\
+    wordToNat tx_len <> 0 /\
+    (forall frx future, TracePredicate.interleave (kleene nop) (interp (xchg_prog (wordToNat tx_len) tx rx) frx +++ kleene spec ) future ->
+    TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) frx) (future ++ past)).
   Proof.
-    induction 1 as [A B C D | A t C regs E _ IHTrace HStep K I]; subst.
-    { admit. }
+    intros s past.
+    pose proof eq_refl s as MARKER.
+    induction 1 as [A B C D | regsBefore t regUpds regsAfter E _ IHTrace HStep K I].
+    { subst. admit. }
 
     unshelve epose proof InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep as HHS;
       clear HStep; [abstract discharge_wf|..|rename HHS into HStep].
@@ -384,10 +392,47 @@ Section Named.
       | _ => progress discharge_string_dec
       | _ => progress cbn [SPI getMethods baseModule makeModule makeModule' type evalExpr isEq evalConstT Kind_rect List.app map fst snd projT1 projT2 invariant doUpdRegs findReg] in *
       | _ => progress cbv [invariant] in *
-      | K: UpdRegs _ _ _ |- _ => unshelve ( repeat erewrite (NoDup_UpdRegs _ _ K) in * ); clear K
+      | K: UpdRegs _ _ ?z |- _ =>
+          let H := fresh K in
+          unshelve epose proof (NoDup_UpdRegs _ _ K); clear K; [> ..| progress subst z]
       | |- NoDup _ => admit
+      | |- context G [@cons ?T ?a ?b] =>
+          assert_fails (idtac; match b with nil => idtac end);
+          let goal := context G [@List.app T (@cons T a nil) b] in
+          change goal
+      | _ => progress rewrite ?app_assoc, ?app_nil_r
+      | H : ?T -> _ |- _ => assert_succeeds (idtac; match type of T with Prop => idtac end); specialize (H ltac:(auto))
     end.
 
+    {
+      repeat match goal with
+      | _ => eapply ex_intro || eapply conj
+      | _ => eapply IHTrace; clear IHTrace
+      end.
+
+      1: solve[cbv [enforce_regs doUpdRegs] in *;subst;clear;
+      repeat match goal with
+      | _ => progress discharge_string_dec
+      | _ => progress cbn [fst snd]
+      | |- context G [match ?x with _ => _ end] =>
+         let X := eval hnf in x in
+         progress change x with X
+      | _ => progress (f_equal; [])
+      | |- ?l = ?r =>
+          let l := eval hnf in l in
+          let r := eval hnf in r in
+          progress change (l = r)
+      | _ => exact eq_refl
+      end].
+
+      1:solve[auto].
+      
+      intros.
+      progress rewrite ?app_assoc, ?app_nil_r.
+      eapply H10.
+
+      remember (wordToNat tx_len) as i; destruct i; repeat rewrite Heqi in *; try solve [congruence].
+      eapply TracePredicate.interleave_kleene_l_app_r.
 
 
     (* 
@@ -422,7 +467,6 @@ Section Named.
         all : cbn [map fst].
         1,2: admit. (* NoDup *)
       }
- *)
     
       4: {
         match goal with
