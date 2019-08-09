@@ -100,9 +100,6 @@ Module TracePredicate.
     (HC : TracePredicate.interleave (kleene A) C cs)
     : TracePredicate.interleave (kleene A) (B +++ C) (cs ++ bs).
   Admitted.
-  
-  Definition at_next_edge {T} clk data : list T -> Prop :=
-    (fun x => clk false x)^+ +++ (fun x => clk true x /\ data x).
   (* TODO: how do I actually prove this in a loop *)
 End TracePredicate.
 
@@ -229,23 +226,6 @@ Section Named.
     | yield k => fun l w t => exists r, (eq [[(r, (Rle (name ++ "_cycle"), l))]] +++ interp k nil w) t
     | ret w => fun l' w' t => w' = w /\ t = nil
     end.
-
-  (*
-  Inductive behavior : forall (c : p) (r : word 8), list _ -> Prop  :=
-  | yield_behavior sck mosi miso k r t
-      (_ : behavior (k miso) r t)
-      : behavior (yield sck mosi k) r ((sck,mosi,miso)::t)
-  | ret_behavior r : behavior (ret r) r nil.
-  *)
-
-  (*
-  Definition mosi mosi t := exists sck miso, iocycle miso sck mosi t.
-  Definition miso miso t := exists sck mosi, iocycle miso sck mosi t.
-  
-  (* these are probably not useful because interleaving.. *)
-  Definition mosis := TracePredicate.flat_map (fun x => TracePredicate.at_next_edge sck (mosi x)).
-  Definition misos := TracePredicate.flat_map (fun x => TracePredicate.at_next_edge sck (miso x)).
-  *)
 
   Definition silent t := exists miso mosi, iocycle miso false mosi t.
 
