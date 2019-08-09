@@ -157,7 +157,7 @@ Section Named.
     with Method "write" (data : Bit 8) : Bool := (
       Write @^"hack_for_sequential_semantics" : Bit 0 <- $$(WO);
       Read i <- @^"i";
-      If (#i == $$@natToWord 4 0) then (
+      If #i == $$@natToWord 4 0 then (
         Write @^"tx" : Bit 8 <- #data;
         Write @^"i" <- $$@natToWord 4 8;
         Write @^"rx_valid" <- $$false;
@@ -171,7 +171,7 @@ Section Named.
     with Method "read" () : Bool := ( (* TODO return pair *)
       Write @^"hack_for_sequential_semantics" : Bit 0 <- $$(WO);
       Read rx_valid <- @^"rx_valid";
-      If (#rx_valid) then (
+      If #rx_valid then (
         Read data : Bit 8 <- @^"rx";
         Write @^"rx_valid" <- $$false;
         Ret $$false (* TODO: return (data, false) *)
