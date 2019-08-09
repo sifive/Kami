@@ -176,10 +176,9 @@ Section Named.
       If (#rx_valid) then (
         Read data : Bit 8 <- @^"rx_fifo";
         Write @^"rx_valid" <- $$false;
-        LET err : Bool <- $$false;
-        Ret #err (* TODO: return (data, err) *) (*7*)
+        Ret $$false (* TODO: return (data, false) *)
       ) else (
-        Ret $$true (*8*)
+        Ret $$true
       ) as r;
       Ret #r
     )
