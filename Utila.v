@@ -1137,7 +1137,7 @@ Open Scope word_scope.
         replace
           (fun (x0 : Expr type (SyntaxKind k))
                (acc : Expr type (SyntaxKind (Bit (size k))))
-           => (CABit (Bor) ((IF f x0 then pack x0 else (Const type (zToWord _ 0))) :: acc :: nil)))
+           => (CABit (Bor) ((IF f x0 then pack x0 else (Const type (zToWord _ (Z.of_nat 0)))) :: acc :: nil)))
           with (case f).
         (rewrite (utila_expr_find_lm2 f xs H)).
         (apply unpack_pack).

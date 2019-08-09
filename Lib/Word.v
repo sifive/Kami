@@ -45,7 +45,9 @@ Section Word.
 
     Definition wxor x y := zToWord (Z.lxor (wordVal x) (wordVal y)).
 
-    Definition wnot x := zToWord (Z.sub (Z.sub (Z.pow 2 (Z.of_nat width)) (wordVal x)) 1).
+    Definition wneg x := zToWord (Z.sub (Z.pow 2 (Z.of_nat width)) (wordVal x)).
+
+    Definition wnot x := zToWord (Z.sub (wordVal (wneg x)) 1).
 
     Definition wmax := zToWord (Z.pow 2 (Z.of_nat width) - 1).
 
@@ -137,7 +139,7 @@ End Word.
 
 Module Notations.
 
-  Notation "^~" := wnot : word_scope.
+  Notation "^~" := wneg : word_scope.
   Notation "l ^* r" := (@wmul _ l r) (at level 40, left associativity) : word_scope.
   Notation "l ^/ r" := (@wdiv _ l r) (at level 50, left associativity) : word_scope.
   Notation "l ^+ r" := (@wadd _ l r) (at level 50, left associativity) : word_scope.
@@ -147,6 +149,10 @@ Module Notations.
   Notation "l ^& r" := (@wand _ l r) (at level 40, left associativity) : word_scope.
 
 End Notations.
+
+(* Compute (@wnot 2 (zToWord 2 2)). *)
+
+(* Compute (@wneg 2 (zToWord 2 3)). *)
 
 (* Compute (wsra (zToWord 4 15) (zToWord 1 1)). *)
 

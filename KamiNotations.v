@@ -58,7 +58,7 @@ Require Import RecordUpdate.RecordSet.
   Notation "k @# ty" := (Expr ty (SyntaxKind k)) (no associativity, at level 98, only parsing).
 
   Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (at level 0, only parsing) : kami_expr_scope. 
-  Notation "$ n" := (Const _ (zToWord _ n)) (at level 9) : kami_expr_scope.
+  Notation "$ n" := (Const _ (zToWord _ (Z.of_nat n))) (at level 9) : kami_expr_scope.
   Notation "$$ e" := (Const ltac:(assumption) e) (at level 8, only parsing) : kami_expr_scope.
 
   Notation "! v" := (UniBool Neg v) (at level 35): kami_expr_scope.
