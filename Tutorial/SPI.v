@@ -1,6 +1,5 @@
 Require Import Coq.Lists.List. Import ListNotations.
   
-Axiom one : forall {T}, (T -> Prop) -> list T -> Prop.
 Axiom kleene : forall {T}, (list T -> Prop) -> list T -> Prop.
 Axiom plus : forall {T}, (list T -> Prop) -> list T -> Prop.
 Axiom app : forall {T}, (list T -> Prop) -> (list T -> Prop) -> list T -> Prop.
@@ -109,93 +108,6 @@ End TracePredicate.
 
 Require Import Kami.All.
 
-(*
-module spi;
-  // defunctionalized continuation control flow
-  reg [3:0] i = 4'd8; // as above, 15 = start, 9 = after read
-  reg sck=1'b0;
-  // captured variables
-  reg [7:0] tx_fifo;
-  reg [7:0] rx_fifo;
-  // output hold
-  reg mosi=1'b0;
-  /* reg sck; */
-
-  task automatic cycle;
-    input miso;
-    output sck_out, mosi_out;
-  begin:cycle
-    if (i==4'd15 || i < 4'd8 &&  sck) begin
-      mosi = tx_fifo[7];
-      tx_fifo = {tx_fifo[6:0], 1'bx};
-      sck = 1'b0;
-      i = i + 4'd1;
-    end else if (i < 4'd8 && !sck) begin
-      rx_fifo = {rx_fifo[6:0], miso};
-      sck = 1'b1;
-    end else sck = 1'b0;
-    sck_out = sck; mosi_out = mosi;
-  end endtask
-
-  task automatic write;
-    input [7:0] data;
-    output err;
-  begin:write
-    if (!(i < 4'd8)) begin
-      tx_fifo = data;
-      i = 4'd15;
-      err = 0;
-    end else begin
-      err = 1;
-    end
-  end endtask
-
-  task automatic read;
-    output [7:0] data;
-    output err;
-  begin:write
-  if (i == 4'd8) begin
-      data = rx_fifo;
-      i = 9;
-      err = 0;
-    end else begin
-      err = 1;
-    end
-  end endtask
-
-endmodule
-
-module spi_test;
-  spi spi();
-
-  initial begin : initial_
-    integer i;
-    reg err;
-
-    reg miso, sck, mosi;
-    miso = 0; sck = 0; mosi = 0;
-
-    $dumpfile("spi.vcd");
-    $dumpvars(1, spi.tx_fifo, spi.i, mosi, sck, miso, spi.rx_fifo);
-
-    spi.write(8'ha5, err);
-    $display("%b", err);
-    for (i = 0; i < 20; i = i + 1) begin : for_
-      #1
-      spi.cycle(miso,
-        sck, mosi);
-      miso = mosi;
-      $display("%x %x %x", miso, sck, mosi);
-    end
-    begin:_
-      reg [7:0] read_result; reg read_err;
-      spi.read(read_result, read_err);
-      $display("%x %x", read_result, read_err);
-    end
-  end
-endmodule
-*)
-
 Definition bits {w} : word w -> list bool. Admitted.
 Lemma length_bits w x : List.length (@bits w x) = w. Admitted.
 Lemma bits_nil x : @bits 0 x = nil.
@@ -213,65 +125,58 @@ Section Named.
 
   Definition SPI := MODULE {
          Register @^"hack_for_sequential_semantics" : Bit 0 <- Default
-    with Register @^"tx_fifo"     : Bit 8 <- Default
-    with Register @^"tx_fifo_len" : Bit 4 <- Default
-    with Register @^"rx_fifo"     : Bit 8 <- Default
-    with Register @^"rx_fifo_len" : Bit 4 <- @natToWord 4 15
+    with Register @^"i"           : Bit 4 <- Default
     with Register @^"sck"         : Bool  <- Default
+    with Register @^"tx_fifo"     : Bit 8 <- Default
+    with Register @^"rx_fifo"     : Bit 8 <- Default
+    with Register @^"rx_valid"    : Bool  <- Default
     
     with Rule @^"cycle" := (
       Write @^"hack_for_sequential_semantics" : Bit 0 <- $$(WO);
-
       Read sck <- @^"sck";
+      Read i : Bit 4 <- @^"i";
       Read tx_fifo : Bit 8 <- @^"tx_fifo";
-      Read tx_fifo_len : Bit 4 <- @^"tx_fifo_len";
-      Read rx_fifo : Bit 8 <- @^"rx_fifo";
-      Read rx_fifo_len : Bit 4 <- @^"rx_fifo_len";
+      If (*!*) #i == $$@natToWord 4 0 then Retv else (
+        If (#sck) then (
+          Write @^"sck" : Bool <- $$false;
+          Call "PutSCK"($$false : Bool);
+          Call "PutMOSI"((UniBit (TruncMsb 7 1) #tx_fifo) : Bit 1);
+          Retv
+        ) else (
+          Read rx_fifo : Bit 8 <- @^"rx_fifo";
+          Call miso : Bit 1 <- "GetMISO"();
+          Write @^"rx_fifo" : Bit 8 <- BinBit (Concat 7 1) (UniBit (TruncMsb 1 7) #rx_fifo) #miso;
+          Write @^"sck" : Bool <- $$true;
+          Call "PutSCK"($$true : Bool);
+          Call "PutMOSI"((UniBit (TruncMsb 7 1) #tx_fifo) : Bit 1);
+          Write @^"tx_fifo" : Bit 8 <- BinBit (Concat 7 1) (UniBit (TruncMsb 1 7) #tx_fifo) $$(@ConstBit 1 $x);
+          Retv
+        );
+      Retv);
 
-      Call miso : Bit 1 <- "GetMISO"();
-      Call "PutSCK"(#sck : Bool);
-      Call "PutMOSI"((UniBit (TruncMsb 7 1) #tx_fifo) : Bit 1);
-      
-      If (#sck) then (
-        If (*!*) #tx_fifo_len == $$@natToWord 4 0 then Retv (*1*) else (
-          Write @^"tx_fifo" : Bit 8 <- UniBit (TruncLsb 8 1) (BinBit (Concat 8 1) #tx_fifo $$(@ConstBit 1 $x));
-          Write @^"tx_fifo_len" <- #tx_fifo_len + $1;
-          Write @^"sck" : Bool <- !#sck;
-          Retv );
-          Retv (*2*)
-      ) else (
-        If (#rx_fifo_len < $$@natToWord 4 8) then (
-          Write @^"rx_fifo" : Bit 8 <- UniBit (TruncLsb 8 1) (BinBit (Concat 8 1) #rx_fifo #miso);
-          Write @^"rx_fifo_len" <- #rx_fifo_len - $1;
-          Write @^"sck" : Bool <- !#sck;
-          Retv (*3*) ) (*else 4*);
-        Retv);
-      Retv
-    )
+    Retv)
     
     with Method "write" (data : Bit 8) : Bool := (
       Write @^"hack_for_sequential_semantics" : Bit 0 <- $$(WO);
-      Read tx_fifo_len <- @^"tx_fifo_len";
-      Read rx_fifo_len <- @^"rx_fifo_len";
-      If ((#tx_fifo_len == $$@natToWord 4 0) && ! (#rx_fifo_len < $$@natToWord 4 8)) then (
+      Read i <- @^"i";
+      If (#i == $$@natToWord 4 0) then (
         Write @^"tx_fifo" : Bit 8 <- #data;
-        Write @^"tx_fifo_len" <- $$@natToWord 4 8;
-        Write @^"rx_fifo_len" <- $$@natToWord 4 0;
-        Ret $$false (*5*)
+        Write @^"i" <- $$@natToWord 4 8;
+        Write @^"rx_valid" <- $$false;
+        Ret $$false
       ) else (
-        Ret $$true (*6*)
+        Ret $$true
       ) as b;
       Ret #b
     )
     
     with Method "read" () : Bool := ( (* TODO return pair *)
       Write @^"hack_for_sequential_semantics" : Bit 0 <- $$(WO);
-      Read rx_fifo_len : Bit 4 <- @^"rx_fifo_len";
-      Read rx_fifo <- @^"rx_fifo";
-      If (#rx_fifo_len == $$@natToWord 4 8) then (
-        LET data : Bit 8 <- #rx_fifo;
+      Read rx_valid <- @^"rx_valid";
+      If (#rx_valid) then (
+        Read data : Bit 8 <- @^"rx_fifo";
+        Write @^"rx_valid" <- $$false;
         LET err : Bool <- $$false;
-        Write @^"rx_fifo_len" <- $$@natToWord 4 15;
         Ret #err (* TODO: return (data, err) *) (*7*)
       ) else (
         Ret $$true (*8*)
@@ -351,10 +256,10 @@ Section Named.
                    interp (xchg_prog 8 tx (wzero 8)) nil rx +++
                    maybe (cmd_read rx false)) t)).
 
-  Definition enforce_regs (regs:RegsT) tx_fifo tx_fifo_len rx_fifo rx_fifo_len sck := regs =
+  Definition enforce_regs (regs:RegsT) tx_fifo i rx_fifo rx_fifo_len sck := regs =
     [(@^"hack_for_sequential_semantics", existT _ (SyntaxKind (Bit 0)) WO);
      (@^"tx_fifo", existT _ (SyntaxKind (Bit 8)) tx_fifo);
-     (@^"tx_fifo_len", existT _ (SyntaxKind (Bit 4)) tx_fifo_len);
+     (@^"i", existT _ (SyntaxKind (Bit 4)) i);
      (@^"rx_fifo", existT _ (SyntaxKind (Bit 8)) rx_fifo);
      (@^"rx_fifo_len", existT _ (SyntaxKind (Bit 4)) rx_fifo_len);
      (@^"sck", existT _ (SyntaxKind Bool) sck) ].
@@ -439,12 +344,14 @@ Section Named.
       eapply H10.
 
       remember (wordToNat tx_len) as i; destruct i; repeat rewrite <-Heqi in *; try solve [congruence].
-      cbn [interp xchg_prog].
-      (* eapply TracePredicate.interleave_kleene_l_app_r. *)
+      Notation "( x , y , .. , z )" := (existT _ .. (existT _ x y) .. z) : core_scope.
+      cbn [xchg_prog].
+      cbn [interp].
+      eapply TracePredicate.interleave_kleene_l_app_r.
 
 
     (* 
-    destruct IHTrace as [sck tx tx_fifo tx_fifo_len rx_fifo rx_fifo_len IH TODO1 Henforce]; cbv [enforce_regs] in *;
+    destruct IHTrace as [sck tx tx_fifo i rx_fifo rx_fifo_len IH TODO1 Henforce]; cbv [enforce_regs] in *;
       repeat match goal with
         | _ => progress intros
         | _ => progress clean_hyp_step
