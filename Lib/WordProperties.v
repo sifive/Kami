@@ -1329,9 +1329,6 @@ Proof.
   f_equal.
 Qed.
 
-Require Import Psatz.
-Require Import PreOmegaWord.
-
 Lemma word_cancel_r sz (a b c: word sz):
   a = b -> a ^+ c = b ^+ c.
 Proof.
