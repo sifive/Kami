@@ -311,7 +311,6 @@ Section Named.
       eapply H7.
 
       remember (wordToNat i) as i1; destruct i1; repeat rewrite <-Heqi in *; try solve [congruence].
-      Notation "( x , y , .. , z )" := (existT _ .. (existT _ x y) .. z) : core_scope.
       cbn [xchg_prog].
       cbn [interp].
       eapply TracePredicate.interleave_kleene_l_app_r.
