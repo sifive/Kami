@@ -147,6 +147,7 @@ Section Named.
           Call "PutSCK"($$true : Bool);
           Call "PutMOSI"((UniBit (TruncMsb 7 1) #tx_fifo) : Bit 1);
           Write @^"tx_fifo" : Bit 8 <- BinBit (Concat 7 1) (UniBit (TruncMsb 1 7) #tx_fifo) $$(@ConstBit 1 $x);
+          Write @^"rx_valid" <- #i == $$@natToWord 4 1;
           Retv
         );
       Retv);
@@ -240,7 +241,7 @@ Section Named.
      (@^"tx_fifo", existT _ (SyntaxKind (Bit 8)) tx_fifo);
      (@^"i", existT _ (SyntaxKind (Bit 4)) i);
      (@^"rx_fifo", existT _ (SyntaxKind (Bit 8)) rx_fifo);
-     (@^"rx_fifo_len", existT _ (SyntaxKind (Bit 4)) rx_fifo_len);
+     (@^"rx_valid", existT _ (SyntaxKind (Bit 4)) rx_valid);
      (@^"sck", existT _ (SyntaxKind Bool) sck) ].
 
   Ltac expand := (* Goal: invariant *)
