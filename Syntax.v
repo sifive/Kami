@@ -806,11 +806,11 @@ Coercion getModWf: BaseModuleWf >-> ModWf.
 Coercion getModWfOrd: BaseModuleWfOrd >-> ModWfOrd.
 
 Section NoCallActionT.
-  Variable ls: list string.
+  Variable ls: list DefMethT.
   Variable ty : Kind -> Type.
   
   Inductive NoCallActionT: forall k , ActionT ty k -> Prop :=
-  | NoCallMCall meth s e lretT c: ~ In meth ls -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (MCall meth s e c)
+  | NoCallMCall meth s e lretT c: ~ In (meth, s) (getKindAttr ls) -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (MCall meth s e c)
   | NoCallLetExpr k (e: Expr ty k) lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetExpr e c)
   | NoCallLetAction k (a: ActionT ty k) lretT c: NoCallActionT a -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetAction a c)
   | NoCallReadNondet k lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (ReadNondet k c)
@@ -825,15 +825,15 @@ Section NoSelfCallBaseModule.
   Variable m: BaseModule.
   
   Definition NoSelfCallRuleBaseModule (rule : Attribute (Action Void)) :=
-    forall ty, NoCallActionT (map fst (getMethods m)) (snd rule ty).
+    forall ty, NoCallActionT (getMethods m) (snd rule ty).
   
   Definition NoSelfCallRulesBaseModule :=
     forall rule ty, In rule (getRules m) ->
-                    NoCallActionT (map fst (getMethods m)) (snd rule ty).
+                    NoCallActionT (getMethods m) (snd rule ty).
   
   Definition NoSelfCallMethsBaseModule :=
     forall meth ty, In meth (getMethods m) ->
-                 forall (arg: ty (fst (projT1 (snd meth)))), NoCallActionT (map fst (getMethods m)) (projT2 (snd meth) ty arg).
+                 forall (arg: ty (fst (projT1 (snd meth)))), NoCallActionT (getMethods m) (projT2 (snd meth) ty arg).
 
   Definition NoSelfCallBaseModule :=
     NoSelfCallRulesBaseModule /\ NoSelfCallMethsBaseModule.
@@ -1435,13 +1435,13 @@ Definition getListFullLabel_diff (f : MethT) (l : list FullLabel) :=
 
 Definition MatchingExecCalls_Base (l : list FullLabel) m :=
   forall f,
-    In (fst f) (map fst (getMethods m)) ->
+    In (fst f, projT1 (snd f)) (getKindAttr (getMethods m)) ->
     (getNumCalls f l <= getNumExecs f l)%Z.
 
 Definition MatchingExecCalls_Concat (lcall lexec : list FullLabel) mexec :=
   forall f,
     (getNumCalls f lcall <> 0%Z) ->
-    In (fst f) (map fst (getAllMethods mexec)) ->
+    In (fst f, projT1 (snd f)) (getKindAttr (getAllMethods mexec)) ->
     ~In (fst f) (getHidden mexec) /\
     (getNumCalls f lcall + getNumCalls f lexec <= getNumExecs f lexec)%Z.
 
@@ -1488,7 +1488,7 @@ Inductive Step: Mod -> RegsT -> list FullLabel -> Prop :=
 | BaseStep m o l (HSubsteps: Substeps m o l) (HMatching: MatchingExecCalls_Base l  m):
     Step (Base m) o l
 | HideMethStep m s o l (HStep: Step m o l)
-               (HHidden : In s (map fst (getAllMethods m)) -> (forall v, (getListFullLabel_diff (s, v) l = 0%Z))):
+               (HHidden : forall v, In (s, projT1 v) (getKindAttr (getAllMethods m)) -> getListFullLabel_diff (s, v) l = 0%Z):
     Step (HideMeth m s) o l
 | ConcatModStep m1 m2 o1 o2 l1 l2
                 (HStep1: Step m1 o1 l1)
