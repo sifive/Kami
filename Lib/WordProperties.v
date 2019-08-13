@@ -1403,7 +1403,36 @@ Proof.
   apply Zmod_small; auto.
 Qed.
 
+Lemma Zpow_successor : forall x (y : nat),
+    (0 <= x < 2 ^ (Z.of_nat y))%Z ->
+    (0 <= x < 2 ^ Z.of_nat(y + 1))%Z.
+Proof.
+  intros.
+  inversion H.
+  split.
+  * auto.
+  * rewrite Nat2Z.inj_add.
+    rewrite Z.add_comm.
+    apply Zpow_lt_add.
+    lia.
+    lia.
+    lia.
+Qed.
 
+Lemma Zpow_successor_itself : forall  (y : nat),
+    (0 <= 2 ^ (Z.of_nat y) < 2 ^ Z.of_nat(y + 1))%Z.
+Proof.
+  intros.
+  split.
+  * rewrite (Z.pow_nonneg 2 (Z.of_nat y)).
+    lia.
+    lia.
+  * apply Z.pow_lt_mono_r.
+    lia.
+    lia.
+    lia.
+Qed.
+  
 
 Lemma concat_shiftl_plus_n n x:
   (0 <= x < 2 ^ (Z.of_nat n))%Z ->
@@ -1421,14 +1450,12 @@ Proof.
   rewrite H0.
   repeat (rewrite getWordVal).
   lia.
-  rewrite Nat2Z.inj_add.
-  admit.
-  admit.
-  lia.
-Admitted.
+  apply Zpow_successor; auto.
+  apply Zpow_successor_itself.
+  auto.
+Qed.
 
-
-Lemma combine_wplus sz (w1 w2: word sz):
+Lemma concat_wplus sz (w1 w2: word sz):
   forall sz' (w': word sz'),
     (0 <= (wordVal _ w1) + (wordVal _ w2) < 2 ^ Z.of_nat sz)%Z ->
     wconcat w' (w1 ^+ w2) = @wconcat sz' sz (sz'+sz) w' w1 ^+ wconcat (zToWord sz' 0) w2.
@@ -1441,6 +1468,74 @@ Proof.
   lia.
   auto.
 Qed.
+
+Lemma wminus_inv : forall sz (x : word sz), x ^+ ^~ _ x = zToWord sz 0.
+Proof.
+  intros.
+  arithmetizeWord; autorewrite with distributeMod.
+  rewrite Zplus_mod.
+  rewrite Zminus_mod.
+  rewrite Z_mod_same_full, Z.sub_0_l, Zplus_mod_idemp_r, Z.add_opp_r, Zminus_mod_idemp_r.
+  rewrite (Zmod_small _ _ H); rewrite Z.sub_diag; reflexivity.
+Qed.
+
+Lemma wadd_wzero_1:
+  forall sz (w: word sz), w ^+ (zToWord _ 0) = w.
+Proof.
+  intros.
+  arithmetizeWord; autorewrite with distributeMod.
+  rewrite Z.add_0_r.
+  auto.
+Qed.
+
+Lemma move_wadd_wminus sz (a b c: word sz):
+  a ^+ b = c <-> a = c ^- b.
+Proof.
+  split; intro.
+  + rewrite <- H.
+    rewrite wminus_def.
+    rewrite <- wplus_assoc.
+    rewrite wminus_inv.
+    rewrite wadd_wzero_1.
+    reflexivity.
+  + rewrite H.
+    rewrite wminus_def.
+    rewrite <- wplus_assoc.
+    rewrite wplus_comm with (x:= ^~ _ b).
+    rewrite wminus_inv.
+    rewrite wadd_wzero_1.
+    reflexivity.
+Qed.
+
+Lemma wneg_idempotent:
+  forall {sz} (w: word sz), ^~ _ (^~ _ w) = w.
+Proof.
+  intros.
+  arithmetizeWord; autorewrite with distributeMod.
+  rewrite <- Zminus_mod_idemp_l.
+  rewrite Z_mod_same_full.
+  rewrite Z.sub_0_l.
+  rewrite Z.opp_sub_distr.
+  rewrite Z.add_opp_l.
+  rewrite <- Zminus_mod_idemp_r.
+  rewrite Z_mod_same_full.
+  rewrite Z.sub_0_r.
+  auto.
+Qed.
+
+Lemma zToWord_plus : forall sz n m,
+    zToWord sz (n + m) = zToWord _ n ^+ zToWord _ m.
+Proof.
+  intros.
+  arithmetizeWord; autorewrite with distributeMod.
+  f_equal.
+Qed.
+
+
+
+
+
+
 
 
 
