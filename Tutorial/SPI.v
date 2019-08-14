@@ -196,7 +196,7 @@ Section Named.
   Inductive p :=
   | getmiso (_ : forall miso : bool, p)
   | putsck (_ : bool) (_ : p)
-  | putmosi (_ : bool) (_ : p)
+  | putmosi (_ : word 1) (_ : p)
 
   | yield (_ : p)
   | ret (_ : word 8).
@@ -205,7 +205,7 @@ Section Named.
     match n with
     | O => fun _ rx => ret rx
     | S n => fun tx rx =>
-      let mosi := wmsb tx false in
+      let mosi := split2 7 1 tx in
       let tx := WS false (split1 7 1 tx) in
       putsck false (
       putmosi mosi (
@@ -223,7 +223,7 @@ Section Named.
     match e with
     | getmiso k => fun l w t => exists miso, interp (k miso) (l++[("GetMISO", existT SignT (Void, Bit 1) (wzero 0, WS miso WO))]) w t
     | putsck sck k => fun l w t => interp k (l++[("PutSCK", existT SignT (Bool, Void) (sck, wzero 0))]) w t
-    | putmosi mosi k => fun l w t => interp k (l++[("PutMOSI", existT SignT (Bit 1, Void) (WS mosi WO, wzero 0))]) w t
+    | putmosi mosi k => fun l w t => interp k (l++[("PutMOSI", existT SignT (Bit 1, Void) (mosi, wzero 0))]) w t
     | yield k => fun l w t => exists r, (eq [[(r, (Rle (name ++ "_cycle"), l))]] +++ interp k nil w) t
     | ret w => fun l' w' t => w' = w /\ t = nil
     end.
@@ -243,18 +243,39 @@ Section Named.
      (@^"sck", existT _ (SyntaxKind Bool) sck);
      (@^"tx", existT _ (SyntaxKind (Bit 8)) tx);
      (@^"rx", existT _ (SyntaxKind (Bit 8)) rx);
-     (@^"rx_valid", existT _ (SyntaxKind (Bit 4)) rx_valid)
+     (@^"rx_valid", existT _ (SyntaxKind Bool) rx_valid)
      ].
+
+  Definition xchg_prog_sckfalse (n : nat) (tx : word 8) (rx : word 8) (mosi : word 1) : p :=
+    getmiso (fun miso =>
+    let rx := WS miso (split1 7 1 rx) in
+    putsck true (
+    putmosi mosi (
+    yield (
+    @xchg_prog n tx rx)))).
+
+  Definition xchg_prog_as_sckfalse (n : nat) (tx : word 8) (rx : word 8) :
+    xchg_prog (S n) tx rx =
+    let mosi := split2 7 1 tx in
+    let tx := WS false (split1 7 1 tx) in
+    putsck false (
+    putmosi mosi (
+    yield (
+    xchg_prog_sckfalse n tx rx mosi)))
+    := eq_refl.
 
   (* draining case only *)
   Goal forall s past,
     Trace SPI s past ->
-    exists i sck tx rx rx_valid,
-    enforce_regs s i sck tx rx rx_valid /\
+    exists i sck tx rx (*rx_valid*)false,
+    enforce_regs s i sck tx rx false /\
     wordToNat i <> 0 /\
     let i := wordToNat i in
-    (forall frx future, TracePredicate.interleave (kleene nop) (interp (xchg_prog i tx rx) nil frx +++ kleene spec ) future ->
-    TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) nil frx) (future ++ past)).
+    forall frx future,
+    (if sck
+    then TracePredicate.interleave (kleene nop) (interp (xchg_prog i tx rx) nil frx +++ kleene spec ) future
+    else TracePredicate.interleave (kleene nop) (interp (xchg_prog_sckfalse i tx rx (split2 7 1 tx)) nil frx +++ kleene spec ) future)
+    -> TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) nil frx) (future ++ past).
   Proof.
     intros s past.
     pose proof eq_refl s as MARKER.
@@ -269,8 +290,7 @@ Section Named.
       | _ => progress intros
       | _ => progress clean_hyp_step
       | _ => progress discharge_string_dec
-      | _ => progress cbn [SPI getMethods baseModule makeModule makeModule' type evalExpr isEq evalConstT Kind_rect List.app map fst snd projT1 projT2 invariant doUpdRegs findReg] in *
-      | _ => progress cbv [invariant] in *
+      | _ => progress cbv [enforce_regs] in *
       | K: UpdRegs _ _ ?z |- _ =>
           let H := fresh K in
           unshelve epose proof (NoDup_UpdRegs _ _ K); clear K; [> ..| progress subst z]
@@ -283,10 +303,15 @@ Section Named.
       | H : ?T -> _ |- _ => assert_succeeds (idtac; match type of T with Prop => idtac end); specialize (H ltac:(auto))
     end.
 
+    { (* i = 0 *)
+      unshelve epose proof ((_ : forall x y, getBool (weq x y) = true -> x = y) _ _ H3).
+      1:admit.
+      subst rv0.
+      case (H4 eq_refl). }
+
     {
       repeat match goal with
       | _ => eapply ex_intro || eapply conj
-      | _ => eapply IHTrace; clear IHTrace
       end.
 
       1: solve[cbv [enforce_regs doUpdRegs] in *;subst;clear;
@@ -303,19 +328,62 @@ Section Named.
           progress change (l = r)
       | _ => exact eq_refl
       end].
-
       1:solve[auto].
       
+      (* trace construction *)
+      destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|].
+      cbn [evalExpr evalConstT] in *; subst.
       intros.
       progress rewrite ?app_assoc, ?app_nil_r.
-      eapply H7.
+      Local Infix "||" := TracePredicate.interleave.
+      epose proof (fun x => H8 _ (List.app future (cons _ nil)) x) as H8cons.
+      refine (H8cons _); clear H8cons H8.
 
-      remember (wordToNat i) as i1; destruct i1; repeat rewrite <-Heqi in *; try solve [congruence].
-      cbn [xchg_prog].
-      cbn [interp].
-      eapply TracePredicate.interleave_kleene_l_app_r.
+      rewrite xchg_prog_as_sckfalse; cbn zeta beta.
+
+      admit.
+      }
+
+    {
+      repeat match goal with
+      | _ => eapply ex_intro || eapply conj
+      end.
+
+      1: solve[cbv [enforce_regs doUpdRegs] in *;subst;clear;
+      repeat match goal with
+      | _ => progress discharge_string_dec
+      | _ => progress cbn [fst snd]
+      | |- context G [match ?x with _ => _ end] =>
+         let X := eval hnf in x in
+         progress change x with X
+      | _ => progress (f_equal; [])
+      | |- ?l = ?r =>
+          let l := eval hnf in l in
+          let r := eval hnf in r in
+          progress change (l = r)
+      | _ => exact eq_refl
+      end].
+      1:solve[auto].
+      
+      destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|].
+      cbn [evalExpr evalBinBit evalUniBit evalConstT] in *; subst.
+      (* trace construction *)
+      intros.
+      progress rewrite ?app_assoc, ?app_nil_r.
+      Local Infix "||" := TracePredicate.interleave.
+      epose proof (fun x => H8 _ (List.app future (cons _ nil)) x) as H8cons.
+      refine (H8cons _); clear H8cons H8.
+
+      rewrite xchg_prog_as_sckfalse; cbn zeta beta.
+
+      admit.
 
 Abort.
+      cbv [xchg_prog_sckfalse] in H. 
+      setoid_rewrite xchg_prog_as_sckfalse in H; cbn zeta beta in H.
+      cbn [xchg_prog] in H.
+      cbn [interp].
+      eapply TracePredicate.interleave_kleene_l_app_r.
 
 End Named.
 
