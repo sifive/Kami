@@ -281,6 +281,7 @@ Section Named.
     pose proof eq_refl s as MARKER.
     induction 1 as [A B C D | regsBefore t regUpds regsAfter E _ IHTrace HStep K I].
     { subst. admit. }
+    rename t into past.
 
     unshelve epose proof InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep as HHS;
       clear HStep; [abstract discharge_wf|..|rename HHS into HStep].
@@ -333,13 +334,19 @@ Section Named.
       (* trace construction *)
       destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|].
       cbn [evalExpr evalConstT] in *; subst.
-      intros.
-      progress rewrite ?app_assoc, ?app_nil_r.
+      move H8 at bottom.
       Local Infix "||" := TracePredicate.interleave.
-      epose proof (fun x => H8 _ (List.app future (cons _ nil)) x) as H8cons.
-      refine (H8cons _); clear H8cons H8.
+      change (list (list (RegsT * (RuleOrMeth * list MethT)))) with (list (list FullLabel)).
+
+      intros frx future Hfuture.
+      rewrite app_assoc.
+      revert Hfuture; revert future; revert frx.
+
+      intros; refine (H8 _ _ _); clear H8; revert Hfuture; revert future; revert frx.
+      cbv [xchg_prog_sckfalse]. (* False *)
 
       rewrite xchg_prog_as_sckfalse; cbn zeta beta.
+
 
       admit.
       }
