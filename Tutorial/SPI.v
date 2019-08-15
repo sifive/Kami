@@ -274,7 +274,7 @@ Section Named.
     forall frx future,
     (if sck
     then TracePredicate.interleave (kleene nop) (interp (xchg_prog i tx rx) nil frx +++ kleene spec ) future
-    else TracePredicate.interleave (kleene nop) (interp (xchg_prog_sckfalse i tx rx (split2 7 1 tx)) nil frx +++ kleene spec ) future)
+    else TracePredicate.interleave (kleene nop) (interp (xchg_prog_sckfalse (pred i)  tx rx (split2 7 1 tx)) nil frx +++ kleene spec ) future)
     -> TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) nil frx) (future ++ past).
   Proof.
     intros s past.
@@ -333,7 +333,7 @@ Section Named.
       
       (* trace construction *)
       destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|].
-      cbn [evalExpr evalConstT] in *; subst.
+      cbn [Init.Nat.pred evalExpr evalConstT] in *; subst.
       move H8 at bottom.
       Local Infix "||" := TracePredicate.interleave.
       change (list (list (RegsT * (RuleOrMeth * list MethT)))) with (list (list FullLabel)).
@@ -343,8 +343,6 @@ Section Named.
       revert Hfuture; revert future; revert frx.
 
       intros; refine (H8 _ _ _); clear H8; revert Hfuture; revert future; revert frx.
-      cbv [xchg_prog_sckfalse]. (* False *)
-
       rewrite xchg_prog_as_sckfalse; cbn zeta beta.
 
 
