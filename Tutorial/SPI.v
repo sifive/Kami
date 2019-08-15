@@ -271,6 +271,7 @@ Section Named.
 
   Definition xchg_prog_sckfalse (n : nat) (tx : word 8) (rx : word 8) (mosi : word 1) : p :=
     getmiso (fun miso =>
+    let tx := WS false (split1 7 1 tx) in
     let rx := WS miso (split1 7 1 rx) in
     putsck true (
     putmosi mosi (
@@ -280,7 +281,6 @@ Section Named.
   Definition xchg_prog_as_sckfalse (n : nat) (tx : word 8) (rx : word 8) :
     xchg_prog (S n) tx rx =
     let mosi := split2 7 1 tx in
-    let tx := WS false (split1 7 1 tx) in
     putsck false (
     putmosi mosi (
     yield (
@@ -370,18 +370,15 @@ Section Named.
       intros.
       cbn [interp].
       eapply TracePredicate.interleave_exist_r; eexists.
-      eapply TracePredicate.interleave_rapp.
-      (* HERE *)
-      admit.
+      eapply TracePredicate.interleave_kleene_l_app_r; [|eassumption].
       eexists nil, _; split; [|split].
       { eapply List.interleave_nil_l. }
       { (* kleene_nil *) admit. }
       cbv [List.app]. f_equal. f_equal. f_equal. f_equal.
       repeat f_equal.
       eapply f_equal.
-      2:eapply f_equal.
-      1,2: admit.
-    }
+      2:eapply f_equal.       
+      1,2: rewrite word0, (word0 (wzero 0)); reflexivity. }
 
     {
       repeat match goal with
