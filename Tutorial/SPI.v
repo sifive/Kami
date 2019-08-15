@@ -287,6 +287,22 @@ Section Named.
     xchg_prog_sckfalse n tx rx mosi)))
     := eq_refl.
 
+  Ltac solve_enforce_regs :=
+    solve[cbv [doUpdRegs enforce_regs] in *; subst; clear;
+    repeat match goal with
+    | _ => progress discharge_string_dec
+    | _ => progress cbn [fst snd]
+    | |- context G [match ?x with _ => _ end] =>
+       let X := eval hnf in x in
+       progress change x with X
+    | _ => progress (f_equal; [])
+    | |- ?l = ?r =>
+        let l := eval hnf in l in
+        let r := eval hnf in r in
+        progress change (l = r)
+    | _ => exact eq_refl
+    end].
+
   (* draining case only *)
   Goal forall s past,
     Trace SPI s past ->
@@ -304,7 +320,9 @@ Section Named.
     pose proof eq_refl s as MARKER.
     induction 1 as [A B C D | regsBefore t regUpds regsAfter E _ IHTrace HStep K I].
     { subst. admit. }
+
     rename t into past.
+    specialize (IHTrace eq_refl); destruct IHTrace as (i&sck&tx&rx&rx_valid&Hregs&Hi&IHTrace).
 
     unshelve epose proof InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep as HHS;
       clear HStep; [abstract discharge_wf|..|rename HHS into HStep].
@@ -312,13 +330,17 @@ Section Named.
 
     repeat match goal with
       | _ => progress intros
+      | _ => progress subst
       | _ => progress clean_hyp_step
       | _ => progress discharge_string_dec
+      | _ => progress cbn [fst snd] in *
       | _ => progress cbv [enforce_regs] in *
       | K: UpdRegs _ _ ?z |- _ =>
           let H := fresh K in
           unshelve epose proof (NoDup_UpdRegs _ _ K); clear K; [> ..| progress subst z]
       | |- NoDup _ => admit
+      | |- exists _ _ _ _ _, doUpdRegs _ _ = _ /\ _ =>
+          eexists _, _, _, _, _; eapply conj; [> solve_enforce_regs| ]
       | |- context G [@cons ?T ?a ?b] =>
           assert_fails (idtac; match b with nil => idtac end);
           let goal := context G [@List.app T (@cons T a nil) b] in
@@ -327,44 +349,24 @@ Section Named.
       | H : ?T -> _ |- _ => assert_succeeds (idtac; match type of T with Prop => idtac end); specialize (H ltac:(auto))
     end.
 
+    all:
+    repeat match goal with
+      | |- _ /\ _ => split; try solve [auto 2]; (let n := numgoals in guard n <= 1)
+    end.
+
     { (* i = 0 *)
-      unshelve epose proof ((_ : forall x y, getBool (weq x y) = true -> x = y) _ _ H3).
-      1:admit.
+      unshelve epose proof ((_ : forall x y, getBool (weq x y) = true -> x = y) _ _ H3); [>admit|].
       subst rv0.
-      case (H4 eq_refl). }
-
+      case (Hi eq_refl). }
     {
-      repeat match goal with
-      | _ => eapply ex_intro || eapply conj
-      end.
-
-      1: solve[cbv [enforce_regs doUpdRegs] in *;subst;clear;
-      repeat match goal with
-      | _ => progress discharge_string_dec
-      | _ => progress cbn [fst snd]
-      | |- context G [match ?x with _ => _ end] =>
-         let X := eval hnf in x in
-         progress change x with X
-      | _ => progress (f_equal; [])
-      | |- ?l = ?r =>
-          let l := eval hnf in l in
-          let r := eval hnf in r in
-          progress change (l = r)
-      | _ => exact eq_refl
-      end].
-      1:solve[auto].
-      
       (* trace construction *)
-      destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|].
-      cbn [Init.Nat.pred evalExpr evalConstT] in *; subst.
-      move H8 at bottom.
-      change (list (list (RegsT * (RuleOrMeth * list MethT)))) with (list (list FullLabel)).
+      rename Hi into Hi'; destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|]; clear Hi'.
+      cbn [Init.Nat.pred evalExpr evalConstT getBool isEq] in *; subst.
 
       intros frx future Hfuture.
       rewrite app_assoc.
       revert Hfuture; revert future; revert frx.
-
-      intros; refine (H8 _ _ _); clear H8; revert Hfuture; revert future; revert frx.
+      intros; refine (IHTrace _ _ _); clear IHTrace; revert Hfuture; revert future; revert frx.
       rewrite xchg_prog_as_sckfalse; cbn zeta beta.
 
       intros.
@@ -380,46 +382,8 @@ Section Named.
       2:eapply f_equal.       
       1,2: rewrite word0, (word0 (wzero 0)); reflexivity. }
 
-    {
-      repeat match goal with
-      | _ => eapply ex_intro || eapply conj
-      end.
-
-      1: solve[cbv [enforce_regs doUpdRegs] in *;subst;clear;
-      repeat match goal with
-      | _ => progress discharge_string_dec
-      | _ => progress cbn [fst snd]
-      | |- context G [match ?x with _ => _ end] =>
-         let X := eval hnf in x in
-         progress change x with X
-      | _ => progress (f_equal; [])
-      | |- ?l = ?r =>
-          let l := eval hnf in l in
-          let r := eval hnf in r in
-          progress change (l = r)
-      | _ => exact eq_refl
-      end].
-      1:solve[auto].
-      
-      destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|].
-      cbn [evalExpr evalBinBit evalUniBit evalConstT] in *; subst.
-      (* trace construction *)
-      intros.
-      progress rewrite ?app_assoc, ?app_nil_r.
-      Local Infix "||" := TracePredicate.interleave.
-      epose proof (fun x => H8 _ (List.app future (cons _ nil)) x) as H8cons.
-      refine (H8cons _); clear H8cons H8.
-
-      rewrite xchg_prog_as_sckfalse; cbn zeta beta.
-
-      admit.
 
 Abort.
-      cbv [xchg_prog_sckfalse] in H. 
-      setoid_rewrite xchg_prog_as_sckfalse in H; cbn zeta beta in H.
-      cbn [xchg_prog] in H.
-      cbn [interp].
-      eapply TracePredicate.interleave_kleene_l_app_r.
 
 End Named.
 
