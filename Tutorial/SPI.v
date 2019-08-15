@@ -1,11 +1,17 @@
 Require Import Coq.Lists.List. Import ListNotations.
-  
-Axiom kleene : forall {T}, (list T -> Prop) -> list T -> Prop.
-Axiom plus : forall {T}, (list T -> Prop) -> list T -> Prop.
-Axiom app : forall {T}, (list T -> Prop) -> (list T -> Prop) -> list T -> Prop.
-Lemma app_empty_r {T} (P Q : list T -> Prop) t : P t -> Q nil -> app P Q t. Admitted.
-Axiom either : forall {T}, (list T -> Prop) -> (list T -> Prop) -> list T -> Prop.
-Axiom maybe : forall {T}, (list T -> Prop) -> list T -> Prop.
+
+Section TracePredicate.  
+  Context {T : Type}.
+  Axiom kleene : (list T -> Prop) -> list T -> Prop.
+  Axiom plus : (list T -> Prop) -> list T -> Prop.
+  Axiom app : (list T -> Prop) -> (list T -> Prop) -> list T -> Prop.
+  Lemma app_empty_r (P Q : list T -> Prop) t : P t -> Q nil -> app P Q t. Admitted.
+  Axiom either : (list T -> Prop) -> (list T -> Prop) -> list T -> Prop.
+  Axiom maybe : (list T -> Prop) -> list T -> Prop.
+
+  Definition exist {V} (P : V -> list T -> Prop) (l : list T) : Prop :=
+    exists v : V, P v l.
+End TracePredicate.
 Local Notation "x ^*" := (kleene x) (at level 50).
 Local Notation "x ^+" := (plus x) (at level 50).
 Local Infix "+++" := app (at level 60).
@@ -34,7 +40,7 @@ Module List. Section __.
 
   Lemma interleave_nil_r zs : interleave zs nil zs.
   Proof. induction zs; cbn; eauto. Qed.
-  Lemma interleave_nil_l zs : interleave zs nil zs.
+  Lemma interleave_nil_l zs : interleave nil zs zs.
   Proof. induction zs; cbn; eauto. Qed.
 End __. End List.
 
@@ -49,6 +55,7 @@ Module TracePredicate.
   Definition interleave {T} (P Q : list T -> Prop) :=
     fun zs => exists xs ys, List.interleave xs ys zs /\ P xs /\ Q ys.
 
+  Local Infix "||" := TracePredicate.interleave.
   Lemma interleave_rapp {T} {P QQ Q : list T -> Prop} z zs
     (H : Q z) (HH : interleave P QQ zs) : interleave P (QQ +++ Q) (z++zs).
   Proof.
@@ -101,7 +108,23 @@ Module TracePredicate.
     : TracePredicate.interleave (kleene A) (B +++ C) (cs ++ bs).
   Admitted.
   (* TODO: how do I actually prove this in a loop *)
+
+  Lemma interleave_exist_r {T V} P Q (t : list T) : (exist (fun v:V => P || Q v)) t -> (P || exist Q) t.
+  Proof.
+    cbv [exist].
+    intros (?&?&?&?&?&?).
+    eexists _, _; eauto.
+  Qed.
+
+  Lemma interleave_exist_l {T V} P Q (t : list T) : (exist (fun v:V => P v || Q)) t -> (exist P || Q) t.
+  Proof.
+    cbv [exist].
+    intros (?&?&?&?&?&?).
+    eexists _, _; eauto.
+  Qed.
+
 End TracePredicate.
+Local Infix "||" := TracePredicate.interleave.
 
 Require Import Kami.All.
 
@@ -182,14 +205,14 @@ Section Named.
     )
   }.
 
-  Definition cmd_write arg err t := exists r : RegsT, t =
-    [[(r, (Meth ("write", existT SignT (Bit 8, Bool) (arg, err)), @nil MethT))]].
-  Definition cmd_read (ret : word 8) err t := exists r : RegsT, t =
-    [[(r, (Meth ("read", existT SignT (Void, Bool) (wzero 0, err)), @nil MethT))]].
-  Definition iocycle miso sck mosi t := exists r : RegsT, t = [[(r, (Rle (name ++ "_cycle"),
+  Definition cmd_write arg err := exist (fun r : RegsT =>
+    eq [[(r, (Meth ("write", existT SignT (Bit 8, Bool) (arg, err)), @nil MethT))]]).
+  Definition cmd_read (ret : word 8) err := exist (fun r : RegsT =>
+    eq [[(r, (Meth ("read", existT SignT (Void, Bool) (wzero 0, err)), @nil MethT))]]).
+  Definition iocycle miso sck mosi := exist (fun r : RegsT => eq [[(r, (Rle (name ++ "_cycle"),
       [("GetMISO", existT SignT (Void, Bit 1) (wzero 0, WS miso WO));
       ("PutSCK",   existT SignT (Bool, Void)  (sck, wzero 0));
-      ("PutMOSI",  existT SignT (Bit 1, Void) (WS mosi WO, wzero 0))]))]].
+      ("PutMOSI",  existT SignT (Bit 1, Void) (WS mosi WO, wzero 0))]))]]).
 
   Definition nop x := (exists arg, cmd_write arg true x) \/ (exists ret, cmd_read ret true x).
   
@@ -221,14 +244,14 @@ Section Named.
 
   Fixpoint interp (e : p) : list MethT -> word 8 -> list (list FullLabel) -> Prop :=
     match e with
-    | getmiso k => fun l w t => exists miso, interp (k miso) (l++[("GetMISO", existT SignT (Void, Bit 1) (wzero 0, WS miso WO))]) w t
-    | putsck sck k => fun l w t => interp k (l++[("PutSCK", existT SignT (Bool, Void) (sck, wzero 0))]) w t
-    | putmosi mosi k => fun l w t => interp k (l++[("PutMOSI", existT SignT (Bit 1, Void) (mosi, wzero 0))]) w t
-    | yield k => fun l w t => exists r, (eq [[(r, (Rle (name ++ "_cycle"), l))]] +++ interp k nil w) t
+    | getmiso k => fun l w => exist (fun miso => interp (k miso) (l++[("GetMISO", existT SignT (Void, Bit 1) (wzero 0, WS miso WO))]) w)
+    | putsck sck k => fun l w => interp k (l++[("PutSCK", existT SignT (Bool, Void) (sck, wzero 0))]) w
+    | putmosi mosi k => fun l w => interp k (l++[("PutMOSI", existT SignT (Bit 1, Void) (mosi, wzero 0))]) w
+    | yield k => fun l w => exist (fun r => (eq [[(r, (Rle (name ++ "_cycle"), l))]] +++ interp k nil w))
     | ret w => fun l' w' t => w' = w /\ t = nil
     end.
 
-  Definition silent t := exists miso mosi, iocycle miso false mosi t.
+  Definition silent := exist (fun miso => exist (fun mosi => iocycle miso false mosi)).
 
   Definition spec := TracePredicate.interleave (kleene nop) (kleene (fun t =>
     silent t \/
@@ -273,8 +296,8 @@ Section Named.
     let i := wordToNat i in
     forall frx future,
     (if sck
-    then TracePredicate.interleave (kleene nop) (interp (xchg_prog i tx rx) nil frx +++ kleene spec ) future
-    else TracePredicate.interleave (kleene nop) (interp (xchg_prog_sckfalse (pred i)  tx rx (split2 7 1 tx)) nil frx +++ kleene spec ) future)
+    then TracePredicate.interleave (kleene nop) (interp (xchg_prog i tx rx) nil frx) future
+    else TracePredicate.interleave (kleene nop) (interp (xchg_prog_sckfalse (pred i)  tx rx (split2 7 1 tx)) nil frx) future)
     -> TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) nil frx) (future ++ past).
   Proof.
     intros s past.
@@ -335,7 +358,6 @@ Section Named.
       destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|].
       cbn [Init.Nat.pred evalExpr evalConstT] in *; subst.
       move H8 at bottom.
-      Local Infix "||" := TracePredicate.interleave.
       change (list (list (RegsT * (RuleOrMeth * list MethT)))) with (list (list FullLabel)).
 
       intros frx future Hfuture.
@@ -345,9 +367,21 @@ Section Named.
       intros; refine (H8 _ _ _); clear H8; revert Hfuture; revert future; revert frx.
       rewrite xchg_prog_as_sckfalse; cbn zeta beta.
 
-
+      intros.
+      cbn [interp].
+      eapply TracePredicate.interleave_exist_r; eexists.
+      eapply TracePredicate.interleave_rapp.
+      (* HERE *)
       admit.
-      }
+      eexists nil, _; split; [|split].
+      { eapply List.interleave_nil_l. }
+      { (* kleene_nil *) admit. }
+      cbv [List.app]. f_equal. f_equal. f_equal. f_equal.
+      repeat f_equal.
+      eapply f_equal.
+      2:eapply f_equal.
+      1,2: admit.
+    }
 
     {
       repeat match goal with
