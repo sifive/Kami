@@ -1235,7 +1235,7 @@ Section Properties.
       econstructor; eauto; intros; contradiction.
   Qed.
 
-  Lemma SignatureRepace_NoCall k ty (a : ActionT ty k) :
+  Lemma SignatureReplace_NoCall k ty (a : ActionT ty k) :
     forall (ls ls' : list DefMethT),
       getKindAttr ls = getKindAttr ls' ->
       NoCallActionT ls a ->
@@ -1391,6 +1391,23 @@ Section Properties.
     eapply NeverCall_inlineSome_pos_persistent; eauto using NeverCall_inlineSingle_pos.
   Qed.
 
+  Lemma NeverCall_inlineSome_pos_full xs :
+    forall ty k (a : ActionT ty k)
+           (l : list DefMethT)
+           (HNeverCall : forall meth ty,
+               In meth l ->
+               forall arg, NeverCallActionT (projT2 (snd meth) ty arg)),
+      NoCallActionT (subseq_list l xs) (fold_left (inlineSingle_pos l) xs a).
+  Proof.
+    induction xs; eauto using NilNoCall; intros.
+    simpl; unfold inlineSingle_pos at 2.
+    destruct (nth_error _ _) eqn:G; eauto.
+    assert (d::subseq_list l xs = [d] ++ subseq_list l xs) as TMP; auto; rewrite TMP; clear TMP.
+    apply NoCallActionT_Stitch; auto.
+    apply NeverCall_inlineSome_pos_persistent; auto.
+    apply  NeverCall_inline; eauto using nth_error_In.
+  Qed.
+  
   Lemma NoSelfCall_ignorable k (a : ActionT type k) :
     forall (l1 l2 : list DefMethT) (n : nat),
       n < length l1 ->
@@ -2093,7 +2110,7 @@ Section Properties.
       specialize (HNoCall _ ty H0 arg); simpl in *.
       eapply NeverCall_inlineSome_pos_persistent; auto.
       * specialize (SameKindAttrs_inlineSome_Meths_map (seq 0 (length l')) l l') as P0.
-        eauto using SignatureRepace_NoCall.
+        eauto using SignatureReplace_NoCall.
   Qed.
 
   Lemma inlineSingle_Rules_app_l :
@@ -6917,72 +6934,174 @@ Section Properties.
         assumption.
   Qed.
   
-    Lemma EEquivLoop (b : BaseModule) (lrf : list RegFileBase) o :
-      let m := inlineAll_All_mod (mergeSeparatedSingle b lrf) in
-      forall rules upds calls retl ls
-             (HWfMod : WfMod (mergeSeparatedSingle b lrf))
-             (HTrace : Trace m o ls)
-             (HNoSelfCalls : NoSelfCallBaseModule m)
-             (HNoSelfCallsBase : NoSelfCallBaseModule b),
-        SubList rules (getRules b) ->
-        @SemCompActionT Void (compileRulesRf type (o, nil) rules lrf) (o, upds) calls retl ->
-        (forall u, In u upds -> (NoDup (map fst u)) /\ SubList (getKindAttr u) (getKindAttr o)) /\
-        exists o' (ls' : list (list FullLabel)),
-          PriorityUpds o upds o' /\
-          upds = (map getLabelUpds ls') /\
-          calls = concat (map getLabelCalls (rev ls')) /\
-          Trace m o' (ls' ++ ls).
-    Proof.
-      intros.
-      specialize (mergeFile_noCalls lrf) as P0.
-      assert (
-          forall (meth : DefMethT) (ty : Kind -> Type),
-            In meth (getAllMethods (mergeSeparatedBaseFile lrf)) -> forall arg : ty (fst (projT1 (snd meth))), NeverCallActionT (projT2 (snd meth) ty arg)).
-      { revert P0; clear.
-        induction lrf; simpl; intros; [contradiction|].
-        rewrite in_app_iff in H; inv H.
-        - specialize (RegFileBase_noCalls a) as P1.
-          inv P1; inv HNCBaseModule; eauto.
-        - inv P0.
-          eapply IHlrf; eauto. }
-      eapply EquivLoop'; eauto; simpl.
-      - rewrite map_app, NoDup_app_iff; repeat split; auto; inv HWfMod.
-        + inv HWf1; inv HWfBaseModule; dest; assumption.
-        + clear - HWf2; induction lrf; simpl; [constructor| inv HWf2].
-          rewrite map_app, NoDup_app_iff; repeat split; eauto.
-          * inv HWf1; inv HWfBaseModule; dest; assumption.
-          * repeat intro; specialize (HDisjRegs a0); clear - HDisjRegs H H0; inv HDisjRegs; contradiction.
-          * repeat intro; specialize (HDisjRegs a0); clear - HDisjRegs H H0; inv HDisjRegs; contradiction.
-        + repeat intro; specialize (HDisjRegs a); clear - HDisjRegs H2 H3; inv HDisjRegs; contradiction.
-        + repeat intro; specialize (HDisjRegs a); clear - HDisjRegs H2 H3; inv HDisjRegs; contradiction.
-      - unfold inlineAll_All_mod, inlineAll_All, inlineAll_Meths; simpl.
-        rewrite inlineAll_Meths_RegFile_fold_flat, inlineAll_Rules_NoCalls, inlineAll_Rules_in; eauto; simpl in *.
-        instantiate (1 := map (inline_Rules (getAllMethods (mergeSeparatedBaseFile lrf)) (seq 0 (Datatypes.length (getAllMethods (mergeSeparatedBaseFile lrf))))) rules).
-        rewrite getAllRules_mergeBaseFile, app_nil_r.
-        inv HNoSelfCallsBase; unfold NoSelfCallMethsBaseModule, NoSelfCallRulesBaseModule in *.
-        apply SubList_map.
-        erewrite inlineSome_Meths_pos_NoCalls_ident'; eauto using SubList_refl.
-        unfold inlineAll_Rules.
-        erewrite inlineSome_Rules_pos_NoCalls_ident'; eauto.
-        rewrite SameKindAttrs_inlineSome_Flat; apply SubList_refl.
-      - setoid_rewrite <- (rev_involutive rules).
-        eapply CompileRules_Congruence.
-        + apply (Trace_sameRegs HTrace).
-        + simpl; unfold inlineAll_Meths.
-          rewrite inlineAll_Meths_RegFile_fold_flat; simpl.
-          * repeat intro; rewrite in_app_iff; right.
-            clear - H2.
-            unfold listRfMethods in *; simpl in *.
-            induction lrf; simpl in *; auto.
-            rewrite in_app_iff in *; inv H2; auto.
-          * assumption.
-        + repeat intro.
-          rewrite <-in_rev in H2; apply H; assumption.
-        + assumption.
-        + rewrite rev_involutive.
-          apply H0.
-    Qed.
-        
+  Lemma EEquivLoop (b : BaseModule) (lrf : list RegFileBase) o :
+    let m := inlineAll_All_mod (mergeSeparatedSingle b lrf) in
+    forall rules upds calls retl ls
+           (HWfMod : WfMod (mergeSeparatedSingle b lrf))
+           (HTrace : Trace m o ls)
+           (HNoSelfCalls : NoSelfCallBaseModule m)
+           (HNoSelfCallsBase : NoSelfCallBaseModule b),
+      SubList rules (getRules b) ->
+      @SemCompActionT Void (compileRulesRf type (o, nil) rules lrf) (o, upds) calls retl ->
+      (forall u, In u upds -> (NoDup (map fst u)) /\ SubList (getKindAttr u) (getKindAttr o)) /\
+      exists o' (ls' : list (list FullLabel)),
+        PriorityUpds o upds o' /\
+        upds = (map getLabelUpds ls') /\
+        calls = concat (map getLabelCalls (rev ls')) /\
+        Trace m o' (ls' ++ ls).
+  Proof.
+    intros.
+    specialize (mergeFile_noCalls lrf) as P0.
+    assert (
+        forall (meth : DefMethT) (ty : Kind -> Type),
+          In meth (getAllMethods (mergeSeparatedBaseFile lrf)) -> forall arg : ty (fst (projT1 (snd meth))), NeverCallActionT (projT2 (snd meth) ty arg)).
+    { revert P0; clear.
+      induction lrf; simpl; intros; [contradiction|].
+      rewrite in_app_iff in H; inv H.
+      - specialize (RegFileBase_noCalls a) as P1.
+        inv P1; inv HNCBaseModule; eauto.
+      - inv P0.
+        eapply IHlrf; eauto. }
+    eapply EquivLoop'; eauto; simpl.
+    - rewrite map_app, NoDup_app_iff; repeat split; auto; inv HWfMod.
+      + inv HWf1; inv HWfBaseModule; dest; assumption.
+      + clear - HWf2; induction lrf; simpl; [constructor| inv HWf2].
+        rewrite map_app, NoDup_app_iff; repeat split; eauto.
+        * inv HWf1; inv HWfBaseModule; dest; assumption.
+        * repeat intro; specialize (HDisjRegs a0); clear - HDisjRegs H H0; inv HDisjRegs; contradiction.
+        * repeat intro; specialize (HDisjRegs a0); clear - HDisjRegs H H0; inv HDisjRegs; contradiction.
+      + repeat intro; specialize (HDisjRegs a); clear - HDisjRegs H2 H3; inv HDisjRegs; contradiction.
+      + repeat intro; specialize (HDisjRegs a); clear - HDisjRegs H2 H3; inv HDisjRegs; contradiction.
+    - unfold inlineAll_All_mod, inlineAll_All, inlineAll_Meths; simpl.
+      rewrite inlineAll_Meths_RegFile_fold_flat, inlineAll_Rules_NoCalls, inlineAll_Rules_in; eauto; simpl in *.
+      instantiate (1 := map (inline_Rules (getAllMethods (mergeSeparatedBaseFile lrf)) (seq 0 (Datatypes.length (getAllMethods (mergeSeparatedBaseFile lrf))))) rules).
+      rewrite getAllRules_mergeBaseFile, app_nil_r.
+      inv HNoSelfCallsBase; unfold NoSelfCallMethsBaseModule, NoSelfCallRulesBaseModule in *.
+      apply SubList_map.
+      erewrite inlineSome_Meths_pos_NoCalls_ident'; eauto using SubList_refl.
+      unfold inlineAll_Rules.
+      erewrite inlineSome_Rules_pos_NoCalls_ident'; eauto.
+      rewrite SameKindAttrs_inlineSome_Flat; apply SubList_refl.
+    - setoid_rewrite <- (rev_involutive rules).
+      eapply CompileRules_Congruence.
+      + apply (Trace_sameRegs HTrace).
+      + simpl; unfold inlineAll_Meths.
+        rewrite inlineAll_Meths_RegFile_fold_flat; simpl.
+        * repeat intro; rewrite in_app_iff; right.
+          clear - H2.
+          unfold listRfMethods in *; simpl in *.
+          induction lrf; simpl in *; auto.
+          rewrite in_app_iff in *; inv H2; auto.
+        * assumption.
+      + repeat intro.
+        rewrite <-in_rev in H2; apply H; assumption.
+      + assumption.
+      + rewrite rev_involutive.
+        apply H0.
+  Qed.
+
+  Lemma NeverCallMod_NeverCalls m :
+    NeverCallMod m ->
+    (forall rule ty, In rule (getAllRules m) -> NeverCallActionT (snd rule ty)) /\
+    (forall meth ty,
+        In meth (getAllMethods m) -> forall v, NeverCallActionT (projT2 (snd meth) ty v)).
+  Proof.
+    induction 1; simpl; eauto; dest.
+    setoid_rewrite in_app_iff; split; intros; inv H5; eauto.
+  Qed.
+
+  Lemma inlineSingle_pos_NoCall_persistent xs:
+    forall ty k (a : ActionT ty k) (l l' : list DefMethT),
+      (forall f, In f l' -> (forall v, NeverCallActionT (projT2 (snd f) ty v))) ->
+    NoCallActionT l a ->
+    NoCallActionT l (fold_left (inlineSingle_pos l') xs a).
+  Proof.
+    induction xs; simpl; auto; intros.
+    eapply IHxs; eauto; unfold inlineSingle_pos; destruct (nth_error _ _) eqn:G; auto.
+    apply NeverCall_inline_persistent; eauto using nth_error_In.
+  Qed.
+
+  Lemma inlineFlat_persistent xs :
+    forall (l l' l'': list DefMethT),
+    (forall meth ty, In meth l -> (forall v, NeverCallActionT (projT2 (snd meth) ty v))) ->
+    (forall meth ty, In meth l' -> (forall v, NoCallActionT l'' (projT2 (snd meth) ty v))) ->
+    (forall meth ty, In meth (fold_left (inlineSingle_Flat_pos l) xs l') ->
+                  (forall v, NoCallActionT l'' (projT2 (snd meth) ty v))).
+  Proof.
+    induction xs; simpl; auto; intros.
+    eapply IHxs with (l := l) (l' := (inlineSingle_Flat_pos l l' a)); auto; intros.
+    unfold inlineSingle_Flat_pos in H2; destruct (nth_error _ _) eqn:G; auto.
+    rewrite in_map_iff in H2; dest; destruct x, s0, d; subst; simpl in *.
+    destruct (String.eqb s0 s); simpl in *.
+    - specialize (H0 _ ty0 H3 v0); assumption.
+    - apply NeverCall_inline_persistent; eauto using nth_error_In.
+      specialize (H0 _ ty0 H3 v0); assumption.
+  Qed.
+
+  Lemma inlineFlat_ident' xs :
+    forall (l l' : list DefMethT),
+      (forall meth ty, In meth l' -> (forall v, NeverCallActionT (projT2 (snd meth) ty v))) ->
+      (forall meth ty,
+          In meth (map (inline_Meths l' xs) l) ->
+          (forall v, NoCallActionT (subseq_list l' xs) (projT2 (snd meth) ty v))).
+  Proof.
+    intros; rewrite in_map_iff in H0; dest; subst.
+    unfold inline_Meths in *; destruct x, s0; simpl in *.
+    apply NeverCall_inlineSome_pos_full; eauto.
+  Qed.
+  
+  Lemma NoSelfCall_BaseModule_extension (b : BaseModule) (lrf : list RegFileBase) :
+    forall (HDisjKeys : DisjKey (getMethods b) (getAllMethods (mergeSeparatedBaseFile lrf))),
+    NoSelfCallBaseModule b ->
+    (NoSelfCallBaseModule (inlineAll_All_mod (mergeSeparatedSingle b lrf))).
+  Proof.
+    specialize (NeverCallMod_NeverCalls (mergeFile_noCalls lrf)) as TMP; dest.
+    unfold inlineAll_All_mod, inlineAll_All, inlineAll_Meths, NoSelfCallBaseModule, NoSelfCallRulesBaseModule, NoSelfCallMethsBaseModule;
+      simpl; repeat intro; dest; split; intros; rewrite getAllRules_mergeBaseFile in *.
+    - rewrite inlineAll_Meths_RegFile_fold_flat, app_nil_r in *; eauto.
+      erewrite inlineSome_Meths_pos_NoCalls_ident' in *; eauto using SubList_refl.
+      rewrite inlineAll_Rules_NoCalls in H3.
+      unfold inlineAll_Rules at 2 in H3; erewrite inlineSome_Rules_pos_NoCalls_ident' in H3; eauto.
+      + unfold inlineAll_Rules in H3; rewrite inline_Rules_eq_inlineSome, in_map_iff in H3; dest; subst; destruct x; simpl.
+        apply NoCallActionT_Stitch.
+        * eapply SignatureReplace_NoCall with (ls := (getMethods b)); eauto using SameKindAttrs_inlineSome_Flat.
+          apply inlineSingle_pos_NoCall_persistent; eauto.
+          apply (H1 _ ty H4).
+        * eapply SignatureReplace_NoCall;[apply f_equal, (subseq_list_all (getAllMethods (mergeSeparatedBaseFile lrf)))|].
+          apply NeverCall_inlineSome_pos_full; auto.
+      + rewrite SameKindAttrs_inlineSome_Flat; apply SubList_refl.
+    - rewrite inlineAll_Meths_RegFile_fold_flat in *; auto.
+      erewrite inlineSome_Meths_pos_NoCalls_ident' in *; eauto using SubList_refl.
+      rewrite in_app_iff in H3; inv H3.
+      + apply NoCallActionT_Stitch.
+        * eapply SignatureReplace_NoCall with (ls := (getMethods b));
+            eauto using SameKindAttrs_inlineSome_Flat.
+          eapply inlineFlat_persistent; intros; eauto.
+        * rewrite inline_Meths_eq_inlineSome in H4; auto.
+          rewrite <- (subseq_list_all (getAllMethods (_ _))).
+          eapply inlineFlat_ident'; eauto.
+      + apply NeverCall_NoCalls; eauto.
+  Qed.
+
+  Lemma EEquivLoop' (b : BaseModule) (lrf : list RegFileBase) o :
+    let m := inlineAll_All_mod (mergeSeparatedSingle b lrf) in
+    forall rules upds calls retl ls
+           (HWfMod : WfMod (mergeSeparatedSingle b lrf))
+           (HTrace : Trace m o ls)
+           (HNoSelfCallsBase : NoSelfCallBaseModule b),
+      SubList rules (getRules b) ->
+      @SemCompActionT Void (compileRulesRf type (o, nil) rules lrf) (o, upds) calls retl ->
+      (forall u, In u upds -> (NoDup (map fst u)) /\ SubList (getKindAttr u) (getKindAttr o)) /\
+      exists o' (ls' : list (list FullLabel)),
+        PriorityUpds o upds o' /\
+        upds = (map getLabelUpds ls') /\
+        calls = concat (map getLabelCalls (rev ls')) /\
+        Trace m o' (ls' ++ ls).
+  Proof.
+    intros; eapply EEquivLoop; eauto.
+    inv HWfMod; apply NoSelfCall_BaseModule_extension; auto.
+  Qed.
+  
 End Properties.
 
 
