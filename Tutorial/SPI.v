@@ -334,6 +334,7 @@ Section Named.
       | _ => progress clean_hyp_step
       | _ => progress discharge_string_dec
       | _ => progress cbn [fst snd] in *
+      | _ => progress cbn [Init.Nat.pred evalExpr evalBinBit evalUniBit evalConstT getBool isEq] in *
       | _ => progress cbv [enforce_regs] in *
       | K: UpdRegs _ _ ?z |- _ =>
           let H := fresh K in
@@ -361,11 +362,12 @@ Section Named.
     {
       (* trace construction *)
       rename Hi into Hi'; destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|]; clear Hi'.
-      cbn [Init.Nat.pred evalExpr evalConstT getBool isEq] in *; subst.
+      subst.
 
       intros frx future Hfuture.
       rewrite app_assoc.
       revert Hfuture; revert future; revert frx.
+
       intros; refine (IHTrace _ _ _); clear IHTrace; revert Hfuture; revert future; revert frx.
       rewrite xchg_prog_as_sckfalse; cbn zeta beta.
 
@@ -381,6 +383,8 @@ Section Named.
       eapply f_equal.
       2:eapply f_equal.       
       1,2: rewrite word0, (word0 (wzero 0)); reflexivity. }
+
+    {
 
 
 Abort.
