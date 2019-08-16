@@ -191,6 +191,7 @@ Section Named.
           Call "PutMOSI"((UniBit (TruncMsb 7 1) #tx) : Bit 1);
           Write @^"tx" : Bit 8 <- BinBit (Concat 7 1) (UniBit (TruncLsb 7 1) #tx) $$(@ConstBit 1 $0);
           Write @^"rx_valid" <- #i == $$@natToWord 4 1;
+          Write @^"i" <- #i - $1;
           Retv
         );
       Retv);
@@ -375,10 +376,13 @@ Section Named.
       | |- _ /\ _ => split; try solve [auto 2]; (let n := numgoals in guard n <= 1)
     end.
 
+    all : try (
+      rename Hi into Hi'; destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|]; clear Hi').
+
     { (* i = 0 *)
       unshelve epose proof ((_ : forall x y, getBool (weq x y) = true -> x = y) _ _ H3); [>admit|].
       subst rv0.
-      case (Hi eq_refl). }
+      inversion Hi. }
     {
       (* trace construction *)
       rename Hi into Hi'; destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|]; clear Hi'.
@@ -404,8 +408,16 @@ Section Named.
       2:eapply f_equal.       
       1,2: rewrite word0, (word0 (wzero 0)); reflexivity. }
 
+    destruct (wordToNat (wminus_simple rv0 $1)) as [|i'] eqn:Hi'; [>|split;[congruence|]]; cycle 1.
     {
-      rename Hi into Hi'; destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|]; clear Hi'.
+      (* Hi : rv0 = 1+i   and   1+i = (1+i) mod 16
+         Hi': rv0-1 mod 16 = S i'
+         --> subst rv0
+         (1+i-1) mod 16 = S i'
+         i mod 16 = S i'
+         and I would like to say i = S i'
+         *)
+      replace (S i') with i in * by admit.
       cbn [Init.Nat.pred] in *.
       subst.
       intros frx future Hfuture__________________________________________________.
@@ -433,10 +445,7 @@ Section Named.
         instantiate (1:=whd mret). admit. (* forall x : word 1, WS (whd x) WO = x *)
       }
       replace (WS (whd mret) WO) with mret by admit (* word as above *).
-      replace (S i) with i in * by admit.
-      eassumption.
-
-    }
+      eassumption. }
 
 Abort.
 
