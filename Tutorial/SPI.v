@@ -447,6 +447,14 @@ Section Named.
       replace (WS (whd mret) WO) with mret by admit (* word as above *).
       eassumption. }
 
+    {
+      exfalso; set False as TBD.
+
+      replace i with 0 in * by admit; clear i.
+      cbn [pred] in *; cbv [xchg_prog_sckfalse] in *.
+      change (xchg_prog 0) with (fun _ : word 8 => ret) in *; cbn beta in *.
+
+    }
 Abort.
 
 End Named.
