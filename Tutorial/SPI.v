@@ -448,12 +448,21 @@ Section Named.
       eassumption. }
 
     {
-      exfalso; set False as TBD.
-
+      assert (exists future tx rx, TracePredicate.interleave (kleene nop)
+                              (interp (xchg_prog 8 tx rx) [] rx) (future ++ past)). {
+      eexists _; eapply IHTrace; clear IHTrace.
       replace i with 0 in * by admit; clear i.
-      cbn [pred] in *; cbv [xchg_prog_sckfalse] in *.
-      change (xchg_prog 0) with (fun _ : word 8 => ret) in *; cbn beta in *.
-
+      cbn [pred]; cbv [xchg_prog_sckfalse].
+      change (xchg_prog 0) with (fun _ : word 8 => ret); cbv beta.
+      cbn [interp].
+      eapply TracePredicate.interleave_exist_r; eexists.
+      eapply TracePredicate.interleave_exist_r; eexists.
+      eapply TracePredicate.interleave_kleene_l_app_r.
+      {
+        eexists nil, _; split; [|split].
+        { eapply List.interleave_nil_l. }
+        { (* kleene_nil *) admit. }
+      }
     }
 Abort.
 
