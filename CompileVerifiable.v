@@ -679,6 +679,23 @@ Section Semantics.
                             regMap calls val
                             (HSemCompActionT : SemCompActionT (cont regVal) regMap calls val):
       SemCompActionT (@CompSyncReadRes _ _ idxNum num readRegName dataArray Data isAddr readMap lret cont) regMap calls val.
+
+  Variable (k : Kind) (a : CompActionT type RegMapType k) (regInits : list RegInitT).
+  
+  Inductive SemCompTrace: RegsT -> list UpdRegsT -> list MethsT -> Prop :=
+  | SemCompTraceInit (oInit : RegsT) (lupds : list UpdRegsT) (lcalls : list MethsT)
+                     (HNoUpds : lupds = nil) (HNoCalls : lcalls = nil)
+                     (HInitRegs : Forall2 regInit oInit regInits) :
+      SemCompTrace oInit lupds lcalls
+  | SemCompTraceCont (o o' : RegsT) (lupds lupds' : list UpdRegsT) (upds : UpdRegsT)
+                     (lcalls lcalls' : list MethsT) (calls : MethsT) val
+                     (HOldTrace : SemCompTrace o lupds lcalls)
+                     (HSemAction : SemCompActionT a (o, upds) calls val)
+                     (HNewUpds : lupds' = upds :: lupds)
+                     (HNewCalls : lcalls' = calls :: lcalls)
+                     (HPriorityUpds : PriorityUpds o upds o') :
+      SemCompTrace o' lupds' lcalls'.
+  
     
 End Semantics.
 
@@ -7101,6 +7118,45 @@ Section Properties.
     intros; eapply EEquivLoop; eauto.
     inv HWfMod; apply NoSelfCall_BaseModule_extension; auto.
   Qed.
+
+  Lemma CompTraceEquiv (b : BaseModule) (lrf : list RegFileBase) o :
+    let m := inlineAll_All_mod (mergeSeparatedSingle b lrf) in
+    let regInits := (getRegisters b) ++ (concat (map getRegFileRegisters lrf)) in
+    forall rules lupds lcalls
+           (HWfMod : WfMod (mergeSeparatedSingle b lrf))
+           (HNoSelfCallsBase : NoSelfCallBaseModule b),
+      SubList rules (getRules b) ->
+      SemCompTrace (compileRulesRf type (o, nil) rules lrf) regInits o lupds lcalls ->
+      (forall upds u, In upds lupds -> In u upds -> (NoDup (map fst u)) /\ SubList (getKindAttr u) (getKindAttr o)) /\
+      exists (lss : list (list (list FullLabel))),
+        Forall2 (fun x y => x = (map getLabelUpds y)) lupds lss /\
+        Forall2 (fun x y => x = concat (map getLabelCalls (rev y))) lcalls lss /\
+        Trace m o (concat lss).
+  Proof.
+    induction 4; split; subst; intros; dest; auto.
+    - inv H0.
+    - exists nil; repeat split; auto.
+      econstructor; eauto.
+      unfold regInits in *; simpl in *.
+      enough (getAllRegisters (mergeSeparatedBaseFile lrf) = concat (map getRegFileRegisters lrf)).
+      { rewrite H0; assumption. }
+      clear; induction lrf; simpl; auto.
+      rewrite IHlrf; reflexivity.
+    - rewrite <-(rev_involutive rules) in HSemAction.
+      specialize (ESameOldLoop _ _ _ HSemAction) as TMP; subst.
+      rewrite rev_involutive in HSemAction.
+      inv H1; rewrite <- (prevPrevRegsTrue HPriorityUpds); eauto.
+      eapply EEquivLoop' with (calls := calls) (retl := val); eauto.
+    - rewrite <-(rev_involutive rules) in HSemAction.
+      specialize (ESameOldLoop _ _ _ HSemAction) as TMP; subst.
+      rewrite rev_involutive in HSemAction.
+      specialize (EEquivLoop' HWfMod H4 HNoSelfCallsBase H HSemAction) as TMP; dest.
+      unfold m; exists (x1 :: x); repeat split; auto.
+      simpl.
+      enough (o' = x0).
+      { subst; assumption. }
+      admit.
+  Admitted.
   
 End Properties.
 
