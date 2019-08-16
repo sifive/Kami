@@ -185,11 +185,11 @@ Section Named.
         ) else (
           Read rx : Bit 8 <- @^"rx";
           Call miso : Bit 1 <- "GetMISO"();
-          Write @^"rx" : Bit 8 <- BinBit (Concat 7 1) (UniBit (TruncMsb 1 7) #rx) #miso;
+          Write @^"rx" : Bit 8 <- BinBit (Concat 7 1) (UniBit (TruncLsb 7 1) #rx) #miso;
           Write @^"sck" : Bool <- $$true;
           Call "PutSCK"($$true : Bool);
           Call "PutMOSI"((UniBit (TruncMsb 7 1) #tx) : Bit 1);
-          Write @^"tx" : Bit 8 <- BinBit (Concat 7 1) (UniBit (TruncMsb 1 7) #tx) $$(@ConstBit 1 $0);
+          Write @^"tx" : Bit 8 <- BinBit (Concat 7 1) (UniBit (TruncLsb 7 1) #tx) $$(@ConstBit 1 $0);
           Write @^"rx_valid" <- #i == $$@natToWord 4 1;
           Retv
         );
@@ -253,10 +253,10 @@ Section Named.
       putmosi mosi (
       yield (
       getmiso (fun miso =>
-      let rx := WS miso (split1 7 1 rx) in
+      let rx := combine (WS miso WO) (split1 7 1 rx) in
       putsck true (
       putmosi mosi (
-      let tx := WS false (split1 7 1 tx) in
+      let tx := combine (WS false WO) (split1 7 1 tx) in
       yield (
       @xchg_prog n tx rx
       )))))))
@@ -291,10 +291,10 @@ Section Named.
 
   Definition xchg_prog_sckfalse (n : nat) (tx : word 8) (rx : word 8) (mosi : word 1) : p :=
     getmiso (fun miso =>
-    let rx := WS miso (split1 7 1 rx) in
+    let rx := combine (WS miso WO) (split1 7 1 rx) in
     putsck true (
     putmosi mosi (
-    let tx := WS false (split1 7 1 tx) in
+    let tx := combine (WS false WO) (split1 7 1 tx) in
     yield (
     @xchg_prog n tx rx)))).
 
@@ -432,6 +432,9 @@ Section Named.
         2,3:rewrite word0, (word0 (wzero 0)); reflexivity.
         instantiate (1:=whd mret). admit. (* forall x : word 1, WS (whd x) WO = x *)
       }
+      replace (WS (whd mret) WO) with mret by admit (* word as above *).
+      replace (S i) with i in * by admit.
+      eassumption.
 
     }
 
