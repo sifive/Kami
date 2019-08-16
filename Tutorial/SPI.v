@@ -135,7 +135,6 @@ Proof.
   pose proof length_bits x as H.
   destruct (bits x); [trivial | inversion H].
 Qed.
-Definition x : nat. exact O. Qed.
 
 Section Named.
   Context (name : string).
@@ -169,7 +168,7 @@ Section Named.
           Write @^"sck" : Bool <- $$true;
           Call "PutSCK"($$true : Bool);
           Call "PutMOSI"((UniBit (TruncMsb 7 1) #tx) : Bit 1);
-          Write @^"tx" : Bit 8 <- BinBit (Concat 7 1) (UniBit (TruncMsb 1 7) #tx) $$(@ConstBit 1 $x);
+          Write @^"tx" : Bit 8 <- BinBit (Concat 7 1) (UniBit (TruncMsb 1 7) #tx) $$(@ConstBit 1 $0);
           Write @^"rx_valid" <- #i == $$@natToWord 4 1;
           Retv
         );
@@ -229,7 +228,6 @@ Section Named.
     | O => fun _ rx => ret rx
     | S n => fun tx rx =>
       let mosi := split2 7 1 tx in
-      let tx := WS false (split1 7 1 tx) in
       putsck false (
       putmosi mosi (
       yield (
@@ -237,6 +235,7 @@ Section Named.
       let rx := WS miso (split1 7 1 rx) in
       putsck true (
       putmosi mosi (
+      let tx := WS false (split1 7 1 tx) in
       yield (
       @xchg_prog n tx rx
       )))))))
@@ -271,10 +270,10 @@ Section Named.
 
   Definition xchg_prog_sckfalse (n : nat) (tx : word 8) (rx : word 8) (mosi : word 1) : p :=
     getmiso (fun miso =>
-    let tx := WS false (split1 7 1 tx) in
     let rx := WS miso (split1 7 1 rx) in
     putsck true (
     putmosi mosi (
+    let tx := WS false (split1 7 1 tx) in
     yield (
     @xchg_prog n tx rx)))).
 
@@ -314,7 +313,7 @@ Section Named.
     (if sck
     then TracePredicate.interleave (kleene nop) (interp (xchg_prog i tx rx) nil frx) future
     else TracePredicate.interleave (kleene nop) (interp (xchg_prog_sckfalse (pred i)  tx rx (split2 7 1 tx)) nil frx) future)
-    -> TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) nil frx) (future ++ past).
+    -> exists tx rx, TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) nil frx) (future ++ past).
   Proof.
     intros s past.
     pose proof eq_refl s as MARKER.
@@ -362,12 +361,11 @@ Section Named.
     {
       (* trace construction *)
       rename Hi into Hi'; destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|]; clear Hi'.
+      cbn [Init.Nat.pred] in *.
       subst.
-
       intros frx future Hfuture.
       rewrite app_assoc.
       revert Hfuture; revert future; revert frx.
-
       intros; refine (IHTrace _ _ _); clear IHTrace; revert Hfuture; revert future; revert frx.
       rewrite xchg_prog_as_sckfalse; cbn zeta beta.
 
@@ -385,7 +383,18 @@ Section Named.
       1,2: rewrite word0, (word0 (wzero 0)); reflexivity. }
 
     {
+      rename Hi into Hi'; destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|]; clear Hi'.
+      cbn [Init.Nat.pred] in *.
+      subst.
+      intros frx future Hfuture.
+      rewrite app_assoc.
+      revert Hfuture; revert future; revert frx.
+      intros; refine (IHTrace _ _ _); clear IHTrace; revert Hfuture; revert future; revert frx.
+      rewrite xchg_prog_as_sckfalse; cbn zeta beta.
 
+      intros.
+
+    }
 
 Abort.
 
