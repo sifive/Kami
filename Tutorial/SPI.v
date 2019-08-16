@@ -45,6 +45,7 @@ Module List. Section __.
 End __. End List.
 
 
+Require Import Coq.Classes.Morphisms.
 Module TracePredicate.
   Definition flat_map {A B} (P:A->list B->Prop) xs :=
     List.fold_right app (eq nil) (List.map P xs).
@@ -54,6 +55,21 @@ Module TracePredicate.
      events, but consider [(P \/ Q)^*] instead first. *)
   Definition interleave {T} (P Q : list T -> Prop) :=
     fun zs => exists xs ys, List.interleave xs ys zs /\ P xs /\ Q ys.
+
+  Global Instance Proper_interleave_impl {T} :
+    Proper (pointwise_relation _ Basics.impl==>pointwise_relation _ Basics.impl==>pointwise_relation _ Basics.impl) (@TracePredicate.interleave T).
+  Proof.
+    intros a b c d e f g h.
+    cbv [interleave pointwise_relation Basics.impl] in *.
+    firstorder idtac.
+  Qed.
+  Global Instance Proper_interleave_iff {T} :
+    Proper (pointwise_relation _ iff==>pointwise_relation _ iff==>pointwise_relation _ iff) (@TracePredicate.interleave T).
+  Proof.
+    intros a b c d e f g.
+    cbv [interleave pointwise_relation iff] in *.
+    firstorder idtac.
+  Qed.
 
   Local Infix "||" := TracePredicate.interleave.
   Lemma interleave_rapp {T} {P QQ Q : list T -> Prop} z zs
@@ -123,6 +139,11 @@ Module TracePredicate.
     eexists _, _; eauto.
   Qed.
 
+  Lemma app_exist_r {T V} P Q (t : list T) : (exist (fun v:V => P +++ Q v)) t <-> (P +++ exist Q) t.
+  Admitted.
+
+  Lemma app_exist_l {T V} P Q (t : list T) : (exist (fun v:V => P v +++ Q)) t <-> (exist P +++ Q) t.
+  Admitted.
 End TracePredicate.
 Local Infix "||" := TracePredicate.interleave.
 
@@ -313,7 +334,7 @@ Section Named.
     (if sck
     then TracePredicate.interleave (kleene nop) (interp (xchg_prog i tx rx) nil frx) future
     else TracePredicate.interleave (kleene nop) (interp (xchg_prog_sckfalse (pred i)  tx rx (split2 7 1 tx)) nil frx) future)
-    -> exists tx rx, TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) nil frx) (future ++ past).
+    -> exists tx rx, TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) nil rx) (future ++ past).
   Proof.
     intros s past.
     pose proof eq_refl s as MARKER.
@@ -367,6 +388,7 @@ Section Named.
       rewrite app_assoc.
       revert Hfuture; revert future; revert frx.
       intros; refine (IHTrace _ _ _); clear IHTrace; revert Hfuture; revert future; revert frx.
+
       rewrite xchg_prog_as_sckfalse; cbn zeta beta.
 
       intros.
@@ -386,13 +408,30 @@ Section Named.
       rename Hi into Hi'; destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|]; clear Hi'.
       cbn [Init.Nat.pred] in *.
       subst.
-      intros frx future Hfuture.
+      intros frx future Hfuture__________________________________________________.
       rewrite app_assoc.
-      revert Hfuture; revert future; revert frx.
-      intros; refine (IHTrace _ _ _); clear IHTrace; revert Hfuture; revert future; revert frx.
-      rewrite xchg_prog_as_sckfalse; cbn zeta beta.
+      revert Hfuture__________________________________________________; revert future; revert frx.
+      intros; refine (IHTrace _ _ _); clear IHTrace; revert Hfuture__________________________________________________; revert future; revert frx.
 
+      cbv [xchg_prog_sckfalse].
       intros.
+      cbn [interp].
+      eapply TracePredicate.interleave_exist_r; eexists.
+      (* setoid_rewrite <-TracePredicate.app_exist_l. *) (* WHY does this fail? *)
+      eapply TracePredicate.Proper_interleave_impl; [reflexivity|intros ? H; eapply TracePredicate.app_exist_l; eapply H|].
+      eapply TracePredicate.interleave_kleene_l_app_r.
+      {
+        eexists nil, _; split; [|split].
+        { eapply List.interleave_nil_l. }
+        { (* kleene_nil *) admit. }
+        eexists. cbv [List.app]. f_equal. f_equal. f_equal. f_equal.
+        repeat f_equal.
+        eapply f_equal.
+        2:eapply f_equal.       
+        3:eapply f_equal.       
+        2,3:rewrite word0, (word0 (wzero 0)); reflexivity.
+        instantiate (1:=whd mret). admit. (* forall x : word 1, WS (whd x) WO = x *)
+      }
 
     }
 
