@@ -1,5 +1,5 @@
 Require Export List String Ascii.
-Require Export Syntax Compile Rtl.
+Require Export Kami.Syntax Kami.Compile Kami.Rtl.
 
 Require Coq.extraction.Extraction.
 

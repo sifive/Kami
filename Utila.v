@@ -2,10 +2,10 @@
   This library contains useful functions for generating Kami
   expressions.
  *)
-Require Import Syntax KamiNotations LibStruct.
+Require Import Kami.Syntax Kami.KamiNotations Kami.LibStruct.
 Require Import List.
 Import Word.Notations.
-Require Import EclecticLib.
+Require Import Kami.Lib.EclecticLib.
 Import ListNotations.
 
 Module EqIndNotations.

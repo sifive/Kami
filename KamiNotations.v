@@ -1,4 +1,4 @@
-Require Import Syntax Lib.EclecticLib.
+Require Import Kami.Syntax Kami.Lib.EclecticLib.
 Require Import RecordUpdate.RecordSet.
 Require Import Wf.
 Require Import Wf_nat.

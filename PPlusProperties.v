@@ -1,10 +1,10 @@
-Require Import Kami.Syntax KamiNotations.
+Require Import Kami.Syntax Kami.KamiNotations.
 Require Import Kami.Properties Kami.PProperties.
 Import ListNotations.
 Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
-Require Import ZArith Lib.EclecticLib.
+Require Import ZArith Kami.Lib.EclecticLib.
 
 Local Notation PPT_execs := (fun x => fst (snd x)).
 Local Notation PPT_calls := (fun x => snd (snd x)).
