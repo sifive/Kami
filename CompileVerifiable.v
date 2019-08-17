@@ -1,4 +1,4 @@
-Require Import Syntax StateMonad Properties All.
+Require Import Kami.StateMonad Kami.All.
 Import Word.Notations.
 
 Require Import ZArith.

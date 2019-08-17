@@ -1,4 +1,4 @@
-Require Import Syntax String.
+Require Import Kami.Syntax String.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.

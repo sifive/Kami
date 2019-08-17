@@ -1,4 +1,4 @@
-Require Import Kami.Syntax KamiNotations.
+Require Import Kami.Syntax Kami.KamiNotations.
 Require Import Kami.Properties.
 Import ListNotations.
 Require Import Coq.Sorting.Permutation.
