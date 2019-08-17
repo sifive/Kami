@@ -12,7 +12,7 @@ echo "Fixing Literals"
 for file in $(find $1 -maxdepth 1 -name "*.hs")
 do
   baseval=`basename $file`
-  if [[ $baseval != $2 ]]
+  if [[ $baseval != $2 && $baseval != $3 ]]
   then
     ./FixLits $file
     mv $file $1/Haskell
