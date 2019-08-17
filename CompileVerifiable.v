@@ -1531,6 +1531,7 @@ Section Properties.
         assumption.
   Qed.
 
+  
   Lemma PriorityUpdsCompact upds:
     forall old new,
       PriorityUpds old upds new -> PriorityUpds old (nil::upds) new.
@@ -7119,6 +7120,54 @@ Section Properties.
     inv HWfMod; apply NoSelfCall_BaseModule_extension; auto.
   Qed.
 
+  Lemma KeyPair_Equiv {A B : Type} (l : list (A * B)) :
+    NoDup (map fst l) ->
+    forall l',
+      SubList l l' ->
+      map fst l = map fst l' ->
+      l = l'.
+  Proof.
+    induction l; simpl; intros.
+    - rewrite (map_eq_nil _ _ (eq_sym H1)); reflexivity.
+    - destruct l'; [discriminate|].
+      apply f_equal2; simpl in *.
+      + assert (In a (p :: l')).
+        { apply H0; left; reflexivity. }
+        inv H2; eauto.
+        exfalso.
+        apply (in_map fst) in H3; rewrite H1 in H; inv H1.
+        rewrite <- H4 in H; inv H; contradiction.
+      + enough (SubList l l').
+        { inv H; inv H1; eapply IHl; eauto. }
+        repeat intro.
+        specialize (H0 _ (in_cons _ _ _ H2)).
+        inv H0; eauto.
+        exfalso.
+        apply (in_map fst) in H2.
+        inv H1; rewrite H3 in H; inv H; contradiction.
+  Qed.
+  
+  Lemma PriorityUpds_Equiv' :
+    forall old upds new,
+      NoDup (map fst old) ->
+      (forall u, In u upds -> NoDup (map fst u)) ->
+      PriorityUpds old upds new ->
+      (forall new',
+          PriorityUpds old upds new' ->
+          new = new').
+  Proof.
+    intros.
+    specialize (PriorityUpds_Equiv H H0 H1 H2) as P0.
+    assert (map fst old = map fst new) as P1.
+    { do 2 rewrite <- fst_getKindAttr.
+      setoid_rewrite <- (prevPrevRegsTrue H1); reflexivity. }
+    assert (map fst old = map fst new') as P2.
+    { do 2 rewrite <- fst_getKindAttr.
+      setoid_rewrite <- (prevPrevRegsTrue H2); reflexivity. }
+    rewrite P1 in H, P2.
+    apply KeyPair_Equiv; assumption.
+  Qed.
+
   Lemma CompTraceEquiv (b : BaseModule) (lrf : list RegFileBase) o :
     let m := inlineAll_All_mod (mergeSeparatedSingle b lrf) in
     let regInits := (getRegisters b) ++ (concat (map getRegFileRegisters lrf)) in
@@ -7152,11 +7201,16 @@ Section Properties.
       rewrite rev_involutive in HSemAction.
       specialize (EEquivLoop' HWfMod H4 HNoSelfCallsBase H HSemAction) as TMP; dest.
       unfold m; exists (x1 :: x); repeat split; auto.
-      simpl.
-      enough (o' = x0).
+      simpl; enough (o' = x0).
       { subst; assumption. }
-      admit.
-  Admitted.
+      eapply PriorityUpds_Equiv'; eauto.
+      + apply Trace_sameRegs in H4.
+        apply WfNoDups in HWfMod; dest.
+        unfold m in H4; simpl in *.
+        rewrite <- fst_getKindAttr; setoid_rewrite H4.
+        rewrite <- fst_getKindAttr in H10; assumption.
+      + intros; eapply H5; assumption.
+  Qed.
   
 End Properties.
 
