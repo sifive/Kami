@@ -1951,18 +1951,26 @@ Definition struct_get_names
 
 Definition struct_get_field_index
   (ty: Kind -> Type)
-  (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
-  (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
-  (name : string)
-  :  option (Fin.t (S n))
-  := struct_foldr ty get_kind get_name
-       (fun index field_name _ acc
-         => if string_dec name field_name
-              then Some index
-              else acc)
-       None.
+  :  forall (n : nat)
+       (get_kind : Fin.t n -> Kind)
+       (get_name : Fin.t n -> string)
+       (packet : Expr ty (SyntaxKind (Struct get_kind get_name))),
+       string -> option (Fin.t n)
+  := nat_rect
+       (fun n
+         => forall
+              (get_kind : Fin.t n -> Kind)
+              (get_name : Fin.t n -> string)
+              (packet : Expr ty (SyntaxKind (Struct get_kind get_name))),
+              string -> option (Fin.t n))
+       (fun _ _ _ _ => None)
+       (fun n _ get_kind get_name packet name
+         => struct_foldr ty get_kind get_name
+              (fun index field_name _ acc
+                => if string_dec name field_name
+                     then Some index
+                     else acc)
+              None).
 
 Ltac struct_get_field_ltac packet name :=
   let val := eval cbv in (struct_get_field_index packet name) in
