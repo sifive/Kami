@@ -491,6 +491,25 @@ Section Named.
       1:cbv; clear; congruence.
 
       intros.
+      exists arg, frx.
+
+      rewrite List.app_assoc.
+      change (Init.Nat.pred (wordToNat $8)) with 7 in *.
+      set (n := 7) in *.
+      rewrite xchg_prog_as_sckfalse; cbn zeta beta.
+      cbn [interp].
+      (* [past] needs to be described in invariant *)
+      eapply TracePredicate.interleave_exist_r; eexists.
+      eapply TracePredicate.interleave_kleene_l_app_r. [|eassumption].
+      eexists nil, _; split; [|split].
+      { eapply List.interleave_nil_l. }
+      { (* kleene_nil *) admit. }
+      cbv [List.app]. f_equal; f_equal. f_equal. f_equal.
+      repeat f_equal.
+      eapply f_equal.
+      2:eapply f_equal.       
+      1,2: rewrite word0, (word0 (wzero 0)); reflexivity. }
+
 
 
 Abort.
