@@ -329,13 +329,16 @@ Section Named.
     Trace SPI s past ->
     exists i sck tx rx (*rx_valid*)false,
     enforce_regs s i sck tx rx false /\
-    wordToNat i <> 0 /\
+    Logic.or
+    (wordToNat i <> 0 /\
     let i := wordToNat i in
     forall frx future,
     (if sck
     then TracePredicate.interleave (kleene nop) (interp (xchg_prog i tx rx) nil frx) future
     else TracePredicate.interleave (kleene nop) (interp (xchg_prog_sckfalse (pred i)  tx rx (split2 7 1 tx)) nil frx) future)
-    -> exists tx rx, TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) nil rx) (future ++ past).
+    -> exists tx rx, TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) nil rx) (future ++ past))
+    (wordToNat i = 0)
+  .
   Proof.
     intros s past.
     pose proof eq_refl s as MARKER.
@@ -343,12 +346,13 @@ Section Named.
     { subst. admit. }
 
     rename t into past.
-    specialize (IHTrace eq_refl); destruct IHTrace as (i&sck&tx&rx&rx_valid&Hregs&Hi&IHTrace).
+    specialize (IHTrace eq_refl); destruct IHTrace as (i&sck&tx&rx&rx_valid&Hregs&IH).
 
     unshelve epose proof InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep as HHS;
       clear HStep; [abstract discharge_wf|..|rename HHS into HStep].
     1,2,3: admit.
 
+    destruct IH as [[Hi IHTrace]|];
     repeat match goal with
       | _ => progress intros
       | _ => progress subst
@@ -384,6 +388,7 @@ Section Named.
       subst rv0.
       inversion Hi. }
     {
+      left; split; [Lia.lia|].
       (* trace construction *)
       rename Hi into Hi'; destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|]; clear Hi'.
       cbn [Init.Nat.pred] in *.
@@ -408,7 +413,7 @@ Section Named.
       2:eapply f_equal.       
       1,2: rewrite word0, (word0 (wzero 0)); reflexivity. }
 
-    destruct (wordToNat (wminus_simple rv0 $1)) as [|i'] eqn:Hi'; [>|split;[congruence|]]; cycle 1.
+    destruct (wordToNat (wminus_simple rv0 $1)) as [|i'] eqn:Hi'; [>|left;split;[congruence|]]; cycle 1.
     {
       (* Hi : rv0 = 1+i   and   1+i = (1+i) mod 16
          Hi': rv0-1 mod 16 = S i'
@@ -447,23 +452,36 @@ Section Named.
       replace (WS (whd mret) WO) with mret by admit (* word as above *).
       eassumption. }
 
-    {
+    { right.
       assert (exists future tx rx, TracePredicate.interleave (kleene nop)
                               (interp (xchg_prog 8 tx rx) [] rx) (future ++ past)). {
-      eexists _; eapply IHTrace; clear IHTrace.
-      replace i with 0 in * by admit; clear i.
-      cbn [pred]; cbv [xchg_prog_sckfalse].
-      change (xchg_prog 0) with (fun _ : word 8 => ret); cbv beta.
-      cbn [interp].
-      eapply TracePredicate.interleave_exist_r; eexists.
-      eapply TracePredicate.interleave_exist_r; eexists.
-      eapply TracePredicate.interleave_kleene_l_app_r.
-      {
-        eexists nil, _; split; [|split].
-        { eapply List.interleave_nil_l. }
-        { (* kleene_nil *) admit. }
+        replace i with 0 in * by admit; clear i.
+        eexists _; eapply IHTrace; clear IHTrace.
+        cbn [pred]; cbv [xchg_prog_sckfalse].
+        change (xchg_prog 0) with (fun _ : word 8 => ret); cbv beta.
+        cbn [interp].
+        eapply TracePredicate.interleave_exist_r; eexists.
+        eapply TracePredicate.interleave_exist_r; eexists.
+        eapply TracePredicate.interleave_kleene_l_app_r.
+        {
+          eexists nil, _; split; [|split].
+          { eapply List.interleave_nil_l. }
+          { (* kleene_nil *) admit. }
+          exact eq_refl.
+        }
+        {
+          eexists nil, _; split; [|split].
+          { eapply List.interleave_nil_l. }
+          { (* kleene_nil *) admit. }
+          split. 
+          exact eq_refl.
+          exact eq_refl.
+        }
       }
+
+      solve [trivial].
     }
+
 Abort.
 
 End Named.
