@@ -205,6 +205,9 @@ Section Named.
         Write @^"tx" : Bit 8 <- #data;
         Write @^"i" <- $$@natToWord 4 8;
         Write @^"rx_valid" <- $$false;
+          Write @^"sck" : Bool <- $$false;
+          Call "PutSCK"($$false : Bool);
+          Call "PutMOSI"((UniBit (TruncMsb 7 1) #data) : Bit 1);
         Ret $$false
       ) else (
         Ret $$true
@@ -272,10 +275,7 @@ Section Named.
     | ret w => fun l' w' t => w' = w /\ t = nil
     end.
 
-  Definition silent := exist (fun miso => exist (fun mosi => iocycle miso false mosi)).
-
   Definition spec := TracePredicate.interleave (kleene nop) (kleene (fun t =>
-    silent t \/
     exists tx rx, (cmd_write tx false +++
                    interp (xchg_prog 8 tx (wzero 8)) nil rx +++
                    maybe (cmd_read rx false)) t)).
@@ -483,8 +483,20 @@ Section Named.
       solve [trivial].
     }
 
+    admit. (* rv <> 0 /\ rv = 0 *)
+
+    7: {
+      left.
+      split.
+      1:cbv; clear; congruence.
+
+      intros.
+
+
 Abort.
 
 End Named.
+
+(* scheduling order: cycle, read, write ? *)
 
   (* Notation "( x , y , .. , z )" := (existT _ .. (existT _ x y) .. z) : core_scope. *)
