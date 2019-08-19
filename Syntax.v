@@ -2122,8 +2122,8 @@ Local Notation "X >>- F" := (option_bind X F) (at level 85, only parsing).
 Local Definition struct_get_field_aux
   (ty: Kind -> Type)
   (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
+  (get_kind : Fin.t n -> Kind)
+  (get_name : Fin.t n -> string)
   (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
   (name : string)
   :  option ({kind : Kind & Expr ty (SyntaxKind kind)})
@@ -2138,8 +2138,8 @@ Local Definition struct_get_field_aux
 Definition struct_get_field
   (ty: Kind -> Type)
   (n : nat)
-  (get_value : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
+  (get_value : Fin.t n -> Kind)
+  (get_name : Fin.t n -> string)
   (packet : Expr ty (SyntaxKind (Struct get_value get_name)))
   (name : string)
   (k : Kind)
@@ -2160,8 +2160,8 @@ Defined.
 Definition struct_get_field_default
   (ty: Kind -> Type)
   (n : nat)
-  (get_value : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
+  (get_value : Fin.t n -> Kind)
+  (get_name : Fin.t n -> string)
   (packet : Expr ty (SyntaxKind (Struct get_value get_name)))
   (name : string)
   (kind : Kind)
@@ -2177,8 +2177,8 @@ Definition struct_get_field_default
 Definition struct_set_field
   (ty: Kind -> Type)
   (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
+  (get_kind : Fin.t n -> Kind)
+  (get_name : Fin.t n -> string)
   (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
   (name : string)
   (kind : Kind)
