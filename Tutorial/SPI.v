@@ -453,10 +453,11 @@ Section Named.
       eassumption. }
 
     { right.
-      assert (exists future tx rx, TracePredicate.interleave (kleene nop)
+      replace i with 0 in * by admit; clear i.
+      let future := open_constr:(_) in 
+      assert (exists tx rx, TracePredicate.interleave (kleene nop)
                               (interp (xchg_prog 8 tx rx) [] rx) (future ++ past)). {
-        replace i with 0 in * by admit; clear i.
-        eexists _; eapply IHTrace; clear IHTrace.
+        eapply IHTrace; clear IHTrace.
         cbn [pred]; cbv [xchg_prog_sckfalse].
         change (xchg_prog 0) with (fun _ : word 8 => ret); cbv beta.
         cbn [interp].
@@ -478,7 +479,7 @@ Section Named.
           exact eq_refl.
         }
       }
-
+      cbn [List.app] in H.
       solve [trivial].
     }
 
