@@ -205,9 +205,7 @@ Section Named.
         Write @^"tx" : Bit 8 <- #data;
         Write @^"i" <- $$@natToWord 4 8;
         Write @^"rx_valid" <- $$false;
-          Write @^"sck" : Bool <- $$false;
-          Call "PutSCK"($$false : Bool);
-          Call "PutMOSI"((UniBit (TruncMsb 7 1) #data) : Bit 1);
+        Write @^"sck" <- $$true; (* not actually, just internal fiction to be consistent with the draining case *)
         Ret $$false
       ) else (
         Ret $$true
@@ -327,8 +325,9 @@ Section Named.
   (* draining case only *)
   Goal forall s past,
     Trace SPI s past ->
-    exists i sck tx rx (*rx_valid*)false,
+    exists i sck tx rx rx_valid,
     enforce_regs s i sck tx rx false /\
+    rx_valid = false /\
     Logic.or
     (wordToNat i <> 0 /\
     let i := wordToNat i in
@@ -336,7 +335,7 @@ Section Named.
     (if sck
     then TracePredicate.interleave (kleene nop) (interp (xchg_prog i tx rx) nil frx) future
     else TracePredicate.interleave (kleene nop) (interp (xchg_prog_sckfalse (pred i)  tx rx (split2 7 1 tx)) nil frx) future)
-    -> exists tx rx, TracePredicate.interleave (kleene nop) (interp (xchg_prog 8 tx rx) nil rx) (future ++ past))
+    -> exists tx rx, TracePredicate.interleave (kleene nop) (cmd_write tx false +++ interp (xchg_prog 8 tx rx) nil rx) (future ++ past))
     (wordToNat i = 0)
   .
   Proof.
@@ -346,7 +345,7 @@ Section Named.
     { subst. admit. }
 
     rename t into past.
-    specialize (IHTrace eq_refl); destruct IHTrace as (i&sck&tx&rx&rx_valid&Hregs&IH).
+    specialize (IHTrace eq_refl). destruct IHTrace as (i&sck&tx&rx&rx_valid&Hregs&IH).
 
     unshelve epose proof InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep as HHS;
       clear HStep; [abstract discharge_wf|..|rename HHS into HStep].
@@ -500,7 +499,7 @@ Section Named.
       cbn [interp].
       (* [past] needs to be described in invariant *)
       eapply TracePredicate.interleave_exist_r; eexists.
-      eapply TracePredicate.interleave_kleene_l_app_r. [|eassumption].
+      eapply TracePredicate.interleave_kleene_l_app_r; [|eassumption].
       eexists nil, _; split; [|split].
       { eapply List.interleave_nil_l. }
       { (* kleene_nil *) admit. }
