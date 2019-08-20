@@ -1,4 +1,4 @@
-Require Import Lib.EclecticLib Syntax Properties KamiNotations.
+Require Import Kami.Lib.EclecticLib Kami.Syntax Kami.Properties Kami.KamiNotations.
 
 Lemma string_dec_refl {A} : forall (s: string) (T E: A),
   (if String.eqb s s then T else E) = T.

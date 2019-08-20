@@ -11,9 +11,13 @@ $cmd
 echo "Fixing Literals"
 for file in $(find $1 -maxdepth 1 -name "*.hs")
 do
-  ./FixLits $file
-  mv $file $1/Haskell
-  echo "$file fixed."
+  baseval=`basename $file`
+  if [[ $baseval != $2 && $baseval != $3 ]]
+  then
+    ./FixLits $file
+    mv $file $1/Haskell
+    echo "$file fixed."
+  fi
 done
 
 echo "Adding missing imports"

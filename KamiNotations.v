@@ -1,4 +1,4 @@
-Require Import Syntax Lib.EclecticLib.
+Require Import Kami.Syntax Kami.Lib.EclecticLib.
 Require Import RecordUpdate.RecordSet.
 Require Import Wf.
 Require Import Wf_nat.
@@ -325,6 +325,10 @@ Notation "'RegisterN' name : type <- init" :=
   (Leaf ((MERegister (name%string, existT RegInitValT type (Some ((NativeConst init)%kami_init)%word))) :: nil))
     (at level 13, name at level 99) : kami_scope.
 
+Notation "'RegisterNDef' name : type <- init" :=
+  (MERegister (name%string, existT RegInitValT (@NativeKind type init)%kami_init (Some ((NativeConst init)%kami_init))))
+    (at level 13, name at level 99) : kami_scope.
+
 Notation "'Register' name : type <- init" :=
   (Leaf ((MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst ((init)%kami_init)%word)))) :: nil))
     (at level 13, name at level 99) : kami_scope.
@@ -332,18 +336,6 @@ Notation "'Register' name : type <- init" :=
 Notation "'RegisterU' name : type" :=
   (Leaf ((MERegister (name%string, existT RegInitValT (SyntaxKind type) None)) :: nil))
     (at level 13, name at level 99) : kami_scope.
-
-(* Notation "'Registers' [ r1 ; .. ; rn }" := *)
-(*   (MERegAry *)
-(*      (fold_right *)
-(*         (fun elem acc *)
-(*          => match elem with *)
-(*             | MERegister reg => reg :: acc *)
-(*             | _ => acc *)
-(*             end) *)
-(*         nil *)
-(*         (cons r1 .. (cons rn nil) ..))) *)
-(*     (at level 13) : kami_scope. *)
 
 Notation "'Method' name () : retT := c" :=
   (Leaf ((MEMeth (name%string, existT MethodT (Void, retT)

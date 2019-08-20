@@ -1,4 +1,4 @@
-Require Import Syntax KamiNotations.
+Require Import Kami.Syntax Kami.KamiNotations.
 
 (* TODO: move to KamiStdLib? *)
 Definition extractArbitraryRange ty sz (inst: Bit sz ## ty) (range: nat * nat):

@@ -1,2 +1,2 @@
-Require Export bbv.Word bbv.HexNotationWord Rtl Compile Lib.Fold Lib.EclecticLib Utila RecordUpdate.RecordSet.
-Require Export Syntax Properties PProperties PPlusProperties Extraction Tactics.
+Require Export bbv.Word bbv.HexNotationWord Kami.Rtl Kami.Compile Kami.Lib.Fold Kami.Lib.EclecticLib Kami.Utila RecordUpdate.RecordSet.
+Require Export Kami.Syntax Kami.Properties Kami.PProperties Kami.PPlusProperties Kami.Extraction Kami.Tactics.

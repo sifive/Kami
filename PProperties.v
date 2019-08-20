@@ -1,4 +1,4 @@
-Require Import Kami.Syntax KamiNotations.
+Require Import Kami.Syntax Kami.KamiNotations.
 Require Import Kami.Properties.
 Import ListNotations.
 Require Import Coq.Sorting.Permutation.
@@ -1568,7 +1568,8 @@ Proof.
   - induction (getHidden m); simpl; auto; dest.
     + constructor; auto.
     + assert (sth: PStep (createHide (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) l0) o l) by firstorder fail.
-      assert (sth2: forall v, In a (map fst (getAllMethods m)) -> (getListFullLabel_diff (a, v) l = 0%Z)) by firstorder fail.
+      assert (sth2: forall v, In (a, projT1 v) (getKindAttr (getAllMethods m)) -> (getListFullLabel_diff (a, v) l = 0%Z)).
+      {intros; apply H1; auto; left; reflexivity. }
       constructor; auto.
       rewrite createHide_Meths.
       auto.

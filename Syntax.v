@@ -1,5 +1,5 @@
 Require Export Bool Ascii String Fin List FunctionalExtensionality Psatz PeanoNat.
-Require Export bbv.Word Lib.VectorFacts Lib.EclecticLib.
+Require Export bbv.Word Kami.Lib.VectorFacts Kami.Lib.EclecticLib.
 
 Export Word.Notations.
 Export ListNotations.
@@ -806,16 +806,17 @@ Coercion getModWf: BaseModuleWf >-> ModWf.
 Coercion getModWfOrd: BaseModuleWfOrd >-> ModWfOrd.
 
 Section NoCallActionT.
-  Variable ls: list string.
+  Variable ls: list DefMethT.
+  Variable ty : Kind -> Type.
   
-  Inductive NoCallActionT: forall k, ActionT type k -> Prop :=
-  | NoCallMCall meth s e lretT c: ~ In meth ls -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (MCall meth s e c)
-  | NoCallLetExpr k (e: Expr type k) lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetExpr e c)
-  | NoCallLetAction k (a: ActionT type k) lretT c: NoCallActionT a -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetAction a c)
+  Inductive NoCallActionT: forall k , ActionT ty k -> Prop :=
+  | NoCallMCall meth s e lretT c: ~ In (meth, s) (getKindAttr ls) -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (MCall meth s e c)
+  | NoCallLetExpr k (e: Expr ty k) lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetExpr e c)
+  | NoCallLetAction k (a: ActionT ty k) lretT c: NoCallActionT a -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetAction a c)
   | NoCallReadNondet k lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (ReadNondet k c)
   | NoCallReadReg r k lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (ReadReg r k c)
-  | NoCallWriteReg r k (e: Expr type k) lretT c: NoCallActionT c  -> @NoCallActionT lretT (WriteReg r e c)
-  | NoCallIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, NoCallActionT (c v)) -> NoCallActionT atrue -> NoCallActionT afalse -> @NoCallActionT lretT (IfElse p atrue afalse c)
+  | NoCallWriteReg r k (e: Expr ty k) lretT c: NoCallActionT c  -> @NoCallActionT lretT (WriteReg r e c)
+  | NoCallIfElse p k (atrue: ActionT ty k) afalse lretT c: (forall v, NoCallActionT (c v)) -> NoCallActionT atrue -> NoCallActionT afalse -> @NoCallActionT lretT (IfElse p atrue afalse c)
   | NoCallSys ls lretT c: NoCallActionT c -> @NoCallActionT lretT (Sys ls c)
   | NoCallReturn lretT e: @NoCallActionT lretT (Return e).
 End NoCallActionT.
@@ -824,15 +825,15 @@ Section NoSelfCallBaseModule.
   Variable m: BaseModule.
   
   Definition NoSelfCallRuleBaseModule (rule : Attribute (Action Void)) :=
-    NoCallActionT (map fst (getMethods m)) (snd rule type).
+    forall ty, NoCallActionT (getMethods m) (snd rule ty).
   
   Definition NoSelfCallRulesBaseModule :=
-    forall rule, In rule (getRules m) ->
-                 NoCallActionT (map fst (getMethods m)) (snd rule type).
+    forall rule ty, In rule (getRules m) ->
+                    NoCallActionT (getMethods m) (snd rule ty).
   
   Definition NoSelfCallMethsBaseModule :=
-    forall meth, In meth (getMethods m) ->
-                 forall (arg: type (fst (projT1 (snd meth)))), NoCallActionT (map fst (getMethods m)) (projT2 (snd meth) type arg).
+    forall meth ty, In meth (getMethods m) ->
+                 forall (arg: ty (fst (projT1 (snd meth)))), NoCallActionT (getMethods m) (projT2 (snd meth) ty arg).
 
   Definition NoSelfCallBaseModule :=
     NoSelfCallRulesBaseModule /\ NoSelfCallMethsBaseModule.
@@ -1434,13 +1435,13 @@ Definition getListFullLabel_diff (f : MethT) (l : list FullLabel) :=
 
 Definition MatchingExecCalls_Base (l : list FullLabel) m :=
   forall f,
-    In (fst f) (map fst (getMethods m)) ->
+    In (fst f, projT1 (snd f)) (getKindAttr (getMethods m)) ->
     (getNumCalls f l <= getNumExecs f l)%Z.
 
 Definition MatchingExecCalls_Concat (lcall lexec : list FullLabel) mexec :=
   forall f,
     (getNumCalls f lcall <> 0%Z) ->
-    In (fst f) (map fst (getAllMethods mexec)) ->
+    In (fst f, projT1 (snd f)) (getKindAttr (getAllMethods mexec)) ->
     ~In (fst f) (getHidden mexec) /\
     (getNumCalls f lcall + getNumCalls f lexec <= getNumExecs f lexec)%Z.
 
@@ -1487,7 +1488,7 @@ Inductive Step: Mod -> RegsT -> list FullLabel -> Prop :=
 | BaseStep m o l (HSubsteps: Substeps m o l) (HMatching: MatchingExecCalls_Base l  m):
     Step (Base m) o l
 | HideMethStep m s o l (HStep: Step m o l)
-               (HHidden : In s (map fst (getAllMethods m)) -> (forall v, (getListFullLabel_diff (s, v) l = 0%Z))):
+               (HHidden : forall v, In (s, projT1 v) (getKindAttr (getAllMethods m)) -> getListFullLabel_diff (s, v) l = 0%Z):
     Step (HideMeth m s) o l
 | ConcatModStep m1 m2 o1 o2 l1 l2
                 (HStep1: Step m1 o1 l1)
@@ -1950,18 +1951,26 @@ Definition struct_get_names
 
 Definition struct_get_field_index
   (ty: Kind -> Type)
-  (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
-  (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
-  (name : string)
-  :  option (Fin.t (S n))
-  := struct_foldr ty get_kind get_name
-       (fun index field_name _ acc
-         => if string_dec name field_name
-              then Some index
-              else acc)
-       None.
+  :  forall (n : nat)
+       (get_kind : Fin.t n -> Kind)
+       (get_name : Fin.t n -> string)
+       (packet : Expr ty (SyntaxKind (Struct get_kind get_name))),
+       string -> option (Fin.t n)
+  := nat_rect
+       (fun n
+         => forall
+              (get_kind : Fin.t n -> Kind)
+              (get_name : Fin.t n -> string)
+              (packet : Expr ty (SyntaxKind (Struct get_kind get_name))),
+              string -> option (Fin.t n))
+       (fun _ _ _ _ => None)
+       (fun n _ get_kind get_name packet name
+         => struct_foldr ty get_kind get_name
+              (fun index field_name _ acc
+                => if string_dec name field_name
+                     then Some index
+                     else acc)
+              None).
 
 Ltac struct_get_field_ltac packet name :=
   let val := eval cbv in (struct_get_field_index packet name) in
@@ -2113,8 +2122,8 @@ Local Notation "X >>- F" := (option_bind X F) (at level 85, only parsing).
 Local Definition struct_get_field_aux
   (ty: Kind -> Type)
   (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
+  (get_kind : Fin.t n -> Kind)
+  (get_name : Fin.t n -> string)
   (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
   (name : string)
   :  option ({kind : Kind & Expr ty (SyntaxKind kind)})
@@ -2129,8 +2138,8 @@ Local Definition struct_get_field_aux
 Definition struct_get_field
   (ty: Kind -> Type)
   (n : nat)
-  (get_value : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
+  (get_value : Fin.t n -> Kind)
+  (get_name : Fin.t n -> string)
   (packet : Expr ty (SyntaxKind (Struct get_value get_name)))
   (name : string)
   (k : Kind)
@@ -2151,8 +2160,8 @@ Defined.
 Definition struct_get_field_default
   (ty: Kind -> Type)
   (n : nat)
-  (get_value : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
+  (get_value : Fin.t n -> Kind)
+  (get_name : Fin.t n -> string)
   (packet : Expr ty (SyntaxKind (Struct get_value get_name)))
   (name : string)
   (kind : Kind)
@@ -2168,8 +2177,8 @@ Definition struct_get_field_default
 Definition struct_set_field
   (ty: Kind -> Type)
   (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
+  (get_kind : Fin.t n -> Kind)
+  (get_name : Fin.t n -> string)
   (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
   (name : string)
   (kind : Kind)

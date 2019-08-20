@@ -1,4 +1,4 @@
-Require Import Syntax KamiNotations.
+Require Import Kami.Syntax Kami.KamiNotations.
 Section mod_test.
   Variable a: string.
   Local Notation "^ x" := (a ++ "." ++ x)%string (at level 0).

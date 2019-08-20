@@ -163,7 +163,7 @@ ppRtlExpr who e =
       do
         strs <- mapM (ppRtlExpr who) (filterKind0 num fk es)  -- (Data.List.map es (getFins num))
         return $ ppDealSize0 (T.Struct num fk fs) "0" ('{': intercalate ", " strs ++ "}")
-    T.RtlReadArray n k vec idx ->
+    T.RtlReadArray n m k vec idx ->
       do
         xidx <- ppRtlExpr who idx
         xvec <- ppRtlExpr who vec
