@@ -491,7 +491,7 @@ Section Named.
       left.
       split.
       1:cbv; clear; congruence.
-      split; trivial; [].
+      split. solve[trivial].
 
       change (wordToNat $8) with 8.
 
@@ -503,7 +503,6 @@ Section Named.
       eapply TracePredicate.interleave_exist_r; eexists.
       eapply TracePredicate.interleave_kleene_l_app_r.
       1:admit. (* past *)
-      eapply TracePredicate.interleave_exist_r; eexists.
       eapply TracePredicate.interleave_kleene_l_app_r; [|exact H].
       eexists nil, _; split; [|split].
       { eapply List.interleave_nil_l. }
@@ -517,7 +516,7 @@ Section Named.
       right.
       split; trivial; [].
       split; trivial; [].
-      cbv [spec spi_xchgs spi_xchg].
+     cbv [spec spi_xchgs spi_xchg].
   Notation "( x , y , .. , z )" := (existT _ .. (existT _ x y) .. z) : core_scope.
       
 
