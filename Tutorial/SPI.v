@@ -551,12 +551,6 @@ TracePredicate.interleave (kleene nop)
       replace arg with (wzero 0) by admit. 2:replace mret with WO by admit. 1,2:solve[trivial].
     }
 
-
-      eapply TracePredicate.interleave_exist_r; eexists.
-      eapply TracePredicate.interleave_exist_r; eexists.
-  Notation "( x , y , .. , z )" := (existT _ .. (existT _ x y) .. z) : core_scope.
-      
-
 Abort.
 
 End Named.
