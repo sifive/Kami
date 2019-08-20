@@ -271,7 +271,7 @@ Definition eval_BaseModule_rr_unc(meths : list (string * Signature))(m : BaseMod
 
 Definition eval_BaseModule_rr meths m := curry _ (eval_BaseModule_rr_unc meths m).
 
-Require Import SyntaxEx.
+Require Import Kami.Tutorial.SyntaxEx.
 
 Section BigTest.
 

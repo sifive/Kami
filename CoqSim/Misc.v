@@ -1,4 +1,4 @@
-Require Import Fin Bool Lib.EclecticLib String Ascii List.
+Require Import Fin Bool Kami.Lib.EclecticLib String Ascii List.
 Import ListNotations.
 
 Fixpoint Fin n :=
