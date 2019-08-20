@@ -273,10 +273,12 @@ Section Named.
     | ret w => fun l' w' t => w' = w /\ t = nil
     end.
 
-  Definition spec := TracePredicate.interleave (kleene nop) (kleene (fun t =>
-    exists tx rx, (cmd_write tx false +++
-                   interp (xchg_prog 8 tx (wzero 8)) nil rx +++
-                   maybe (cmd_read rx false)) t)).
+  Definition spi_xchg tx rx := 
+    cmd_write tx false +++
+    interp (xchg_prog 8 tx (wzero 8)) nil rx +++
+    maybe (cmd_read rx false).
+  Definition spi_xchgs := kleene (exist (fun tx => (exist (fun rx => spi_xchg tx rx)))).
+  Definition spec := TracePredicate.interleave (kleene nop) spi_xchgs.
 
   Definition enforce_regs (regs:RegsT) i sck tx rx rx_valid := regs =
     [
@@ -326,16 +328,16 @@ Section Named.
   Goal forall s past,
     Trace SPI s past ->
     exists i sck tx rx rx_valid,
-    enforce_regs s i sck tx rx false /\
-    rx_valid = false /\
+    enforce_regs s i sck tx rx rx_valid /\
     Logic.or
     (wordToNat i <> 0 /\
+    rx_valid = false /\
     let i := wordToNat i in
     forall frx future,
     (if sck
     then TracePredicate.interleave (kleene nop) (interp (xchg_prog i tx rx) nil frx) future
     else TracePredicate.interleave (kleene nop) (interp (xchg_prog_sckfalse (pred i)  tx rx (split2 7 1 tx)) nil frx) future)
-    -> exists tx rx, TracePredicate.interleave (kleene nop) (cmd_write tx false +++ interp (xchg_prog 8 tx rx) nil rx) (future ++ past))
+    -> TracePredicate.interleave (kleene nop) (spi_xchgs +++ exist (fun tx => exist (fun rx => cmd_write tx false +++ interp (xchg_prog 8 tx rx) nil rx))) (future ++ past))
     (wordToNat i = 0)
   .
   Proof.
@@ -351,7 +353,7 @@ Section Named.
       clear HStep; [abstract discharge_wf|..|rename HHS into HStep].
     1,2,3: admit.
 
-    destruct IH as [[Hi IHTrace]|];
+    destruct IH as [(Hi&Hrx_valid&IHTrace)|];
     repeat match goal with
       | _ => progress intros
       | _ => progress subst
@@ -392,6 +394,7 @@ Section Named.
       rename Hi into Hi'; destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|]; clear Hi'.
       cbn [Init.Nat.pred] in *.
       subst.
+      split;trivial; [].
       intros frx future Hfuture.
       rewrite app_assoc.
       revert Hfuture; revert future; revert frx.
@@ -412,18 +415,14 @@ Section Named.
       2:eapply f_equal.       
       1,2: rewrite word0, (word0 (wzero 0)); reflexivity. }
 
-    destruct (wordToNat (wminus_simple rv0 $1)) as [|i'] eqn:Hi'; [>|left;split;[congruence|]]; cycle 1.
+    Search sumbool (@eq (word _)).
+    destruct (weq rv0 $1); subst; cycle 1.
     {
-      (* Hi : rv0 = 1+i   and   1+i = (1+i) mod 16
-         Hi': rv0-1 mod 16 = S i'
-         --> subst rv0
-         (1+i-1) mod 16 = S i'
-         i mod 16 = S i'
-         and I would like to say i = S i'
-         *)
-      replace (S i') with i in * by admit.
+      left.
+      split. { admit. } (* word *)
+      split. admit. (* word *)
+      replace (wordToNat (wminus_simple rv0 $1)) with i in * by admit. (* word *)
       cbn [Init.Nat.pred] in *.
-      subst.
       intros frx future Hfuture__________________________________________________.
       rewrite app_assoc.
       revert Hfuture__________________________________________________; revert future; revert frx.
@@ -453,10 +452,7 @@ Section Named.
 
     { right.
       replace i with 0 in * by admit; clear i.
-      let future := open_constr:(_) in 
-      assert (exists tx rx, TracePredicate.interleave (kleene nop)
-                              (interp (xchg_prog 8 tx rx) [] rx) (future ++ past)). {
-        eapply IHTrace; clear IHTrace.
+      unshelve epose proof IHTrace _ _ _; shelve_unifiable. {
         cbn [pred]; cbv [xchg_prog_sckfalse].
         change (xchg_prog 0) with (fun _ : word 8 => ret); cbv beta.
         cbn [interp].
@@ -479,35 +475,35 @@ Section Named.
         }
       }
       cbn [List.app] in H.
-      solve [trivial].
+      exact eq_refl.
     }
 
     admit. (* rv <> 0 /\ rv = 0 *)
 
-    7: {
+    6: { (* idle -> draining *)
       left.
       split.
       1:cbv; clear; congruence.
+      split; trivial; [].
 
-      intros.
-      exists arg, frx.
+      change (wordToNat $8) with 8.
 
+      intros ? ? H.
+
+      eapply TracePredicate.Proper_interleave_impl; [eapply reflexivity| |].
+      { intros ? ?. eapply TracePredicate.app_exist_r; eassumption. }
       rewrite List.app_assoc.
-      change (Init.Nat.pred (wordToNat $8)) with 7 in *.
-      set (n := 7) in *.
-      rewrite xchg_prog_as_sckfalse; cbn zeta beta.
-      cbn [interp].
-      (* [past] needs to be described in invariant *)
       eapply TracePredicate.interleave_exist_r; eexists.
-      eapply TracePredicate.interleave_kleene_l_app_r; [|eassumption].
+      eapply TracePredicate.interleave_kleene_l_app_r.
+      1:admit. (* past *)
+      eapply TracePredicate.interleave_exist_r; eexists.
+      eapply TracePredicate.interleave_kleene_l_app_r; [|exact H].
       eexists nil, _; split; [|split].
       { eapply List.interleave_nil_l. }
       { (* kleene_nil *) admit. }
-      cbv [List.app]. f_equal; f_equal. f_equal. f_equal.
-      repeat f_equal.
-      eapply f_equal.
-      2:eapply f_equal.       
-      1,2: rewrite word0, (word0 (wzero 0)); reflexivity. }
+      cbv [cmd_write exist].
+      eexists.
+      exact eq_refl. }
 
 
 
