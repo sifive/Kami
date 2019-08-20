@@ -219,6 +219,7 @@ Section Named.
       If #rx_valid then (
         Read data : Bit 8 <- @^"rx";
         Write @^"rx_valid" <- $$false;
+        Call "ReturnData"(#data : Bit 8);
         Ret $$false (* TODO: return (data, false) *)
       ) else (
         Ret $$true
@@ -229,8 +230,8 @@ Section Named.
 
   Definition cmd_write arg err := exist (fun r : RegsT =>
     eq [[(r, (Meth ("write", existT SignT (Bit 8, Bool) (arg, err)), @nil MethT))]]).
-  Definition cmd_read (ret : word 8) err := exist (fun r : RegsT =>
-    eq [[(r, (Meth ("read", existT SignT (Void, Bool) (wzero 0, err)), @nil MethT))]]).
+  Definition cmd_read ret err := exist (fun r : RegsT =>
+    eq [[(r, (Meth ("read", existT SignT (Void, Bool) (wzero 0, err)), [("ReturnData", existT SignT (Bit 8, Void) (ret, WO))]))]]).
   Definition iocycle miso sck mosi := exist (fun r : RegsT => eq [[(r, (Rle (name ++ "_cycle"),
       [("GetMISO", existT SignT (Void, Bit 1) (wzero 0, WS miso WO));
       ("PutSCK",   existT SignT (Bool, Void)  (sck, wzero 0));
@@ -337,8 +338,13 @@ Section Named.
     (if sck
     then TracePredicate.interleave (kleene nop) (interp (xchg_prog i tx rx) nil frx) future
     else TracePredicate.interleave (kleene nop) (interp (xchg_prog_sckfalse (pred i)  tx rx (split2 7 1 tx)) nil frx) future)
-    -> TracePredicate.interleave (kleene nop) (spi_xchgs +++ exist (fun tx => exist (fun rx => cmd_write tx false +++ interp (xchg_prog 8 tx rx) nil rx))) (future ++ past))
-    (wordToNat i = 0)
+    -> TracePredicate.interleave (kleene nop) (spi_xchgs +++ exist (fun tx => cmd_write tx false +++ interp (xchg_prog 8 tx rx) nil frx)) (future ++ past))
+    (
+     rx_valid = true /\ wordToNat i = 0
+     /\ TracePredicate.interleave (kleene nop) (spi_xchgs +++ exist (fun tx => cmd_write tx false +++ interp (xchg_prog 8 tx rx) nil rx)) past
+    \/
+     rx_valid = false /\  wordToNat i = 0 /\ spec past
+    )
   .
   Proof.
     intros s past.
@@ -384,6 +390,12 @@ Section Named.
     all : try (
       rename Hi into Hi'; destruct (wordToNat rv0) as [|?i] eqn:Hi; [>congruence|]; clear Hi').
 
+    all: try
+    match goal with
+    | H: wordToNat ?x <> 0, G: getBool (isEq _ ?x ($0)%word) = true |- _ => admit
+    | H: wordToNat ?x = 0, G: getBool (isEq _ ?x ($0)%word) = false |- _ => admit
+    end.
+
     { (* i = 0 *)
       unshelve epose proof ((_ : forall x y, getBool (weq x y) = true -> x = y) _ _ H3); [>admit|].
       subst rv0.
@@ -415,7 +427,6 @@ Section Named.
       2:eapply f_equal.       
       1,2: rewrite word0, (word0 (wzero 0)); reflexivity. }
 
-    Search sumbool (@eq (word _)).
     destruct (weq rv0 $1); subst; cycle 1.
     {
       left.
@@ -452,35 +463,31 @@ Section Named.
 
     { right.
       replace i with 0 in * by admit; clear i.
-      unshelve epose proof IHTrace _ _ _; shelve_unifiable. {
-        cbn [pred]; cbv [xchg_prog_sckfalse].
-        change (xchg_prog 0) with (fun _ : word 8 => ret); cbv beta.
-        cbn [interp].
-        eapply TracePredicate.interleave_exist_r; eexists.
-        eapply TracePredicate.interleave_exist_r; eexists.
-        eapply TracePredicate.interleave_kleene_l_app_r.
-        {
-          eexists nil, _; split; [|split].
-          { eapply List.interleave_nil_l. }
-          { (* kleene_nil *) admit. }
-          exact eq_refl.
-        }
-        {
-          eexists nil, _; split; [|split].
-          { eapply List.interleave_nil_l. }
-          { (* kleene_nil *) admit. }
-          split. 
-          exact eq_refl.
-          exact eq_refl.
-        }
-      }
-      cbn [List.app] in H.
-      exact eq_refl.
-    }
+      left.
+      split. { exact eq_refl. }
+      split. { exact eq_refl. }
+      eapply IHTrace.
 
-    admit. (* rv <> 0 /\ rv = 0 *)
+      cbn [pred]; cbv [xchg_prog_sckfalse].
+      change (xchg_prog 0) with (fun _ : word 8 => ret); cbv beta.
+      cbn [interp].
+      eapply TracePredicate.interleave_exist_r; eexists.
+      eapply TracePredicate.interleave_exist_r; eexists.
+      eapply TracePredicate.Proper_interleave_impl; [eapply reflexivity| |].
+      { intros ? H. eapply app_empty_r; [exact H|].
+        split; trivial.
+        instantiate (1:=whd mret).
+        repeat f_equal.
+        admit (* forall x : word 1, WS (whd x) WO = x *) . }
+      eexists nil, _; split; [|split].
+      { eapply List.interleave_nil_l. }
+      { (* kleene_nil *) admit. }
+      cbn [List.app].
+      repeat f_equal; eapply f_equal.
+      { admit. (* forall x : word 1, WS (whd x) WO = x *) }
+      1,2:rewrite word0, (word0 (wzero 0)); reflexivity. }
 
-    6: { (* idle -> draining *)
+    5: { (* idle -> draining *)
       left.
       split.
       1:cbv; clear; congruence.
@@ -505,7 +512,14 @@ Section Named.
       eexists.
       exact eq_refl. }
 
-
+    5: {
+      right.
+      right.
+      split; trivial; [].
+      split; trivial; [].
+      cbv [spec spi_xchgs spi_xchg].
+  Notation "( x , y , .. , z )" := (existT _ .. (existT _ x y) .. z) : core_scope.
+      
 
 Abort.
 
