@@ -516,7 +516,44 @@ Section Named.
       right.
       split; trivial; [].
       split; trivial; [].
-     cbv [spec spi_xchgs spi_xchg].
+      cbv [spec spi_xchgs spi_xchg].
+
+      assert ( HH:
+      exists tx, TracePredicate.interleave (kleene nop) (spi_xchgs +++ cmd_write tx false +++ interp (xchg_prog 8 tx rv0) [] rv0) past
+      ) by admit; destruct HH as [? HH].
+
+      enough (
+      exists tx0 rx,
+TracePredicate.interleave (kleene nop)
+  ((spi_xchgs +++ 
+         cmd_write tx0 false +++ interp (xchg_prog 8 tx0 (wzero 8)) [] rx +++
+         maybe (cmd_read rx false)))
+  ([[([((name ++ "_hack_for_sequential_semantics")%string,
+       existT (fullType type) (SyntaxKind Void) WO)] ++
+      [((name ++ "_rx_valid")%string,
+       existT (fullType type) (SyntaxKind Bool) false)],
+     (Meth ("read", existT SignT (Void, Bool) (arg, false)),
+     [("ReturnData", existT SignT (Bit 8, Void) (rv0, mret))]))]] ++ past)
+     ) by admit.
+
+     eexists ?[tx], ?[rx].
+     refine (TracePredicate.interleave_rapp _ _ _ _); [|exact HH].
+
+     enough ((cmd_read rv0 false)
+       [[([((name ++ "_hack_for_sequential_semantics")%string,
+        existT (fullType type) (SyntaxKind Void) WO)] ++
+       [((name ++ "_rx_valid")%string,
+        existT (fullType type) (SyntaxKind Bool) false)],
+      (Meth ("read", existT SignT (Void, Bool) (arg, false)),
+      [("ReturnData", existT SignT (Bit 8, Void) (rv0, mret))]))]]) by admit.
+
+      cbv [cmd_read]. eexists. repeat f_equal.
+      replace arg with (wzero 0) by admit. 2:replace mret with WO by admit. 1,2:solve[trivial].
+    }
+
+
+      eapply TracePredicate.interleave_exist_r; eexists.
+      eapply TracePredicate.interleave_exist_r; eexists.
   Notation "( x , y , .. , z )" := (existT _ .. (existT _ x y) .. z) : core_scope.
       
 
