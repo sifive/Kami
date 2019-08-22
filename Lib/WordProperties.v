@@ -1320,6 +1320,24 @@ Proof.
   lia.
 Qed.
 
+Lemma wminus_diag : (forall sz (x : word sz), x ^- x = zToWord sz 0).
+Proof.
+  intros.
+  arithmetizeWord; f_equal; lia.
+Qed.
+
+Lemma move_wplus_wminus : (forall sz (x y z : word sz), x ^+ y = z -> x = z ^- y).
+Proof.
+  intros.
+  arithmetizeWord. 
+  simpl in *; subst.
+  autorewrite with distributeMod.
+  assert (wordVal1 + wordVal0 - wordVal0 = wordVal1)%Z by lia.
+  rewrite H3.
+  lia.
+Qed.
+
+
 Lemma word_cancel_l sz (a b c: word sz):
   a = b -> c ^+ a = c ^+ b.
 Proof.
