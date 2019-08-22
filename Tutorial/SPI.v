@@ -3,6 +3,7 @@ Require Import Coq.Lists.List. Import ListNotations.
 Section TracePredicate.  
   Context {T : Type}.
   Axiom kleene : (list T -> Prop) -> list T -> Prop.
+  Axiom kleene_one : forall (P:_->Prop) x, P x -> kleene P x.
   Axiom plus : (list T -> Prop) -> list T -> Prop.
   Axiom app : (list T -> Prop) -> (list T -> Prop) -> list T -> Prop.
   Lemma app_empty_r (P Q : list T -> Prop) t : P t -> Q nil -> app P Q t. Admitted.
@@ -111,6 +112,16 @@ Module TracePredicate.
     eexists _, _; split.
     eapply List.interleave_lapp; eauto.
     split; eauto.
+  Admitted.
+
+  Lemma interleave_rkleene_back {T} {P Q : list T -> Prop} z zs
+    (H : Q^* z) (HH : interleave P (Q^* ) zs) : interleave P (Q^* ) (zs++z).
+  Proof.
+  Admitted.
+  
+  Lemma interleave_lkleene_back {T} {P Q : list T -> Prop} z zs
+    (H : P^* z) (HH : interleave (P^* ) Q zs) : interleave (P^* ) Q (zs++z).
+  Proof.
   Admitted.
 
   Definition interleave_rkleene_cons {T} {P Q} (z:T) zs H HH : interleave _ _ (cons _ _) :=
@@ -222,6 +233,7 @@ Section Named.
         Call "ReturnData"(#data : Bit 8);
         Ret $$false (* TODO: return (data, false) *)
       ) else (
+        Call "ReturnData"($0 : Bit 8);
         Ret $$true
       ) as r;
       Ret #r
@@ -232,12 +244,10 @@ Section Named.
     eq [[(r, (Meth ("write", existT SignT (Bit 8, Bool) (arg, err)), @nil MethT))]]).
   Definition cmd_read ret err := exist (fun r : RegsT =>
     eq [[(r, (Meth ("read", existT SignT (Void, Bool) (wzero 0, err)), [("ReturnData", existT SignT (Bit 8, Void) (ret, WO))]))]]).
-  Definition iocycle miso sck mosi := exist (fun r : RegsT => eq [[(r, (Rle (name ++ "_cycle"),
-      [("GetMISO", existT SignT (Void, Bit 1) (wzero 0, WS miso WO));
-      ("PutSCK",   existT SignT (Bool, Void)  (sck, wzero 0));
-      ("PutMOSI",  existT SignT (Bit 1, Void) (WS mosi WO, wzero 0))]))]]).
+  Definition silent : list (list (RegsT * (RuleOrMeth * list MethT))) -> Prop :=
+    exist (fun r : RegsT => eq [[(r, (Rle (name ++ "_cycle"), []))]]).
 
-  Definition nop x := (exists arg, cmd_write arg true x) \/ (exists ret, cmd_read ret true x).
+  Definition nop x := silent x \/ (exists arg, cmd_write arg true x) \/ (exists ret, cmd_read ret true x).
   
   Inductive p :=
   | getmiso (_ : forall miso : bool, p)
@@ -392,8 +402,8 @@ Section Named.
 
     all: try
     match goal with
-    | H: wordToNat ?x <> 0, G: getBool (isEq _ ?x ($0)%word) = true |- _ => admit
-    | H: wordToNat ?x = 0, G: getBool (isEq _ ?x ($0)%word) = false |- _ => admit
+    | H: wordToNat ?x <> 0, G: getBool (isEq _ ?x ($0)%word) = true |- _ => exfalso; revert H; revert G; admit
+    | H: wordToNat ?x = 0, G: getBool (isEq _ ?x ($0)%word) = false |- _ => exfalso; revert H; revert G; admit
     end.
 
     { (* i = 0 *)
@@ -502,7 +512,11 @@ Section Named.
       rewrite List.app_assoc.
       eapply TracePredicate.interleave_exist_r; eexists.
       eapply TracePredicate.interleave_kleene_l_app_r.
-      1:admit. (* past *)
+      { (* past *)
+        cbv [spi_xchgs spi_xchg fst] in *.
+        revert i0.
+        admit.
+      }
       eapply TracePredicate.interleave_kleene_l_app_r; [|exact H].
       eexists nil, _; split; [|split].
       { eapply List.interleave_nil_l. }
@@ -551,6 +565,85 @@ TracePredicate.interleave (kleene nop)
       replace arg with (wzero 0) by admit. 2:replace mret with WO by admit. 1,2:solve[trivial].
     }
 
+    5: { (* idle -> draining , COPYPASTE FROM ABOVE *)
+      left.
+      split.
+      1:cbv; clear; congruence.
+      split. solve[trivial].
+
+      change (wordToNat $8) with 8.
+
+      intros ? ? H.
+
+      eapply TracePredicate.Proper_interleave_impl; [eapply reflexivity| |].
+      { intros ? ?. eapply TracePredicate.app_exist_r; eassumption. }
+      rewrite List.app_assoc.
+      eapply TracePredicate.interleave_exist_r; eexists.
+      eapply TracePredicate.interleave_kleene_l_app_r.
+      { eassumption. }
+      eapply TracePredicate.interleave_kleene_l_app_r; [|exact H].
+      eexists nil, _; split; [|split].
+      { eapply List.interleave_nil_l. }
+      { (* kleene_nil *) admit. }
+      cbv [cmd_write exist].
+      eexists.
+      exact eq_refl. }
+
+    3: { (* nop cycle, rx_valid = true *)
+      right.
+      left.
+      repeat (split; trivial; [>]).
+      eapply TracePredicate.interleave_lkleene; [|eassumption].
+      eapply kleene_one.
+      cbv [nop].
+      left.
+      cbv [silent].
+      eexists.
+      repeat f_equal.
+    }
+
+    3: { (* nop cycle, rx_valid = false *)
+      right.
+      right.
+      repeat (split; trivial; [>]).
+      eapply TracePredicate.interleave_lkleene; [|eassumption].
+      eapply kleene_one.
+      cbv [nop].
+      left.
+      cbv [silent].
+      eexists.
+      repeat f_equal.
+    }
+
+    1,2,3: (left + (right;left) + (right;right)); do 2 (split; trivial; []); intros.
+    1,2: rewrite app_assoc; eapply IHTrace; clear IHTrace; destruct sck.
+    1,2,3,4: (eapply TracePredicate.interleave_rkleene + eapply TracePredicate.interleave_lkleene_back); try eassumption; [].
+    1,2,3,4 : eapply kleene_one; cbv [nop silent].
+    all: try ((left + (right;left) + (right;right)); repeat eexists; solve[repeat f_equal]).
+    {
+      right; right.
+      repeat eexists.
+      repeat f_equal.
+      1,2:eapply f_equal2; eauto.
+    }
+    {
+      right.
+      right.
+      eexists.
+      eexists.
+      repeat f_equal.
+      1,2:eapply f_equal2; eauto.
+    }
+    {
+      eapply TracePredicate.interleave_lkleene; try eassumption; [].
+      eapply kleene_one.
+      right. right. eexists. eexists. repeat f_equal; eapply f_equal2; eauto.
+    }
+
+
+    Grab Existential Variables.
+    all : eauto.
+  
 Abort.
 
 End Named.
