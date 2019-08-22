@@ -10,6 +10,8 @@ Section TracePredicate.
   Lemma app_empty_r (P Q : list T -> Prop) t : P t -> Q nil -> app P Q t. Admitted.
   Axiom either : (list T -> Prop) -> (list T -> Prop) -> list T -> Prop.
   Axiom maybe : (list T -> Prop) -> list T -> Prop.
+  Axiom maybe_nil : forall (P:_->Prop), maybe P [].
+  Axiom maybe_one : forall (P:_->Prop) x, P x -> maybe P x.
 
   Definition exist {V} (P : V -> list T -> Prop) (l : list T) : Prop :=
     exists v : V, P v l.
@@ -563,14 +565,7 @@ TracePredicate.interleave (kleene nop)
 
      eexists ?[tx], ?[rx].
      refine (TracePredicate.interleave_rapp _ _ _ _); [|exact HH].
-
-     enough ((cmd_read rv0 false)
-       [[([((name ++ "_hack_for_sequential_semantics")%string,
-        existT (fullType type) (SyntaxKind Void) WO)] ++
-       [((name ++ "_rx_valid")%string,
-        existT (fullType type) (SyntaxKind Bool) false)],
-      (Meth ("read", existT SignT (Void, Bool) (arg, false)),
-      [("ReturnData", existT SignT (Bit 8, Void) (rv0, mret))]))]]) by admit.
+     eapply maybe_one.
 
       cbv [cmd_read]. eexists. repeat f_equal.
       replace arg with (wzero 0) by admit. 2:replace mret with WO by admit. 1,2:solve[trivial].
