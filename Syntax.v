@@ -999,7 +999,7 @@ Defined.
 
 *)
 
-Definition Signature_dec' (s1 s2 : Signature) : {s1 = s2} + {s1 <> s2}.
+Definition Signature_dec (s1 s2 : Signature) : {s1 = s2} + {s1 <> s2}.
 Proof.
   intros; destruct (Signature_decb s1 s2) eqn:G.
   left; rewrite <- Signature_decb_eq; auto.
@@ -1324,7 +1324,7 @@ Section MethT_dec.
   :  forall (s : Signature) (x y : SignT s), existT SignT s x = existT SignT s y -> x = y.
   Proof.
     intros. inv H.
-    apply (Eqdep_dec.inj_pair2_eq_dec Signature Signature_dec' SignT) in H1. auto.
+    apply (Eqdep_dec.inj_pair2_eq_dec Signature Signature_dec SignT) in H1. auto.
   Qed.
 
   (*
@@ -1391,7 +1391,7 @@ Section MethT_dec.
                                                             r H)
                                                 (fun (H : s <> r) (_ : SignT r)
                                                  => right (method_values_neq H))
-                                                (Signature_dec' s r))).
+                                                (Signature_dec s r))).
 
   Lemma MethT_dec: forall s1 s2: MethT, {s1 = s2} + {s1 <> s2}.
   Proof.
@@ -1742,7 +1742,7 @@ Section inlineSingle.
     | MCall g sign arg cont =>
       match String.eqb (fst f) g with
       | true =>
-        match Signature_dec' sign (projT1 (snd f)) with
+        match Signature_dec sign (projT1 (snd f)) with
         | left isEq =>
           LetAction (LetExpr match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with
                              | eq_refl => arg

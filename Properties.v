@@ -4308,7 +4308,7 @@ Section ModularSubstitution.
         pose proof (Trace_meth_InCall_InDef_InExec H2 f i) as sth10.
         pose proof (map_nth_error (filterExecs id a) _ _ H11) as sth11.
         specialize (sth10 _ sth11).
-        pose proof (in_dec (prod_dec string_dec Signature_dec') (fst f, projT1 (snd f)) (getKindAttr (getAllMethods a))) as [th1 | th2].
+        pose proof (in_dec (prod_dec string_dec Signature_dec) (fst f, projT1 (snd f)) (getKindAttr (getAllMethods a))) as [th1 | th2].
         * clear - H11 H2 helper th1 sth10 sth11.
           specialize (sth10 th1).
           pose proof (Trace_meth_InCall_InDef_InExec H2 f i) as sth0.
@@ -4317,7 +4317,7 @@ Section ModularSubstitution.
           assert (sth13: (getNumCalls f (filterExecs id a l) > 0)%Z) by (Omega.omega).
           rewrite sth12 in *.
           assert (sth14: getNumCalls f (filterExecs id a l) = getNumCalls f l1) by Omega.omega.
-          destruct (in_dec (prod_dec string_dec Signature_dec') (fst f, projT1 (snd f)) (getKindAttr (getAllMethods b))) as [ez|hard].
+          destruct (in_dec (prod_dec string_dec Signature_dec) (fst f, projT1 (snd f)) (getKindAttr (getAllMethods b))) as [ez|hard].
           -- specialize (H5 ez); dest.
              rewrite sth14 in *.
              split; [tauto |Omega.omega].
@@ -4347,7 +4347,7 @@ Section ModularSubstitution.
         pose proof (Trace_meth_InCall_InDef_InExec H3 f i) as sth10.
         pose proof (map_nth_error (filterExecs id b) _ _ H11) as sth11.
         specialize (sth10 _ sth11).
-        pose proof (in_dec (prod_dec string_dec Signature_dec') (fst f, projT1 (snd f)) (getKindAttr (getAllMethods b))) as [th1 | th2].
+        pose proof (in_dec (prod_dec string_dec Signature_dec) (fst f, projT1 (snd f)) (getKindAttr (getAllMethods b))) as [th1 | th2].
         * clear - H11 H3 helper th1 sth10 sth11.
           specialize (sth10 th1).
           pose proof (Trace_meth_InCall_InDef_InExec H3 f i) as sth0.
@@ -4356,7 +4356,7 @@ Section ModularSubstitution.
           assert (sth13: (getNumCalls f (filterExecs id b l) > 0)%Z) by (Omega.omega).
           rewrite sth12 in *.
           assert (sth14: getNumCalls f (filterExecs id b l) = getNumCalls f l0) by Omega.omega.
-          destruct (in_dec (prod_dec string_dec Signature_dec') (fst f, projT1 (snd f)) (getKindAttr (getAllMethods a))) as [ez|hard].
+          destruct (in_dec (prod_dec string_dec Signature_dec) (fst f, projT1 (snd f)) (getKindAttr (getAllMethods a))) as [ez|hard].
           -- specialize (H14 ez); dest.
              rewrite sth14 in *.
              split; [tauto|Omega.omega].
