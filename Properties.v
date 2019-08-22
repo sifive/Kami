@@ -543,6 +543,235 @@ Section evalExpr.
 End evalExpr.
 
 
+Lemma seq_nil n m :
+  seq n m = nil ->
+  m = 0.
+Proof.
+  induction m; auto; intro; exfalso.
+  rewrite seq_eq in H.
+  apply app_eq_nil in H; dest.
+  inv H0.
+Qed.
+
+Lemma Reduce_seq :
+  forall m n k,
+    k <= n ->
+    (map (fun x => x - k) (seq n m)) = (seq (n - k) m).
+Proof.
+  induction m; intros; simpl; auto.
+  apply f_equal2; auto.
+  rewrite IHm, Nat.sub_succ_l; auto.
+Qed.
+
+Lemma getKindAttr_fst {A B : Type} {P : B -> Type}  {Q : B -> Type} (l1 : list (A * {x : B & P x})):
+  forall  (l2 : list (A * {x : B & Q x})),
+    getKindAttr l1 = getKindAttr l2 ->
+    (map fst l1) = (map fst l2).
+Proof.
+  induction l1, l2; intros; auto; simpl in *; inv H.
+  erewrite IHl1; eauto.
+Qed.
+
+Lemma NoDup_app_split {A : Type} (l l' : list A) :
+  NoDup (l++l') ->
+  forall a,
+    In a l ->
+    ~ In a l'.
+Proof.
+  induction l'; repeat intro;[inv H1|].
+  specialize (NoDup_remove _ _ _ H) as P0; dest.
+  inv H1; apply H3; rewrite in_app_iff; auto.
+  exfalso; eapply IHl'; eauto.
+Qed.
+
+Lemma KeyMatch (l1 : RegsT) :
+  NoDup (map fst l1) ->
+  forall l2,
+    map fst l1 = map fst l2 ->
+    (forall s v, In (s, v) l1 -> In (s, v) l2) ->
+    l1 = l2.
+Proof.
+  induction l1; intros.
+  - destruct l2; inv H0; auto.
+  - destruct a; simpl in *.
+    destruct l2; inv H0.
+    destruct p; simpl in *.
+    inv H.
+    specialize (H1 _ _ (or_introl (eq_refl))) as TMP; destruct TMP.
+    + rewrite H in *.
+      assert (forall s v, In (s, v) l1 -> In (s, v) l2).
+      { intros.
+        destruct (H1 _ _ (or_intror H0)); auto.
+        exfalso.
+        inv H2.
+        apply H3.
+        rewrite in_map_iff.
+        exists (s2, v); auto.
+      }
+      rewrite (IHl1 H5 _ H4 H0).
+      reflexivity.
+    + exfalso.
+      apply H3.
+      rewrite H4, in_map_iff.
+      exists (s, s0); auto.
+Qed.
+
+Lemma seq_app s e :
+  forall m (Hm_lte_e : m <= e),
+    seq s e = seq s m ++ seq (s + m) (e - m).
+Proof.
+  induction e; intros.
+  - rewrite Nat.le_0_r in *; subst; simpl; reflexivity.
+  - destruct (le_lt_or_eq _ _ Hm_lte_e).
+    + rewrite Nat.sub_succ_l; [|lia].
+      repeat rewrite seq_eq.
+      assert (s + m + (e - m) = s + e) as P0.
+      { lia. }
+      rewrite (IHe m), app_assoc, P0; auto.
+      lia.
+    + rewrite <- H.
+      rewrite Nat.sub_diag, app_nil_r; reflexivity.
+Qed.
+
+Lemma fst_getKindAttr {A B : Type} {P : B -> Type} (l : list (A * {x : B & P x})) :
+  map fst (getKindAttr l) = map fst l.
+Proof.
+  induction l; simpl; auto.
+  rewrite IHl; reflexivity.
+Qed.
+
+Lemma key_not_In_app {A B : Type} (key : A) (ls1 ls2 : list (A * B)):
+  key_not_In key (ls1 ++ ls2) ->
+  key_not_In key ls1 /\ key_not_In key ls2.
+Proof.
+  induction ls1; simpl; intros; split;
+    repeat intro; auto; eapply H; eauto; simpl; rewrite in_app_iff; eauto.
+  inv H0; eauto.
+Qed.
+
+Lemma key_not_In_app_iff {A B : Type} (key : A) (ls1 ls2 : list (A * B)):
+  key_not_In key (ls1 ++ ls2) <-> key_not_In key ls1 /\ key_not_In key ls2.
+Proof.
+  split; eauto using key_not_In_app.
+  repeat intro; dest.
+  rewrite in_app_iff in H0.
+  destruct H0.
+  - eapply H; eauto.
+  - eapply H1; eauto.
+Qed.
+
+Lemma existsb_nexists_str str l :
+  existsb (String.eqb str) l = false <->
+  ~ In str l.
+Proof.
+  split; repeat intro.
+  - assert (exists x, In x l /\ (String.eqb str) x = true) as P0.
+    { exists str; split; auto. apply String.eqb_refl. }
+    rewrite <- existsb_exists in P0; rewrite P0 in *; discriminate.
+  - remember (existsb _ _) as exb; symmetry in Heqexb; destruct exb; auto.
+    exfalso; rewrite existsb_exists in Heqexb; dest.
+    rewrite String.eqb_eq in *; subst; auto.
+Qed.
+
+Lemma nth_error_map_None_iff :
+  forall {A B : Type} (f : A -> B) (l : list A) (n : nat),
+    nth_error l n = None <-> nth_error (map f l) n = None.
+Proof.
+  intros; split; intros; rewrite nth_error_None, map_length in *; assumption.
+Qed.
+
+Lemma nth_error_map_Some1 :
+  forall {A B : Type} (f : A -> B) (l : list A) (b : B) (n : nat),
+    nth_error (map f l) n = Some b -> exists a, nth_error l n = Some a /\ (f a = b).
+Proof.
+  intros.
+  specialize (nth_error_map f (fun b => nth_error (map f l) n = Some b) n l) as P0.
+  rewrite H in P0.
+  remember (nth_error l _) as err0; symmetry in Heqerr0; destruct err0.
+  - exists a; split; auto.
+    destruct P0 as [P0 P1].
+    specialize (P0 eq_refl); inv P0; reflexivity.
+  - exfalso.
+    rewrite nth_error_None in Heqerr0.
+    enough (Some b <> None).
+    { eapply H0; rewrite <- H.
+      rewrite nth_error_None, map_length; assumption. }
+    intro; discriminate.
+Qed.
+
+Lemma nth_error_map_Some2 :
+  forall {A B : Type} (f : A -> B) (l : list A) (b : B) (n : nat),
+    (exists a, nth_error l n = Some a /\ (f a = b)) -> nth_error (map f l) n = Some b.
+Proof.
+  intros; dest.
+  rewrite <- H0; eapply map_nth_error; eauto.
+Qed.
+
+Lemma nth_error_map_iff :
+  forall {A B : Type} (f : A -> B) (l : list A) (b : B) (n : nat),
+    nth_error (map f l) n = Some b <-> (exists a, nth_error l n = Some a /\ (f a = b)).
+Proof.
+  repeat red; intros; dest; eauto using nth_error_map_Some1, nth_error_map_Some2.
+Qed.
+
+Lemma nth_error_nil_None :
+  forall {A : Type} (n : nat),
+    nth_error (nil : list A) n = None.
+Proof.
+  intros; rewrite nth_error_None; simpl; lia.
+Qed.
+
+Lemma SubList_map_iff  {A B : Type} (f : A -> B) (l' : list B) :
+  forall (l : list A),
+    SubList l' (map f l) <->
+    exists l'',
+      SubList l'' l /\
+      (map f l'' = l').
+Proof.
+  intros; split.
+  - induction l'; simpl; intros.
+    + exists nil; simpl; split; repeat intro; auto.
+      destruct l; auto.
+      exfalso; inv H0.
+    + unfold SubList in *; simpl in *.
+      specialize (IHl' (ltac : (eauto))); dest.
+      specialize (H _ (or_introl eq_refl)); rewrite in_map_iff in H; dest.
+      exists (x0 :: x); split; intros; [inv H3; auto|].
+      simpl; apply f_equal2; assumption.
+  - repeat intro; dest.
+    rewrite <- H1 in H0.
+    rewrite in_map_iff in *; dest.
+    specialize (H _ H2).
+    exists x1; split; assumption.
+Qed.
+
+Lemma KeyPair_Equiv {A B : Type} (l : list (A * B)) :
+  NoDup (map fst l) ->
+  forall l',
+    SubList l l' ->
+    map fst l = map fst l' ->
+    l = l'.
+Proof.
+  induction l; simpl; intros.
+  - rewrite (map_eq_nil _ _ (eq_sym H1)); reflexivity.
+  - destruct l'; [discriminate|].
+    apply f_equal2; simpl in *.
+    + assert (In a (p :: l')).
+      { apply H0; left; reflexivity. }
+      inv H2; eauto.
+      exfalso.
+      apply (in_map fst) in H3; rewrite H1 in H; inv H1.
+      rewrite <- H4 in H; inv H; contradiction.
+    + enough (SubList l l').
+      { inv H; inv H1; eapply IHl; eauto. }
+      repeat intro.
+      specialize (H0 _ (in_cons _ _ _ H2)).
+      inv H0; eauto.
+      exfalso.
+      apply (in_map fst) in H2.
+      inv H1; rewrite H3 in H; inv H; contradiction.
+Qed.
+
 Lemma getNumCalls_nil f :
   getNumCalls f nil = 0%Z.
 Proof.
@@ -2537,13 +2766,6 @@ Lemma flatten_Substeps m o l:
   - constructor 1; auto.
   - econstructor 2; eauto.
   - econstructor 3; eauto.
-Qed.
-
-Lemma fst_getKindAttr {A B : Type} {P : B -> Type} (l : list (A * {x : B & P x})) :
-  map fst (getKindAttr l) = map fst l .
-Proof.
-  induction l; simpl; auto.
-  rewrite IHl; reflexivity.
 Qed.
 
 Lemma Step_substitute' m o l:

@@ -1,4 +1,4 @@
-Require Import Kami.SyntaxDoubleWrites Kami.CompileVerifiable Kami.All.
+Require Import Kami.SyntaxDoubleWrites Kami.CompileVerifiable Kami.CVProperties Kami.All.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
