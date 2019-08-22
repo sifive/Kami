@@ -336,6 +336,11 @@ Section Named.
     | _ => exact eq_refl
     end].
 
+  Lemma wneq_isEq_contradiction {sz} x : wordToNat x <> 0 -> getBool (isEq (Bit sz) x ($0)%word) = true -> False.
+  Admitted.
+  Lemma weq_nisEq_contradiction {sz} x : wordToNat x = 0 -> getBool (isEq (Bit sz) x ($0)%word) = false -> False.
+  Admitted.
+
   (* draining case only *)
   Goal forall s past,
     Trace SPI s past ->
@@ -359,16 +364,21 @@ Section Named.
   .
   Proof.
     intros s past.
-    pose proof eq_refl s as MARKER.
     induction 1 as [A B C D | regsBefore t regUpds regsAfter E _ IHTrace HStep K I].
-    { subst. admit. }
+    { subst. (* base case *)
+      repeat clean_hyp_step.
+      eexists _, _, _, _, _; eapply conj; [> solve_enforce_regs| ].
+      right. right.
+      split; trivial; [].
+      split; trivial; [].
+      eexists _, _; repeat split; eapply kleene_nil. }
 
     rename t into past.
-    specialize (IHTrace eq_refl). destruct IHTrace as (i&sck&tx&rx&rx_valid&Hregs&IH).
+    specialize IHTrace. destruct IHTrace as (i&sck&tx&rx&rx_valid&Hregs&IH).
 
     unshelve epose proof InvertStep (@Build_BaseModuleWf SPI _) _ _ _ HStep as HHS;
       clear HStep; [abstract discharge_wf|..|rename HHS into HStep].
-    1,2,3: admit.
+    1,2,3: admit. (* double write hack for sequential semantics *)
 
     destruct IH as [(Hi&Hrx_valid&IHTrace)|];
     repeat match goal with
@@ -403,8 +413,8 @@ Section Named.
 
     all: try
     match goal with
-    | H: wordToNat ?x <> 0, G: getBool (isEq _ ?x ($0)%word) = true |- _ => exfalso; revert H; revert G; admit
-    | H: wordToNat ?x = 0, G: getBool (isEq _ ?x ($0)%word) = false |- _ => exfalso; revert H; revert G; admit
+    | H: wordToNat ?x <> 0, G: getBool (isEq _ ?x ($0)%word) = true |- _ => solve [exfalso; eapply wneq_isEq_contradiction; eauto]
+    | H: wordToNat ?x = 0, G: getBool (isEq _ ?x ($0)%word) = false |- _ => solve [exfalso; eapply weq_nisEq_contradiction; eauto]
     end.
 
     { (* i = 0 *)
