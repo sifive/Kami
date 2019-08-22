@@ -3,6 +3,7 @@ Require Import Coq.Lists.List. Import ListNotations.
 Section TracePredicate.  
   Context {T : Type}.
   Axiom kleene : (list T -> Prop) -> list T -> Prop.
+  Axiom kleene_nil : forall (P:_->Prop), kleene P [].
   Axiom kleene_one : forall (P:_->Prop) x, P x -> kleene P x.
   Axiom plus : (list T -> Prop) -> list T -> Prop.
   Axiom app : (list T -> Prop) -> (list T -> Prop) -> list T -> Prop.
@@ -430,7 +431,7 @@ Section Named.
       eapply TracePredicate.interleave_kleene_l_app_r; [|eassumption].
       eexists nil, _; split; [|split].
       { eapply List.interleave_nil_l. }
-      { (* kleene_nil *) admit. }
+      { eapply kleene_nil. }
       cbv [List.app]. f_equal. f_equal. f_equal. f_equal.
       repeat f_equal.
       eapply f_equal.
@@ -491,7 +492,7 @@ Section Named.
         admit (* forall x : word 1, WS (whd x) WO = x *) . }
       eexists nil, _; split; [|split].
       { eapply List.interleave_nil_l. }
-      { (* kleene_nil *) admit. }
+      { eapply kleene_nil. }
       cbn [List.app].
       repeat f_equal; eapply f_equal.
       { admit. (* forall x : word 1, WS (whd x) WO = x *) }
@@ -520,7 +521,7 @@ Section Named.
       eapply TracePredicate.interleave_kleene_l_app_r; [|exact H].
       eexists nil, _; split; [|split].
       { eapply List.interleave_nil_l. }
-      { (* kleene_nil *) admit. }
+      { eapply kleene_nil. }
       cbv [cmd_write exist].
       eexists.
       exact eq_refl. }
@@ -584,7 +585,7 @@ TracePredicate.interleave (kleene nop)
       eapply TracePredicate.interleave_kleene_l_app_r; [|exact H].
       eexists nil, _; split; [|split].
       { eapply List.interleave_nil_l. }
-      { (* kleene_nil *) admit. }
+      { eapply kleene_nil. }
       cbv [cmd_write exist].
       eexists.
       exact eq_refl. }
@@ -642,7 +643,9 @@ TracePredicate.interleave (kleene nop)
 
 
     Grab Existential Variables.
-    all : eauto.
+    all : try match goal with
+      | |- NoDup _ => admit
+          end.
   
 Abort.
 
