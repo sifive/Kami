@@ -13,7 +13,7 @@ Unset Extraction AutoInline.
 
 Extract Inductive sigT => "(,)" ["(,)"].
 Extract Inductive word => "CustomExtract.EWord" ["CustomExtract.wordNil" "CustomExtract.wordCons"] "CustomExtract.wordRec".
-Extract Inductive Fin.t => "CustomExtract.EFin" ["CustomExtract.fin0" "CustomExtract.finS"] "CustomExtract.finRec".
+(* Extract Inductive Fin.t => "CustomExtract.EFin" ["CustomExtract.fin0" "CustomExtract.finS"] "CustomExtract.finRec". *)
 (* Extract Inductive Vector.t => "[]" ["[]" "(\x xs -> x : xs)"] "(\fnil fcons xs -> case xs of { [] -> fnil (); (x:xs) -> fcons x xs })".
 Extract Inductive Vector.t => "[]" ["[]" "(:)"].
  *)
@@ -36,13 +36,13 @@ Extract Constant List.fold_left => "(\f bs a -> Data.List.foldl' f a bs)".
 Extract Constant natToWord => "(\sz n -> (sz, Prelude.toInteger n))".
 Extract Constant wordToNat => "(\_ (_,v) -> Prelude.fromIntegral v)".
 Extract Constant sumSizes => "(\n f -> Prelude.sum (Prelude.map (\i -> f (n,i)) [0..(n Prelude.-1)]))".
-Extract Constant nth_Fin => "(\xs (_,i) -> xs Prelude.!! i)".
-Extract Constant nth_Fin_map2 => "(\_ _ _ x -> x)".
-Extract Constant getFins => "(\x -> Prelude.map ((,) x) [0..(x Prelude.- 1)])".
-Extract Constant Fin.to_nat => "(\_ (_,i) -> i)".
-Extract Constant Fin.cast => "(\_ x _ -> x)".
-Extract Constant Fin.of_nat_lt => "(\i n -> (n,i))".
-Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)".
+(* Extract Constant nth_Fin => "(\xs (_,i) -> xs Prelude.!! i)". *)
+(* Extract Constant nth_Fin_map2 => "(\_ _ _ x -> x)". *)
+(* Extract Constant getFins => "(\x -> Prelude.map ((,) x) [0..(x Prelude.- 1)])". *)
+(* Extract Constant Fin.to_nat => "(\_ (_,i) -> i)". *)
+(* Extract Constant Fin.cast => "(\_ x _ -> x)". *)
+(* Extract Constant Fin.of_nat_lt => "(\i n -> (n,i))". *)
+(* Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)". *)
 Extract Inlined Constant getBool => "Prelude.id".
 
 (*
