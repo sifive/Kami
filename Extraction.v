@@ -61,8 +61,6 @@ Extract Inlined Constant find => "Data.List.find".
 Extract Constant seq => "(\x y -> [x..(x Prelude.+ y Prelude.- 1)])".
 *)
 
-(* Extract Constant getFinsBound => "(\bound n -> Prelude.map ((,) (n Prelude.- 1)) [0..(Prelude.min (n Prelude.- 1) (bound Prelude.-1))])". *)
-
 (*
 Extract Constant Nat.pow => "(\x y -> x Prelude.^ y)".
 

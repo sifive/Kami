@@ -1,4 +1,4 @@
-Require Import Kami.StateMonad Kami.All Kami.CompileVerifiable.
+Require Import Kami.StateMonad Kami.Syntax Kami.Properties Kami.PProperties Kami.PPlusProperties Kami.Lib.EclecticLib Kami.KamiNotations Kami.CompileVerifiable.
 Import Word.Notations.
 
 Require Import ZArith.
