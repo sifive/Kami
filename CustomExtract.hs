@@ -33,7 +33,7 @@ wordRec fnil fcons (n,v) = if n == 0 then fnil () else fcons (Data.Bits.testBit 
 type EFin = (Int,Int)
 
 fin0 :: Int -> EFin
-fin0 n = (n,0)
+fin0 n = (n+1,0)
 
 finS :: Int -> EFin -> EFin
 finS _ (n,i) = (n+1,i+1)

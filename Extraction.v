@@ -41,7 +41,7 @@ Extract Constant nth_Fin_map2 => "(\_ _ _ x -> x)".
 Extract Constant getFins => "(\x -> Prelude.map ((,) (x Prelude.-1)) [0..(x Prelude.- 1)])".
 Extract Constant Fin.to_nat => "(\_ (_,i) -> i)".
 Extract Constant Fin.cast => "(\_ x _ -> x)".
-Extract Constant Fin.of_nat_lt => "(\i n -> (n,i))".
+(* Extract Constant Fin.of_nat_lt => "(\i n -> (n,i))". *)
 Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)".
 Extract Inlined Constant getBool => "Prelude.id".
 
@@ -61,7 +61,7 @@ Extract Inlined Constant find => "Data.List.find".
 Extract Constant seq => "(\x y -> [x..(x Prelude.+ y Prelude.- 1)])".
 *)
 
-Extract Constant getFinsBound => "(\bound n -> Prelude.map ((,) (n Prelude.- 1)) [0..(Prelude.min (n Prelude.- 1) (bound Prelude.-1))])".
+(* Extract Constant getFinsBound => "(\bound n -> Prelude.map ((,) (n Prelude.- 1)) [0..(Prelude.min (n Prelude.- 1) (bound Prelude.-1))])". *)
 
 (*
 Extract Constant Nat.pow => "(\x y -> x Prelude.^ y)".
