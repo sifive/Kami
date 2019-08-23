@@ -616,7 +616,7 @@ Proof.
       exists (s, s0); auto.
 Qed.
 
-Lemma seq_app s e :
+Lemma seq_app' s e :
   forall m (Hm_lte_e : m <= e),
     seq s e = seq s m ++ seq (s + m) (e - m).
 Proof.

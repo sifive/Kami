@@ -590,7 +590,7 @@ Lemma inlineAll_Meths_RegFile_fold_flat :
 Proof.
   intros.
   specialize (Nat.le_add_r (length l) (length l')) as P0.
-  rewrite app_length, (seq_app _ P0), fold_left_app, Nat.add_0_l.
+  rewrite app_length, (seq_app' _ P0), fold_left_app, Nat.add_0_l.
   rewrite inlineAll_Meths_RegFile_fold_flat1; auto.
   destruct (zerop (length l')).
   - rewrite e; rewrite minus_plus; simpl.
@@ -807,7 +807,7 @@ Proof.
   assert (n <= length (l1 ++ l2)) as P0.
   { rewrite app_length; lia. }
   rewrite H, H0, <- app_length.
-  rewrite (seq_app _ P0), fold_left_app, app_length, H, minus_plus, plus_O_n.
+  rewrite (seq_app' _ P0), fold_left_app, app_length, H, minus_plus, plus_O_n.
   rewrite inlineSome_pos_app_r, inlineSome_pos_app_l; auto.
 Qed.
 

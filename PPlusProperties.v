@@ -8340,7 +8340,7 @@ Proof.
   unfold inlineAll_Rules; intros.
   assert (length l <= length (l ++ l')) as P0.
   { rewrite app_length; lia. }
-  rewrite (seq_app _ P0), app_length, minus_plus, plus_O_n, fold_left_app, inlineSome_Rules_app_r at 1; [setoid_rewrite inlineSome_Rules_app_l|].
+  rewrite (seq_app' _ P0), app_length, minus_plus, plus_O_n, fold_left_app, inlineSome_Rules_app_r at 1; [setoid_rewrite inlineSome_Rules_app_l|].
   - rewrite Reduce_seq, Nat.sub_diag; reflexivity.
   - intros; rewrite in_seq in *; lia.
   - intros; rewrite in_seq in *; dest; assumption.
