@@ -2197,6 +2197,28 @@ Proof.
   - exact None.
 Defined.
 
+Definition struct_set_field_default
+           (ty: Kind -> Type)
+           (n : nat)
+           (get_kind : Fin.t n -> Kind)
+           (get_name : Fin.t n -> string)
+           (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
+           (name : string)
+           (kind : Kind)
+           (value : Expr ty (SyntaxKind kind))
+  : Expr ty (SyntaxKind (Struct get_kind get_name)).
+Proof.
+  refine (let y := struct_get_field_index packet name in
+          match y with
+          | None => packet
+          | Some i => _
+          end).
+  destruct (Kind_dec (get_kind i) kind).
+  - subst.
+    exact (UpdateStruct packet i value).
+  - exact packet.
+Defined.
+
 (* TODO
    + Compiler verification (difficult)
    + PUAR: Linux/Certikos
