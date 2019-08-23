@@ -17,7 +17,8 @@ module CustomExtract(
     ) where
 
 import qualified Data.Bits
-import qualified Data.Char 
+import qualified Data.Char
+import Debug.Trace
 
 type EWord = (Int,Integer)
 
@@ -36,7 +37,7 @@ fin0 :: Int -> EFin
 fin0 n = (n+1,0)
 
 finS :: Int -> EFin -> EFin
-finS _ (n,i) = (n+1,i+1)
+finS m (n,i) = {- trace ("{{{[finS constructor]: " ++ show m ++ " " ++ show n ++ " " ++ show i ++ " VALUE " ++ show (m == n) ++ "}}}")-} (n+1,i+1)
 
 finRec :: (Int -> a) -> (Int -> EFin -> a) -> EFin -> a
 finRec f0 fS (n,i) = if i == 0 then f0 n else fS n (n-1, i-1)
