@@ -35,21 +35,14 @@ Extract Constant Nat.log2_up => "(\x -> Prelude.ceiling (Prelude.logBase 2 (Prel
 Extract Constant List.fold_left => "(\f bs a -> Data.List.foldl' f a bs)".
 Extract Constant natToWord => "(\sz n -> (sz, Prelude.toInteger n))".
 Extract Constant wordToNat => "(\_ (_,v) -> Prelude.fromIntegral v)".
-
 Extract Constant sumSizes => "(\n f -> Prelude.sum (Prelude.map (\i -> f (n Prelude.-1,i)) [0..(n Prelude.-1)]))".
-
 Extract Constant nth_Fin => "(\xs (_,i) -> xs Prelude.!! i)".
 Extract Constant nth_Fin_map2 => "(\_ _ _ x -> x)".
-
 Extract Constant getFins => "(\n -> Prelude.map ((,) (n Prelude.- 1)) [0..(n Prelude.- 1)])".
-
 Extract Constant Fin.to_nat => "(\_ (_,i) -> i)".
 Extract Constant Fin.cast => "(\_ x _ -> x)".
-
 Extract Constant Fin.of_nat_lt => "(\i n -> (n Prelude.- 1,i))".
-
 Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)".
-
 Extract Inlined Constant getBool => "Prelude.id".
 
 (*

@@ -1,4 +1,4 @@
-Require Import Kami.All.
+Require Import Kami.AllNotations.
 
 Lemma Bool_eqb_refl2 : forall b, Bool.eqb b b = true.
 Proof.

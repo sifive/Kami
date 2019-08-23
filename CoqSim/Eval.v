@@ -1,7 +1,7 @@
 Require Import Compare_dec List String.
 Import ListNotations.
 
-Require Import Kami.All.
+Require Import Kami.AllNotations.
 Require Import Kami.CoqSim.Misc.
 Require Import Kami.CoqSim.IO.
 Require Import Kami.CoqSim.TransparentProofs.
