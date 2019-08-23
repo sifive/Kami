@@ -7875,3 +7875,527 @@ Proof.
   }
   eauto using TraceInclusion_trans.
 Qed.
+
+
+(* Begin Basic Properties *)
+
+Lemma NoCallActionT_SubList k ty (a : ActionT ty k):
+  forall l1 l2,
+    SubList l2 l1 ->
+    NoCallActionT l1 a ->
+    NoCallActionT l2 a.
+Proof.
+  induction a; intros; (inv H1 || inv H0); EqDep_subst; econstructor; eauto.
+  intro; apply H5; rewrite in_map_iff in *; dest; inv H1.
+  exists x; split; auto.
+Qed.
+
+Lemma NoCallActionT_Stitch k ty (a : ActionT ty k) :
+  forall l1 l2,
+    NoCallActionT l1 a ->
+    NoCallActionT l2 a ->
+    NoCallActionT (l1 ++ l2) a.
+Proof.
+  induction a; intros; inv H0; (inv H1 || inv H); EqDep_subst; econstructor; eauto.
+  rewrite map_app, in_app_iff; intro TMP; destruct TMP as [P0|P0]; [apply H5| apply H4]; assumption.
+Qed.
+
+Lemma inlineSingle_NoCalls_ident k ty (a : ActionT ty k) l f :
+  In f l ->
+  NoCallActionT l a ->
+  inlineSingle f a = a.
+Proof.
+  induction a; intros; try (inv H1; EqDep_subst; simpl);
+    try (apply f_equal || apply f_equal2 || apply f_equal3);
+    eauto using functional_extensionality.
+  - simpl; remember (String.eqb _ _) as strb; symmetry in Heqstrb; destruct strb.
+    + rewrite String.eqb_eq in *; subst; destruct Signature_dec; subst; [|apply f_equal; eauto using functional_extensionality].
+      exfalso; apply H5; rewrite in_map_iff; exists f; split; auto.
+    + apply f_equal; eauto using functional_extensionality.
+  - inv H0; EqDep_subst; simpl; apply f_equal; auto.
+  - inv H0; EqDep_subst; simpl; apply f_equal; auto.
+Qed.
+
+Lemma inlineSingle_NoCalls_ident' k ty (a : ActionT ty k) l f :
+  In (fst f, projT1 (snd f)) (getKindAttr l) ->
+  NoCallActionT l a ->
+  inlineSingle f a = a.
+Proof.
+  induction a; intros; try (inv H1; EqDep_subst; simpl);
+    try (apply f_equal || apply f_equal2 || apply f_equal3);
+    eauto using functional_extensionality.
+  - simpl; remember (String.eqb _ _) as strb; symmetry in Heqstrb; destruct strb.
+    + rewrite String.eqb_eq in *; subst; destruct Signature_dec; subst; [|apply f_equal; eauto using functional_extensionality].
+      exfalso; apply H5; rewrite in_map_iff; exists f; split; auto.
+      contradiction.
+    + apply f_equal; eauto using functional_extensionality.
+  - inv H0; EqDep_subst; simpl; apply f_equal; auto.
+  - inv H0; EqDep_subst; simpl; apply f_equal; auto.
+Qed.
+
+Lemma inlineSingle_Meth_NoCalls_ident (l : list DefMethT) (f meth : DefMethT):
+  In f l ->
+  (forall ty arg, NoCallActionT l (projT2 (snd meth) ty arg)) ->
+  inlineSingle_Meth f meth = meth.
+Proof.
+  unfold inlineSingle_Meth; destruct meth, String.eqb; auto.
+  destruct s0; intros.
+  repeat apply f_equal.
+  apply functional_extensionality_dep; intros; apply functional_extensionality; intros.
+  eapply inlineSingle_NoCalls_ident; eauto.
+Qed.
+
+Lemma inlineSingle_Meth_NoCalls_ident' (l : list DefMethT) (f meth : DefMethT):
+  In (fst f, projT1 (snd f)) (getKindAttr l) ->
+  (forall ty arg, NoCallActionT l (projT2 (snd meth) ty arg)) ->
+  inlineSingle_Meth f meth = meth.
+Proof.
+  unfold inlineSingle_Meth; destruct meth, String.eqb; auto.
+  destruct s0; intros.
+  repeat apply f_equal.
+  apply functional_extensionality_dep; intros; apply functional_extensionality; intros.
+  eapply inlineSingle_NoCalls_ident'; eauto.
+Qed.
+
+Lemma inlineSingle_Rule_NoCalls_ident (l : list DefMethT) (f : DefMethT) (rle : RuleT) :
+  In f l ->
+  (forall ty, NoCallActionT l (snd rle ty)) ->
+  inlineSingle_Rule f rle = rle.
+Proof.
+  unfold inlineSingle_Rule; destruct rle; intros.
+  apply f_equal, functional_extensionality_dep; intros.
+  eapply inlineSingle_NoCalls_ident; eauto.
+Qed.
+
+Lemma inlineSingle_Rule_NoCalls_ident' (l : list DefMethT) (f : DefMethT) (rle : RuleT) :
+  In (fst f, projT1 (snd f)) (getKindAttr l) ->
+  (forall ty, NoCallActionT l (snd rle ty)) ->
+  inlineSingle_Rule f rle = rle.
+Proof.
+  unfold inlineSingle_Rule; destruct rle; intros.
+  apply f_equal, functional_extensionality_dep; intros.
+  eapply inlineSingle_NoCalls_ident'; eauto.
+Qed.
+
+Lemma inlineSingle_Meths_pos_NoCalls_ident (l1 l2 : list DefMethT) n :
+  SubList l1 l2 ->
+  (forall meth,
+      In meth l1 ->
+      (forall ty arg, NoCallActionT l2 (projT2 (snd meth) ty arg))) ->
+  inlineSingle_Meths_pos l1 n = l1.
+Proof.
+  unfold inlineSingle_Meths_pos; remember (nth_error _ _) as nth_err0; symmetry in Heqnth_err0;
+    destruct nth_err0; simpl; auto; intros; apply nth_error_In in Heqnth_err0.
+  rewrite <- (map_id l1) at 2.
+  rewrite forall_map; intros.
+  eapply inlineSingle_Meth_NoCalls_ident with (l := l2); eauto.
+Qed.
+
+Lemma inlineSingle_Meths_pos_NoCalls_ident' (l1 l2 : list DefMethT) n :
+  SubList (getKindAttr l1) (getKindAttr l2) ->
+  (forall meth,
+      In meth l1 ->
+      (forall ty arg, NoCallActionT l2 (projT2 (snd meth) ty arg))) ->
+  inlineSingle_Meths_pos l1 n = l1.
+Proof.
+  unfold inlineSingle_Meths_pos; remember (nth_error _ _) as nth_err0; symmetry in Heqnth_err0;
+    destruct nth_err0; simpl; auto; intros; apply nth_error_In in Heqnth_err0.
+  rewrite <- (map_id l1) at 2.
+  rewrite forall_map; intros.
+  eapply inlineSingle_Meth_NoCalls_ident' with (l := l2); eauto.
+  apply H; rewrite in_map_iff; exists d; split; auto.
+Qed.
+
+Lemma inlineSingle_Rules_pos_NoCalls_ident (l1 l2 :list DefMethT) n (rules : list RuleT):
+  SubList l1 l2 ->
+  (forall rle,
+      In rle rules ->
+      forall ty, NoCallActionT l2 (snd rle ty)) ->
+  inlineSingle_Rules_pos l1 n rules = rules.
+Proof.
+  unfold inlineSingle_Rules_pos; remember (nth_error _ _) as nth_err0; symmetry in Heqnth_err0;
+    destruct nth_err0; simpl; auto; intros; apply nth_error_In in Heqnth_err0.
+  rewrite <- (map_id rules) at 2.
+  rewrite forall_map; intros.
+  eapply inlineSingle_Rule_NoCalls_ident with (l := l2); eauto.
+Qed.
+
+Lemma inlineSingle_Rules_pos_NoCalls_ident' (l1 l2 :list DefMethT) n (rules : list RuleT):
+  SubList (getKindAttr l1) (getKindAttr l2) ->
+  (forall rle,
+      In rle rules ->
+      forall ty, NoCallActionT l2 (snd rle ty)) ->
+  inlineSingle_Rules_pos l1 n rules = rules.
+Proof.
+  unfold inlineSingle_Rules_pos; remember (nth_error _ _) as nth_err0; symmetry in Heqnth_err0;
+    destruct nth_err0; simpl; auto; intros; apply nth_error_In in Heqnth_err0.
+  rewrite <- (map_id rules) at 2.
+  rewrite forall_map; intros.
+  eapply inlineSingle_Rule_NoCalls_ident' with (l := l2); eauto.
+  apply H; rewrite in_map_iff; exists d; split; auto.
+Qed.
+
+Lemma inlineSome_Meths_pos_NoCalls_ident (l1 l2 : list DefMethT) xs :
+  SubList l1 l2 ->
+  (forall meth,
+      In meth l1 ->
+      (forall ty arg, NoCallActionT l2 (projT2 (snd meth) ty arg))) ->
+  fold_left inlineSingle_Meths_pos xs l1 = l1.
+Proof.
+  induction xs; auto; simpl; intros.
+  erewrite inlineSingle_Meths_pos_NoCalls_ident; eauto.
+Qed.
+
+Lemma inlineSome_Meths_pos_NoCalls_ident' (l1 l2 : list DefMethT) xs :
+  SubList (getKindAttr l1) (getKindAttr l2) ->
+  (forall meth,
+      In meth l1 ->
+      (forall ty arg, NoCallActionT l2 (projT2 (snd meth) ty arg))) ->
+  fold_left inlineSingle_Meths_pos xs l1 = l1.
+Proof.
+  induction xs; auto; simpl; intros.
+  erewrite inlineSingle_Meths_pos_NoCalls_ident'; eauto.
+Qed.
+
+Lemma inlineSome_Rules_pos_NoCalls_ident (l1 l2 : list DefMethT) xs (rules : list RuleT):
+  SubList l1 l2 ->
+  (forall rle ty,
+      In rle rules ->
+      NoCallActionT l2 (snd rle ty)) ->
+  fold_left (fun newRules n => inlineSingle_Rules_pos l1 n newRules) xs rules = rules.
+Proof.
+  induction xs; auto; simpl; intros.
+  erewrite inlineSingle_Rules_pos_NoCalls_ident; eauto.
+Qed.
+
+Lemma inlineSome_Rules_pos_NoCalls_ident' (l1 l2 : list DefMethT) xs (rules : list RuleT):
+  SubList (getKindAttr l1) (getKindAttr l2) ->
+  (forall rle ty,
+      In rle rules ->
+      NoCallActionT l2 (snd rle ty)) ->
+  fold_left (fun newRules n => inlineSingle_Rules_pos l1 n newRules) xs rules = rules.
+Proof.
+  induction xs; auto; simpl; intros.
+  erewrite inlineSingle_Rules_pos_NoCalls_ident'; eauto.
+Qed.
+
+Lemma NeverCall_NoCalls ty k (a : ActionT ty k) :
+  NeverCallActionT a -> (forall l, NoCallActionT l a).
+Proof.
+  intro; induction a; inv H; EqDep_subst;
+    econstructor; eauto; intros; contradiction.
+Qed.
+
+Lemma SignatureReplace_NoCall k ty (a : ActionT ty k) :
+  forall (ls ls' : list DefMethT),
+    getKindAttr ls = getKindAttr ls' ->
+    NoCallActionT ls a ->
+    NoCallActionT ls' a.
+Proof.
+  induction a; intros; simpl; eauto; try ((inv H1 || inv H0); EqDep_subst; econstructor; eauto).
+  rewrite <- H0; assumption.
+Qed.
+
+Lemma NeverCall_inline k ty (a : ActionT ty k):
+  forall (f : DefMethT),
+    (forall v,
+        NeverCallActionT (projT2 (snd f) ty v)) ->
+    NoCallActionT [f] (inlineSingle f a).
+Proof.
+  induction a; intros; simpl; eauto; try (econstructor; eauto).
+  - destruct String.eqb eqn:G; [destruct Signature_dec|]; subst; econstructor; eauto.
+    + econstructor; eauto; simpl; intro.
+      apply NeverCall_NoCalls; eauto.
+    + intros B0; inv B0; [| contradiction].
+      inv H1; apply n; reflexivity.
+    + rewrite String.eqb_neq in G; intro B0; inv B0; [|contradiction].
+      inv H1; apply G; reflexivity.
+Qed.
+
+Lemma NeverCall_inline_persistent k ty (a : ActionT ty k):
+  forall (f : DefMethT) (ls : list DefMethT),
+    (forall v,
+        NeverCallActionT (projT2 (snd f) ty v)) ->
+    NoCallActionT ls a ->
+    NoCallActionT ls (inlineSingle f a).
+Proof.
+  induction a; intros; simpl; eauto; try ((inv H1 || inv H0); EqDep_subst;econstructor; eauto).
+  inv H1; EqDep_subst.
+  destruct (String.eqb _ _) eqn:G;[rewrite String.eqb_eq in G; destruct Signature_dec|]; subst; try (econstructor; eauto).
+  econstructor; eauto using NeverCall_NoCalls.
+Qed.
+
+Lemma NotCalled_NotInlined ty k (a : ActionT ty k) :
+  forall (ls : list DefMethT) (f : DefMethT),
+    In (fst f, projT1 (snd f)) (getKindAttr ls) ->
+    NoCallActionT ls a ->
+    inlineSingle f a = a.
+Proof.
+  induction a; simpl; auto; intros; (inv H1 || inv H0); EqDep_subst; try ((apply f_equal || apply f_equal2 || apply f_equal3); eauto using functional_extensionality).
+  - remember (String.eqb _ _) as strb; symmetry in Heqstrb.
+    destruct strb;[destruct Signature_dec|]; subst.
+    + exfalso; rewrite String.eqb_eq in *; subst; auto.
+    + apply f_equal2; eauto using functional_extensionality.
+    + apply f_equal2; eauto using functional_extensionality.
+Qed.
+  
+Lemma NilNoCall k ty (a : ActionT ty k) :
+  NoCallActionT nil a.
+Proof.
+  induction a; intros; econstructor; eauto.
+Qed.
+
+Lemma unifyWO (x : word 0):
+  x = (evalExpr (Const type WO)).
+Proof.
+  simpl.
+  rewrite (shatter_word_0 x).
+  reflexivity.
+Qed.
+
+Local Coercion BaseRegFile : RegFileBase >-> BaseModule.
+
+Lemma RegFileBase_inlineSingle_invar (rf : RegFileBase) f:
+  map (inlineSingle_Meth f) (getMethods rf) = getMethods rf.
+Proof.
+  destruct rf, rfRead; simpl in *.
+  - assert (map (inlineSingle_Meth f) (readRegFile rfNum rfDataArray reads rfIdxNum rfData)
+            = (readRegFile rfNum rfDataArray reads rfIdxNum rfData)) as P0.
+    { unfold readRegFile.
+      induction reads; simpl; auto.
+      destruct String.eqb; rewrite IHreads; auto. }
+    destruct String.eqb, rfIsWrMask; rewrite P0; auto.
+  - assert (map (inlineSingle_Meth f) (readSyncRegFile isAddr rfNum rfDataArray reads rfIdxNum rfData)
+            = readSyncRegFile isAddr rfNum rfDataArray reads rfIdxNum rfData) as P0.
+    { destruct isAddr; simpl; rewrite map_app; apply f_equal2; induction reads;
+        simpl; auto; destruct String.eqb; rewrite IHreads; auto. }
+    rewrite P0.
+    destruct String.eqb; auto.
+    destruct rfIsWrMask; auto.
+Qed.
+
+Lemma RegFileBase_inlineSome_invar (rf : RegFileBase) xs:
+  fold_left inlineSingle_Meths_pos xs (getMethods rf) = getMethods rf.
+Proof.
+  induction xs; simpl in *; auto.
+  unfold inlineSingle_Meths_pos in *.
+  remember (nth_error (getRegFileMethods rf) a) as nth_err.
+  destruct nth_err; setoid_rewrite <- Heqnth_err; simpl; auto.
+  specialize (nth_error_In _ _ (eq_sym Heqnth_err)) as P0.
+  setoid_rewrite RegFileBase_inlineSingle_invar; assumption.
+Qed.
+
+Corollary RegFileBase_inlineAll_invar (rf : RegFileBase) :
+  inlineAll_Meths (getMethods rf) = getMethods rf.
+Proof.
+  unfold inlineAll_Meths.
+  apply RegFileBase_inlineSome_invar.
+Qed.
+Lemma NeverCall_inline_invar (f g : DefMethT) :
+  (forall ty arg, NeverCallActionT (projT2 (snd g) ty arg)) ->
+  inlineSingle_Meth f g = g.
+Proof.
+  intros.
+  eapply inlineSingle_Meth_NoCalls_ident with (l := [f]); eauto using NeverCall_NoCalls.
+  left; reflexivity.
+Qed.
+
+Lemma inlineAll_Meths_RegFile_flat1 :
+  forall (l l' : list DefMethT) (HNeverCall : forall meth ty,
+                                    In meth l' ->
+                                    (forall arg, NeverCallActionT (projT2 (snd meth) ty arg)))
+         n (Hlen : n < length l),
+    inlineSingle_Meths_pos (l ++ l') n = inlineSingle_Meths_pos l n ++ l'.
+Proof.
+  intros; unfold inlineSingle_Meths_pos.
+  remember (nth_error _ _ ) as err0.
+  destruct err0.
+  - rewrite nth_error_app1 in Heqerr0; auto.
+    rewrite <- Heqerr0; rewrite map_app.
+    induction l'; auto; simpl.
+    rewrite NeverCall_inline_invar.
+    + repeat apply f_equal2; auto.
+      eapply app_inv_head, IHl'; intros.
+      apply HNeverCall.
+      right; assumption.
+    + intros; apply HNeverCall; left; reflexivity.
+  - exfalso.
+    symmetry in Heqerr0.
+    rewrite nth_error_None, app_length in *; lia.
+Qed.    
+
+Lemma inlineAll_Meths_RegFile_flat2 :
+  forall (l l' : list DefMethT)
+         (HNeverCall : forall meth ty,
+             In meth l' ->
+             (forall arg, NeverCallActionT (projT2 (snd meth) ty arg))) n
+         (Hlen : length l <= n) f (HSome : nth_error l' (n - length l) = Some f),
+    inlineSingle_Meths_pos (l ++ l') n = (map (inlineSingle_Meth f) l) ++ l'.
+Proof.
+  intros; unfold inlineSingle_Meths_pos.
+  remember (nth_error (l ++ l') n) as err0.
+  destruct err0.
+  - rewrite nth_error_app2 in Heqerr0; auto.
+    rewrite <- Heqerr0 in HSome; inv HSome.
+    rewrite map_app.
+    enough (forall f', In f' l' -> map (inlineSingle_Meth f') l' = l').
+    { rewrite (H f); auto. symmetry in Heqerr0; eapply nth_error_In; eauto. }
+    intros.
+    rewrite <- map_id; apply map_ext_in; intros.
+    apply NeverCall_inline_invar; eauto.
+  - exfalso.
+    symmetry in Heqerr0; rewrite nth_error_None, app_length in *.
+    specialize (nth_error_Some l' (n - length l)) as P0.
+    rewrite HSome in *.
+    assert (n - length l < length l') as P1.
+    { rewrite <- P0; intros; discriminate. }
+    clear - P1 Heqerr0 Hlen. lia.
+Qed.
+
+Lemma inlineSingle_Meths_pos_length l n :
+  length (inlineSingle_Meths_pos l n) = length l.
+Proof.
+  setoid_rewrite <- (map_length fst).
+  rewrite <- SameKeys_inlineSingle_Meth_pos; reflexivity.
+Qed.
+
+Lemma inlineSome_Meths_pos_length l xs :
+  length (fold_left inlineSingle_Meths_pos xs l) = length l.
+Proof.
+  setoid_rewrite <- (map_length fst).
+  rewrite <- SameKeys_inlineSome_Meths; reflexivity.
+Qed.
+
+Lemma inlineAll_Meths_RegFile_fold_flat1 n :
+  forall (l l' : list DefMethT)
+         (HNeverCall : forall meth ty,
+             In meth l' ->
+             (forall arg, NeverCallActionT (projT2 (snd meth) ty arg)))
+         (Hlen : n <= length l),
+    fold_left inlineSingle_Meths_pos (seq 0 n) (l ++ l') = fold_left inlineSingle_Meths_pos (seq 0 n) l ++ l'.
+Proof.
+  intros; repeat rewrite <- fold_left_rev_right.
+  induction n.
+  - simpl; auto.
+  - rewrite seq_eq, rev_app_distr; simpl.
+    rewrite IHn; [|lia].
+    rewrite (inlineAll_Meths_RegFile_flat1); auto.
+    assert (forall xs, length (fold_right (fun y x => inlineSingle_Meths_pos x y) l xs) = length l) as P0.
+    { clear.
+      induction xs; simpl; auto.
+      rewrite inlineSingle_Meths_pos_length; assumption. }
+    rewrite P0; lia.
+Qed.
+
+Lemma inline_NeverCall k ty (a : ActionT ty k) :
+  forall (f : DefMethT) ls,
+    (forall v, NeverCallActionT (projT2 (snd f) ty v)) ->
+    ~In (fst f, projT1 (snd f)) (getKindAttr ls) ->
+    NoCallActionT ls (inlineSingle f a) ->
+    NoCallActionT ls a.
+Proof.
+  induction a; intros; simpl in *;
+    [remember (String.eqb _ _ ) as strb; symmetry in Heqstrb; destruct strb;[rewrite String.eqb_eq in *; destruct Signature_dec|]; subst
+    | | | | | | | | ]; (inv H2 || inv H1); EqDep_subst; constructor; intros; eauto.
+Qed.
+
+Lemma inlineSingle_Rules_app_l :
+  forall (l l' : list DefMethT) (lr : list RuleT) n,
+    n < length l ->
+    inlineSingle_Rules_pos (l ++ l') n lr = inlineSingle_Rules_pos l n lr.
+Proof.
+  intros; unfold inlineSingle_Rules_pos; rewrite nth_error_app1; auto.
+Qed.
+
+Lemma inlineSome_Rules_app_l xs :
+  forall (l l' : list DefMethT) (lr : list RuleT),
+    (forall n, In n xs -> n < length l) ->
+    fold_left (fun lr' n => inlineSingle_Rules_pos (l ++ l') n lr') xs lr = fold_left (fun lr' n => inlineSingle_Rules_pos l n lr') xs lr.
+Proof.
+  induction xs; auto; simpl; intros.
+  rewrite inlineSingle_Rules_app_l; eauto.
+Qed.
+
+Lemma inlineSingle_Rules_app_r :
+  forall (l l' : list DefMethT) (lr : list RuleT) n,
+    length l <= n ->
+    inlineSingle_Rules_pos (l ++ l') n lr = inlineSingle_Rules_pos l' (n - length l) lr.
+Proof.
+  intros; unfold inlineSingle_Rules_pos; rewrite nth_error_app2; eauto.
+Qed.
+
+Lemma inlineSome_Rules_app_r xs :
+  forall (l l' : list DefMethT) (lr : list RuleT),
+    (forall n, In n xs -> length l <= n) ->
+    fold_left (fun lr' n => inlineSingle_Rules_pos (l ++ l') n lr') xs lr = fold_left (fun lr' n => inlineSingle_Rules_pos l' n lr') (map (fun m => m - length l) xs) lr.
+Proof.
+  induction xs; auto; simpl; intros.
+  rewrite inlineSingle_Rules_app_r; eauto.
+Qed.
+
+Lemma inlineAll_Rules_NoCalls :
+  forall (l l' : list DefMethT) (lr : list RuleT),
+    inlineAll_Rules (l ++ l') lr = inlineAll_Rules l' (inlineAll_Rules l lr).
+Proof.
+  unfold inlineAll_Rules; intros.
+  assert (length l <= length (l ++ l')) as P0.
+  { rewrite app_length; lia. }
+  rewrite (seq_app' _ P0), app_length, minus_plus, plus_O_n, fold_left_app, inlineSome_Rules_app_r at 1; [setoid_rewrite inlineSome_Rules_app_l|].
+  - rewrite Reduce_seq, Nat.sub_diag; reflexivity.
+  - intros; rewrite in_seq in *; lia.
+  - intros; rewrite in_seq in *; dest; assumption.
+Qed.
+
+Lemma inlineAll_Meths_same_len l :
+  length (inlineAll_Meths l) = length l.
+Proof.
+  setoid_rewrite <- (map_length fst); rewrite <- SameKeys_inlineAll_Meths; reflexivity.
+Qed.
+
+Lemma NoSelfCall_nil (m : BaseModule) :
+  getMethods m = nil ->
+  NoSelfCallBaseModule m.
+Proof.
+  enough (forall {k : Kind} ty (a : ActionT ty k), NoCallActionT nil a).
+  { intros.
+    unfold NoSelfCallBaseModule, NoSelfCallRulesBaseModule, NoSelfCallMethsBaseModule.
+    split; simpl; intros; rewrite H0; auto. }
+  intros; induction a; econstructor; eauto.
+Qed.
+
+Lemma WfBaseMod_inlineSingle (m : BaseModule) (HWfMod : WfBaseModule m) k (a : ActionT type k):
+  forall  (f : DefMethT),
+    In f (getMethods m) ->
+    WfActionT m a ->
+    WfActionT m (inlineSingle f a).
+Proof. 
+  induction a; simpl; intros; (inv H1||inv H0); EqDep_subst; try (econstructor; eauto).
+  unfold WfBaseModule in *; dest.
+  destruct String.eqb; [destruct Signature_dec; subst|]; repeat (econstructor; eauto).
+Qed.
+
+Lemma NeverCallMod_NeverCalls m :
+  NeverCallMod m ->
+  (forall rule ty, In rule (getAllRules m) -> NeverCallActionT (snd rule ty)) /\
+  (forall meth ty,
+      In meth (getAllMethods m) -> forall v, NeverCallActionT (projT2 (snd meth) ty v)).
+Proof.
+  induction 1; simpl; eauto; dest.
+  setoid_rewrite in_app_iff; split; intros; inv H5; eauto.
+Qed.
+
+Lemma WfExpand k (a : ActionT type k):
+  forall  (m1 m2 : BaseModule),
+    SubList (getRegisters m1) (getRegisters m2) ->
+    WfActionT m1 a ->
+    WfActionT m2 a.
+Proof.
+  induction a; intros; (inv H1||inv H0); EqDep_subst; econstructor; eauto.
+  - rewrite in_map_iff in H7; dest; inv H1; specialize (H0 _ H2).
+    rewrite in_map_iff; exists x; split; auto.
+  - rewrite in_map_iff in H7; dest; inv H0; specialize (H _ H1).
+    rewrite in_map_iff; exists x; split; auto.
+Qed.
+
+(* End Basic Properties *)
+
