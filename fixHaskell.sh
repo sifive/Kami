@@ -2,7 +2,7 @@
 
 mkdir -p $1/Haskell
 
-cmd="ghc -j -O1 --make ./FixLits.hs"
+cmd="ghc $GHCFLAGS -j -O1 --make ./FixLits.hs"
 
 echo $cmd
 
