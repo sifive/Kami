@@ -1,4 +1,4 @@
-Require Import Kami.StateMonad Kami.Syntax Kami.Properties Kami.PProperties Kami.PPlusProperties Kami.KamiNotations Kami.Lib.EclecticLib.
+Require Import Kami.StateMonad Kami.Syntax Kami.Properties Kami.PProperties Kami.PPlusProperties Kami.Notations Kami.Lib.EclecticLib.
 Import Word.Notations.
 
 Require Import ZArith.

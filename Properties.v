@@ -1,4 +1,4 @@
-Require Import Kami.Syntax Kami.KamiNotations Kami.Lib.Fold.
+Require Import Kami.Syntax Kami.Notations Kami.Lib.Fold.
 Import Word.Notations.
 Import ListNotations.
 Require Import Coq.Sorting.Permutation.

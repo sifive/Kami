@@ -1,4 +1,4 @@
-Require Import Kami.Syntax Kami.KamiNotations.
+Require Import Kami.Syntax Kami.Notations.
 Set Asymmetric Patterns.
 Set Implicit Arguments.
 Axiom cheat: forall t, t.

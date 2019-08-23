@@ -1,4 +1,4 @@
-Require Import String Kami.All Kami.CoqSim.Misc.
+Require Import String Kami.AllNotations Kami.CoqSim.Misc.
 
 (*
 Parameter IO : Type -> Type.

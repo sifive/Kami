@@ -42,7 +42,7 @@ Extract Constant getFins => "(\x -> Prelude.map ((,) x) [0..(x Prelude.- 1)])".
 Extract Constant Fin.to_nat => "(\_ (_,i) -> i)".
 Extract Constant Fin.cast => "(\_ x _ -> x)".
 Extract Constant Fin.of_nat_lt => "(\i n -> (n,i))".
-Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)".
+Extract Constant Fin_eq_dec => "(\_ x y -> ((Prelude.snd x) Prelude.== (Prelude.snd y)))".
 Extract Inlined Constant getBool => "Prelude.id".
 
 (*

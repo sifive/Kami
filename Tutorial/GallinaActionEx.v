@@ -1,4 +1,4 @@
-Require Import Kami.All. Import Word.Notations.
+Require Import Kami.AllNotations.
 
 Section Ex.
   (* The usual boiler plate *)
