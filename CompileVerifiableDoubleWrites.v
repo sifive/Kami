@@ -1,4 +1,4 @@
-Require Import Kami.SyntaxDoubleWrites Kami.CompileVerifiable Kami.CVProperties Kami.Syntax Kami.Properties Kami.PProperties Kami.PPlusProperties Kami.Lib.EclecticLib Kami.KamiNotations.
+Require Import Kami.SyntaxDoubleWrites Kami.CompileVerifiable Kami.CVProperties Kami.Syntax Kami.Properties Kami.PProperties Kami.PPlusProperties Kami.Lib.EclecticLib Kami.Notations.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
