@@ -129,40 +129,39 @@ process_args :: [String] -> [(String,String)]
 process_args = catMaybes . map (binary_split '=')
 
 initialize_file :: [(String,FilePath)] -> T.RegFileBase -> FileState -> IO FileState
-initialize_file args rfb state = do
+initialize_file args rfb@(T.Build_RegFileBase rfIsWrMask rfNum rfDataArray rfRead rfWrite rfIdxNum rfData rfInit) state = do
 
     arr <- array
 
-    let fn = T.rfDataArray rfb
+    let fn = rfDataArray
 
     let rf = RegFile {
         fileName = fn
- --       , offset = 0 -- off
-        , isWrMask = T.rfIsWrMask rfb
-        , chunkSize = T.rfNum rfb
-        , readers = T.rfRead rfb
-        , write = T.rfWrite rfb
-        , size = T.rfIdxNum rfb
-        , kind = T.rfData rfb
+        , isWrMask = rfIsWrMask 
+        , chunkSize = rfNum 
+        , readers = rfRead 
+        , write = rfWrite 
+        , size = rfIdxNum 
+        , kind = rfData 
     }
 
-    let reads = case T.rfRead rfb of
+    let reads = case rfRead of
                     T.Async rs -> map (\r -> (r,(AsyncRead, fn))) rs
                     T.Sync _ rs -> map (\r -> (T.readReqName r,(ReadReq $ T.readRegName r, fn))) rs ++
                                  map (\r -> (T.readResName r, (ReadResp $ T.readRegName r, fn))) rs
 
-    let newmeths = (T.rfWrite rfb, (Write, T.rfDataArray rfb)) : reads
+    let newmeths = (rfWrite, (Write, rfDataArray)) : reads
 
-    let newregs = case T.rfRead rfb of
+    let newregs = case rfRead of
                     T.Async _ -> []
                     T.Sync _ rs -> map (\r -> (T.readReqName r, T.readRegName r)) rs ++
                                    map (\r -> (T.readResName r, T.readRegName r)) rs
 
-    newvals <- case T.rfRead rfb of
+    newvals <- case rfRead of
                     T.Async _ -> return []
                     T.Sync b rs -> mapM (\r -> do
                                                 debug <- debug_mode
-                                                v <- (if debug then (pure . defVal) else randVal) (if b then T.Bit (log2 $ T.rfIdxNum rfb) else T.rfData rfb)
+                                                v <- (if debug then (pure . defVal) else randVal) (if b then T.Bit (log2 $ rfIdxNum) else rfData)
                                                 return (T.readRegName r, v)) rs
 
     return $ state {
@@ -174,14 +173,14 @@ initialize_file args rfb state = do
 
      where
 
-        array = case T.rfInit rfb of
+        array = case rfInit of
             T.RFNonFile Nothing -> do
                 debug <- debug_mode
-                vs <- mapM (if debug then (pure . defVal) else randVal) $ V.replicate (T.rfIdxNum rfb) (T.rfData rfb)
+                vs <- mapM (if debug then (pure . defVal) else randVal) $ V.replicate (rfIdxNum) (rfData)
                 return vs
-            T.RFNonFile (Just c) -> return $ V.replicate (T.rfIdxNum rfb) (eval c)
+            T.RFNonFile (Just c) -> return $ V.replicate (rfIdxNum) (eval c)
             T.RFFile isAscii isArg file _ _ _ -> 
-                parseHex isAscii (T.rfData rfb) (T.rfIdxNum rfb) filepath
+                parseHex isAscii (rfData) (rfIdxNum) filepath
 
                 where
 
