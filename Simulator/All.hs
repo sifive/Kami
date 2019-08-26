@@ -6,7 +6,6 @@ module Simulator.All(
     , module Simulator.RegisterFile
     , module Simulator.Simulator
 --    , module Simulator.Strategy
-    , module Simulator.UART
     , module Simulator.Util
     , module Simulator.Value
     , module Simulator.Parse
@@ -20,7 +19,6 @@ import Simulator.Print
 import Simulator.RegisterFile
 import Simulator.Simulator
 --import Simulator.Strategy
-import Simulator.UART
 import Simulator.Util
 import Simulator.Value
 import Simulator.Parse
