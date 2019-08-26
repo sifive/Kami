@@ -9,6 +9,7 @@
 
 module Simulator.Simulator where
 
+import Simulator.Device
 import Simulator.Evaluate
 import Simulator.RegisterFile
 import Simulator.Print
@@ -22,7 +23,12 @@ import qualified Data.HashMap as M
 import Data.Maybe (isJust)
 import Control.Monad (mapM, when)
 import System.Random (mkStdGen, setStdGen)
-
+{-
+import Control.Exception
+import System.IO
+import Data.IORef
+import UART
+-}
 get_rules :: [String] -> [T.RuleT] -> Either String [T.RuleT]
 get_rules [] _ = Right []
 get_rules (x:xs) rules = case lookup x rules of
@@ -79,9 +85,9 @@ simulate_action state meths act regs = sim act [] [] where
 
     sim (T.Return e) updates fupdates = return (updates, fupdates, eval e)
 
-simulate_module :: Int -> ([T.RuleT] -> Str (IO T.RuleT)) -> [String] -> [(String, Val -> FileState -> M.Map String Val -> IO Val)] -> [T.RegFileBase] -> T.BaseModule -> IO (M.Map String Val)
-simulate_module _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
-simulate_module seed strategy rulenames meths rfbs (T.BaseMod init_regs rules defmeths) = 
+simulate_module :: Int -> ([T.RuleT] -> Str (IO T.RuleT)) -> [Device] -> [String] -> [(String, Val -> FileState -> M.Map String Val -> IO Val)] -> [T.RegFileBase] -> T.BaseModule -> IO (M.Map String Val)
+simulate_module _ _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
+simulate_module seed strategy devices rulenames meths rfbs (T.BaseMod init_regs rules defmeths) = 
 
     -- passes the seed to the global rng
     (setStdGen $ mkStdGen seed) >>
@@ -95,7 +101,7 @@ simulate_module seed strategy rulenames meths rfbs (T.BaseMod init_regs rules de
             regs <- mapM initialize init_regs
             sim (strategy rules') (M.fromList regs) state  where
                 sim (r :+ rs) regs filestate = do
+                    mapM_ (\device -> device_step device) devices
                     (ruleName,a) <- r
-
                     (upd,fupd,_) <- simulate_action filestate meths (unsafeCoerce $ a ()) regs
                     sim rs (updates regs upd) (exec_file_updates filestate fupd)
