@@ -1,6 +1,6 @@
 
 module Simulator.All(
-      module Simulator.Device
+      module Simulator.Environment
     , module Simulator.Evaluate
     , module Simulator.Print
     , module Simulator.RegisterFile
@@ -13,7 +13,7 @@ module Simulator.All(
     )
  where
 
-import Simulator.Device
+import Simulator.Environment
 import Simulator.Evaluate
 import Simulator.Print
 import Simulator.RegisterFile
