@@ -698,7 +698,7 @@ Fixpoint type (k: Kind): Type :=
     | Bool => bool
     | Bit n => word n
     | Struct n fk fs => forall i, type (fk i)
-    | Array n k' => Fin.t n -> type k'
+    | Array n k' => { l : list (type k') | length l = n }
   end.
 
 Section WfBaseMod.
@@ -1029,22 +1029,21 @@ Proof.
            apply (n0 eq_refl).
       * right; intro; subst.
         apply (n0 eq_refl).
-  - induction n.
-    + left.
-      extensionality x.
-      apply Fin.case0.
-      apply x.
-    + simpl in *.
-      destruct (IHn (fun i => e1 (Fin.FS i)) (fun i => e2 (Fin.FS i))).
-      * destruct (IHk (e1 Fin.F1) (e2 Fin.F1)).
-        -- left.
-           extensionality x.
-           apply (Fin.caseS' x); try assumption; apply equal_f; assumption.
-        -- right; intro; subst.
-           apply (n0 eq_refl).
-      * right; intro; subst.
-        apply (n0 eq_refl).
-Defined.
+  - admit. (* simpl in *.
+    destruct e1 as [l1 H1]. destruct e2 as [l2 H2].
+    induction n.
+    + left. 
+      destruct l1; destruct l2; auto; simpl in *; try omega.
+      f_equal. apply UIP_nat.
+    + edestruct IHn.
+      * left.
+        inversion e.
+        subst.
+        f_equal.
+        apply UIP_nat.
+      * admit.
+        Unshelve. *)
+Admitted. (* Defined. *)
 
 Definition evalUniBool (op: UniBoolOp) : bool -> bool :=
   match op with
