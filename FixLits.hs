@@ -25,6 +25,7 @@ data Tok =
     | Nil
     | Cons
     | Chr Char
+    | CodeChr Int
     | StringLit T.Text
 
     --words
@@ -43,14 +44,12 @@ data Tok =
     | VCons
     | VecLit [T.Text]
 
-
-
     deriving (Show)
 
 assert :: Bool -> Maybe ()
 assert b = if b then Just () else Nothing
 
-stripChar :: T.Text -> Maybe (Char,T.Text)
+stripChar :: T.Text -> Maybe (Tok,T.Text)
 stripChar txt = do
     (c,rest) <- T.uncons txt
     assert (c == '\'')
@@ -61,10 +60,15 @@ stripChar txt = do
             (c'',rest'') <- T.uncons rest'
             case c'' of
                 -- tail removes the final single quote char
-                '\'' -> return ('\'', T.tail rest'')
-                '\\' -> return ('\\', T.tail rest'')
+                '\'' -> return (Chr '\'', T.tail rest'')
+                '\\' -> return (Chr '\\', T.tail rest'')
                 --add more escape chars here as needed
-        _ -> return (c', T.tail rest')
+                --at this point we know the character is '\xyz'
+                _ -> let (x,y) = T.breakOn "\'" rest' in
+                        return (CodeChr $ read $ T.unpack x, T.tail y)
+
+                --add more escape chars here as needed
+        _ -> return (Chr c', T.tail rest')
 
 toks :: T.Text -> [Tok]
 toks txt
@@ -94,7 +98,7 @@ toks txt
                                                 Nothing -> case T.stripPrefix "[]" txt of
                                                     Just rest -> Nil : toks rest
                                                     Nothing -> case stripChar txt of
-                                                        Just (c,rest) -> (Chr c) : (toks rest)
+                                                        Just (t,rest) -> t : (toks rest)
                                                         Nothing -> case isSpace $ T.head txt of
                                                             True -> let (white,rest) = T.span isSpace txt in (White white) : toks rest
                                                             False -> let (txt',rest) = T.span (\c -> not $ isSpace c && c /= '(' && c /= ')') txt in (Txt txt') : toks rest
@@ -171,6 +175,9 @@ fix_lits ts = case ts of
 single_quotes :: Char -> T.Text
 single_quotes c = T.cons '\'' $ T.cons c $ T.cons '\'' T.empty
 
+single_quotes_txt :: T.Text -> T.Text
+single_quotes_txt txt = T.cons '\'' $ T.append txt $ T.cons '\'' T.empty
+
 double_quotes :: T.Text -> T.Text
 double_quotes txt = T.cons '"' (T.snoc txt '"')
 
@@ -183,6 +190,9 @@ print_tok Zero = "0"
 print_tok Succ = "Prelude.succ"
 print_tok Nil = "[]"
 print_tok Cons = "(:)"
+--print_tok (Chr '\000') = single_quotes_txt "\\000"
+--print_tok (Chr '\001') = single_quotes_txt "\\001"
+print_tok (CodeChr n) = single_quotes_txt (T.append "\\" $ T.pack $ show n)
 print_tok (Chr c) = single_quotes c
 print_tok (NatLit n) = T.pack $ show n
 print_tok (StringLit str) = double_quotes str
