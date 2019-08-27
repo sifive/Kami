@@ -76,7 +76,7 @@ Lemma WfBaseMod_inlineSingle_map (m : BaseModule) (HWfMod : WfBaseModule m) k (a
   forall  (lf : list DefMethT),
     SubList lf (getMethods m) ->
     WfActionT m a ->
-    WfActionT m (apply_nth (map (fun f => @inlineSingle type f k) lf) a n).
+    WfActionT m (apply_nth (map (fun f a' => @inlineSingle type k a' f) lf) a n).
 Proof.
   intros.
   unfold apply_nth; remember (nth_error _ _) as err0; symmetry in Heqerr0; destruct err0; auto.
@@ -89,7 +89,7 @@ Lemma WfBaseMod_inlineSome_map (m : BaseModule) (HWfMod : WfBaseModule m) xs:
   forall  (lf : list DefMethT) k (a : ActionT type k),
     SubList lf (getMethods m) ->
     WfActionT m a ->
-    WfActionT m (fold_left (apply_nth (map (fun f => @inlineSingle type f k) lf)) xs a).
+    WfActionT m (fold_left (apply_nth (map (fun f a' => @inlineSingle type k a' f) lf)) xs a).
 Proof.
   induction xs; simpl; intros; eauto.
   apply IHxs; auto.
@@ -3012,7 +3012,7 @@ Qed.
 
 Lemma WrInline_inlines {k : Kind} (a : ActionT type k) :
   forall rf o uml retv,
-    ESemAction o (Action_EAction (inlineSingle (getRegFileWrite rf) a)) uml retv ->
+    ESemAction o (Action_EAction (inlineSingle a (getRegFileWrite rf))) uml retv ->
     ESemAction o (inlineWriteFile rf (Action_EAction a)) uml retv.
 Proof.
   induction a; intros; auto; simpl; destruct rf; subst; simpl in *.
@@ -3085,7 +3085,7 @@ Qed.
 Lemma inline_WrInlines {k : Kind} (a : ActionT type k) rf :
   forall o uml retv,
     ESemAction o (inlineWriteFile rf (Action_EAction a)) uml retv ->
-    ESemAction o (Action_EAction (inlineSingle (getRegFileWrite rf) a)) uml retv.
+    ESemAction o (Action_EAction (inlineSingle a (getRegFileWrite rf))) uml retv.
 Proof.
   induction a; intros; auto; simpl; destruct rf; subst; simpl in *.
   - destruct String.eqb, rfIsWrMask;
@@ -3540,7 +3540,7 @@ Qed.
 Lemma AsyncReadInline_inlines {k : Kind} (a : ActionT type k) :
   forall rf (reads : list string)(HIsAsync : rfRead rf = Async reads)
          (read : string) (HIn : In read reads) o uml retv,
-    ESemAction o (Action_EAction (inlineSingle (getAsyncReads rf read) a)) uml retv ->
+    ESemAction o (Action_EAction (inlineSingle a (getAsyncReads rf read))) uml retv ->
     ESemAction o (inlineAsyncReadFile read rf (Action_EAction a)) uml retv.
 Proof.
   induction a; intros; auto; simpl; destruct rf; simpl in *; rewrite HIsAsync in *;
@@ -3585,7 +3585,7 @@ Lemma inline_AsyncReadInlines {k : Kind} (a : ActionT type k) rf :
   forall (reads : list string)(HIsAsync : rfRead rf = Async reads)
          (read : string) (HIn : In read reads) o uml retv,
     ESemAction o (inlineAsyncReadFile read rf (Action_EAction a)) uml retv ->
-    ESemAction o (Action_EAction (inlineSingle (getAsyncReads rf read) a)) uml retv.
+    ESemAction o (Action_EAction (inlineSingle a (getAsyncReads rf read))) uml retv.
 Proof.
   induction a; intros; auto; simpl; destruct rf; simpl in *; rewrite HIsAsync in *;
     remember (existsb _ _) as exb; symmetry in Heqexb; destruct exb;
@@ -4047,7 +4047,7 @@ Lemma SyncReqInline_inlines {k : Kind} (a : ActionT type k) :
   forall rf (read : SyncRead) (isAddr : bool) (reads : list SyncRead)
          (HIsSync : rfRead rf = Sync isAddr reads)
          (HIn : In read reads) o uml retv,
-    ESemAction o (Action_EAction (inlineSingle (getSyncReq rf isAddr read) a)) uml retv ->
+    ESemAction o (Action_EAction (inlineSingle a (getSyncReq rf isAddr read))) uml retv ->
     ESemAction o (inlineSyncReqFile read rf (Action_EAction a)) uml retv.
 Proof.
   induction a; simpl in *; intros rf read; remember rf as rf'; remember read as read';
@@ -4123,7 +4123,7 @@ Lemma inline_SyncReqInlines {k : Kind} (a : ActionT type k) rf :
          (HIsSync : rfRead rf = Sync isAddr reads)
          (HIn : In read reads) o uml retv,
     ESemAction o (inlineSyncReqFile read rf (Action_EAction a)) uml retv ->
-    ESemAction o (Action_EAction (inlineSingle (getSyncReq rf isAddr read) a)) uml retv.
+    ESemAction o (Action_EAction (inlineSingle a (getSyncReq rf isAddr read))) uml retv.
 Proof.
   intros read isAddr; induction a; intros; auto; simpl; destruct rf; subst;
     simpl in *; rewrite HIsSync in *; unfold getSyncReq in *; destruct read;
@@ -4576,7 +4576,7 @@ Lemma SyncResInline_inlines {k : Kind} (a : ActionT type k) :
   forall rf (read : SyncRead) (isAddr : bool) (reads : list SyncRead)
          (HIsSync : rfRead rf = Sync isAddr reads)
          (HIn : In read reads) o uml retv,
-    ESemAction o (Action_EAction (inlineSingle (getSyncRes rf isAddr read) a)) uml retv ->
+    ESemAction o (Action_EAction (inlineSingle a (getSyncRes rf isAddr read))) uml retv ->
     ESemAction o (inlineSyncResFile read rf (Action_EAction a)) uml retv.
 Proof.
   induction a; simpl in *; intros rf read; remember rf as rf'; remember read as read';
@@ -4634,7 +4634,7 @@ Lemma inline_SyncResInlines {k : Kind} (a : ActionT type k) rf :
          (HIsSync : rfRead rf = Sync isAddr reads)
          (HIn : In read reads) o uml retv,
     ESemAction o (inlineSyncResFile read rf (Action_EAction a)) uml retv ->
-    ESemAction o (Action_EAction (inlineSingle (getSyncRes rf isAddr read) a)) uml retv.
+    ESemAction o (Action_EAction (inlineSingle a (getSyncRes rf isAddr read))) uml retv.
 Proof.
   intros read isAddr; induction a; intros; auto; simpl; destruct rf; subst;
     simpl in *; rewrite HIsSync in *; unfold getSyncReq in *; destruct read;
@@ -4702,9 +4702,9 @@ Proof.
     remember (nth_error _ _) as err0; remember (nth_error (map _ _) _) as err1.
     symmetry in Heqerr0, Heqerr1.
     destruct err0.
-    + eapply (map_nth_error (fun f => inlineSingle f (k:=k))) in Heqerr0.
+    + eapply (map_nth_error (fun f a' => inlineSingle a' f (k:=k))) in Heqerr0.
       rewrite Heqerr1 in Heqerr0; rewrite Heqerr0; reflexivity.
-    + rewrite (nth_error_map_None_iff (fun f => @inlineSingle ty f k)) in Heqerr0.
+    + rewrite (nth_error_map_None_iff (fun f a' => @inlineSingle ty k a' f)) in Heqerr0.
       setoid_rewrite Heqerr0 in Heqerr1; rewrite <- Heqerr1; reflexivity.
 Qed.
 
@@ -4732,7 +4732,7 @@ Qed.
 Lemma inlineEach_SingleRf_inlineEeach (rf : RegFileBase) :
   forall n k (a : ActionT type k),
     (forall o uml retV,
-        ESemAction o (Action_EAction (apply_nth (map (fun f => @inlineSingle type f k) (getRegFileMethods rf)) a n)) uml retV ->
+        ESemAction o (Action_EAction (apply_nth (map (fun f a' => @inlineSingle type k a' f) (getRegFileMethods rf)) a n)) uml retV ->
         ESemAction o (apply_nth (EgetRegFileMapMethods type k rf) (Action_EAction a) n) uml retV).
 Proof.
   unfold getRegFileMethods, EgetRegFileMapMethods; destruct rf, rfRead; simpl.
@@ -4857,7 +4857,7 @@ Lemma inlineEeach_SingleRf_inlineEach (rf : RegFileBase) :
   forall n k (a : ActionT type k),
     (forall o uml retV,
         ESemAction o (apply_nth (EgetRegFileMapMethods type k rf) (Action_EAction a) n) uml retV
-        -> ESemAction o (Action_EAction (apply_nth (map (fun f => @inlineSingle type f k) (getRegFileMethods rf)) a n)) uml retV).
+        -> ESemAction o (Action_EAction (apply_nth (map (fun f a' => @inlineSingle type k a' f) (getRegFileMethods rf)) a n)) uml retV).
 Proof.
   unfold getRegFileMethods, EgetRegFileMapMethods; destruct rf, rfRead; simpl.
   - unfold apply_nth in *; destruct n; simpl in *; intros.

@@ -679,7 +679,7 @@ Lemma PSemAction_inline_notIn (f : DefMethT) o k (a : ActionT type k)
       readRegs newRegs calls (fret : type k) :
   PSemAction o a readRegs newRegs calls fret ->
   ~In (fst f) (map fst calls) ->
-  PSemAction o (inlineSingle f a) readRegs newRegs calls fret.
+  PSemAction o (inlineSingle a f) readRegs newRegs calls fret.
 Proof.
   induction 1; simpl; intros.
   - destruct (fst f =? meth) eqn:G. rewrite <- (proj1 (String.eqb_eq _ _) G) in *.
@@ -975,7 +975,7 @@ Lemma PSemAction_inline_In (f : DefMethT) o:
     forall readRegs' newRegs' calls',
       DisjKey newRegs' newRegs ->
       PSemAction_meth_collector f o readRegs' newRegs' calls' calls1 ->      
-      PSemAction o (inlineSingle f a) (readRegs' ++ readRegs) (newRegs' ++ newRegs) (calls'++calls2) retV2.
+      PSemAction o (inlineSingle a f) (readRegs' ++ readRegs) (newRegs' ++ newRegs) (calls'++calls2) retV2.
 Proof.
   induction a; intros.
   - simpl; destruct (fst f =? meth) eqn:G; [rewrite String.eqb_eq in G|rewrite eqb_neq in G]; [destruct Signature_dec | ]; subst.
@@ -1624,7 +1624,7 @@ Qed.
 
 Lemma InRule_In_inlined f rn rb m:
   In (rn, rb) (getRules m) ->
-  In (rn, (fun ty => (inlineSingle f (rb ty)))) (getRules (inlineSingle_Rule_BaseModule f rn m)).
+  In (rn, (fun ty => (inlineSingle (rb ty) f))) (getRules (inlineSingle_Rule_BaseModule f rn m)).
 Proof.
   destruct m; simpl in *.
   - intro; contradiction.
@@ -1851,7 +1851,7 @@ Lemma PPlus_inline_Rule_with_action f m o rn rb upds1 upds2 execs calls1 calls2 
   SubList (getKindAttr reads) (getKindAttr (getRegisters m)) ->
   SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) ->
   DisjKey upds2 upds1 ->
-  PSemAction o (inlineSingle f (rb type)) reads upds1 calls1 WO ->
+  PSemAction o (inlineSingle (rb type) f) reads upds1 calls1 WO ->
   PPlusSubsteps m o upds2 execs calls2 ->
   PPlusSubsteps (inlineSingle_Rule_BaseModule f rn m) o (upds1++upds2) ((Rle rn)::execs) (calls1++calls2).
 Proof.
@@ -2104,7 +2104,7 @@ Qed.
 Lemma WfActionT_inline_Rule_inline_action (k : Kind) m (a : ActionT type k) rn (f : DefMethT):
   WfActionT m a ->
   (forall v, WfActionT m (projT2 (snd f) type v)) ->
-  WfActionT (inlineSingle_Rule_BaseModule f rn m) (inlineSingle f a).
+  WfActionT (inlineSingle_Rule_BaseModule f rn m) (inlineSingle a f).
 Proof.
   induction 1; try econstructor; eauto.
   simpl.
@@ -2121,7 +2121,7 @@ Lemma inlineSingle_Rule_BaseModule_dec ty rule f rn l:
   exists rule',
     In rule' l /\
     (fst rule' = fst rule) /\
-    ((inlineSingle f (snd rule' ty)) = snd rule ty).
+    ((inlineSingle (snd rule' ty) f) = snd rule ty).
 Proof.
   induction l.
   - intros; auto.
@@ -2139,7 +2139,7 @@ Qed.
 
 Lemma inlineSingle_Rule_BaseModule_dec2 f rn rb l:
   In (rn, rb) l ->
-  In (rn, fun ty : Kind -> Type => inlineSingle f (rb ty)) (inlineSingle_Rule_in_list f rn l).
+  In (rn, fun ty : Kind -> Type => inlineSingle (rb ty) f) (inlineSingle_Rule_in_list f rn l).
 Proof.
   induction l;[contradiction|].
   intros; simpl in *.
@@ -2935,7 +2935,7 @@ Qed.
 Lemma WfActionT_inline_Meth_inline_action (k : Kind) m (a : ActionT type k) gn (f : DefMethT):
   WfActionT m a ->
   (forall v, WfActionT m (projT2 (snd f) type v)) ->
-  WfActionT (inlineSingle_Meth_BaseModule f gn m) (inlineSingle f a).
+  WfActionT (inlineSingle_Meth_BaseModule f gn m) (inlineSingle a f).
 Proof.
   induction 1; try econstructor; eauto.
   simpl.
@@ -5061,7 +5061,7 @@ Qed.
 
 Lemma PSemAction_In_inline (f : DefMethT) o:
   forall {retK2} a readRegs newRegs calls (retV2 : type retK2),
-    PSemAction o (inlineSingle f a) readRegs newRegs calls retV2 ->
+    PSemAction o (inlineSingle a f) readRegs newRegs calls retV2 ->
     exists readRegs1 readRegs2 newRegs1 newRegs2 calls1 calls2 calls3,
       DisjKey newRegs1 newRegs2 /\
       readRegs [=] readRegs1++readRegs2 /\
@@ -5328,7 +5328,7 @@ Lemma PPlus_inlineSingle_BaseModule_with_action f m o rn rb upds execs calls:
     DisjKey upds2 upds1 /\
     SubList (getKindAttr reads) (getKindAttr (getRegisters m)) /\
     SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) /\
-    PSemAction o (inlineSingle f (rb type)) reads upds1 calls1 WO /\
+    PSemAction o (inlineSingle (rb type) f) reads upds1 calls1 WO /\
     PPlusSubsteps m o upds2 execs calls2.
 Proof.
   intros.
@@ -5607,7 +5607,7 @@ Lemma inlineSingle_Meth_in_list_body fb f gn l:
   exists (fb' : {x : Signature & MethodT x}),
     (fb = existT
          (fun sig : Signature => forall ty : Kind -> Type, ty (fst sig) -> ActionT ty (snd sig))
-         (projT1 fb') (fun (ty : Kind -> Type) (X : ty (fst (projT1 fb'))) => inlineSingle f ((projT2 fb') ty X))) /\
+         (projT1 fb') (fun (ty : Kind -> Type) (X : ty (fst (projT1 fb'))) => inlineSingle ((projT2 fb') ty X) f)) /\
     In (gn, fb') l.
 Proof.
   intros.
@@ -7437,7 +7437,7 @@ Qed.
 Lemma WfConcatActionT_inlineSingle_Meth {k : Kind} (f: DefMethT) (a : ActionT type k) m:
   (forall v, WfConcatActionT (projT2 (snd f) type v) m) ->
   WfConcatActionT a m ->
-  WfConcatActionT (inlineSingle f a) m.
+  WfConcatActionT (inlineSingle a f) m.
 Proof.
   intros.
   induction a; unfold inlineSingle; inv H0; EqDep_subst; try econstructor; eauto.
@@ -7903,7 +7903,7 @@ Qed.
 Lemma inlineSingle_NoCalls_ident k ty (a : ActionT ty k) l f :
   In f l ->
   NoCallActionT l a ->
-  inlineSingle f a = a.
+  inlineSingle a f = a.
 Proof.
   induction a; intros; try (inv H1; EqDep_subst; simpl);
     try (apply f_equal || apply f_equal2 || apply f_equal3);
@@ -7919,7 +7919,7 @@ Qed.
 Lemma inlineSingle_NoCalls_ident' k ty (a : ActionT ty k) l f :
   In (fst f, projT1 (snd f)) (getKindAttr l) ->
   NoCallActionT l a ->
-  inlineSingle f a = a.
+  inlineSingle a f = a.
 Proof.
   induction a; intros; try (inv H1; EqDep_subst; simpl);
     try (apply f_equal || apply f_equal2 || apply f_equal3);
@@ -8100,7 +8100,7 @@ Lemma NeverCall_inline k ty (a : ActionT ty k):
   forall (f : DefMethT),
     (forall v,
         NeverCallActionT (projT2 (snd f) ty v)) ->
-    NoCallActionT [f] (inlineSingle f a).
+    NoCallActionT [f] (inlineSingle a f).
 Proof.
   induction a; intros; simpl; eauto; try (econstructor; eauto).
   - destruct String.eqb eqn:G; [destruct Signature_dec|]; subst; econstructor; eauto.
@@ -8117,7 +8117,7 @@ Lemma NeverCall_inline_persistent k ty (a : ActionT ty k):
     (forall v,
         NeverCallActionT (projT2 (snd f) ty v)) ->
     NoCallActionT ls a ->
-    NoCallActionT ls (inlineSingle f a).
+    NoCallActionT ls (inlineSingle a f).
 Proof.
   induction a; intros; simpl; eauto; try ((inv H1 || inv H0); EqDep_subst;econstructor; eauto).
   inv H1; EqDep_subst.
@@ -8129,7 +8129,7 @@ Lemma NotCalled_NotInlined ty k (a : ActionT ty k) :
   forall (ls : list DefMethT) (f : DefMethT),
     In (fst f, projT1 (snd f)) (getKindAttr ls) ->
     NoCallActionT ls a ->
-    inlineSingle f a = a.
+    inlineSingle a f = a.
 Proof.
   induction a; simpl; auto; intros; (inv H1 || inv H0); EqDep_subst; try ((apply f_equal || apply f_equal2 || apply f_equal3); eauto using functional_extensionality).
   - remember (String.eqb _ _) as strb; symmetry in Heqstrb.
@@ -8291,7 +8291,7 @@ Lemma inline_NeverCall k ty (a : ActionT ty k) :
   forall (f : DefMethT) ls,
     (forall v, NeverCallActionT (projT2 (snd f) ty v)) ->
     ~In (fst f, projT1 (snd f)) (getKindAttr ls) ->
-    NoCallActionT ls (inlineSingle f a) ->
+    NoCallActionT ls (inlineSingle a f) ->
     NoCallActionT ls a.
 Proof.
   induction a; intros; simpl in *;
@@ -8367,7 +8367,7 @@ Lemma WfBaseMod_inlineSingle (m : BaseModule) (HWfMod : WfBaseModule m) k (a : A
   forall  (f : DefMethT),
     In f (getMethods m) ->
     WfActionT m a ->
-    WfActionT m (inlineSingle f a).
+    WfActionT m (inlineSingle a f).
 Proof. 
   induction a; simpl; intros; (inv H1||inv H0); EqDep_subst; try (econstructor; eauto).
   unfold WfBaseModule in *; dest.
