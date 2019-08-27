@@ -22,6 +22,12 @@ Section Tree.
     end.
 End Tree.
 
+Fixpoint string_rev (ls: string) :=
+  match ls with
+  | EmptyString => EmptyString
+  | String x xs => append (string_rev xs) (String x EmptyString)
+  end.
+
 (* Definition in_decb{X}(eqb : X -> X -> bool) : X -> list X -> bool :=
   fun x => existsb (eqb x).
 
