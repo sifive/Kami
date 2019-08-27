@@ -9,6 +9,7 @@
 
 module Simulator.Simulator where
 
+import Simulator.Environment
 import Simulator.Evaluate
 import Simulator.RegisterFile
 import Simulator.Print
@@ -19,6 +20,7 @@ import qualified HaskellTarget as T
 
 import qualified Data.HashMap as M
 
+import Data.IORef
 import Data.Maybe (isJust)
 import Control.Monad (mapM, when)
 import System.Random (mkStdGen, setStdGen)
@@ -39,8 +41,8 @@ initialize (regName, (k, Nothing)) = do
     v <- (if debug then (pure . defVal_FK) else randVal_FK) k
     return (regName,v)
 
-simulate_action :: FileState -> [(String, Val -> FileState -> M.Map String Val -> IO Val)] -> T.ActionT Val -> M.Map String Val -> IO ([(String,Val)], [FileUpd] ,Val)
-simulate_action state meths act regs = sim act [] [] where
+simulate_action :: AbstractEnvironment a => IORef a -> FileState -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> T.ActionT Val -> M.Map String Val -> IO ([(String,Val)], [FileUpd] ,Val)
+simulate_action envRef state meths act regs = sim act [] [] where
 
     sim (T.MCall methName _ arg cont) updates fupdates = case rf_methcall state methName (eval arg) of
         Just (Nothing,v) -> sim (cont v) updates fupdates
@@ -48,7 +50,9 @@ simulate_action state meths act regs = sim act [] [] where
         Nothing -> case lookup methName meths of
             Nothing -> error ("Method " ++ methName ++ " not found.")
             Just f -> do
-                v <- f (eval arg) state regs
+                currEnv <- readIORef envRef
+                (nextEnv, v) <- f currEnv (eval arg) state regs
+                writeIORef envRef nextEnv
                 sim (cont v) updates fupdates
 
     sim (T.LetExpr _ e cont) updates fupdates = sim (cont $ unsafeCoerce $ (eval e :: Val)) updates fupdates
@@ -79,9 +83,9 @@ simulate_action state meths act regs = sim act [] [] where
 
     sim (T.Return e) updates fupdates = return (updates, fupdates, eval e)
 
-simulate_module :: Int -> ([T.RuleT] -> Str (IO T.RuleT)) -> [String] -> [(String, Val -> FileState -> M.Map String Val -> IO Val)] -> [T.RegFileBase] -> T.BaseModule -> IO (M.Map String Val)
-simulate_module _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
-simulate_module seed strategy rulenames meths rfbs (T.BaseMod init_regs rules defmeths) = 
+simulate_module :: AbstractEnvironment a => Int -> ([T.RuleT] -> Str (IO T.RuleT)) -> IORef a -> [String] -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> [T.RegFileBase] -> T.BaseModule -> IO (M.Map String Val)
+simulate_module _ _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
+simulate_module seed strategy envRef rulenames meths rfbs (T.BaseMod init_regs rules defmeths) = 
 
     -- passes the seed to the global rng
     (setStdGen $ mkStdGen seed) >>
@@ -95,7 +99,9 @@ simulate_module seed strategy rulenames meths rfbs (T.BaseMod init_regs rules de
             regs <- mapM initialize init_regs
             sim (strategy rules') (M.fromList regs) state  where
                 sim (r :+ rs) regs filestate = do
+                    currEnv <- readIORef envRef
+                    nextEnv <- envStep currEnv
+                    writeIORef envRef nextEnv
                     (ruleName,a) <- r
-
-                    (upd,fupd,_) <- simulate_action filestate meths (unsafeCoerce $ a ()) regs
+                    (upd,fupd,_) <- simulate_action envRef filestate meths (unsafeCoerce $ a ()) regs
                     sim rs (updates regs upd) (exec_file_updates filestate fupd)
