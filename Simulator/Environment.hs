@@ -8,4 +8,6 @@ import Simulator.Util
 import Simulator.Value
 
 class AbstractEnvironment a where
-  envStep :: a -> FileState -> M.Map String Val -> IO a
+  envPre  :: a -> FileState -> M.Map String Val -> String -> IO a
+  envPost :: a -> FileState -> M.Map String Val -> String -> IO a
+
