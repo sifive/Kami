@@ -1787,6 +1787,12 @@ Proof.
     auto.
 Qed.
 
+Lemma string_rev_append : forall s1 s2,
+  (string_rev (s1 ++ s2) = string_rev s2 ++ string_rev s1)%string.
+Proof.
+  induction s1; intros *; cbn; auto using append_nil.
+  rewrite IHs1; auto using append_assoc.
+Qed.
 
 Lemma key_not_In_fst A B (ls: list (A*B)):
   forall k,
