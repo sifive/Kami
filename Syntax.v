@@ -2009,6 +2009,12 @@ Ltac destruct_string_dec :=
 
 Local Ltac process_append :=
   repeat match goal with
+         | H: (_ ++ _)%string = (_ ++ _)%string |- _ =>
+           rewrite <- ?append_assoc in H; cbn [append] in H
+         | |- (_ ++ _)%string = (_ ++ _)%string =>
+           rewrite <- ?append_assoc; cbn [append]
+         end;
+  repeat match goal with
          | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
            apply append_remove_prefix in H; subst
          | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
@@ -2017,6 +2023,11 @@ Local Ltac process_append :=
            apply append_remove_prefix
          | |- (?a ++ ?b)%string = (?c ++ ?b)%string =>
            apply append_remove_suffix
+         | H: (?a ++ (String ?x ?b))%string = (?c ++ (String ?y ?d))%string |- _ =>
+           apply (f_equal string_rev) in H;
+           rewrite (string_rev_append a (String x b)), (string_rev_append c (String y d)) in H;
+           cbn [string_rev] in H;
+           rewrite <- ?append_assoc in H; cbn [append] in H
          end.
 
 Local Ltac finish_append :=
@@ -2024,6 +2035,15 @@ Local Ltac finish_append :=
 
 Ltac discharge_append :=
   simpl; unfold getBool in *; process_append; finish_append.
+
+Goal forall (a b c: string),
+  (a ++ "a" <> a ++ "b"
+  /\ a ++ "a" ++ b <> c ++ "b" ++ b
+  /\ a ++ "a" ++ "b" <> a ++ "a" ++ "c"
+  /\ "a" ++ a <> "b" ++ b
+  /\ (a ++ "a") ++ b <> a ++ "b" ++ a
+  /\ (a ++ (b ++ "b")) ++ "c" <> (a ++ b) ++ "d")%string.
+Proof. intuition idtac; discharge_append. Qed.
 
 Ltac discharge_DisjKey :=
   repeat match goal with
