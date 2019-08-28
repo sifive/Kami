@@ -99,9 +99,13 @@ simulate_module seed strategy envRef rulenames meths rfbs (T.BaseMod init_regs r
             regs <- mapM initialize init_regs
             sim (strategy rules') (M.fromList regs) state  where
                 sim (r :+ rs) regs filestate = do
-                    currEnv <- readIORef envRef
-                    nextEnv <- envStep currEnv filestate regs
-                    writeIORef envRef nextEnv
                     (ruleName,a) <- r
+                    currEnv <- readIORef envRef
+                    preEnv <- envPre currEnv filestate regs ruleName
+                    writeIORef envRef preEnv
                     (upd,fupd,_) <- simulate_action envRef filestate meths (unsafeCoerce $ a ()) regs
+                    postEnv <- readIORef envRef
+                    nextEnv <- envPost postEnv filestate regs ruleName
+                    writeIORef envRef nextEnv
                     sim rs (updates regs upd) (exec_file_updates filestate fupd)
+
