@@ -412,7 +412,7 @@ Section Compile.
 
     Definition inlineSingle_pos k meths (a : ActionT ty k) n :=
       match nth_error meths n with
-      | Some f => inlineSingle f a
+      | Some f => inlineSingle a f
       | None => a
       end.
     
@@ -434,7 +434,7 @@ Definition EeachRfMethodInliners k (lrf : list RegFileBase) : list (EActionT k -
       concat (map (fun rf => EgetRegFileMapMethods k rf) lrf).
 
     Definition eachRfMethodInliners k (lrf : list RegFileBase) : list (ActionT ty k -> ActionT ty k) :=
-      (concat (map (fun rf => (map (fun f => @inlineSingle ty f k) (getRegFileMethods rf))) lrf)).
+      (concat (map (fun rf => (map (fun f a' => @inlineSingle ty k a' f) (getRegFileMethods rf))) lrf)).
     
     Definition apply_nth {A : Type} (lf : list (A -> A)) (a : A) (n : nat) :=
       match nth_error lf n with

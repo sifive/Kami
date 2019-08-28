@@ -1735,9 +1735,8 @@ Definition concatFlat m1 m2 := BaseMod (getRegisters m1 ++ getRegisters m2)
 
 Section inlineSingle.
   Variable ty: Kind -> Type.
-  Variable f: DefMethT.
 
-  Fixpoint inlineSingle k (a: ActionT ty k): ActionT ty k :=
+  Fixpoint inlineSingle k (a: ActionT ty k) (f: DefMethT): ActionT ty k :=
     match a with
     | MCall g sign arg cont =>
       match String.eqb (fst f) g with
@@ -1749,25 +1748,25 @@ Section inlineSingle.
                              end (projT2 (snd f) ty))
                     (fun ret => inlineSingle (match isEq in _ = Y return ty (snd Y) -> ActionT ty k with
                                               | eq_refl => cont
-                                              end ret))
-        | right _ => MCall g sign arg (fun ret => inlineSingle (cont ret))
+                                              end ret) f)
+        | right _ => MCall g sign arg (fun ret => inlineSingle (cont ret) f)
         end
-      | false => MCall g sign arg (fun ret => inlineSingle (cont ret))
+      | false => MCall g sign arg (fun ret => inlineSingle (cont ret) f)
       end
     | LetExpr _ e cont =>
-      LetExpr e (fun ret => inlineSingle (cont ret))
+      LetExpr e (fun ret => inlineSingle (cont ret) f)
     | LetAction _ a cont =>
-      LetAction (inlineSingle a) (fun ret => inlineSingle (cont ret))
+      LetAction (inlineSingle a f) (fun ret => inlineSingle (cont ret) f)
     | ReadNondet k c =>
-      ReadNondet k (fun ret => inlineSingle (c ret))
+      ReadNondet k (fun ret => inlineSingle (c ret) f)
     | ReadReg r k c =>
-      ReadReg r k (fun ret => inlineSingle (c ret))
+      ReadReg r k (fun ret => inlineSingle (c ret) f)
     | WriteReg r k e a =>
-      WriteReg r e (inlineSingle a)
+      WriteReg r e (inlineSingle a f)
     | IfElse p _ aT aF c =>
-      IfElse p (inlineSingle aT) (inlineSingle aF) (fun ret => inlineSingle (c ret))
+      IfElse p (inlineSingle aT f) (inlineSingle aF f) (fun ret => inlineSingle (c ret) f)
     | Sys ls c =>
-      Sys ls (inlineSingle c)
+      Sys ls (inlineSingle c f)
     | Return e =>
       Return e
     end.
@@ -1776,7 +1775,7 @@ End inlineSingle.
 
 Definition inlineSingle_Rule  (f : DefMethT) (rle : RuleT): RuleT :=
   let (s, a) := rle in
-  (s, fun ty => inlineSingle f (a ty)).
+  (s, fun ty => inlineSingle (a ty) f).
 
 Definition inlineSingle_Rule_map_BaseModule (f : DefMethT) (m : BaseModule) :=
   BaseMod (getRegisters m) (map (inlineSingle_Rule f) (getRules m)) (getMethods m).
@@ -1800,7 +1799,7 @@ Definition inlineSingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT :=
    then sig_body
    else
      let (sig, body) := sig_body in
-     existT _ sig (fun ty arg => inlineSingle f (body ty arg))).
+     existT _ sig (fun ty arg => inlineSingle (body ty arg) f)).
 
 Definition inlineSingle_Meth_map_BaseModule (f : DefMethT) (m : BaseModule) :=
   BaseMod (getRegisters m) (getRules m) (map (inlineSingle_Meth f) (getMethods m)).
