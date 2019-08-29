@@ -85,4 +85,8 @@ interactive_mode = do
     args <- getArgs
     return $ "--interactive" `elem` args
 
+no_print_mode :: IO Bool
+no_print_mode = do
+    args <- getArgs
+    return $ "--noprint" `elem` args
 

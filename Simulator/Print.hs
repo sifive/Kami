@@ -49,15 +49,18 @@ printNum T.Hex v = resize_num (BV.size v `cdiv` 4) $ tail $ tail $ BV.showHex v
 
 sysIO :: T.SysT Val -> IO ()
 sysIO T.Finish = do
+    no_print <- no_print_mode
     interactive <- interactive_mode
-    when (not interactive) $ hPutStrLn stdout "Exiting..."
+    when (not no_print && not interactive) $ hPutStrLn stdout "Exiting..."
     exitSuccess
 sysIO (T.DispString msg) = do
+    no_print <- no_print_mode
     interactive <- interactive_mode
-    when (not interactive) $ hPutStr stdout $ format_string $ msg
+    when (not no_print && not interactive) $ hPutStr stdout $ format_string $ msg
 sysIO (T.DispExpr _ e ff) = do
+    no_print <- no_print_mode
     interactive <- interactive_mode
-    when (not interactive) $ hPutStr stdout $ printVal ff $ eval e
+    when (not no_print && not interactive) $ hPutStr stdout $ printVal ff $ eval e
 
 format_string :: String -> String
 format_string [] = []
