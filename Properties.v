@@ -4039,13 +4039,13 @@ Proof.
   - rewrite e.
     destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e2)) (zToWord 1 0)); simpl; auto.
     + rewrite e0.
-      destruct (wlt_dec _ (evalExpr e1) (evalExpr e2)).
+      destruct (wltu _ (evalExpr e1) (evalExpr e2)).
       simpl. destruct weq.
       * simpl. reflexivity.
       * simpl. contradiction.
       * simpl. destruct weq. simpl. reflexivity.
         simpl. contradiction.
-    + destruct (wlt_dec _ (evalExpr e1) (evalExpr e2)); simpl; auto.
+    + case_eq (wltu _ (evalExpr e1) (evalExpr e2)); intros; simpl; auto.
       * destruct (weq _ (zToWord 1 0) (@truncMsb 1 (n+1) (evalExpr e2))); simpl; auto.
       * destruct (weq _ (zToWord 1 0) (@truncMsb 1 (n+1) (evalExpr e2))); simpl; auto.
         apply word0_neq in n0.
@@ -4056,16 +4056,16 @@ Proof.
         rewrite Zmod_1_l. lia.
         rewrite Z.pow_pos_fold. lia.
         specialize truncMsbLtTrue. intros.
-        specialize (H0 (n+1) 1 (evalExpr e1) (evalExpr e2) H).
-        rewrite e0 in H0. eapply H0.
+        specialize (H1 (n+1) 1 (evalExpr e1) (evalExpr e2) H0).
+        rewrite H1 in H. eapply (eq_sym H).
   - destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e2)) (zToWord 1 0)); simpl; auto.
     + rewrite e.
-      destruct (wlt_dec _ (evalExpr e1) (evalExpr e2)); simpl; auto.
+      case_eq (wltu _ (evalExpr e1) (evalExpr e2)); intros; simpl; auto.
       * destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e1)) (zToWord 1 0)); simpl; auto.
         apply word0_neq in n1.
         simpl in n1.
         destruct weq.
-        ** simpl. inversion e3.
+        ** simpl. inversion e0.
         ** simpl. apply word0_neq in n0.
            simpl in n0.
            assert ((wordVal 1 (truncMsb (evalExpr e2))) < (wordVal 1 (truncMsb (evalExpr e1))))%Z.
@@ -4074,17 +4074,17 @@ Proof.
         rewrite Zmod_1_l. lia.
         rewrite Z.pow_pos_fold. lia.
         specialize truncMsbLtFalse. intros.
-        specialize (H0 (n+1) 1 (evalExpr e2) (evalExpr e1) H).
-        rewrite e0 in H0. auto.
+        specialize (H1 (n+1) 1 (evalExpr e2) (evalExpr e1) H0).
+        rewrite H in H1. auto.
       * destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e1)) (zToWord 1 0)); simpl; auto.
         tauto. destruct weq.
-        ** simpl. inversion e3.
+        ** simpl. inversion e0.
         ** simpl. reflexivity.
     + apply word0_neq in n0.
       apply word0_neq in n1.
       rewrite ?n0, ?n1.
       simpl.
-      destruct (wlt_dec _ (evalExpr e1) (evalExpr e2)); simpl; auto.
+      case_eq (wltu _ (evalExpr e1) (evalExpr e2)); intros; simpl; auto.
       ** destruct weq. simpl. reflexivity.
          simpl. exfalso. apply n2. reflexivity.
       ** destruct weq. simpl. reflexivity.
