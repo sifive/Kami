@@ -81,8 +81,6 @@ Section Compile.
 
   Local Definition inc ns := S ns.
 
-  Axiom cheat: forall t, t.
-
   Record RtlExprs := { tempWires : list (string * VarType * sigT RtlExpr) ;
                        regsWrite : string -> forall k, option (RtlExpr Bool * RtlExpr k) ;
                        methCalls : string -> forall k, option (RtlExpr Bool * RtlExpr k) ;

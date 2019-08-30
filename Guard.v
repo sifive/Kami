@@ -1,7 +1,6 @@
 Require Import Kami.Syntax Kami.Notations.
 Set Asymmetric Patterns.
 Set Implicit Arguments.
-Axiom cheat: forall t, t.
 
 Section ty.
   Variable ty: Kind -> Type.
