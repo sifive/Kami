@@ -1004,7 +1004,7 @@ Definition evalCABit n (op: CABitOp) (ls: list (word n)): word n :=
 Definition evalBinBitBool n1 n2 (op: BinBitBoolOp n1 n2)
   : word n1 -> word n2 -> bool :=
   match op with
-    | LessThan n => fun a b => getBool (@wlt_dec n a b)
+    | LessThan n => fun a b => @wltu n a b
   end.
 
 Fixpoint evalConstT k (e: ConstT k): type k :=
