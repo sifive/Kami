@@ -1549,10 +1549,45 @@ Proof.
   f_equal.
 Qed.
 
+(* The ring of size-0 words is the trivial ring, with 0 = 1 *)
+Lemma ws_zero_trivial (w : word 0) : w = zToWord 0 1.
+Proof.
+  arithmetizeWord.
+  cbn in *.
+  Search Z.modulo.
+  rewrite Z.mod_1_r in wordBound.
+  auto.
+Qed.
 
+Lemma pow2_gt_1 n : (n > 0)%nat -> (2 ^ n > 1)%nat.
+Proof.
+  induction n.
+  + lia.
+  + intros ?.
+    apply one_lt_pow2.
+Qed.
 
+Lemma wone_wmul : forall sz w, wmul _ (zToWord sz 1) w = w.
+Proof.
+  intros.
+  case (zerop sz) as [H_wz | H_wpos].
+  + subst. rewrite ws_zero_trivial. auto.
+  + arithmetizeWord.
+    repeat rewrite Z.mod_small; try lia;
+    split; intuition;
+    apply Z2Nat.inj_lt; try lia; simpl;
+    rewrite <- Zpow_of_nat;
+    rewrite Nat2Z.id;
+    apply pow2_gt_1; auto.
+Qed.
 
-
+Lemma wmul_comm : forall sz (x y : word sz), x ^* y = y ^* x.
+Proof.
+  intros.
+  arithmetizeWord; autorewrite with distributeMod.
+  f_equal.
+  lia.
+Qed.
 
 
 
