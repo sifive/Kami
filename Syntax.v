@@ -1910,66 +1910,24 @@ Definition baseNoSelfCalls (m : Mod) :=
 
 
 
-Definition struct_foldr
-  (T : Type)
-  (ty : Kind -> Type)
-  (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
-  (f : Fin.t (S n) -> string -> Kind -> T -> T)
-  (init : T)
-  :  T
-  := nat_rect
-       (fun m : nat => m < (S n) -> T)
-       (fun H : 0 < (S n)
-         => let index : Fin.t (S n)
-              := Fin.of_nat_lt H in
-            f index (get_name index) (get_kind index) init)
-       (fun (m : nat)
-         (F : m < (S n) -> T)
-         (H : S m < (S n))
-         => let H0
-              :  m < (S n)
-              := PeanoNat.Nat.lt_lt_succ_r m n
-                   (Lt.lt_S_n m n H) in
-            let index
-              :  Fin.t (S n)
-              := Fin.of_nat_lt H in
-            (f index (get_name index) (get_kind index) (F H0)))
-       n
-       (PeanoNat.Nat.lt_succ_diag_r n).
+Fixpoint struct_get_field_index'
+         (name: string) n
+  := match n return
+         forall (get_name : Fin.t n -> string),
+                option (Fin.t n)
+     with
+     | 0 => fun _ => None
+     | S m => fun get_name =>
+       if String.eqb (get_name Fin.F1) name
+       then Some Fin.F1
+       else match struct_get_field_index' name _ (fun i => get_name (Fin.FS i)) with
+            | Some i => Some (Fin.FS i)
+            | None => None
+            end
+     end.
 
-Definition struct_get_names
-  (ty : Kind -> Type)
-  (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
-  (_ : ConstT (Struct get_kind get_name))
-  :  list string
-  := struct_foldr ty get_kind get_name (fun _ name _ acc => name :: acc) nil.
-
-Definition struct_get_field_index
-  (ty: Kind -> Type)
-  :  forall (n : nat)
-       (get_kind : Fin.t n -> Kind)
-       (get_name : Fin.t n -> string)
-       (packet : Expr ty (SyntaxKind (Struct get_kind get_name))),
-       string -> option (Fin.t n)
-  := nat_rect
-       (fun n
-         => forall
-              (get_kind : Fin.t n -> Kind)
-              (get_name : Fin.t n -> string)
-              (packet : Expr ty (SyntaxKind (Struct get_kind get_name))),
-              string -> option (Fin.t n))
-       (fun _ _ _ _ => None)
-       (fun n _ get_kind get_name packet name
-         => struct_foldr ty get_kind get_name
-              (fun index field_name _ acc
-                => if string_dec name field_name
-                     then Some index
-                     else acc)
-              None).
+Definition struct_get_field_index n (kinds: Fin.t n -> Kind) (names: Fin.t n -> string) ty (e: Expr ty (SyntaxKind (Struct kinds names))) name
+  := struct_get_field_index' name names.
 
 Ltac struct_get_field_ltac packet name :=
   let val := eval cbv in (struct_get_field_index packet name) in
@@ -2187,10 +2145,8 @@ Definition struct_get_field_default
   (default : Expr ty (SyntaxKind kind))
   :  Expr ty (SyntaxKind kind)
   := match struct_get_field packet name kind with
-       | Some field_value
-         => field_value
-       | None
-         => default
+       | Some field_value => field_value
+       | None => default
      end.
 
 Definition struct_set_field
@@ -2209,9 +2165,8 @@ Proof.
           | None => None
           | Some i => _
           end).
-  destruct (Kind_decb (get_kind i) kind) eqn:G.
-  - apply Kind_decb_eq in G.
-    subst.
+  destruct (Kind_dec (get_kind i) kind).
+  - subst.
     exact (Some (UpdateStruct packet i value)).
   - exact None.
 Defined.
@@ -2237,8 +2192,7 @@ Proof.
     exact (UpdateStruct packet i value).
   - exact packet.
 Defined.
-
+           
 (* TODO
-   + Compiler verification (difficult)
    + PUAR: Linux/Certikos
  *)
