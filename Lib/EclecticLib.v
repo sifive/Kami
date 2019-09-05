@@ -43,6 +43,17 @@ Proof.
   exists x; split; [auto | rewrite H; auto].
 Qed. *)
 
+Fixpoint Fin_t_foldr
+         (A : Type)
+         (n : nat)
+         (init : A)
+  := match n return
+           forall (f : Fin.t n -> A -> A), A
+     with
+     | 0 => fun _ => init
+     | S m => fun f => f Fin.F1 (Fin_t_foldr m init (fun i => f (Fin.FS i)))
+     end.
+
 Section nth_Fin.
   Variable A: Type.
   Fixpoint nth_Fin (ls: list A): Fin.t (length ls) -> A :=
