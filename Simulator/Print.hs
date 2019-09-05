@@ -47,19 +47,19 @@ printNum T.Binary v = resize_num (BV.size v) $ tail $ tail $ BV.showBin v
 printNum T.Decimal v = show (BV.nat v)
 printNum T.Hex v = resize_num (BV.size v `cdiv` 4) $ tail $ tail $ BV.showHex v
 
-sysIO :: T.SysT Val -> IO ()
-sysIO T.Finish = do
-    no_print <- no_print_mode
-    interactive <- interactive_mode
+sysIO :: Modes -> T.SysT Val -> IO ()
+sysIO modes T.Finish = do
+    let no_print = no_print_mode modes
+    let interactive = interactive_mode modes
     when (not no_print && not interactive) $ hPutStrLn stdout "Exiting..."
     exitSuccess
-sysIO (T.DispString msg) = do
-    no_print <- no_print_mode
-    interactive <- interactive_mode
+sysIO modes (T.DispString msg) = do
+    let no_print = no_print_mode modes
+    let interactive = interactive_mode modes
     when (not no_print && not interactive) $ hPutStr stdout $ format_string $ msg
-sysIO (T.DispExpr _ e ff) = do
-    no_print <- no_print_mode
-    interactive <- interactive_mode
+sysIO modes (T.DispExpr _ e ff) = do
+    let no_print = no_print_mode modes
+    let interactive = interactive_mode modes
     when (not no_print && not interactive) $ hPutStr stdout $ printVal ff $ eval e
 
 format_string :: String -> String

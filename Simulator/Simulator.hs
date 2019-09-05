@@ -33,16 +33,16 @@ get_rules (x:xs) rules = case lookup x rules of
         rest <- get_rules xs rules
         return ((x,a):rest)
 
-initialize :: T.RegInitT -> IO (String,Val)
-initialize (_, (_, Just (T.NativeConst _))) = error "Encountered a NativeConst."
-initialize (regName, (_, Just (T.SyntaxConst _ c))) = return (regName, eval c)
-initialize (regName, (k, Nothing)) = do
-    debug <- debug_mode
+initialize :: Modes -> T.RegInitT -> IO (String,Val)
+initialize _ (_, (_, Just (T.NativeConst _))) = error "Encountered a NativeConst."
+initialize _ (regName, (_, Just (T.SyntaxConst _ c))) = return (regName, eval c)
+initialize modes (regName, (k, Nothing)) = do
+    let debug = debug_mode modes
     v <- (if debug then (pure . defVal_FK) else randVal_FK) k
     return (regName,v)
 
-simulate_action :: AbstractEnvironment a => IORef a -> FileState -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> T.ActionT Val -> M.Map String Val -> IO ([(String,Val)], [FileUpd] ,Val)
-simulate_action envRef state meths act regs = sim act [] [] where
+simulate_action :: AbstractEnvironment a => Modes -> IORef a -> FileState -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> T.ActionT Val -> M.Map String Val -> IO ([(String,Val)], [FileUpd] ,Val)
+simulate_action modes envRef state meths act regs = sim act [] [] where
 
     sim (T.MCall methName _ arg cont) updates fupdates = case rf_methcall state methName (eval arg) of
         Just (Nothing,v) -> sim (cont v) updates fupdates
@@ -78,32 +78,29 @@ simulate_action envRef state meths act regs = sim act [] [] where
             sim (cont v) updates' fupdates'
 
     sim (T.Sys syss a) updates fupdates = do
-        execIOs $ map sysIO syss
+        execIOs $ map (sysIO modes) syss
         sim a updates fupdates
 
     sim (T.Return e) updates fupdates = return (updates, fupdates, eval e)
 
 simulate_module :: AbstractEnvironment a => Int -> ([T.RuleT] -> Str (IO T.RuleT)) -> IORef a -> [String] -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> [T.RegFileBase] -> T.BaseModule -> IO (M.Map String Val)
 simulate_module _ _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
-simulate_module seed strategy envRef rulenames meths rfbs (T.BaseMod init_regs rules defmeths) = 
-
-    -- passes the seed to the global rng
-    (setStdGen $ mkStdGen seed) >>
-
-    (when (not $ null defmeths) $ putStrLn "Warning: Encountered internal methods.") >>
- 
+simulate_module seed strategy envRef rulenames meths rfbs (T.BaseMod init_regs rules defmeths) = do
+    modes <- get_modes
+    setStdGen $ mkStdGen seed
+    when (not $ null defmeths) $ putStrLn "Warning: Encountered internal methods."
     case get_rules rulenames rules of
         Left ruleName -> error ("Rule " ++ ruleName ++ " not found.")
         Right rules' -> do
-            state <- initialize_files rfbs
-            regs <- mapM initialize init_regs
+            state <- initialize_files modes rfbs
+            regs <- mapM (initialize modes) init_regs
             sim (strategy rules') (M.fromList regs) state  where
                 sim (r :+ rs) regs filestate = do
                     (ruleName,a) <- r
                     currEnv <- readIORef envRef
                     preEnv <- envPre currEnv filestate regs ruleName
                     writeIORef envRef preEnv
-                    (upd,fupd,_) <- simulate_action envRef filestate meths (unsafeCoerce $ a ()) regs
+                    (upd,fupd,_) <- simulate_action modes envRef filestate meths (unsafeCoerce $ a ()) regs
                     postEnv <- readIORef envRef
                     nextEnv <- envPost postEnv filestate regs ruleName
                     writeIORef envRef nextEnv

@@ -128,8 +128,8 @@ exec_file_updates = foldr exec_file_update
 process_args :: [String] -> [(String,String)]
 process_args = catMaybes . map (binary_split '=')
 
-initialize_file :: [(String,FilePath)] -> T.RegFileBase -> FileState -> IO FileState
-initialize_file args rfb@(T.Build_RegFileBase rfIsWrMask rfNum rfDataArray rfRead rfWrite rfIdxNum rfData rfInit) state = do
+initialize_file :: Modes -> [(String,FilePath)] -> T.RegFileBase -> FileState -> IO FileState
+initialize_file modes args rfb@(T.Build_RegFileBase rfIsWrMask rfNum rfDataArray rfRead rfWrite rfIdxNum rfData rfInit) state = do
 
     arr <- array
 
@@ -160,7 +160,7 @@ initialize_file args rfb@(T.Build_RegFileBase rfIsWrMask rfNum rfDataArray rfRea
     newvals <- case rfRead of
                     T.Async _ -> return []
                     T.Sync b rs -> mapM (\r -> do
-                                                debug <- debug_mode
+                                                let debug = debug_mode modes
                                                 v <- (if debug then (pure . defVal) else randVal) (if b then T.Bit (log2 $ rfIdxNum) else rfData)
                                                 return (T.readRegName r, v)) rs
 
@@ -175,7 +175,7 @@ initialize_file args rfb@(T.Build_RegFileBase rfIsWrMask rfNum rfDataArray rfRea
 
         array = case rfInit of
             T.RFNonFile Nothing -> do
-                debug <- debug_mode
+                let debug = debug_mode modes
                 vs <- mapM (if debug then (pure . defVal) else randVal) $ V.replicate (rfIdxNum) (rfData)
                 return vs
             T.RFNonFile (Just c) -> return $ V.replicate (rfIdxNum) (eval c)
@@ -191,7 +191,7 @@ initialize_file args rfb@(T.Build_RegFileBase rfIsWrMask rfNum rfDataArray rfRea
 
                         else file
 
-initialize_files :: [T.RegFileBase] -> IO FileState
-initialize_files rfbs = do
+initialize_files :: Modes -> [T.RegFileBase] -> IO FileState
+initialize_files modes rfbs = do
     args <- getArgs
-    foldrM (initialize_file $ process_args args) empty_state rfbs
+    foldrM (initialize_file modes $ process_args args) empty_state rfbs

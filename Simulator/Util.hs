@@ -75,6 +75,22 @@ intersperse_with_period n f xs = go n xs where
     go 0 (x :+ ys) = f x :+ go n ys
     go m (x :+ ys) = x :+ go (m-1) ys
 
+data Modes = Modes {
+      debug_mode :: Bool
+    , interactive_mode :: Bool
+    , no_print_mode :: Bool
+}
+
+get_modes :: IO Modes
+get_modes = do
+    args <- getArgs
+    return $ Modes {
+          debug_mode = "--debug" `elem` args
+        , interactive_mode = "--interactive" `elem` args
+        , no_print_mode = "--noprint" `elem` args
+    }
+
+{-
 debug_mode :: IO Bool
 debug_mode = do
     args <- getArgs
@@ -89,4 +105,4 @@ no_print_mode :: IO Bool
 no_print_mode = do
     args <- getArgs
     return $ "--noprint" `elem` args
-
+-}
