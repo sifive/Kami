@@ -2259,6 +2259,7 @@ Lemma EquivLoop (m : BaseModule) o:
     exists o' (ls' : list (list FullLabel)),
       PriorityUpds o upds o' /\
       upds = (map getLabelUpds ls') /\
+      (map Rle (map fst rules)) = getLabelExecs (concat ls') /\
       calls = concat (map getLabelCalls (rev ls')) /\
       Trace m o' (ls' ++ ls).
 Proof.
@@ -2293,7 +2294,7 @@ Proof.
     rewrite <-CompactPriorityUpds_iff in H2; auto.
     assert (forall u, In u (nil :: upds0) -> NoDup (map fst u)) as P1.
     { intros.
-      destruct (H1 _ H7); auto.
+      destruct (H1 _ H8); auto.
     }
     assert (WfRegMapExpr (VarRegMap type (o, nil :: upds0)) (o, nil::upds0)) as P2.
     { clear - HRegMapWf0.
@@ -2304,8 +2305,8 @@ Proof.
                              P2 HSemCompActionT_cont0) as TMP; dest.
     split; auto; simpl in *.
     assert (upds = (x1::upds0)) as P4.
-    { inv H8. destruct x1; auto. }
-    clear H8; subst.
+    { inv H9. destruct x1; auto. }
+    clear H9; subst.
     exists (doUpdRegs x1 x), (((x1, (Rle (fst a), calls_cont0))::nil)::x0).
     unfold getLabelCalls, getLabelUpds in *; simpl in *.
     rewrite app_nil_r.
@@ -2313,36 +2314,37 @@ Proof.
     + econstructor 2 with (u := x1); auto.
       * rewrite CompactPriorityUpds_iff in H2; auto.
         apply H2.
-      * specialize (H7 _ (or_introl eq_refl)); dest.
+      * specialize (H8 _ (or_introl eq_refl)); dest.
         rewrite (prevPrevRegsTrue H2).
         apply getKindAttr_doUpdRegs; eauto.
         -- rewrite <- (getKindAttr_map_fst _ _ (prevPrevRegsTrue H2)).
            assumption.
         -- intros.
            rewrite <- (prevPrevRegsTrue H2).
-           apply H4.
+           apply H5.
            rewrite in_map_iff.
            exists (s, v); simpl; split; auto.
       * repeat intro.
         rewrite (getKindAttr_map_fst _ _ (prevPrevRegsTrue H2)) in HoInitNoDups.
-        specialize (H7 _ (or_introl eq_refl)); dest.
-        rewrite (prevPrevRegsTrue H2) in H7.
-        specialize (doUpdRegs_UpdRegs _ (HoInitNoDups) _ H4 H7) as P4.
+        specialize (H8 _ (or_introl eq_refl)); dest.
+        rewrite (prevPrevRegsTrue H2) in H8.
+        specialize (doUpdRegs_UpdRegs _ (HoInitNoDups) _ H5 H8) as P4.
         unfold UpdRegs in P4; dest.
-        specialize (H10 _ _ H3); dest.
-        destruct H10; dest.
-        -- inv H10; auto.
-           inv H12.
+        specialize (H11 _ _ H3); dest.
+        destruct H11; dest.
+        -- inv H11; auto.
+           inv H13.
         -- right; split; auto.
-           intro; apply H10.
+           intro; apply H11.
            exists x1; split; simpl; auto.
+    + apply f_equal; assumption.
     + repeat rewrite map_app; simpl.
       repeat rewrite concat_app; simpl.
       repeat rewrite app_nil_r.
       reflexivity.
     + destruct a; simpl in *.
       econstructor 2.
-      * apply H5.
+      * apply H7.
       * enough (Step m x ((x1, (Rle s, calls_cont0))::nil)) as P3.
         { apply P3. }
         econstructor.
@@ -2350,10 +2352,10 @@ Proof.
            ++ rewrite <- TMP, (prevPrevRegsTrue H2); reflexivity.
            ++ apply H; left; simpl; reflexivity.
            ++ rewrite <- TMP, (prevPrevRegsTrue H2).
-              apply SubList_map, (SemActionReadsSub H9).
-           ++ specialize (H7 _ (or_introl eq_refl)); dest.
+              apply SubList_map, (SemActionReadsSub H10).
+           ++ specialize (H8 _ (or_introl eq_refl)); dest.
               rewrite <- TMP, (prevPrevRegsTrue H2).
-              apply (SemActionUpdSub H9).
+              apply (SemActionUpdSub H10).
            ++ intros; inv H3.
            ++ intros; inv H3.
            ++ econstructor.
@@ -2365,17 +2367,17 @@ Proof.
            rewrite getNumFromCalls_app; simpl.
            erewrite NoSelfCallRule_Impl; eauto.
            ++ apply H; apply in_eq.
-           ++ apply H9.
+           ++ apply H10.
       * simpl.
         apply doUpdRegs_enuf; auto.
-        -- specialize (H7 _ (or_introl (eq_refl))); dest; auto.
+        -- specialize (H8 _ (or_introl (eq_refl))); dest; auto.
         -- apply getKindAttr_doUpdRegs; auto.
            ++ rewrite <-(getKindAttr_map_fst _ _ (prevPrevRegsTrue H2)); assumption.
-           ++ specialize (H7 _ (or_introl (eq_refl))); dest; assumption.
+           ++ specialize (H8 _ (or_introl (eq_refl))); dest; assumption.
            ++ intros.
-              specialize (H7 _ (or_introl (eq_refl))); dest.
+              specialize (H8 _ (or_introl (eq_refl))); dest.
               rewrite <-(prevPrevRegsTrue H2).
-              apply H7.
+              apply H8.
               rewrite in_map_iff.
               exists (s0, v); auto.
       * reflexivity.
@@ -2389,11 +2391,12 @@ Corollary EquivLoop' {m : BaseModule} {o ls rules upds calls retl}
   exists o' (ls' : list (list FullLabel)),
     PriorityUpds o upds o' /\
     upds = (map getLabelUpds ls') /\
+    (map Rle (map fst (rev rules))) = getLabelExecs (concat ls') /\
     calls = concat (map getLabelCalls (rev ls')) /\
     Trace m o' (ls' ++ ls).
 Proof.
   specialize (Trace_NoDup HTrace HRegsWf) as HoInitNoDups.
-  rewrite <- (rev_involutive rules).
+  rewrite <- (rev_involutive rules) at 1.
   assert (SubList (rev rules) (getRules m)) as P0.
   { repeat intro; apply HValidSch; rewrite in_rev; assumption. }
   eapply EquivLoop; eauto.
@@ -5311,6 +5314,7 @@ Lemma EEquivLoop (b : BaseModule) (lrf : list RegFileBase) o :
     exists o' (ls' : list (list FullLabel)),
       PriorityUpds o upds o' /\
       upds = (map getLabelUpds ls') /\
+      (map Rle (map fst (rev rules))) = getLabelExecs (concat ls') /\
       calls = concat (map getLabelCalls (rev ls')) /\
       Trace m o' (ls' ++ ls).
 Proof.
@@ -5326,6 +5330,12 @@ Proof.
       inv P1; inv HNCBaseModule; eauto.
     - inv P0.
       eapply IHlrf; eauto. }
+  assert ( map fst (rev rules) =
+           map fst (rev (map (inline_Rules (getAllMethods (mergeSeparatedBaseFile lrf))
+                                           (seq 0 (Datatypes.length (getAllMethods (mergeSeparatedBaseFile lrf))))) rules))) as P2.
+  { rewrite <- map_rev.
+    rewrite SameKeys_inlineSome_Rules_map; reflexivity. }
+  rewrite P2.
   eapply EquivLoop'; eauto; simpl.
   - rewrite map_app, NoDup_app_iff; repeat split; auto; inv HWfMod.
     + inv HWf1; inv HWfBaseModule; dest; assumption.
@@ -5337,8 +5347,8 @@ Proof.
     + repeat intro; specialize (HDisjRegs a); clear - HDisjRegs H2 H3; inv HDisjRegs; contradiction.
     + repeat intro; specialize (HDisjRegs a); clear - HDisjRegs H2 H3; inv HDisjRegs; contradiction.
   - unfold inlineAll_All_mod, inlineAll_All, inlineAll_Meths; simpl.
-    rewrite inlineAll_Meths_RegFile_fold_flat, inlineAll_Rules_NoCalls, inlineAll_Rules_in; eauto; simpl in *.
-    instantiate (1 := map (inline_Rules (getAllMethods (mergeSeparatedBaseFile lrf)) (seq 0 (Datatypes.length (getAllMethods (mergeSeparatedBaseFile lrf))))) rules).
+    rewrite inlineAll_Meths_RegFile_fold_flat, inlineAll_Rules_NoCalls, inlineAll_Rules_in;
+      eauto; simpl in *.
     rewrite getAllRules_mergeBaseFile, app_nil_r.
     inv HNoSelfCallsBase; unfold NoSelfCallMethsBaseModule, NoSelfCallRulesBaseModule in *.
     apply SubList_map.
@@ -5449,6 +5459,7 @@ Lemma EEquivLoop' (b : BaseModule) (lrf : list RegFileBase) o :
     exists o' (ls' : list (list FullLabel)),
       PriorityUpds o upds o' /\
       upds = (map getLabelUpds ls') /\
+      (map Rle (map fst (rev rules))) = getLabelExecs (concat ls') /\
       calls = concat (map getLabelCalls (rev ls')) /\
       Trace m o' (ls' ++ ls).
 Proof.
@@ -5488,18 +5499,21 @@ Lemma CompTraceEquiv (b : BaseModule) (lrf : list RegFileBase) o :
     (forall upds u, In upds lupds -> In u upds -> (NoDup (map fst u)) /\ SubList (getKindAttr u) (getKindAttr o)) /\
     exists (lss : list (list (list FullLabel))),
       Forall2 (fun x y => x = (map getLabelUpds y)) lupds lss /\
+      (forall x, In x lss -> (map Rle (map fst (rev rules))) = getLabelExecs (concat x)) /\ 
       Forall2 (fun x y => x = concat (map getLabelCalls (rev y))) lcalls lss /\
       Trace m o (concat lss).
 Proof.
   induction 4; split; subst; intros; dest; auto.
   - inv H0.
   - exists nil; repeat split; auto.
-    econstructor; eauto.
-    unfold regInits in *; simpl in *.
-    enough (getAllRegisters (mergeSeparatedBaseFile lrf) = concat (map getRegFileRegisters lrf)).
-    { rewrite H0; assumption. }
-    clear; induction lrf; simpl; auto.
-    rewrite IHlrf; reflexivity.
+    + intros; exfalso.
+      inv H0.
+    + econstructor; eauto.
+      unfold regInits in *; simpl in *.
+      enough (getAllRegisters (mergeSeparatedBaseFile lrf) = concat (map getRegFileRegisters lrf)).
+      { rewrite H0; assumption. }
+      clear; induction lrf; simpl; auto.
+      rewrite IHlrf; reflexivity.
   - rewrite <-(rev_involutive rules) in HSemAction.
     specialize (ESameOldLoop _ _ _ HSemAction) as TMP; subst.
     rewrite rev_involutive in HSemAction.
@@ -5508,15 +5522,16 @@ Proof.
   - rewrite <-(rev_involutive rules) in HSemAction.
     specialize (ESameOldLoop _ _ _ HSemAction) as TMP; subst.
     rewrite rev_involutive in HSemAction.
-    specialize (EEquivLoop' HWfMod H4 HNoSelfCallsBase H HSemAction) as TMP; dest.
+    specialize (EEquivLoop' HWfMod H5 HNoSelfCallsBase H HSemAction) as TMP; dest.
     unfold m; exists (x1 :: x); repeat split; auto.
-    simpl; enough (o' = x0).
+    + intros; inv H12; eauto.
+    + simpl; enough (o' = x0).
     { subst; assumption. }
     eapply PriorityUpds_Equiv'; eauto.
-    + apply Trace_sameRegs in H4.
+    * apply Trace_sameRegs in H5.
       apply WfNoDups in HWfMod; dest.
       unfold m in H4; simpl in *.
-      rewrite <- fst_getKindAttr; setoid_rewrite H4.
-      rewrite <- fst_getKindAttr in H10; assumption.
-    + intros; eapply H5; assumption.
+      rewrite <- fst_getKindAttr; setoid_rewrite H5.
+      rewrite <- fst_getKindAttr in H12; assumption.
+    * intros; eapply H6; assumption.
 Qed.
