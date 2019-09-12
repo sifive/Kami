@@ -498,6 +498,23 @@ Section utila.
                     F)
               xs).
 
+    Lemma utila_any_correct_false:
+      forall xs : list (Expr type (SyntaxKind Bool)),
+        evalExpr (utila_any xs) = false <-> Forall (fun x : Expr type (SyntaxKind Bool) => evalExpr x = false) xs.
+    Proof.
+      intros; split; intros.
+      - induction xs; simpl; auto.
+        simpl in *.
+        rewrite orb_false_iff in H; dest.
+        specialize (IHxs H0).
+        constructor; auto.
+      - induction xs; simpl; auto.
+        simpl in *.
+        inv H.
+        specialize (IHxs H3).
+        rewrite IHxs, H2.
+        auto.
+    Qed.
   End ver.
 
   (* VI. Denotational semantics for monadic expressions. *)
