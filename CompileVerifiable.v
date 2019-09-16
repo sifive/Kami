@@ -22,7 +22,7 @@ Section Compile.
              lret (cont: fullType ty (SyntaxKind (snd argRetK)) -> CompActionT lret): CompActionT lret
   | CompLetExpr k (e: Expr ty k) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
   | CompNondet k lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
-  | CompSys (ls: list (SysT ty)) lret (cont: CompActionT lret): CompActionT lret
+  | CompSys (pred: Bool @# ty) (ls: list (SysT ty)) lret (cont: CompActionT lret): CompActionT lret
   | CompRead (r: string) (k: FullKind) (readMap: RegMapExpr) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
   | CompRet lret (e: lret @# ty) (newMap: RegMapExpr) : CompActionT lret
   | CompLetFull k (a: CompActionT k) lret (cont: fullType ty (SyntaxKind k) -> regMapTy -> CompActionT lret): CompActionT lret
@@ -87,7 +87,7 @@ Section Compile.
         CompRet x writeMap
       | LetExpr k' expr cont => CompLetExpr expr (fun ret => @compileAction _ (cont ret) pred writeMap)
       | ReadNondet k' cont => CompNondet k' (fun ret => @compileAction _ (cont ret) pred writeMap)
-      | Sys ls cont => CompSys ls (compileAction cont pred writeMap)
+      | Sys ls cont => CompSys pred ls (compileAction cont pred writeMap)
       | ReadReg r k' cont =>
         @CompRead r k' (VarRegMap readMap) _ (fun v => @compileAction _ (cont v) pred writeMap)
       | WriteReg r k' expr cont =>
@@ -116,7 +116,7 @@ Section Compile.
         CompRet x writeMap
       | ELetExpr k' expr cont => CompLetExpr expr (fun ret => @EcompileAction _ (cont ret) pred writeMap)
       | EReadNondet k' cont => CompNondet k' (fun ret => @EcompileAction _ (cont ret) pred writeMap)
-      | ESys ls cont => CompSys ls (EcompileAction cont pred writeMap)
+      | ESys ls cont => CompSys pred ls (EcompileAction cont pred writeMap)
       | EReadReg r k' cont =>
         @CompRead r k' (VarRegMap readMap) _ (fun v => @EcompileAction _ (cont v) pred writeMap)
       | EWriteReg r k' expr cont =>
@@ -547,10 +547,10 @@ Section Semantics.
                   ret regMap calls val
                   (HSemCompActionT: SemCompActionT (cont ret) regMap calls val):
       SemCompActionT (@CompNondet _ _ k lret cont) regMap calls val
-  | SemCompSys ls lret cont
+  | SemCompSys pred ls lret cont
                regMap calls val
                (HSemCompActionT: SemCompActionT cont regMap calls val):
-      SemCompActionT (@CompSys _ _ ls lret cont) regMap calls val
+      SemCompActionT (@CompSys _ _ pred ls lret cont) regMap calls val
   | SemCompRead r k readMap lret cont
                 regMap calls val regVal
                 updatedRegs readMapValOld readMapValUpds
