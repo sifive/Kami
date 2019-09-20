@@ -222,6 +222,15 @@ Proof.
   assumption.
 Qed.
 
+Lemma wplus_wzero : forall sz w, wadd _ w (zToWord sz 0) = w.
+Proof.
+  intros.
+  arithmetizeWord.
+  rewrite Zmod_0_l.
+  rewrite Z.add_0_r.
+  assumption.
+Qed.
+
 Lemma wor_idemp :  forall (n : nat) (x0 : word n), wor _ x0 x0 = x0.
 Proof.
   intros.
@@ -1497,6 +1506,19 @@ Proof.
   rewrite (Zmod_small _ _ H); rewrite Z.sub_diag; reflexivity.
 Qed.
 
+Lemma wminus_cancel : forall sz (x y : word sz),
+   (wordVal _ x + wordVal _ y < 2 ^ Z.of_nat sz)%Z -> x ^+ y ^- y = x.
+Proof.
+  intros.
+  arithmetizeWord.
+  simpl in *.
+  rewrite Z.mod_small; try lia.
+  rewrite Z.mod_small; try lia.
+  split. rewrite Z.mod_small. lia.
+  split; lia.
+  rewrite Z.mod_small; lia.
+Qed.
+  
 Lemma wadd_wzero_1:
   forall sz (w: word sz), w ^+ (zToWord _ 0) = w.
 Proof.
