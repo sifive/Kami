@@ -917,7 +917,7 @@ Definition Signature_dec (s1 s2: Signature): {s1 = s2} + {s1 <> s2}.
   - exact (f_equal fst x).
   - exact (f_equal fst x).
 Defined.
-
+ 
 Lemma isEq k: forall (e1: type k) (e2: type k),
     {e1 = e2} + {e1 <> e2}.
 Proof.
