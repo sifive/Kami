@@ -54,7 +54,7 @@ Fixpoint getDefaultConstFullKind (k : FullKind) : ConstFullT k :=
   match k with
   | SyntaxKind k' => SyntaxConst (getDefaultConst k')
   | NativeKind t c' => NativeConst c'
-                         end.
+  end.
 
 Inductive UniBoolOp: Set :=
 | Neg: UniBoolOp.
@@ -216,7 +216,7 @@ Section Phoas.
         | right isGe => UniBit (TruncLsb no (ni - no)) (castBits _ e)
         end; abstract Omega.omega.
     Defined.
-
+    
     Definition ZeroExtendTruncMsb ni no (e: Expr (SyntaxKind (Bit ni))):
       Expr (SyntaxKind (Bit no)).
       refine
@@ -225,7 +225,7 @@ Section Phoas.
         | right isGe => UniBit (TruncMsb (ni - no) no) (castBits _ e)
         end; abstract lia.
     Defined.
-
+    
     Definition SignExtendTruncMsb ni no (e: Expr (SyntaxKind (Bit ni))):
       Expr (SyntaxKind (Bit no)).
       refine
@@ -234,7 +234,7 @@ Section Phoas.
         | right isGe => UniBit (TruncMsb (ni - no) no) (castBits _ e)
         end; abstract Omega.omega.
     Defined.
-
+    
     Fixpoint countLeadingZeros ni no: Expr (SyntaxKind (Bit ni)) -> Expr (SyntaxKind (Bit no)).
     refine
       match ni return Expr (SyntaxKind (Bit ni)) -> Expr (SyntaxKind (Bit no)) with
@@ -261,7 +261,6 @@ Section Phoas.
         sumSizes (fun i => size (fk i))
       | Array n k => n * size k
       end.
-
     (* ConstExtract: LSB, MIDDLE, MSB *)
     (* Concat: MSB, LSB *)
 
@@ -279,7 +278,7 @@ Section Phoas.
                    (Concat _ _) (f Fin.F1)
                    (@concatStructExpr m (fun x => (sizes (Fin.FS x))) (fun x => f (Fin.FS x)))
       end.
-
+    
     Fixpoint pack (k: Kind): Expr (SyntaxKind k) -> Expr (SyntaxKind (Bit (size k))).
       refine
       match k return Expr (SyntaxKind k) -> Expr (SyntaxKind (Bit (size k))) with
@@ -302,7 +301,7 @@ Section Phoas.
              end) n
       end; abstract lia.
     Defined.
-
+    
     Fixpoint sumSizesMsbs n (i: Fin.t n) {struct i}: (Fin.t n -> nat) -> nat :=
       match i in Fin.t n return (Fin.t n -> nat) -> nat with
       | Fin.F1 _ => fun _ => 0
@@ -525,18 +524,21 @@ Fixpoint getRules m :=
 
 Definition getStruct ls :=
   (Struct (fun i => snd (nth_Fin ls i)) (fun j => fst (nth_Fin ls j))).
+Arguments getStruct : simpl never.
 
 Definition getStructVal ty ls :=
   (BuildStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i))
                (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j))
                (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => Expr ty (SyntaxKind (snd x)))
                                       ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))).
+Arguments getStructVal : simpl never.
 
 Definition getStructConst ls :=
   (ConstStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i))
                (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j))
                (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => ConstT (snd x))
                                       ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))).
+Arguments getStructConst : simpl never. 
 
 Definition WriteRq lgIdxNum Data := (getStruct (cons ("addr", Bit lgIdxNum)
                                                      (cons ("data", Data) nil))).
@@ -561,7 +563,7 @@ Definition buildNumDataArray num dataArray IdxNum Data ty (idx: ty (Bit (Nat.log
                                      (Var ty _ val)
                                      (CABit Add (Var ty (SyntaxKind _) idx ::
                                                      Const ty (natToWord _ (proj1_sig (Fin.to_nat i))) :: nil))))).
-                                                                                                                   
+
 Definition updateNumDataArray num dataArray IdxNum Data ty (idxData: ty (WriteRq (Nat.log2_up IdxNum)
                                                                                  (Array num Data))):
   ActionT ty Void :=
@@ -924,12 +926,12 @@ Proof.
 Defined.
 
 
-
 Lemma Kind_decb_refl : forall k, Kind_decb k k = true.
 Proof.
   induction k; simpl; auto.
   - apply Nat.eqb_refl.
-  - rewrite silly_lemma_true with (pf := (Nat.eqb_refl _)) by apply Nat.eqb_refl.
+  -
+    rewrite silly_lemma_true with (pf := (Nat.eqb_refl _)) by apply Nat.eqb_refl.
     rewrite andb_true_iff; split; rewrite Fin_forallb_correct; intros.
     + rewrite (hedberg Nat.eq_dec _ eq_refl); simpl; apply H.
     + rewrite (hedberg Nat.eq_dec _ eq_refl); simpl; apply String.eqb_refl.
@@ -1184,6 +1186,7 @@ Section Semantics.
         (@evalExpr _ fv) i
       | BuildArray n k fv => fun i => @evalExpr _ (fv i)
     end.
+  Arguments evalExpr : simpl nomatch.
   
   Fixpoint evalLetExpr k (e: LetExprSyntax type k) :=
     match e in LetExprSyntax _ _ return type k with
@@ -1194,7 +1197,7 @@ Section Semantics.
                                                     then evalLetExpr t
                                                     else evalLetExpr f))
     end.
-
+  
   Variable o: RegsT.
 
   Inductive SemAction:
@@ -1373,6 +1376,7 @@ Section MethT_dec.
                   (fun H0 : existT SignT s x = existT SignT s y
                    => H (method_values_eq H0)))
             (method_denotation_values_dec x y).
+  
   (*
   Determines whether or not the values passed to,
   and returned by, two method calls are equal.
@@ -1401,6 +1405,7 @@ Section MethT_dec.
     - apply string_dec.
     - apply sigT_SignT_dec.
   Defined.
+  
 End MethT_dec.
   
 Fixpoint getNumFromCalls (f : MethT) (l : MethsT) : Z :=
@@ -2192,7 +2197,44 @@ Proof.
     exact (UpdateStruct packet i value).
   - exact packet.
 Defined.
-           
+
+Create HintDb KamiDb.
+Hint Unfold 
+     inlineSingle_Meths_pos
+     flatten_inline_remove 
+     getHidden
+     getAllRegisters
+     getAllMethods
+     getAllRules
+     inlineAll_All_mod
+     inlineAll_All
+     writeRegFileFn
+     readRegFile
+     createHideMod
+     List.find
+     List.fold_right
+     List.fold_left
+     List.filter
+     List.length
+     List.app
+     List.seq
+     List.nth_error
+     List.map
+     List.concat
+     List.existsb
+     List.nth
+     Datatypes.length
+     Ascii.eqb
+     String.eqb
+     Bool.eqb
+     Datatypes.negb
+     Datatypes.andb
+     Datatypes.orb
+     Datatypes.fst
+     Datatypes.snd
+     String.append
+     EclecticLib.nth_Fin
+  : KamiDb.
 (* TODO
    + PUAR: Linux/Certikos
  *)
