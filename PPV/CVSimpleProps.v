@@ -34,7 +34,29 @@ Proof.
   - econstructor 9; eauto using RME_Simple_RME_Equiv.
   - inv HSemCA_simple; simpl in *; EqDep_subst; rewrite unifyWO in *.
     inv HSemCA_simple_a; EqDep_subst.
-Admitted.  
+    destruct regMap_a; inv HRegMapWf; inv H0; EqDep_subst.
+    + inv HUpdate; EqDep_subst.
+      econstructor 10; eauto using RME_Simple_RME_Equiv.
+      * econstructor; eauto.
+        econstructor; eauto using RME_Simple_RME_Equiv.
+      * econstructor 10; eauto using RME_Simple_RME_Equiv.
+        econstructor; eauto.
+        eapply SemUpdRegMapFalse; eauto using RME_Simple_RME_Equiv.
+    + econstructor 11; eauto using RME_Simple_RME_Equiv.
+      econstructor; eauto using RME_Simple_RME_Equiv.
+  - inv HSemCA_simple; simpl in *; EqDep_subst; rewrite unifyWO in *.
+    inv HSemCA_simple_a; EqDep_subst.
+    destruct regMap_a; inv HRegMapWf; inv H0; EqDep_subst;[|discriminate].
+    econstructor 12; eauto.
+    econstructor; eauto using RME_Simple_RME_Equiv.
+  - inv HSemCA_simple; simpl in *; EqDep_subst; rewrite unifyWO in *.
+    inv HSemCA_simple_a; EqDep_subst.
+    destruct regMap_a; inv HRegMapWf; inv H0; EqDep_subst;[discriminate|].
+    econstructor 13; eauto using RME_Simple_RME_Equiv.
+    econstructor; eauto using RME_Simple_RME_Equiv.
+  - econstructor 14; eauto using RME_Simple_RME_Equiv.
+  - econstructor 15; eauto using RME_Simple_RME_Equiv.
+Qed.
 
 (* End PropertiesSimple *)
 
