@@ -188,5 +188,20 @@ Section SemSimple.
                                     regMap calls val
                                     (HSemCA_simple : SemCA_simple (cont regVal) regMap calls val):
       SemCA_simple (@CompSyncReadRes_simple _ _ idxNum num readRegName dataArray Data isAddr readMap lret cont) regMap calls val.
-
+  Variable (k : Kind) (a : CA_simple type RegMapType k) (regInits : list RegInitT).
+  
+  Inductive SemCA_simple_Trace: RegsT -> list UpdRegsT -> list MethsT -> Prop :=
+  | SemCA_simple_TraceInit (oInit : RegsT) (lupds : list UpdRegsT) (lcalls : list MethsT)
+                     (HNoUpds : lupds = nil) (HNoCalls : lcalls = nil)
+                     (HInitRegs : Forall2 regInit oInit regInits) :
+      SemCA_simple_Trace oInit lupds lcalls
+  | SemCA_simple_TraceCont (o o' : RegsT) (lupds lupds' : list UpdRegsT) (upds : UpdRegsT)
+                     (lcalls lcalls' : list MethsT) (calls : MethsT) val
+                     (HOldTrace : SemCA_simple_Trace o lupds lcalls)
+                     (HSemAction : SemCA_simple a (o, upds) calls val)
+                     (HNewUpds : lupds' = upds :: lupds)
+                     (HNewCalls : lcalls' = calls :: lcalls)
+                     (HPriorityUpds : PriorityUpds o upds o') :
+      SemCA_simple_Trace o' lupds' lcalls'.
+  
 End SemSimple.
