@@ -124,7 +124,7 @@ Section SemSimple.
                           (HNewCalls : newCalls = calls_a ++ calls_cont)
                           (HSemCA_simple_cont: SemCA_simple (cont val_a regMap_a) regMap_cont calls_cont val_cont):
       SemCA_simple (@CompLetFull_simple _ _ k a lret cont) regMap_cont newCalls val_cont
-  | SemCompAsyncRead_simple num (dataArray : string) idxNum (idx : Bit (Nat.log2_up idxNum) @# type) Data readMap lret
+  | SemCompAsyncRead_simple num (readPort dataArray : string) idxNum (idx : Bit (Nat.log2_up idxNum) @# type) Data readMap lret
                             updatedRegs readMapValOld readMapValUpds regVal regMap
                             (HReadMap : Sem_RME_simple readMap (readMapValOld, readMapValUpds))
                             (HUpdatedRegs : PriorityUpds readMapValOld readMapValUpds updatedRegs)
@@ -137,7 +137,7 @@ Section SemSimple.
                                                           (CABit Add (Var type (SyntaxKind _) (evalExpr idx) ::
                                                                           Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                             (HSemCA_simple : SemCA_simple (cont (evalExpr contArray)) regMap calls val):
-      SemCA_simple (@CompAsyncRead_simple _ _ idxNum num dataArray idx Data readMap lret cont) regMap calls val
+      SemCA_simple (@CompAsyncRead_simple _ _ idxNum num readPort dataArray idx Data readMap lret cont) regMap calls val
   | SemCompWrite_simple (dataArray : string) idxNum Data (readMap : RME_simple type RegMapType) lret
                      updatedRegs readMapValOld readMapValUpds regVal
                      (HReadMap : Sem_RME_simple readMap (readMapValOld, readMapValUpds))

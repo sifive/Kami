@@ -227,11 +227,11 @@ type Name = String
 
 data RegMapTy = RegMapTy {
     reg_counters :: H.Map Name Int
-  , async_read_counters ::  H.Map Name Int
-  , sync_isAddr :: H.Map Name Int
-  , sync_not_isAddr :: H.Map Name Int
-  , sync_isAddr_reg :: H.Map Name Int
-  , sync_not_isAddr_reg :: H.Map Name Int
+  , async_counters ::  H.Map Name Int
+  , isAddr_counters :: H.Map Name Int
+  , not_isAddr_counters :: H.Map Name Int
+  , isAddr_reg_counters :: H.Map Name Int
+  , not_isAddr_reg_counters :: H.Map Name Int
 }
 
 data ExprState = ExprState {
@@ -240,8 +240,9 @@ data ExprState = ExprState {
   , meth_counters :: H.Map Name Int
   , let_counter :: Int
   , all_regs :: [Name]
-  , all_rfs :: [(Name,Name)]
-  , all_sync_regs :: [Name]
+  , all_asyncs :: [(Name,Name)]
+  , all_isAddrs :: [(Name,Name)]
+  , all_not_isAddrs :: [(Name,Name)]
 }
 
 data VExpr =
@@ -263,6 +264,26 @@ data VerilogExprs = VerilogExprs {
 }
 
 {- monadic accessors which both return the current count and increment it -}
+
+get_regs :: State ExprState [Name]
+get_regs = do
+  s <- get
+  return $ all_regs s
+
+get_asyncs :: State ExprState [(Name,Name)]
+get_asyncs = do
+  s <- get
+  return $ all_asyncs s
+
+get_isAddrs :: State ExprState [(Name,Name)]
+get_isAddrs = do
+  s <- get
+  return $ all_isAddrs s
+
+get_not_isAddrs :: State ExprState [(Name,Name)]
+get_not_isAddrs = do
+  s <- get
+  return $ all_not_isAddrs s
 
 let_count :: State ExprState Int
 let_count = do
@@ -287,186 +308,164 @@ reg_count r = do
   put $ s { regmap_counters = rmc { reg_counters = H.insert r (n+1) rc } }
   return n
 
-get_regs :: State ExprState [Name]
-get_regs = do
-  s <- get
-  return $ all_regs s
-
-get_reg_files :: State ExprState [(Name,Name)]
-get_reg_files = do
-  s <- get
-  return $ all_rfs s
-
-
-get_sync_regs :: State ExprState [Name]
-get_sync_regs = do
-  s <- get
-  return $ all_sync_regs s
-
-{-
-rf_count :: Name -> State ExprState Int
-rf_count rf = do
+async_count :: Name -> State ExprState Int
+async_count dataArray = do
   s <- get
   let rmc = regmap_counters s
-  let rfc = regfile_counters rmc
-  let n = rfc H.! rf
-  put $ s { regmap_counters = rmc { regfile_counters = H.insert rf (n+1) rfc } }
-  return n
--}
-
-async_read_count :: Name -> State ExprState Int
-async_read_count dataArray = do
-  s <- get
-  let rmc = regmap_counters s
-  let arc = async_read_counters rmc
+  let arc = async_counters rmc
   let n = arc H.! dataArray
-  put $ s { regmap_counters = rmc { async_read_counters = H.insert dataArray (n+1) arc } }
+  put $ s { regmap_counters = rmc { async_counters = H.insert dataArray (n+1) arc } }
   return n
 
-sync_isAddr_count :: Name -> State ExprState Int
-sync_isAddr_count r = do
+isAddr_count :: Name -> State ExprState Int
+isAddr_count r = do
   s <- get
   let rmc = regmap_counters s
-  let sic = sync_isAddr rmc
+  let sic = isAddr_counters rmc
   let n = sic H.! r
-  put $ s { regmap_counters = rmc { sync_isAddr = H.insert r (n+1) sic } }
+  put $ s { regmap_counters = rmc { isAddr_counters = H.insert r (n+1) sic } }
   return n
 
-sync_not_isAddr_count :: Name -> State ExprState Int
-sync_not_isAddr_count r = do
+not_isAddr_count :: Name -> State ExprState Int
+not_isAddr_count r = do
   s <- get
   let rmc = regmap_counters s
-  let snc = sync_not_isAddr rmc
+  let snc = not_isAddr_counters rmc
   let n = snc H.! r
-  put $ s { regmap_counters = rmc { sync_not_isAddr = H.insert r (n+1) snc} }
+  put $ s { regmap_counters = rmc { not_isAddr_counters = H.insert r (n+1) snc} }
   return n
 
-data MapType = ReadMap | WriteMap
+data MapType = ReadMap | WriteMap deriving (Eq)
 
-query_RME_reg :: MapType -> Name -> T.RME_simple Int RegMapTy -> VExpr
-query_RME_reg x reg (T.VarRME rmt) = VVar $ reg ++ "__" ++ (show $ (reg_counters rmt) H.! reg)
-query_RME_reg x reg (T.UpdReg r pred _ val m) = if reg == r then VITE (KExpr pred) (KExpr val) (query_RME_reg x reg m) else query_RME_reg x reg m
-query_RME_reg ReadMap reg (T.UpdRegFile _ _ _ _ _ _ _ _ writeMap readMap _) = query_RME_reg reg readMap
-query_RME_reg WriteMap reg (T.UpdRegFile _ _ _ _ _ _ _ _ writeMap readMap _) = query_RME_reg reg writeMap
-query_RME_reg ReadMap reg (T.UpdReadReq _ _ _ _ _ _ _ _ writeMap readMap _) = query_RME_reg reg readMap
-query_RME_reg WriteMap reg (T.UpdReadReq _ _ _ _ _ _ _ _ writeMap readMap _) = query_RME_reg reg writeMap
-query_RME_reg x reg (T.CompactRME m) = query_RME_reg x reg m
+{- normal registers -}
+
+query_reg :: MapType -> Name -> T.RME_simple Int RegMapTy -> VExpr
+query_reg x reg (T.VarRME rmt) = VVar $ reg ++ "__" ++ (show $ (reg_counters rmt) H.! reg)
+query_reg x reg (T.UpdReg r pred _ val m) = if reg == r then VITE (KExpr pred) (KExpr val) (query_reg x reg m) else query_reg x reg m
+query_reg ReadMap reg (T.UpdRegFile _ _ _ _ _ _ _ _ writeMap readMap _) = query_reg ReadMap reg readMap
+query_reg WriteMap reg (T.UpdRegFile _ _ _ _ _ _ _ _ writeMap readMap _) = query_reg WriteMap reg writeMap
+query_reg ReadMap reg (T.UpdReadReq _ _ _ _ _ _ _ _ writeMap readMap _) = query_reg ReadMap reg readMap
+query_reg WriteMap reg (T.UpdReadReq _ _ _ _ _ _ _ _ writeMap readMap _) = query_reg WriteMap reg writeMap
+query_reg x reg (T.CompactRME m) = query_reg x reg m
 
 do_reg_upd :: T.RME_simple Int RegMapTy -> Name -> State ExprState [(Name,VExpr)]
-do_reg_upd m r = case query_RME_reg WriteMap r m of
+do_reg_upd m r = case query_reg WriteMap r m of
   VVar _ -> return []
   e -> do
     i <- reg_count r
-    return [(r,e)]
+    return [(r ++ "__" ++ show i,e)]
 
 get_reg_upds :: T.RME_simple Int RegMapTy -> State ExprState [(Name, VExpr)]
 get_reg_upds m = do
   rs <- get_regs
   monad_concat $ map (do_reg_upd m) rs
 
-query_RME_async_rf_i :: MapType -> Name -> T.Expr Int -> Int -> T.RME_simple Int RegMapTy -> VExpr
-query_RME_async_rf_i x dataArray idx i m = case m of
-  T.VarRME rmt -> undefined
-  T.UpdReg _ _ _ _ m -> query_RME_async_rf_i dataArray idx i m 
+{- async regfiles -}
+
+query_async_rf_i :: MapType -> Name -> Int -> T.Expr Int -> Int -> T.RME_simple Int RegMapTy -> VExpr
+query_async_rf_i x dataArray num idx i m = case m of
+  T.VarRME rmt -> let n = async_counters rmt H.! dataArray in
+
+
+      if n == 0 then {- ?? -} undefined else error "Trying to read from regfile that was written to."
+
+
+  T.UpdReg _ _ _ _ m -> query_async_rf_i x dataArray idx i m 
   T.UpdRegFile idxNum num dataArray' idx' _ val Nothing pred writeMap readMap _ -> 
-    let m' = case x of
-      Read -> readMap
-      Write -> writeMap
-      in
+    let m' = if x == ReadMap then readMap else writeMap in
     if dataArray == dataArray' then
-    VITE (VAnd (Between (KExpr idx') (VPlus (KExpr idx') (VInt i)) (VPlus (KExpr idx') (VInt (num-1)))) (KExpr pred)) (Access (KExpr val) (VInt i)) (query_RME_async_rf_i dataArray idx i m')
-    else query_RME_async_rf_i dataArray idx i m'
+    VITE (VAnd (Between (KExpr idx') (VPlus (KExpr idx') (VInt i)) (VPlus (KExpr idx') (VInt (num-1)))) (KExpr pred)) (Access (KExpr val) (VInt i)) (query_async_rf_i x dataArray idx i m')
+    else query_async_rf_i x dataArray idx i m'
   T.UpdRegFile idxNum num dataArray' idx' _ val (Just mask) pred writeMap readMap _ ->
-    let m' = case x of
-      Read -> readMap
-      Write -> writeMap
-      in
+    let m' = if x == ReadMap then readMap else writeMap in
    if dataArray == dataArray' then
-    VITE (VAnd (Between (KExpr idx') (VPlus (KExpr idx') (VInt i)) (VPlus (KExpr idx') (VInt (num-1)))) (VAnd (Access (KExpr mask) (VInt i)) (KExpr pred))) (Access (KExpr val) (VInt i)) (query_RME_async_rf_i dataArray idx i m')
-    else query_RME_async_rf_i dataArray idx i m'
+    VITE (VAnd (Between (KExpr idx') (VPlus (KExpr idx') (VInt i)) (VPlus (KExpr idx') (VInt (num-1)))) (VAnd (Access (KExpr mask) (VInt i)) (KExpr pred))) (Access (KExpr val) (VInt i)) (query_async_rf_i x dataArray idx i m')
+    else query_async_rf_i x dataArray idx i m'
   T.UpdReadReq _ _ _ _ _ _ _ _ writeMap readMap _ -> 
-    let m' = case x of
-      Read -> readMap
-      Write -> writeMap
-      in
-    query_RME_async_rf_i x dataArray idx i m'
-  T.CompactRME m' -> query_RME_async_rf_i x dataArray idx i m'
+    let m' = if x == ReadMap then readMap else writeMap in
+    query_async_rf_i x dataArray idx i m'
+  T.CompactRME m' -> query_async_rf_i x dataArray idx i m'
 
-query_RME_async_rf :: MapType -> Name -> T.Expr Int -> Int -> T.RME_simple Int RegMapTy -> VExpr
-query_RME_async_rf x dataArray idx num m = ConcatVals $ do
+query_async_rf :: MapType -> Name -> T.Expr Int -> Int -> T.RME_simple Int RegMapTy -> VExpr
+query_async_rf x dataArray idx num m = ConcatVals $ do
   i <- [0..(num-1)]
-  return $ query_RME_async_rf_i x dataArray idx i m
+  return $ query_async_rf_i x dataArray idx i m
 
-do_reg_upd_async_rf :: T.Expr Int -> Int -> T.RME_simple Int RegMapTy -> Name -> State ExprState [(Name,VExpr)]
-do_reg_upd idx num m dataArray = case query_RME_async_rf WriteMap dataArray idx num m of
+do_async_rf_upd :: T.Expr Int -> Int -> T.RME_simple Int RegMapTy -> Name -> State ExprState [(Name,VExpr)]
+do_async_rf_upd idx num m dataArray = case query_async_rf WriteMap dataArray idx num m of
   VVar _ -> return []
   e -> do
-    async_read_count dataArray
-    return [(dataArray,e)]
+    i <- async_count dataArray
+    return [(dataArray ++ "__" ++ show i,e)]
 
-get_reg_upds_async_rf :: Name -> T.Expr Int -> Int -> T.RME_simple Int RegMapTy -> State ExprState [(Name, VExpr)]
-get_reg_upds dataArray idx num m = do
-  rfs <- get_reg_files
-  monad_concat $ map (do_reg_upd_async_rf idx num m) rfs
+get_async_rf_upds :: Name -> T.Expr Int -> Int -> T.RME_simple Int RegMapTy -> State ExprState [(Name, VExpr)]
+get_async_rf_upds dataArray idx num m = do
+  rfs <- get_asyncs
+  monad_concat $ map (do_async_rf_upd idx num m) (map fst rfs)
 
-query_RME_sync_isAddr :: MapType -> Name -> Name -> T.RME_simple Int RegMapTy -> VExpr
-query_RME_sync_isAddr x dataArray regName m = case m of
-  T.VarRME rmt -> VVar $ regName ++ "__" ++ (show $ (sync_isAddr_reg rmt) H.! regName)
-  T.UpdReg _ _ _ _ m' -> query_RME_sync_isAddr x dataArray regName m'
-  T.UpdRegFile _ _ _ _ _ _ _ _ writeMap readMap _ -> case x of
-    Read -> query_RME_sync_isAddr x dataArray regName readMap
-    Write -> query_RME_sync_isAddr x dataArray regName writeMap
+{- sync regfile regs; isAddr = true -}
+
+query_isAddr_reg :: MapType -> Name -> Name -> T.RME_simple Int RegMapTy -> VExpr
+query_isAddr_reg x dataArray regName m = case m of
+  T.VarRME rmt -> VVar $ regName ++ "__" ++ (show $ (isAddr_reg_counters rmt) H.! regName)
+  T.UpdReg _ _ _ _ m' -> query_isAddr_reg x dataArray regName m'
+  T.UpdRegFile _ _ _ _ _ _ _ _ writeMap readMap _ ->
+    let m' = if x == ReadMap then readMap else writeMap in query_isAddr_reg x dataArray regName m'
   T.UpdReadReq idxNum num regName' dataArray' idx _ isAddr pred writeMap readMap _ ->
+    let m' = if x == ReadMap then readMap else writeMap in
     if regName == regName' && dataArray == dataArray' && isAddr then
-      case x of
-        Read -> error "Cannot read after an update."
-        Write -> undefined
-      else case x of
-        Read -> query_RME_sync_isAddr x dataArray regName readMap
-        Write -> query_RME_sync_isAddr x dataArray regName writeMap
-  T.CompactRME m' -> query_RME_sync_isAddr x dataArray regName m'
+      if x == ReadMap then error "Cannot read after an update."
+      else VITE (KExpr pred) (KExpr idx) (query_isAddr_reg x dataArray regName m')
+    else 
+      query_isAddr_reg x dataArray regName m'
+  T.CompactRME m' -> query_isAddr_reg x dataArray regName m'
 
-do_async_rf_isAddr_upd :: T.RME_simple Int RegMapTy -> Name -> Name -> State ExprState [(Name,VExpr)]
-do_async_rf_isAddr_upd m dataArray regName = case query_RME_sync_isAddr WriteMap dataArray regName m of
+do_isAddr_reg_upd :: T.RME_simple Int RegMapTy -> Name -> Name -> State ExprState [(Name,VExpr)]
+do_isAddr_reg_upd m dataArray regName = case query_isAddr_reg WriteMap dataArray regName m of
   VVar _ -> return []
   e -> do
-    sync_isAddr_count regName
+    isAddr_count regName
     return [(regName,e)]
 
-get_upds_async :: T.RME_simple Int RegMapTy -> State ExprState [(Name, VExpr)]
-get_upds_async m = do
-  rfs <- get_reg_files
-  monad_concat $ map (\(dataArray,regName) -> do_async_rf_upd_isAddr m dataArray regName) rfs
+get_isAddr_reg_upds :: T.RME_simple Int RegMapTy -> State ExprState [(Name, VExpr)]
+get_isAddr_reg_upds m = do
+  rfs <- get_isAddrs
+  monad_concat $ map (\(dataArray,regName) -> do_isAddr_reg_upd m dataArray regName) rfs
 
-query_RME_sync_not_isAddr :: MapType -> Name -> Name -> T.RME_simple Int RegMapTy -> VExpr
-query_RME_sync_not_isAddr x dataArray regName m = case m of
-  T.VarRME rmt -> VVar $ regName ++ "__" ++ (show $ (sync_not_isAddr_reg rmt) H.! regName)
-  T.UpdReg _ _ _ _ m' -> query_RME_sync_not_isAddr x dataArray regName m'
-  T.UpdRegFile _ _ _ _ _ _ _ _ writeMap readMap _ -> case x of
-    Read -> query_RME_sync_not_isAddr x dataArray regName readMap
-    Write -> query_RME_sync_not_isAddr x dataArray regName writeMap  
+{- sync regfile regs; isAddr = false -}
+
+query_not_isAddr_reg :: MapType -> Name -> Name -> T.RME_simple Int RegMapTy -> VExpr
+query_not_isAddr_reg x dataArray regName m = case m of
+  T.VarRME rmt -> VVar $ regName ++ "__" ++ (show $ (not_isAddr_reg_counters rmt) H.! regName)
+  T.UpdReg _ _ _ _ m' -> query_not_isAddr_reg x dataArray regName m'
+  T.UpdRegFile _ _ _ _ _ _ _ _ writeMap readMap _ -> 
+    let m' = if x == ReadMap then readMap else writeMap in query_not_isAddr_reg x dataArray regName m'
   T.UpdReadReq idxNum num regName' dataArray' idx _ isAddr pred writeMap readMap _ ->
+    let m' = if x == ReadMap then readMap else writeMap in
     if regName == regName' && dataArray == dataArray' && not isAddr then
-      case x of
-        Read -> error "Cannot read after an update."
-        Write -> undefined
-      else case x of
-        Read -> query_RME_sync_not_isAddr x dataArray regName readMap
-        Write -> query_RME_sync_not_isAddr x dataArray regName writeMap
+      if x == ReadMap then error "Cannot read after an update." else VITE (KExpr pred) (KExpr idx) (query_not_isAddr_reg x dataArray regName m')
+      else
+        query_not_isAddr_reg x dataArray regName m'
+  T.CompactRME m' -> query_not_isAddr_reg x dataArray regName m'
 
-  T.CompactRME m' -> query_RME_sync_not_isAddr x dataArray regName m'
-
-do_async_rf_upd_not_isAddr :: T.RME_simple Int RegMapTy -> Name -> Name -> State ExprState [(Name,VExpr)]
-do_async_rf_upd_not_isAddr m dataArray regName = case query_RME_sync_not_isAddr WriteMap dataArray regName m of
+do_not_isAddr_reg_upd :: T.RME_simple Int RegMapTy -> Name -> Name -> State ExprState [(Name,VExpr)]
+do_not_isAddr_reg_upd m dataArray regName = case query_not_isAddr_reg WriteMap dataArray regName m of
   VVar _ -> return []
   e -> do
-    sync_not_isAddr_count regName
+    not_isAddr_count regName
     return [(regName,e)]
 
-get_upds_async_not_isAddr :: T.RME_simple Int RegMapTy -> State ExprState [(Name, VExpr)]
-get_upds_async_not_isAddr m = do
-  rfs <- get_reg_files
-  monad_concat $ map (\(dataArray,regName) -> do_async_rf_upd_not_isAddr m dataArray regName) rfs
+get_not_isAddr_reg_upds :: T.RME_simple Int RegMapTy -> State ExprState [(Name, VExpr)]
+get_not_isAddr_reg_upds m = do
+  rfs <- get_asyncs
+  monad_concat $ map (\(dataArray,regName) -> do_not_isAddr_reg_upd m dataArray regName) rfs
+
+get_all_upds :: T.RME_simple Int RegMapTy -> State ExprState [(Name, VExpr)]
+get_all_upds m = do
+  reg_upds <- get_reg_upds m
+  isAddr_upds <- get_isAddr_reg_upds m
+  not_isAddr_upds <- get_not_isAddr_reg_upds m
+  return $ reg_upds ++ isAddr_upds ++ not_isAddr_upds
 
 ppCAS :: T.CA_simple Int RegMapTy -> State ExprState VerilogExprs
 ppCAS (T.CompCall_simple f _ pred arg _ cont) = do
@@ -503,7 +502,7 @@ ppCAS (T.CompReadReg_simple r _ regmap _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ T.unsafeCoerce j)
   return $ y {
-    assign_exprs = (tmp_var j, query_RME_reg r regmap) : assign_exprs y
+    assign_exprs = (tmp_var j, query_reg ReadMap r regmap) : assign_exprs y
   }
 
 ppCAS (T.CompRet_simple _ retval regmap) = do
@@ -524,29 +523,29 @@ ppCAS (T.CompLetFull_simple _  a _ cont) = do
   y <- ppCAS (cont j $ regmap_counters s)
   return $ y {
     assign_exprs = (tmp_var j, KExpr e) : assigns ++ assign_exprs y 
-  } --finish this
+  }
 
 ppCAS (T.CompAsyncRead_simple idxNum num dataArray idx _ readMap _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ T.unsafeCoerce j)
   return $ y {
-    assign_exprs = (tmp_var j, query_RME_async_rf ReadMap dataArray idx num readMap) : assign_exprs y
+    assign_exprs = (tmp_var j, query_async_rf ReadMap dataArray idx num readMap) : assign_exprs y
   }
 
 ppCAS (T.CompSyncReadRes_simple idxNum num readReg dataArray _ True readMap _ cont) = do
-  let x = query_RME_sync_isAddr_reg dataArray readReg readMap
+  let idx = query_isAddr_reg ReadMap dataArray readReg readMap
   j <- let_count
   y <- ppCAS (cont $ T.unsafeCoerce j)
   return $ y {
-    assign_exprs = (tmp_var j, query_RME_sync_isAddr dataArray x) : assign_exprs y
+    assign_exprs = (tmp_var j, query_isAddr_rf dataArray idx) : assign_exprs y
   }
 
 ppCAS (T.CompSyncReadRes_simple idxNum num readReg dataArray _ False readMap _ cont) = do
-  let (b,x) = query_RME_sync_not_isAddr_reg readReg
+  let (b,x) = (query_not_isAddr_valid ReadMap readReg, query_not_isAddr_reg ReadMap dataArray readReg readMap)
   j <- let_count
   y <- ppCAS (cont $ T.unsafeCoerce j)
   return $ y {
-    assign_exprs = (tmp_var j, IF b THEN x ELSE query_RME_sync_not_isAddr_resp dataArray {-just return dataArray__resp -}) : assign_exprs y
+    assign_exprs = (tmp_var j, VITE b x $ query_not_isAddr_resp dataArray {-just return dataArray__resp -}) : assign_exprs y
   }
 
 ppCAS (T.CompWrite_simple idxNum _ dataArray readMap _ cont) = do
@@ -563,7 +562,12 @@ ppCAS (T.CompSyncReadReq_simple idxNum num _ dataArray readReg isAddr readMap _ 
     assign_exprs = (tmp_var j, KExpr $ T.Const (T.Bit 0) $ T.getDefaultConst (T.Bit 0)) : assign_exprs y
   }
 
-
+query_not_isAddr_resp = undefined
+query_not_isAddr_valid = undefined
+--query_isAddr_reg = undefined
+--get_all_upds = undefined
+--do_isAddr_reg_upd = undefined
+query_isAddr_rf = undefined {- is this the same as the async read query? -}
 
 {-
 query_RME_rf :: (RegMapTy -> H.Map Name Int) -> Name -> T.RME_simple Int RegMapTy -> VExpr
