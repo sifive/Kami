@@ -7,41 +7,6 @@ Local Notation VarType := nat.
 Local Notation NoneVal := (0: VarType).
 Local Notation InitVal := (1: VarType).
 
-Inductive RtlExpr: Kind -> Type :=
-| RtlReadReg k: string -> RtlExpr k
-| RtlReadWire k: (string * VarType) -> RtlExpr k
-| RtlConst k: ConstT k -> RtlExpr k
-| RtlUniBool: UniBoolOp -> RtlExpr Bool -> RtlExpr Bool
-| RtlCABool: CABoolOp -> list (RtlExpr Bool) -> RtlExpr Bool
-| RtlUniBit n1 n2: UniBitOp n1 n2 -> RtlExpr (Bit n1) -> RtlExpr (Bit n2)
-| RtlCABit n: CABitOp -> list (RtlExpr (Bit n)) -> RtlExpr (Bit n)
-| RtlBinBit n1 n2 n3: BinBitOp n1 n2 n3 ->
-                      RtlExpr (Bit n1) -> RtlExpr (Bit n2) ->
-                      RtlExpr (Bit n3)
-| RtlBinBitBool n1 n2: BinBitBoolOp n1 n2 ->
-                       RtlExpr (Bit n1) -> RtlExpr (Bit n2) ->
-                       RtlExpr Bool
-| RtlITE k: RtlExpr Bool -> RtlExpr k -> RtlExpr k -> RtlExpr k
-| RtlEq k: RtlExpr (k) -> RtlExpr (k) -> RtlExpr (Bool)
-| RtlReadStruct n (fk: Fin.t n -> Kind) (fs: Fin.t n -> string)
-                (e: RtlExpr (Struct fk fs)) i:
-    RtlExpr (fk i)
-| RtlBuildStruct n (fk: Fin.t n -> Kind) (fs: Fin.t n -> string)
-                 (fv: forall i, RtlExpr (fk i)):
-    RtlExpr (Struct fk fs)
-| RtlReadArray n m k: RtlExpr (Array n k) ->
-                    RtlExpr (Bit m) ->
-                    RtlExpr k
-| RtlReadArrayConst n k: RtlExpr (Array n k) ->
-                         Fin.t n ->
-                         RtlExpr k
-| RtlBuildArray n k: (Fin.t n -> RtlExpr k) -> RtlExpr (Array n k).
-
-Inductive RtlSysT: Type :=
-| RtlDispString (s: string): RtlSysT
-| RtlDispExpr k (e: RtlExpr k) (ff: FullFormat k): RtlSysT
-| RtlFinish: RtlSysT.
-
 Record RtlSyncRead :=
   { readSync : SyncRead ;
     bypassRqRs: bool ;
@@ -60,6 +25,11 @@ Record RtlRegFileBase := { rtlIsWrMask : bool ;
                            rtlData: Kind ;
                            rtlInit: RegFileInitT rtlIdxNum rtlData }.
 
+Definition rtl_ty := (fun (_ : Kind) => (string * option nat)%type).
+Notation RtlExpr := (Expr rtl_ty).
+Notation RtlSysT := (SysT rtl_ty).
+
+
 Record RtlModule :=
   { hiddenWires: list (string * VarType);
     regFiles: list RtlRegFileBase;
@@ -68,14 +38,8 @@ Record RtlModule :=
     regInits: list (string * sigT RegInitValT);
     regWrites: list (string * sigT RtlExpr);
     wires: list (string * VarType * sigT RtlExpr);
-    sys: list (RtlExpr Bool * list RtlSysT)
+    sys: list (RtlExpr (SyntaxKind Bool) * list RtlSysT)
   }.
-
-Delimit Scope rtl_expr_scope with rtl_expr.
-
-Notation "e1 && e2" := (RtlCABool And (e1 :: e2 :: nil)) : rtl_expr_scope.
-Notation "e1 || e2" := (RtlCABool Or (e1 :: e2 :: nil)) : rtl_expr_scope.
-
 
 (* Section BitOps. *)
 
