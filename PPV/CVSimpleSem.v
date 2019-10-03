@@ -67,6 +67,9 @@ Section SemSimple.
                                                                               Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                                              writeMap) (old, upds)):
       Sem_RME_simple (@UpdReadReq _ _ idxNum num readReg dataArray idx Data isAddr pred writeMap readMap arr) (old, upds)
+  | SemAsyncRead (idxNum num : nat) (readPort dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (k : Kind) (readMap : RME_simple type RegMapType)
+                 old upds (HNoOp : Sem_RME_simple readMap (old, upds)):
+      Sem_RME_simple (@AsyncRead _ _ idxNum num readPort dataArray idx k readMap) (old, upds)
   | SemCompactRME old upds regMap (HSemRegMap: Sem_RME_simple regMap (old, upds)):
       Sem_RME_simple (@CompactRME _ _ regMap) (old, nil::upds).
 

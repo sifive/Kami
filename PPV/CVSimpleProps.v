@@ -32,7 +32,11 @@ Proof.
   - econstructor 7; eauto.
     destruct regMap; inv HRegMapWf; econstructor; eauto using RME_Simple_RME_Equiv.
   - econstructor 8; eauto.
-  - econstructor 9; eauto using RME_Simple_RME_Equiv.
+  - inv HSemCA_simple_a; simpl in *; EqDep_subst.
+    inv HSemCA_simple_cont; simpl in *; EqDep_subst.
+    inv HRegMapWf; inv H0; EqDep_subst.
+    inv HReadMap.
+    econstructor 9; eauto using RME_Simple_RME_Equiv.
   - inv HSemCA_simple; simpl in *; EqDep_subst; rewrite unifyWO in *.
     inv HSemCA_simple_a; EqDep_subst.
     destruct regMap_a; inv HRegMapWf; inv H0; EqDep_subst.
