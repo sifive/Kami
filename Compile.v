@@ -343,19 +343,6 @@ Section order.
     | _, _ => false
     end.
 
-  Definition getRtlRegFile (rf: RegFileBase) :=
-    match rf with
-    | Build_RegFileBase isWrMask num dataArray reads write IdxNum Data init =>
-      Build_RtlRegFileBase isWrMask num dataArray
-                           (match reads with
-                            | Async read => RtlAsync (map (fun rd => (rd, isBeforeCall write rd)) read)
-                            | Sync isAddr read =>
-                              RtlSync isAddr
-                                      (map (fun rd => Build_RtlSyncRead rd
-                                                                        (isBeforeCall (readReqName rd) (readResName rd))
-                                                                        (isBeforeCall write ((if isAddr then readResName else readReqName) rd))) read)
-                            end) write init
-    end.
 End order.
 
 Local Open Scope string.
@@ -387,12 +374,15 @@ Definition rtlModCreate (bm: list string * (list RegFileBase * BaseModule))
   {| hiddenWires := map (fun x => getMethArg' x) hides ++
                         map (fun x => getMethEn' x) hides ++
                         map (fun x => getMethRet' x) hides ;
-     regFiles := map (getRtlRegFile rules order) rfs ;
+     regFiles := rfs ;
      inputs := ins ;
      outputs := outs;
      regInits := getRegisters m ;
      regWrites := map (fun '(x,y) => (x, convertRtl y)) regWr (*regWr*) ;
-     wires := map (fun '(x,y,z) => (x,y, convertRtl z)) temps (*temps*) ;
+     wires := map (fun '(x,y,z) => (x, match y with
+                                       | None => 0
+                                       | Some y' => y'
+                                       end, convertRtl z)) temps (*temps*) ;
      sys := syss |}.
 
 Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) :=

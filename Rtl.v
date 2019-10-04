@@ -7,6 +7,7 @@ Local Notation VarType := nat.
 Local Notation NoneVal := (0: VarType).
 Local Notation InitVal := (1: VarType).
 
+(*
 Record RtlSyncRead :=
   { readSync : SyncRead ;
     bypassRqRs: bool ;
@@ -24,20 +25,22 @@ Record RtlRegFileBase := { rtlIsWrMask : bool ;
                            rtlIdxNum: nat ;
                            rtlData: Kind ;
                            rtlInit: RegFileInitT rtlIdxNum rtlData }.
+*)
+
+
 
 Definition rtl_ty := (fun (_ : Kind) => (string * option nat)%type).
-Notation RtlExpr := (Expr rtl_ty).
-Notation RtlSysT := (SysT rtl_ty).
-
+Definition RtlExpr := (Expr rtl_ty).
+Definition RtlSysT := (SysT rtl_ty).
 
 Record RtlModule :=
   { hiddenWires: list (string * VarType);
-    regFiles: list RtlRegFileBase;
+    regFiles: list RegFileBase;
     inputs: list (string * VarType * Kind);
     outputs: list (string * VarType * Kind);
     regInits: list (string * sigT RegInitValT);
     regWrites: list (string * sigT RtlExpr);
-    wires: list (string * option VarType * sigT RtlExpr);
+    wires: list (string * VarType * sigT RtlExpr);
     sys: list (RtlExpr (SyntaxKind Bool) * list RtlSysT)
   }.
 

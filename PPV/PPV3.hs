@@ -59,6 +59,11 @@ ppType (T.Struct n fk fs) =
 ppPrintVar :: (String, Int) -> String
 ppPrintVar (s, v) = ppName $ s ++ if v /= 0 then '#' : show v else []
 
+{- make sure this is good -}
+ppPrintVar' :: (String, Maybe Int) -> String
+ppPrintVar' (s, Just v) = ppPrintVar (s,v)
+ppPrintVar' (s, Nothing) = s
+
 padwith :: a -> Int -> [a] -> [a]
 padwith x n xs = let m = n - length xs in
   if m > 0 then replicate m x ++ xs else drop (-m) xs
@@ -72,44 +77,50 @@ ppConst (T.ConstBit sz w) = show sz ++ "\'b" ++ ppWord w
 ppConst (T.ConstArray n k fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (reverse $ T.getFins n))) ++ "}"
 ppConst (T.ConstStruct n fk fs fv) = '{' : intercalate ", " (snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins n)) (Data.List.map ppConst (Data.List.map fv (T.getFins n))))))) ++ "}"
 
-optionAddToTrunc :: T.Kind -> T.Expr Int -> State ExprState String
-optionAddToTrunc k e =
+optionAddToTrunc :: String -> T.Kind -> T.RtlExpr' -> State (H.Map String (Int, T.Kind)) String
+optionAddToTrunc who k e =
   case e of
-    T.Var (T.SyntaxKind k) var -> return $ case k of
-                                    T.Bit 0 -> "0"
-                                    _ -> ppPrintVar $ T.unsafeCoerce ("tmp___",var)
+    T.Var (T.SyntaxKind k') x -> let (s,o) = T.unsafeCoerce x in
+      case o of
+        Nothing -> case k' of
+          T.Bit 0 -> return "0"
+          _ -> return $ ppName s
+
+        Just n -> case k' of
+          T.Bit 0 -> return $ "0"
+          _ -> return $ ppPrintVar (s,n)
+
     _ -> do
-      x <- ppExpr e
-      new <- addToTrunc k x
+      x <- ppRtlExpr who e
+      new <- addToTrunc who k x
       return new
 
-createTrunc :: T.Kind -> T.Expr Int -> Int -> Int -> State ExprState String
-createTrunc k e msb lsb =
+createTrunc :: String -> T.Kind -> T.RtlExpr' -> Int -> Int -> State (H.Map String (Int, T.Kind)) String
+createTrunc who k e msb lsb =
   if msb < lsb
   then return "0"
   else do
-    new <- optionAddToTrunc k e
+    new <- optionAddToTrunc who k e
     return $ new ++ '[' : show msb ++ ':' : show lsb ++ "]"
 
-addToTrunc :: T.Kind -> String -> State ExprState String
-addToTrunc kind s =
+addToTrunc :: String -> T.Kind -> String -> State (H.Map String (Int, T.Kind)) String
+addToTrunc who kind s =
   do
-    y <- get
-    let x = expr_map y
+    x <- get
     case H.lookup s x of
-      Just (pos, _) -> return $ "_trunc$" ++ "$" ++ show pos
+      Just (pos, _) -> return $ "_trunc$" ++ who ++ "$" ++ show pos
       Nothing ->
         do
-          put $ y { expr_map = (H.insert s (H.size x, kind) x) }
-          return $ "_trunc$" ++ "$" ++ show (H.size x)
+          put (H.insert s (H.size x, kind) x)
+          return $ "_trunc$" ++ who ++ "$" ++ show (H.size x)
 
-ppExpr :: T.Expr Int -> State ExprState ExprString
-ppExpr e =
+ppRtlExpr :: String -> T.RtlExpr' -> State (H.Map String (Int, T.Kind)) String
+ppRtlExpr who e = 
   case e of
-  --  T.RtlReadReg k s -> return $ ppDealSize0 k "0" (ppName s)
-    T.Var (T.SyntaxKind k) x -> return $ ppDealSize0 k "0" $ ppPrintVar $ T.unsafeCoerce ("tmp___",x)
-    T.Var (T.NativeKind _) _ -> error "Native kinds not synthesizable."
-  --  T.RtlReadWire k var -> return $ ppDealSize0 k "0" (ppPrintVar var)
+    --T.RtlReadReg k s -> return $ ppDealSize0 k "0" (ppName s)
+    --T.RtlReadWire k var -> return $ ppDealSize0 k "0" (ppPrintVar var)
+    T.Var (T.SyntaxKind k) x -> optionAddToTrunc who k e
+    T.Var (T.NativeKind _) _ -> error "NativeKind encountered."
     T.Const k c -> return $ ppDealSize0 k "0" (ppConst c)
     T.UniBool T.Neg e -> uniExpr "~" e
     T.CABool T.And es -> listExpr "&" es "1'b1"
@@ -119,8 +130,8 @@ ppExpr e =
     T.UniBit _ _ (T.UAnd _) e -> uniExpr "&" e
     T.UniBit _ _ (T.UOr _) e -> uniExpr "|" e
     T.UniBit _ _ (T.UXor _) e -> uniExpr "^" e
-    T.UniBit sz retSz (T.TruncLsb lsb msb) e -> createTrunc (T.Bit sz) e (retSz - 1) 0
-    T.UniBit sz retSz (T.TruncMsb lsb msb) e -> createTrunc (T.Bit sz) e (sz - 1) lsb
+    T.UniBit sz retSz (T.TruncLsb lsb msb) e -> createTrunc who (T.Bit sz) e (retSz - 1) 0
+    T.UniBit sz retSz (T.TruncMsb lsb msb) e -> createTrunc who (T.Bit sz) e (sz - 1) lsb
     T.CABit n T.Add es -> listExpr "+" es (show n ++ "'b0")
     T.CABit n T.Mul es -> listExpr "*" es (show n ++ "'b1")
     T.CABit n T.Band es -> listExpr "&" es (show n ++ "'b" ++ Data.List.replicate n '1')
@@ -133,61 +144,61 @@ ppExpr e =
     T.BinBit _ _ _ (T.Srl _ _) e1 e2 -> binExpr e1 ">>" e2
     T.BinBit _ _ _ (T.Sra n m) e1 e2 ->
       do
-        x1 <- ppExpr e1
-        x2 <- ppExpr e2
-        new <- addToTrunc (T.Bit n) ("($signed(" ++ x1 ++ ") >>> " ++ x2 ++ ")")
+        x1 <- ppRtlExpr who e1
+        x2 <- ppRtlExpr who e2
+        new <- addToTrunc who (T.Bit n) ("($signed(" ++ x1 ++ ") >>> " ++ x2 ++ ")")
         return $ new
         -- return $ "($signed(" ++ x1 ++ ") >>> " ++ x2 ++ ")"
     T.BinBit _ _ _ (T.Concat m n) e1 e2 ->
       case (m, n) of
         (0, 0)   -> return $ "0"
         (m', 0)  -> do
-          x1 <- ppExpr e1
+          x1 <- ppRtlExpr who e1
           return x1
         (0, n')  -> do
-          x2 <- ppExpr e2
+          x2 <- ppRtlExpr who e2
           return x2
         (m', n') -> do
-          x1 <- ppExpr e1
-          x2 <- ppExpr e2
+          x1 <- ppRtlExpr who e1
+          x2 <- ppRtlExpr who e2
           return $ '{' : x1 ++ ", " ++ x2 ++ "}"
     T.BinBitBool _ _ (_) e1 e2 -> binExpr e1 "<" e2
     T.ITE _ p e1 e2 -> triExpr p "?" e1 ":" e2
     T.Eq _ e1 e2 -> binExpr e1 "==" e2
     T.ReadStruct num fk fs e i ->
       do
-        new <- optionAddToTrunc (T.Struct num fk fs) e
+        new <- optionAddToTrunc who (T.Struct num fk fs) e
         return $ ppDealSize0 (fk i) "0" (new ++ '.' : ppName (fs i))
     T.BuildStruct num fk fs es ->
       do
-        strs <- mapM (ppExpr) (filterKind0 num fk es)  -- (Data.List.map es (getFins num))
+        strs <- mapM (ppRtlExpr who) (filterKind0 num fk es)  -- (Data.List.map es (getFins num))
         return $ ppDealSize0 (T.Struct num fk fs) "0" ('{': intercalate ", " strs ++ "}")
     T.ReadArray n m k vec idx ->
       do
-        xidx <- ppExpr idx
-        xvec <- ppExpr vec
-        new <- optionAddToTrunc (T.Array n k) vec
+        xidx <- ppRtlExpr who idx
+        xvec <- ppRtlExpr who vec
+        new <- optionAddToTrunc who (T.Array n k) vec
         return $ ppDealSize0 k "0" (new ++ '[' : xidx ++ "]")
     T.ReadArrayConst n k vec idx ->
       do
         let xidx = finToInt idx
-        xvec <- ppExpr vec
-        new <- optionAddToTrunc (T.Array n k) vec
+        xvec <- ppRtlExpr who vec
+        new <- optionAddToTrunc who (T.Array n k) vec
         return $ ppDealSize0 k "0" (new ++ '[' : show xidx ++ "]")
     T.BuildArray n k fv ->
       do
-        strs <- mapM (ppExpr) (Data.List.map fv (reverse $ T.getFins n))
+        strs <- mapM (ppRtlExpr who) (Data.List.map fv (reverse $ T.getFins n))
         return $ ppDealSize0 (T.Array n k) "0" ('{': intercalate ", " strs ++ "}")
   where
     filterKind0 num fk es = snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins num)) (Data.List.map es (T.getFins num)))))
     uniExpr op e =
       do
-        x <- ppExpr e
+        x <- ppRtlExpr who e
         return $ '(' : " " ++ op ++ " " ++ x ++ ")"
     listExpr' op es init =
       case es of
         e : es' -> do
-                     x <- ppExpr e
+                     x <- ppRtlExpr who e
                      xs <- listExpr' op es' init
                      return $ x ++ " " ++ op ++ " " ++ xs
         [] -> return init
@@ -197,14 +208,14 @@ ppExpr e =
         return $ '(' : xs ++ ")"
     binExpr e1 op e2 =
       do
-        x1 <- ppExpr e1
-        x2 <- ppExpr e2
+        x1 <- ppRtlExpr who e1
+        x2 <- ppRtlExpr who e2
         return $ '(' : x1 ++ " " ++ op ++ " " ++ x2 ++ ")"
     triExpr e1 op1 e2 op2 e3 =
       do
-        x1 <- ppExpr e1
-        x2 <- ppExpr e2
-        x3 <- ppExpr e3
+        x1 <- ppRtlExpr who e1
+        x2 <- ppRtlExpr who e2
+        x3 <- ppRtlExpr who e3
         return $ '(' : x1 ++ " " ++ op1 ++ " " ++ x2 ++ " " ++ op2 ++ " " ++ x3 ++ ")"
 
 en_var :: String -> Int -> String
@@ -227,7 +238,7 @@ type Name = String
 
 data RegMapTy = RegMapTy {
     reg_counters :: H.Map Name Int
-  , async_counters ::  H.Map Name Int
+  , async_counters ::  H.Map (Name,Name) Int
   , isAddr_counters :: H.Map Name Int
   , not_isAddr_counters :: H.Map Name Int
   , isAddr_reg_counters :: H.Map Name Int
@@ -239,12 +250,13 @@ data ExprState = ExprState {
   , regmap_counters :: RegMapTy
   , meth_counters :: H.Map Name Int
   , let_counter :: Int
-  , all_regs :: [Name]
+  , all_regs :: [(Name,T.FullKind)]
   , all_asyncs :: [(Name,Name)]
   , all_isAddrs :: [(Name,Name)]
   , all_not_isAddrs :: [(Name,Name)]
 }
 
+{-
 data VExpr =
     VVar Name
   | KExpr (T.Expr Int)
@@ -255,17 +267,20 @@ data VExpr =
   | Access VExpr VExpr
   | VInt Int
   | VAnd VExpr VExpr
+-}
+
+type RME = T.RME_simple T.Coq_rtl_ty RegMapTy
 
 data VerilogExprs = VerilogExprs {
-    assign_exprs :: [(Name, VExpr)]
-  , if_begin_end_exprs :: [(T.Expr Int, [T.SysT Int])]
-  , return_expr :: T.Expr Int
-  , return_maps :: T.RME_simple Int RegMapTy
+    assign_exprs :: [(Name, T.RtlExpr')]
+  , if_begin_end_exprs :: [(T.RtlExpr', [T.SysT T.Coq_rtl_ty])]
+  , return_expr :: T.RtlExpr'
+  , return_maps :: RME
 }
 
 {- monadic accessors which both return the current count and increment it -}
 
-get_regs :: State ExprState [Name]
+get_regs :: State ExprState [(Name, T.FullKind)]
 get_regs = do
   s <- get
   return $ all_regs s
@@ -308,13 +323,13 @@ reg_count r = do
   put $ s { regmap_counters = rmc { reg_counters = H.insert r (n+1) rc } }
   return n
 
-async_count :: Name -> State ExprState Int
-async_count dataArray = do
+async_count :: (Name,Name) -> State ExprState Int
+async_count p = do
   s <- get
   let rmc = regmap_counters s
   let arc = async_counters rmc
-  let n = arc H.! dataArray
-  put $ s { regmap_counters = rmc { async_counters = H.insert dataArray (n+1) arc } }
+  let n = arc H.! p
+  put $ s { regmap_counters = rmc { async_counters = H.insert p (n+1) arc } }
   return n
 
 isAddr_count :: Name -> State ExprState Int
@@ -339,29 +354,44 @@ data MapType = ReadMap | WriteMap deriving (Eq)
 
 {- normal registers -}
 
-query_reg :: MapType -> Name -> T.RME_simple Int RegMapTy -> VExpr
-query_reg x reg (T.VarRME rmt) = VVar $ reg ++ "__" ++ (show $ (reg_counters rmt) H.! reg)
-query_reg x reg (T.UpdReg r pred _ val m) = if reg == r then VITE (KExpr pred) (KExpr val) (query_reg x reg m) else query_reg x reg m
-query_reg ReadMap reg (T.UpdRegFile _ _ _ _ _ _ _ _ writeMap readMap _) = query_reg ReadMap reg readMap
-query_reg WriteMap reg (T.UpdRegFile _ _ _ _ _ _ _ _ writeMap readMap _) = query_reg WriteMap reg writeMap
-query_reg ReadMap reg (T.UpdReadReq _ _ _ _ _ _ _ _ writeMap readMap _) = query_reg ReadMap reg readMap
-query_reg WriteMap reg (T.UpdReadReq _ _ _ _ _ _ _ _ writeMap readMap _) = query_reg WriteMap reg writeMap
-query_reg x reg (T.CompactRME m) = query_reg x reg m
+query_reg :: MapType -> T.FullKind -> Name -> RME -> T.RtlExpr'
+query_reg x k reg (T.VarRME rmt) = T.Var k $ T.unsafeCoerce (reg, Just $ (reg_counters rmt) H.! reg)
+query_reg x k reg (T.UpdReg r pred _ val m) = if reg == r then T.ITE k pred val (query_reg x k reg m) else query_reg x k reg m
+query_reg ReadMap k reg (T.UpdRegFile _ _ _ _ _ _ _ _ writeMap readMap _) = query_reg ReadMap k reg readMap
+query_reg WriteMap k reg (T.UpdRegFile _ _ _ _ _ _ _ _ writeMap readMap _) = query_reg WriteMap k reg writeMap
+query_reg ReadMap k reg (T.UpdReadReq _ _ _ _ _ _ _ _ writeMap readMap _) = query_reg ReadMap k reg readMap
+query_reg WriteMap k reg (T.UpdReadReq _ _ _ _ _ _ _ _ writeMap readMap _) = query_reg WriteMap k reg writeMap
+query_reg x k reg (T.CompactRME m) = query_reg x k reg m
 
-do_reg_upd :: T.RME_simple Int RegMapTy -> Name -> State ExprState [(Name,VExpr)]
-do_reg_upd m r = case query_reg WriteMap r m of
-  VVar _ -> return []
+do_reg_upd :: RME -> T.FullKind -> Name -> State ExprState [(Name, T.RtlExpr')]
+do_reg_upd m k r = case query_reg WriteMap k r m of
+  T.Var _ _ -> return []
   e -> do
     i <- reg_count r
     return [(r ++ "__" ++ show i,e)]
 
-get_reg_upds :: T.RME_simple Int RegMapTy -> State ExprState [(Name, VExpr)]
+get_reg_upds :: RME -> State ExprState [(Name, T.RtlExpr')]
 get_reg_upds m = do
   rs <- get_regs
-  monad_concat $ map (do_reg_upd m) rs
+  monad_concat $ map (\(r,k) -> do_reg_upd m k r) rs
 
 {- async regfiles -}
 
+var :: T.FullKind -> Name -> Int -> T.RtlExpr'
+var k n i = T.Var k $ T.unsafeCoerce (n, Just i)
+
+var' :: T.FullKind -> Name -> T.RtlExpr'
+var' k n = T.Var k $ T.unsafeCoerce (n, Nothing)
+
+{-
+write_query :: Name -> Name -> T.FullKind -> RME -> T.RtlExpr'
+write_query dataArray readPort k m = case m of 
+  T.VarRME rmt -> var k (dataArray ++ "__" ++ readPort) ((async_counters rmt) H.! (dataArray, readPort))
+  T.UpdReg _ _ _ _ m' -> write_query dataArray readPort k m'
+  T.UpdRegFile idxNum num dataArray idx k val mask pred writeMap readMap arr ->
+-}
+
+{-
 query_async_rf_i :: MapType -> Name -> Int -> T.Expr Int -> Int -> T.RME_simple Int RegMapTy -> VExpr
 query_async_rf_i x dataArray num idx i m = case m of
   T.VarRME rmt -> let n = async_counters rmt H.! dataArray in
@@ -466,30 +496,36 @@ get_all_upds m = do
   isAddr_upds <- get_isAddr_reg_upds m
   not_isAddr_upds <- get_not_isAddr_reg_upds m
   return $ reg_upds ++ isAddr_upds ++ not_isAddr_upds
+-}
 
-ppCAS :: T.CA_simple Int RegMapTy -> State ExprState VerilogExprs
-ppCAS (T.CompCall_simple f _ pred arg _ cont) = do
+type CA_rtl = T.CA_simple T.Coq_rtl_ty RegMapTy
+
+tmp :: Int -> (Name, Maybe Int)
+tmp j = ("tmp", Just j)
+
+ppCAS :: CA_rtl -> State ExprState VerilogExprs
+ppCAS (T.CompCall_simple f (_,k) pred arg _ cont) = do
   i <- meth_count f
   j <- let_count
-  y <- ppCAS (cont j)
+  y <- ppCAS (cont $ tmp j)
   return $ y {
-    assign_exprs = (arg_var f i, KExpr arg) : (en_var f i, KExpr pred) : (tmp_var j, VVar $ ret_var f) : assign_exprs y 
+    assign_exprs = (arg_var f i, arg) : (en_var f i, pred) : (tmp_var j, var' (T.SyntaxKind k) $ ret_var f) : assign_exprs y 
   }
 
 ppCAS (T.CompLetExpr_simple (T.NativeKind _) _ _ _) = error "NativeKind encountered."
 ppCAS (T.CompLetExpr_simple (T.SyntaxKind _) arg _ cont) = do
   j <- let_count
-  y <- ppCAS (cont $ T.unsafeCoerce j)
+  y <- ppCAS (cont $ T.unsafeCoerce $ tmp j)
   return $ y {
-    assign_exprs = (tmp_var j, KExpr arg) : assign_exprs y
+    assign_exprs = (tmp_var j, arg) : assign_exprs y
   }
 
 ppCAS (T.CompNondet_simple (T.NativeKind _) _ _) = error "NativeKind encountered."
 ppCAS (T.CompNondet_simple (T.SyntaxKind k) _ cont) = do
   j <- let_count
-  y <- ppCAS (cont $ T.unsafeCoerce j)
+  y <- ppCAS (cont $ T.unsafeCoerce $ tmp j)
   return $ y {
-    assign_exprs = (tmp_var j, KExpr $ T.Const k $ T.getDefaultConst k) : assign_exprs y
+    assign_exprs = (tmp_var j, T.Const k $ T.getDefaultConst k) : assign_exprs y
   }
 
 ppCAS (T.CompSys_simple pred xs _ a) = do
@@ -498,13 +534,14 @@ ppCAS (T.CompSys_simple pred xs _ a) = do
     if_begin_end_exprs = (pred,xs) : if_begin_end_exprs y
   }
 
-ppCAS (T.CompReadReg_simple r _ regmap _ cont) = do
+ppCAS (T.CompReadReg_simple r k regmap _ cont) = do
   j <- let_count
-  y <- ppCAS (cont $ T.unsafeCoerce j)
+  y <- ppCAS (cont $ T.unsafeCoerce $ tmp j)
   return $ y {
-    assign_exprs = (tmp_var j, query_reg ReadMap r regmap) : assign_exprs y
+    assign_exprs = (tmp_var j, query_reg ReadMap k r regmap) : assign_exprs y
   }
 
+{-
 ppCAS (T.CompRet_simple _ retval regmap) = do
   return $ VerilogExprs {
       assign_exprs = []
@@ -581,7 +618,7 @@ query_RME_rf getmap dataArray readMap = case readMap of
 
 main = return ()
 
-{-
+
 
 ppCompActionT (T.CompRead r _ regmap _ cont) = do
   j <- let_count
@@ -954,3 +991,5 @@ ppRfName (((name, reads), write), ((idxType, dataType), T.ConstArray num k fv)) 
 
 main = putStrLn $ ppTopModule T.rtlMod
 -}
+
+main = return ()
