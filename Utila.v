@@ -26,6 +26,28 @@ Section utila.
 
     (* I. Kami Expression Definitions *)
 
+    Definition msb
+      (n m : nat)
+      (width : Bit n @# ty)
+      (x : Bit m @# ty)
+      :  Bit m @# ty
+      := x >> ($m - width).
+
+    Definition lsb
+      (n m : nat)
+      (width : Bit n @# ty)
+      (x : Bit m @# ty)
+      :  Bit m @# ty
+      := (x & ~($$(wones m) << width)).
+
+    Definition slice
+      (n m k : nat)
+      (offset : Bit n @# ty)
+      (width : Bit m @# ty)
+      (x : Bit k @# ty)
+      :  Bit k @# ty
+      := ((x >> offset) & ~($$(wones k) << width)).
+
     Definition utila_opt_pkt
       (k : Kind)
       (x : k @# ty)
