@@ -299,21 +299,21 @@ ppRfModule (rf@(T.Build_RegFileBase isWrMask num name reads write idxNum dataTyp
                          ") ? " ++
                          ppDealSize0 dataType "0" (ppName write ++ "$_argument.data[" ++ show j ++ "]") ++ " : 0) | ")
         [0 .. (num-1)] in
-    let readResponse readResp readAddr isByp =
+    let readResponse readResp readAddr =
           ppDealSize0 (T.Array num dataType) "" ("  assign " ++ ppName readResp ++ " = " ++ "{" ++
                                                 intercalate ", " (map (\i ->
                                                                           ppDealSize0 (T.Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i ++ " < " ++ show idxNum) ++ " ? " ++
-                                                                          (if isByp then writeByps readAddr i else "") ++ ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ (ppDealSize0 (T.Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i)) ++ "]") ++ ": " ++ show (T.size dataType) ++ "'b0")
+                                                                          ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ (ppDealSize0 (T.Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i)) ++ "]") ++ ": " ++ show (T.size dataType) ++ "'b0")
                                                                   (reverse [0 .. (num-1)])) ++ "};\n") in
       (case reads of
          T.Async readLs -> concatMap (\(read) ->
-                                         readResponse (read ++ "$_return") (ppName (read ++ "$_argument")) False) readLs
+                                         readResponse (read ++ "$_return") (ppName (read ++ "$_argument"))) readLs
          T.Sync isAddr readLs ->
-           concatMap (\(T.Build_SyncRead readRq readRs readReg) -> let bypRqRs = False in let bypWrRd = False in 
+           concatMap (\(T.Build_SyncRead readRq readRs readReg) -> 
                         if isAddr
-                        then readResponse (readRs ++ "$_return") (if bypRqRs then "(" ++ (ppName (readRq ++ "$_enable") ++ "? " ++ ppName (readRq ++ "$_argument") ++ ": " ++ ppName readReg) ++ ")" else ppName readReg) bypWrRd
-                        else readResponse (readReg ++ "$_temp") readRq bypWrRd ++
-                             ppDealSize0 (T.Array num dataType) "" ("  assign " ++ ppName readRs ++ " = " ++ if bypRqRs then "(" ++ ppName (readRq ++ "$_enable") ++ "? " ++ ppName (readReg ++ "$_temp") ++ ": " ++ ppName readReg ++ ")"  else ppName readReg)
+                        then readResponse (readRs ++ "$_return") (ppName readReg)
+                        else readResponse (readReg ++ "$_temp") readRq ++
+                             ppDealSize0 (T.Array num dataType) "" ("  assign " ++ ppName readRs ++ " = " ++ ppName readReg)
                      ) readLs) ++
   "  always@(posedge CLK) begin\n" ++
   "    if(RESET) begin\n" ++
