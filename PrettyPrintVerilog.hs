@@ -59,6 +59,11 @@ ppType (T.Struct n fk fs) =
 ppPrintVar :: (String, Int) -> String
 ppPrintVar (s, v) = ppName $ s ++ if v /= 0 then '#' : show v else []
 
+{- make sure this is good -}
+ppPrintVar' :: (String, Maybe Int) -> String
+ppPrintVar' (s, Just v) = ppPrintVar (s,v)
+ppPrintVar' (s, Nothing) = s
+
 padwith :: a -> Int -> [a] -> [a]
 padwith x n xs = let m = n - length xs in
   if m > 0 then replicate m x ++ xs else drop (-m) xs
@@ -72,21 +77,25 @@ ppConst (T.ConstBit sz w) = show sz ++ "\'b" ++ ppWord w
 ppConst (T.ConstArray n k fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (reverse $ T.getFins n))) ++ "}"
 ppConst (T.ConstStruct n fk fs fv) = '{' : intercalate ", " (snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins n)) (Data.List.map ppConst (Data.List.map fv (T.getFins n))))))) ++ "}"
 
-optionAddToTrunc :: String -> T.Kind -> T.RtlExpr -> State (H.Map String (Int, T.Kind)) String
+optionAddToTrunc :: String -> T.Kind -> T.RtlExpr' -> State (H.Map String (Int, T.Kind)) String
 optionAddToTrunc who k e =
   case e of
-    T.RtlReadReg k s -> return $ case k of
-                                 T.Bit 0 -> "0"
-                                 _ -> ppName s
-    T.RtlReadWire k var -> return $ case k of
-                                    T.Bit 0 -> "0"
-                                    _ -> ppPrintVar var
+    T.Var (T.SyntaxKind k') x -> let (s,o) = T.unsafeCoerce x in
+      case o of
+        Nothing -> case k' of
+          T.Bit 0 -> return "0"
+          _ -> return $ ppName s
+
+        Just n -> case k' of
+          T.Bit 0 -> return $ "0"
+          _ -> return $ ppPrintVar (s,n)
+
     _ -> do
       x <- ppRtlExpr who e
       new <- addToTrunc who k x
       return new
 
-createTrunc :: String -> T.Kind -> T.RtlExpr -> Int -> Int -> State (H.Map String (Int, T.Kind)) String
+createTrunc :: String -> T.Kind -> T.RtlExpr' -> Int -> Int -> State (H.Map String (Int, T.Kind)) String
 createTrunc who k e msb lsb =
   if msb < lsb
   then return "0"
@@ -105,41 +114,42 @@ addToTrunc who kind s =
           put (H.insert s (H.size x, kind) x)
           return $ "_trunc$" ++ who ++ "$" ++ show (H.size x)
 
-
-ppRtlExpr :: String -> T.RtlExpr -> State (H.Map String (Int, T.Kind)) String
-ppRtlExpr who e =
+ppRtlExpr :: String -> T.RtlExpr' -> State (H.Map String (Int, T.Kind)) String
+ppRtlExpr who e = 
   case e of
-    T.RtlReadReg k s -> return $ ppDealSize0 k "0" (ppName s)
-    T.RtlReadWire k var -> return $ ppDealSize0 k "0" (ppPrintVar var)
-    T.RtlConst k c -> return $ ppDealSize0 k "0" (ppConst c)
-    T.RtlUniBool T.Neg e -> uniExpr "~" e
-    T.RtlCABool T.And es -> listExpr "&" es "1'b1"
-    T.RtlCABool T.Or es -> listExpr "|" es "1'b0"
-    T.RtlCABool T.Xor es -> listExpr "^" es "1'b0"
-    T.RtlUniBit _ _ (T.Inv _) e -> uniExpr "~" e
-    T.RtlUniBit _ _ (T.UAnd _) e -> uniExpr "&" e
-    T.RtlUniBit _ _ (T.UOr _) e -> uniExpr "|" e
-    T.RtlUniBit _ _ (T.UXor _) e -> uniExpr "^" e
-    T.RtlUniBit sz retSz (T.TruncLsb lsb msb) e -> createTrunc who (T.Bit sz) e (retSz - 1) 0
-    T.RtlUniBit sz retSz (T.TruncMsb lsb msb) e -> createTrunc who (T.Bit sz) e (sz - 1) lsb
-    T.RtlCABit n T.Add es -> listExpr "+" es (show n ++ "'b0")
-    T.RtlCABit n T.Mul es -> listExpr "*" es (show n ++ "'b1")
-    T.RtlCABit n T.Band es -> listExpr "&" es (show n ++ "'b" ++ Data.List.replicate n '1')
-    T.RtlCABit n T.Bor es -> listExpr "|" es (show n ++ "'b0")
-    T.RtlCABit n T.Bxor es -> listExpr "^" es (show n ++ "'b0")
-    T.RtlBinBit _ _ _ (T.Sub _) e1 e2 -> binExpr e1 "-" e2
-    T.RtlBinBit _ _ _ (T.Div _) e1 e2 -> binExpr e1 "/" e2
-    T.RtlBinBit _ _ _ (T.Rem _) e1 e2 -> binExpr e1 "%" e2
-    T.RtlBinBit _ _ _ (T.Sll _ _) e1 e2 -> binExpr e1 "<<" e2
-    T.RtlBinBit _ _ _ (T.Srl _ _) e1 e2 -> binExpr e1 ">>" e2
-    T.RtlBinBit _ _ _ (T.Sra n m) e1 e2 ->
+    --T.RtlReadReg k s -> return $ ppDealSize0 k "0" (ppName s)
+    --T.RtlReadWire k var -> return $ ppDealSize0 k "0" (ppPrintVar var)
+    T.Var (T.SyntaxKind k) x -> optionAddToTrunc who k e
+    T.Var (T.NativeKind _) _ -> error "NativeKind encountered."
+    T.Const k c -> return $ ppDealSize0 k "0" (ppConst c)
+    T.UniBool T.Neg e -> uniExpr "~" e
+    T.CABool T.And es -> listExpr "&" es "1'b1"
+    T.CABool T.Or es -> listExpr "|" es "1'b0"
+    T.CABool T.Xor es -> listExpr "^" es "1'b0"
+    T.UniBit _ _ (T.Inv _) e -> uniExpr "~" e
+    T.UniBit _ _ (T.UAnd _) e -> uniExpr "&" e
+    T.UniBit _ _ (T.UOr _) e -> uniExpr "|" e
+    T.UniBit _ _ (T.UXor _) e -> uniExpr "^" e
+    T.UniBit sz retSz (T.TruncLsb lsb msb) e -> createTrunc who (T.Bit sz) e (retSz - 1) 0
+    T.UniBit sz retSz (T.TruncMsb lsb msb) e -> createTrunc who (T.Bit sz) e (sz - 1) lsb
+    T.CABit n T.Add es -> listExpr "+" es (show n ++ "'b0")
+    T.CABit n T.Mul es -> listExpr "*" es (show n ++ "'b1")
+    T.CABit n T.Band es -> listExpr "&" es (show n ++ "'b" ++ Data.List.replicate n '1')
+    T.CABit n T.Bor es -> listExpr "|" es (show n ++ "'b0")
+    T.CABit n T.Bxor es -> listExpr "^" es (show n ++ "'b0")
+    T.BinBit _ _ _ (T.Sub _) e1 e2 -> binExpr e1 "-" e2
+    T.BinBit _ _ _ (T.Div _) e1 e2 -> binExpr e1 "/" e2
+    T.BinBit _ _ _ (T.Rem _) e1 e2 -> binExpr e1 "%" e2
+    T.BinBit _ _ _ (T.Sll _ _) e1 e2 -> binExpr e1 "<<" e2
+    T.BinBit _ _ _ (T.Srl _ _) e1 e2 -> binExpr e1 ">>" e2
+    T.BinBit _ _ _ (T.Sra n m) e1 e2 ->
       do
         x1 <- ppRtlExpr who e1
         x2 <- ppRtlExpr who e2
         new <- addToTrunc who (T.Bit n) ("($signed(" ++ x1 ++ ") >>> " ++ x2 ++ ")")
         return $ new
         -- return $ "($signed(" ++ x1 ++ ") >>> " ++ x2 ++ ")"
-    T.RtlBinBit _ _ _ (T.Concat m n) e1 e2 ->
+    T.BinBit _ _ _ (T.Concat m n) e1 e2 ->
       case (m, n) of
         (0, 0)   -> return $ "0"
         (m', 0)  -> do
@@ -152,30 +162,30 @@ ppRtlExpr who e =
           x1 <- ppRtlExpr who e1
           x2 <- ppRtlExpr who e2
           return $ '{' : x1 ++ ", " ++ x2 ++ "}"
-    T.RtlBinBitBool _ _ (_) e1 e2 -> binExpr e1 "<" e2
-    T.RtlITE _ p e1 e2 -> triExpr p "?" e1 ":" e2
-    T.RtlEq _ e1 e2 -> binExpr e1 "==" e2
-    T.RtlReadStruct num fk fs e i ->
+    T.BinBitBool _ _ (_) e1 e2 -> binExpr e1 "<" e2
+    T.ITE _ p e1 e2 -> triExpr p "?" e1 ":" e2
+    T.Eq _ e1 e2 -> binExpr e1 "==" e2
+    T.ReadStruct num fk fs e i ->
       do
         new <- optionAddToTrunc who (T.Struct num fk fs) e
         return $ ppDealSize0 (fk i) "0" (new ++ '.' : ppName (fs i))
-    T.RtlBuildStruct num fk fs es ->
+    T.BuildStruct num fk fs es ->
       do
         strs <- mapM (ppRtlExpr who) (filterKind0 num fk es)  -- (Data.List.map es (getFins num))
         return $ ppDealSize0 (T.Struct num fk fs) "0" ('{': intercalate ", " strs ++ "}")
-    T.RtlReadArray n m k vec idx ->
+    T.ReadArray n m k vec idx ->
       do
         xidx <- ppRtlExpr who idx
         xvec <- ppRtlExpr who vec
         new <- optionAddToTrunc who (T.Array n k) vec
         return $ ppDealSize0 k "0" (new ++ '[' : xidx ++ "]")
-    T.RtlReadArrayConst n k vec idx ->
+    T.ReadArrayConst n k vec idx ->
       do
         let xidx = finToInt idx
         xvec <- ppRtlExpr who vec
         new <- optionAddToTrunc who (T.Array n k) vec
         return $ ppDealSize0 k "0" (new ++ '[' : show xidx ++ "]")
-    T.RtlBuildArray n k fv ->
+    T.BuildArray n k fv ->
       do
         strs <- mapM (ppRtlExpr who) (Data.List.map fv (reverse $ T.getFins n))
         return $ ppDealSize0 (T.Array n k) "0" ('{': intercalate ", " strs ++ "}")
@@ -339,6 +349,10 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
   "  end\n" ++
   "endmodule\n\n"
 
+kind_of_fullKind :: T.FullKind -> T.Kind
+kind_of_fullKind (T.SyntaxKind k) = k
+kind_of_fullKind (T.NativeKind _) = error "NativeKind encountered"
+
 removeDups :: Eq a => [(a, b)] -> [(a, b)]
 removeDups = nubBy (\(a, _) (b, _) -> a == b)
 
@@ -351,7 +365,6 @@ getAllMethodsRegFileList ls = concat (map (\(T.Build_RtlRegFileBase isWrMask num
                                                   T.RtlSync _ reads -> map (\(T.Build_RtlSyncRead (T.Build_SyncRead rq rs _) _ _) -> (rq, (T.Bit (log2_up idxNum), T.Bit 0))) reads ++
                                                                        map (\(T.Build_RtlSyncRead (T.Build_SyncRead rq rs _) _ _) -> (rs, (T.Bit 0, d))) reads
                                                ))) ls)
-
 
 ppRtlInstance :: T.RtlModule -> String
 ppRtlInstance m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
@@ -369,18 +382,18 @@ ppFullFormat (T.FBit n sz bf) = "%" ++ show sz ++ ppBitFormat bf
 ppFullFormat (T.FStruct n fk fs ff) = "{ " ++ concatMap (\i -> fs i ++ ":" ++ ppFullFormat (ff i) ++ "; ") (T.getFins n) ++ "}"
 ppFullFormat (T.FArray n k f) = "[ " ++ concatMap (\i -> show i ++ "=" ++ ppFullFormat f ++ "; ") [0 .. (n-1)] ++ "]"
 
-ppExprList :: T.Kind -> T.RtlExpr -> [T.RtlExpr]
+ppExprList :: T.Kind -> T.RtlExpr' -> [T.RtlExpr']
 ppExprList T.Bool e = [e]
 ppExprList (T.Bit n) e = [e]
-ppExprList (T.Struct n fk fs) e = concatMap (\i -> ppExprList (fk i) (T.RtlReadStruct n fk fs e i)) (T.getFins n)
-ppExprList (T.Array n k) e = concatMap (\i -> ppExprList k (T.RtlReadArrayConst n k e i)) (T.getFins n)
+ppExprList (T.Struct n fk fs) e = concatMap (\i -> ppExprList (fk i) (T.ReadStruct n fk fs e i)) (T.getFins n)
+ppExprList (T.Array n k) e = concatMap (\i -> ppExprList k (T.ReadArrayConst n k e i)) (T.getFins n)
 
-ppRtlSys :: T.RtlSysT -> State (H.Map String (Int, T.Kind)) String
-ppRtlSys (T.RtlDispString s) = return $ "        $write(\"" ++ deformat s ++ "\");\n"
-ppRtlSys (T.RtlDispExpr k e f) = do
+ppRtlSys :: T.SysT T.Coq_rtl_ty -> State (H.Map String (Int, T.Kind)) String
+ppRtlSys (T.DispString s) = return $ "        $write(\"" ++ deformat s ++ "\");\n"
+ppRtlSys (T.DispExpr k e f) = do
   printExprs <- mapM (\i -> ppRtlExpr "sys" i) (ppExprList k e)
   return $ "        $write(\"" ++ ppFullFormat f ++ "\"" ++ concatMap (\x -> ", " ++ x) printExprs ++ ");\n"
-ppRtlSys (T.RtlFinish) = return $ "        $finish();\n"
+ppRtlSys (T.Finish) = return $ "        $finish();\n"
 
 ppRtlModule :: T.RtlModule -> String
 ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
@@ -393,7 +406,7 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   ");\n" ++
   concatMap (\(nm, (T.SyntaxKind ty, init)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppName nm) ty ++ ";\n")) regInits ++ "\n" ++
 
-  concatMap (\(nm, (ty, expr)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) assigns ++ "\n" ++
+  concatMap (\(nm, (ty, expr)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar' nm) ty ++ ";\n")) assigns ++ "\n" ++
 
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$wire$" ++ show pos) ty ++ ";\n")) assignTruncs ++ "\n" ++
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$reg$" ++ show pos) ty ++ ";\n")) regTruncs ++ "\n" ++
@@ -403,7 +416,7 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  assign " ++ "_trunc$reg$" ++ show pos ++ " = " ++ sexpr ++ ";\n")) regTruncs ++ "\n" ++
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  assign " ++ "_trunc$sys$" ++ show pos ++ " = " ++ sexpr ++ ";\n")) sysTruncs ++ "\n" ++
   
-  concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("  assign " ++ ppPrintVar nm ++ " = " ++ sexpr ++ ";\n")) assignExprs ++ "\n" ++
+  concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("  assign " ++ ppPrintVar' nm ++ " = " ++ sexpr ++ ";\n")) assignExprs ++ "\n" ++
 
   "  always @(posedge CLK) begin\n" ++
   "    if(RESET) begin\n" ++
@@ -412,7 +425,7 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
                                                  _ -> "") regInits ++
   "    end\n" ++
   "    else begin\n" ++
-  concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ sexpr ++ ";\n")) regExprs ++
+  concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ sexpr ++ ";\n")) (map (\(s1,(k,s2)) -> (s1,(kind_of_fullKind k,s2))) regExprs) ++
   concatMap (\(pred, sys) -> "      if(" ++ pred ++ ") begin\n" ++ sys ++ "      end\n") sys ++
   "    end\n" ++
   "  end\n" ++
@@ -422,7 +435,7 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
     outs = removeDups outs'
     regInits = removeDups regInits'
     regWrites = removeDups regWrites'
-    assigns = removeDups assigns'
+    assigns = removeDups $ map (\(p,(k,x)) -> (p,(kind_of_fullKind k,x))) assigns'
     convAssigns =
       mapM (\(nm, (ty, expr)) ->
               do
@@ -506,4 +519,9 @@ ppRfFile (((name, reads), write), ((idxType, dataType), T.ConstArray num k fv)) 
 ppRfName :: (((String, [(String, Bool)]), String), ((Int, T.Kind), T.ConstT)) -> String
 ppRfName (((name, reads), write), ((idxType, dataType), T.ConstArray num k fv)) = ppName name ++ ".mem"
 
+{-
+main :: IO()
 main = putStrLn $ ppTopModule T.rtlMod
+-}
+
+main = return ()

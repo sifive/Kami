@@ -37,7 +37,7 @@ Record RtlModule :=
     outputs: list (string * VarType * Kind);
     regInits: list (string * sigT RegInitValT);
     regWrites: list (string * sigT RtlExpr);
-    wires: list (string * VarType * sigT RtlExpr);
+    wires: list (string * option VarType * sigT RtlExpr);
     sys: list (RtlExpr (SyntaxKind Bool) * list RtlSysT)
   }.
 

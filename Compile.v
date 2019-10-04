@@ -365,8 +365,6 @@ Definition getMethEn' f := (f ++ "#_enable", 0).
 Definition getMethGuard' f := (f ++ "#_guard", 0).
 Local Close Scope string.
 
-Axiom cheat : forall x, x.
-
 Definition convertRtl (e : {x : Kind & RtlExpr' x}) : {x : FullKind & RtlExpr x} :=
   match e with
   | existT x val => existT _ (SyntaxKind x) val
@@ -393,8 +391,8 @@ Definition rtlModCreate (bm: list string * (list RegFileBase * BaseModule))
      inputs := ins ;
      outputs := outs;
      regInits := getRegisters m ;
-     regWrites := cheat _ (*regWr*) ;
-     wires := cheat _ (*temps*) ;
+     regWrites := map (fun '(x,y) => (x, convertRtl y)) regWr (*regWr*) ;
+     wires := map (fun '(x,y,z) => (x,y, convertRtl z)) temps (*temps*) ;
      sys := syss |}.
 
 Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) :=
