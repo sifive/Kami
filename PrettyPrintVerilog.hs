@@ -75,12 +75,16 @@ ppConst (T.ConstStruct n fk fs fv) = '{' : intercalate ", " (snd (unzip (Data.Li
 optionAddToTrunc :: String -> T.Kind -> T.RtlExpr -> State (H.Map String (Int, T.Kind)) String
 optionAddToTrunc who k e =
   case e of
-    T.RtlReadReg k s -> return $ case k of
-                                 T.Bit 0 -> "0"
-                                 _ -> ppName s
-    T.RtlReadWire k var -> return $ case k of
-                                    T.Bit 0 -> "0"
-                                    _ -> ppPrintVar var
+    T.Var (T.SyntaxKind k') x -> let (s,o) = T.unsafeCoerce x in
+      case o of
+        Nothing -> case k' of
+          T.Bit 0 -> return "0"
+          _ -> return $ ppName s
+
+        Just n -> case k' of
+          T.Bit 0 -> return $ "0"
+          _ -> return $ ppPrintVar (s,n)
+
     _ -> do
       x <- ppRtlExpr who e
       new <- addToTrunc who k x
@@ -105,41 +109,44 @@ addToTrunc who kind s =
           put (H.insert s (H.size x, kind) x)
           return $ "_trunc$" ++ who ++ "$" ++ show (H.size x)
 
-
 ppRtlExpr :: String -> T.RtlExpr -> State (H.Map String (Int, T.Kind)) String
-ppRtlExpr who e =
+ppRtlExpr who e = 
   case e of
-    T.RtlReadReg k s -> return $ ppDealSize0 k "0" (ppName s)
-    T.RtlReadWire k var -> return $ ppDealSize0 k "0" (ppPrintVar var)
-    T.RtlConst k c -> return $ ppDealSize0 k "0" (ppConst c)
-    T.RtlUniBool T.Neg e -> uniExpr "~" e
-    T.RtlCABool T.And es -> listExpr "&" es "1'b1"
-    T.RtlCABool T.Or es -> listExpr "|" es "1'b0"
-    T.RtlCABool T.Xor es -> listExpr "^" es "1'b0"
-    T.RtlUniBit _ _ (T.Inv _) e -> uniExpr "~" e
-    T.RtlUniBit _ _ (T.UAnd _) e -> uniExpr "&" e
-    T.RtlUniBit _ _ (T.UOr _) e -> uniExpr "|" e
-    T.RtlUniBit _ _ (T.UXor _) e -> uniExpr "^" e
-    T.RtlUniBit sz retSz (T.TruncLsb lsb msb) e -> createTrunc who (T.Bit sz) e (retSz - 1) 0
-    T.RtlUniBit sz retSz (T.TruncMsb lsb msb) e -> createTrunc who (T.Bit sz) e (sz - 1) lsb
-    T.RtlCABit n T.Add es -> listExpr "+" es (show n ++ "'b0")
-    T.RtlCABit n T.Mul es -> listExpr "*" es (show n ++ "'b1")
-    T.RtlCABit n T.Band es -> listExpr "&" es (show n ++ "'b" ++ Data.List.replicate n '1')
-    T.RtlCABit n T.Bor es -> listExpr "|" es (show n ++ "'b0")
-    T.RtlCABit n T.Bxor es -> listExpr "^" es (show n ++ "'b0")
-    T.RtlBinBit _ _ _ (T.Sub _) e1 e2 -> binExpr e1 "-" e2
-    T.RtlBinBit _ _ _ (T.Div _) e1 e2 -> binExpr e1 "/" e2
-    T.RtlBinBit _ _ _ (T.Rem _) e1 e2 -> binExpr e1 "%" e2
-    T.RtlBinBit _ _ _ (T.Sll _ _) e1 e2 -> binExpr e1 "<<" e2
-    T.RtlBinBit _ _ _ (T.Srl _ _) e1 e2 -> binExpr e1 ">>" e2
-    T.RtlBinBit _ _ _ (T.Sra n m) e1 e2 ->
+    --T.RtlReadReg k s -> return $ ppDealSize0 k "0" (ppName s)
+    --T.RtlReadWire k var -> return $ ppDealSize0 k "0" (ppPrintVar var)
+    T.Var (T.SyntaxKind k) x -> case T.unsafeCoerce x of
+      (s,Nothing) -> return $ ppDealSize0 k "0" (ppName s)
+      (s,Just n) -> return $ ppDealSize0 k "0" (ppPrintVar (s,n))
+    T.Var (T.NativeKind _) _ -> error "NativeKind encountered."
+    T.Const k c -> return $ ppDealSize0 k "0" (ppConst c)
+    T.UniBool T.Neg e -> uniExpr "~" e
+    T.CABool T.And es -> listExpr "&" es "1'b1"
+    T.CABool T.Or es -> listExpr "|" es "1'b0"
+    T.CABool T.Xor es -> listExpr "^" es "1'b0"
+    T.UniBit _ _ (T.Inv _) e -> uniExpr "~" e
+    T.UniBit _ _ (T.UAnd _) e -> uniExpr "&" e
+    T.UniBit _ _ (T.UOr _) e -> uniExpr "|" e
+    T.UniBit _ _ (T.UXor _) e -> uniExpr "^" e
+    T.UniBit sz retSz (T.TruncLsb lsb msb) e -> createTrunc who (T.Bit sz) e (retSz - 1) 0
+    T.UniBit sz retSz (T.TruncMsb lsb msb) e -> createTrunc who (T.Bit sz) e (sz - 1) lsb
+    T.CABit n T.Add es -> listExpr "+" es (show n ++ "'b0")
+    T.CABit n T.Mul es -> listExpr "*" es (show n ++ "'b1")
+    T.CABit n T.Band es -> listExpr "&" es (show n ++ "'b" ++ Data.List.replicate n '1')
+    T.CABit n T.Bor es -> listExpr "|" es (show n ++ "'b0")
+    T.CABit n T.Bxor es -> listExpr "^" es (show n ++ "'b0")
+    T.BinBit _ _ _ (T.Sub _) e1 e2 -> binExpr e1 "-" e2
+    T.BinBit _ _ _ (T.Div _) e1 e2 -> binExpr e1 "/" e2
+    T.BinBit _ _ _ (T.Rem _) e1 e2 -> binExpr e1 "%" e2
+    T.BinBit _ _ _ (T.Sll _ _) e1 e2 -> binExpr e1 "<<" e2
+    T.BinBit _ _ _ (T.Srl _ _) e1 e2 -> binExpr e1 ">>" e2
+    T.BinBit _ _ _ (T.Sra n m) e1 e2 ->
       do
         x1 <- ppRtlExpr who e1
         x2 <- ppRtlExpr who e2
         new <- addToTrunc who (T.Bit n) ("($signed(" ++ x1 ++ ") >>> " ++ x2 ++ ")")
         return $ new
         -- return $ "($signed(" ++ x1 ++ ") >>> " ++ x2 ++ ")"
-    T.RtlBinBit _ _ _ (T.Concat m n) e1 e2 ->
+    T.BinBit _ _ _ (T.Concat m n) e1 e2 ->
       case (m, n) of
         (0, 0)   -> return $ "0"
         (m', 0)  -> do
@@ -152,30 +159,30 @@ ppRtlExpr who e =
           x1 <- ppRtlExpr who e1
           x2 <- ppRtlExpr who e2
           return $ '{' : x1 ++ ", " ++ x2 ++ "}"
-    T.RtlBinBitBool _ _ (_) e1 e2 -> binExpr e1 "<" e2
-    T.RtlITE _ p e1 e2 -> triExpr p "?" e1 ":" e2
-    T.RtlEq _ e1 e2 -> binExpr e1 "==" e2
-    T.RtlReadStruct num fk fs e i ->
+    T.BinBitBool _ _ (_) e1 e2 -> binExpr e1 "<" e2
+    T.ITE _ p e1 e2 -> triExpr p "?" e1 ":" e2
+    T.Eq _ e1 e2 -> binExpr e1 "==" e2
+    T.ReadStruct num fk fs e i ->
       do
         new <- optionAddToTrunc who (T.Struct num fk fs) e
         return $ ppDealSize0 (fk i) "0" (new ++ '.' : ppName (fs i))
-    T.RtlBuildStruct num fk fs es ->
+    T.BuildStruct num fk fs es ->
       do
         strs <- mapM (ppRtlExpr who) (filterKind0 num fk es)  -- (Data.List.map es (getFins num))
         return $ ppDealSize0 (T.Struct num fk fs) "0" ('{': intercalate ", " strs ++ "}")
-    T.RtlReadArray n m k vec idx ->
+    T.ReadArray n m k vec idx ->
       do
         xidx <- ppRtlExpr who idx
         xvec <- ppRtlExpr who vec
         new <- optionAddToTrunc who (T.Array n k) vec
         return $ ppDealSize0 k "0" (new ++ '[' : xidx ++ "]")
-    T.RtlReadArrayConst n k vec idx ->
+    T.ReadArrayConst n k vec idx ->
       do
         let xidx = finToInt idx
         xvec <- ppRtlExpr who vec
         new <- optionAddToTrunc who (T.Array n k) vec
         return $ ppDealSize0 k "0" (new ++ '[' : show xidx ++ "]")
-    T.RtlBuildArray n k fv ->
+    T.BuildArray n k fv ->
       do
         strs <- mapM (ppRtlExpr who) (Data.List.map fv (reverse $ T.getFins n))
         return $ ppDealSize0 (T.Array n k) "0" ('{': intercalate ", " strs ++ "}")
@@ -208,18 +215,18 @@ ppRtlExpr who e =
         x3 <- ppRtlExpr who e3
         return $ '(' : x1 ++ " " ++ op1 ++ " " ++ x2 ++ " " ++ op2 ++ " " ++ x3 ++ ")"
 
-ppRfInstance :: T.RtlRegFileBase -> String
-ppRfInstance (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum dataType init)) =
+ppRfInstance :: T.RegFileBase -> String
+ppRfInstance (rf@(T.Build_RegFileBase isWrMask num name reads write idxNum dataType init)) =
   "  " ++ ppName name ++ " " ++
   ppName name ++ "$_inst(.CLK(CLK), .RESET(RESET), " ++
   (case reads of
-     T.RtlAsync readLs ->
-       concatMap (\(read, _) ->
+     T.Async readLs ->
+       concatMap (\(read) ->
                     ("." ++ ppName read ++ "$_enable(" ++ ppName read ++ "$_enable), ") ++
                     (ppDealSize0 (T.Bit (log2_up idxNum)) "" ("." ++ ppName read ++ "$_argument(" ++ ppName read ++ "$_argument), ")) ++
                     ppDealSize0 (T.Array num dataType) "" ("." ++ ppName read ++ "$_return(" ++ ppName read ++ "$_return), ")) readLs
-     T.RtlSync isAddr readLs ->
-       concatMap (\(T.Build_RtlSyncRead (T.Build_SyncRead readRq readRs _) _ _) ->
+     T.Sync isAddr readLs ->
+       concatMap (\(T.Build_SyncRead readRq readRs readReg) ->
                     ("." ++ ppName readRq ++ "$_enable(" ++ ppName readRq ++ "$_enable), ") ++
                     (ppDealSize0 (T.Bit (log2_up idxNum)) "" ("." ++ ppName readRq ++ "$_argument(" ++ ppName readRq ++ "$_argument), ")) ++
                     ("." ++ ppName readRs ++ "$_enable(" ++ ppName readRs ++ "$_enable), ") ++
@@ -228,18 +235,18 @@ ppRfInstance (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum da
   ("." ++ ppName write ++ "$_argument(" ++ ppName write ++ "$_argument)") ++
   ");\n\n"
 
-ppRfModule :: T.RtlRegFileBase -> String
-ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum dataType init)) =
+ppRfModule :: T.RegFileBase -> String
+ppRfModule (rf@(T.Build_RegFileBase isWrMask num name reads write idxNum dataType init)) =
   let writeType = if isWrMask then T.coq_WriteRqMask idxNum num dataType else T.coq_WriteRq idxNum (T.Array num dataType) in
   "module " ++ ppName name ++ "(\n" ++
   (case reads of
-     T.RtlAsync readLs ->
-       concatMap (\(read, _) ->
+     T.Async readLs ->
+       concatMap (\(read) ->
                     ("  input " ++ ppDeclType (ppName read ++ "$_enable") T.Bool ++ ",\n") ++
                    (ppDealSize0 (T.Bit (log2_up idxNum)) "" ("  input " ++ ppDeclType (ppName read ++ "$_argument") (T.Bit (log2_up idxNum)) ++ ",\n")) ++
                    ppDealSize0 (T.Array num dataType) "" ("  output " ++ ppDeclType (ppName read ++ "$_return") (T.Array num dataType) ++ ",\n")) readLs
-     T.RtlSync isAddr readLs ->
-       concatMap (\(T.Build_RtlSyncRead (T.Build_SyncRead readRq readRs _) _ _) ->
+     T.Sync isAddr readLs ->
+       concatMap (\(T.Build_SyncRead readRq readRs readReg) ->
                     ("  input " ++ ppDeclType (ppName readRq ++ "$_enable") T.Bool ++ ",\n") ++
                    (ppDealSize0 (T.Bit (log2_up idxNum)) "" ("  input " ++ ppDeclType (ppName readRq ++ "$_argument") (T.Bit (log2_up idxNum)) ++ ",\n")) ++
                     ("  input " ++ ppDeclType (ppName readRs ++ "$_enable") T.Bool ++ ",\n") ++
@@ -262,8 +269,8 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
                             -- ++ show (idxNum - 1)
                             ++ "] /* verilator public */;\n") ++
   (case reads of
-     T.RtlSync isAddr readLs ->
-       concatMap (\(T.Build_RtlSyncRead (T.Build_SyncRead readRq readRs readReg) bypRqRs bypWrRd) ->
+     T.Sync isAddr readLs ->
+       concatMap (\(T.Build_SyncRead readRq readRs readReg) ->
                     if isAddr
                     then ppDealSize0 (T.Bit (log2_up idxNum)) "" ("  " ++ ppDeclType (ppName readReg) (T.Bit (log2_up idxNum)) ++ ";\n")
                     else ppDealSize0 (T.Array num dataType) "" ("  " ++ ppDeclType (ppName readReg) (T.Array num dataType)) ++
@@ -292,21 +299,21 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
                          ") ? " ++
                          ppDealSize0 dataType "0" (ppName write ++ "$_argument.data[" ++ show j ++ "]") ++ " : 0) | ")
         [0 .. (num-1)] in
-    let readResponse readResp readAddr isByp =
+    let readResponse readResp readAddr =
           ppDealSize0 (T.Array num dataType) "" ("  assign " ++ ppName readResp ++ " = " ++ "{" ++
                                                 intercalate ", " (map (\i ->
                                                                           ppDealSize0 (T.Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i ++ " < " ++ show idxNum) ++ " ? " ++
-                                                                          (if isByp then writeByps readAddr i else "") ++ ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ (ppDealSize0 (T.Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i)) ++ "]") ++ ": " ++ show (T.size dataType) ++ "'b0")
+                                                                          ppDealSize0 dataType "0" (ppName name ++ "$_data[" ++ (ppDealSize0 (T.Bit (log2_up idxNum)) "0" (readAddr ++ " + " ++ show i)) ++ "]") ++ ": " ++ show (T.size dataType) ++ "'b0")
                                                                   (reverse [0 .. (num-1)])) ++ "};\n") in
       (case reads of
-         T.RtlAsync readLs -> concatMap (\(read, bypass) ->
-                                         readResponse (read ++ "$_return") (ppName (read ++ "$_argument")) bypass) readLs
-         T.RtlSync isAddr readLs ->
-           concatMap (\(T.Build_RtlSyncRead (T.Build_SyncRead readRq readRs readReg) bypRqRs bypWrRd) ->
+         T.Async readLs -> concatMap (\(read) ->
+                                         readResponse (read ++ "$_return") (ppName (read ++ "$_argument"))) readLs
+         T.Sync isAddr readLs ->
+           concatMap (\(T.Build_SyncRead readRq readRs readReg) -> 
                         if isAddr
-                        then readResponse (readRs ++ "$_return") (if bypRqRs then "(" ++ (ppName (readRq ++ "$_enable") ++ "? " ++ ppName (readRq ++ "$_argument") ++ ": " ++ ppName readReg) ++ ")" else ppName readReg) bypWrRd
-                        else readResponse (readReg ++ "$_temp") readRq bypWrRd ++
-                             ppDealSize0 (T.Array num dataType) "" ("  assign " ++ ppName readRs ++ " = " ++ if bypRqRs then "(" ++ ppName (readRq ++ "$_enable") ++ "? " ++ ppName (readReg ++ "$_temp") ++ ": " ++ ppName readReg ++ ")"  else ppName readReg)
+                        then readResponse (readRs ++ "$_return") (ppName readReg)
+                        else readResponse (readReg ++ "$_temp") readRq ++
+                             ppDealSize0 (T.Array num dataType) "" ("  assign " ++ ppName readRs ++ " = " ++ ppName readReg)
                      ) readLs) ++
   "  always@(posedge CLK) begin\n" ++
   "    if(RESET) begin\n" ++
@@ -324,9 +331,9 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
                                          ppDealSize0 dataType "" (ppName write ++ "$_argument.data[" ++ show i ++ "]") ++ ";\n")) [0 .. (num-1)]) ++
   "      end\n" ++
   (case reads of
-     T.RtlAsync readLs -> ""
-     T.RtlSync isAddr readLs ->
-       concatMap (\(T.Build_RtlSyncRead (T.Build_SyncRead readRq readRs readReg) bypRqRs bypWrRd) ->
+     T.Async readLs -> ""
+     T.Sync isAddr readLs ->
+       concatMap (\(T.Build_SyncRead readRq readRs readReg) ->
                     if isAddr
                     then "      if(" ++ ppName (readRq ++ "$_enable") ++ ") begin\n" ++
                          "        " ++ ppName readReg ++ " <= " ++ ppName (readRq ++ "$_argument") ++ ";\n" ++
@@ -339,19 +346,22 @@ ppRfModule (rf@(T.Build_RtlRegFileBase isWrMask num name reads write idxNum data
   "  end\n" ++
   "endmodule\n\n"
 
+kind_of_fullKind :: T.FullKind -> T.Kind
+kind_of_fullKind (T.SyntaxKind k) = k
+kind_of_fullKind (T.NativeKind _) = error "NativeKind encountered"
+
 removeDups :: Eq a => [(a, b)] -> [(a, b)]
 removeDups = nubBy (\(a, _) (b, _) -> a == b)
 
-getAllMethodsRegFileList :: [T.RtlRegFileBase] -> [(String, (T.Kind, T.Kind))]
-getAllMethodsRegFileList ls = concat (map (\(T.Build_RtlRegFileBase isWrMask num dataArray readLs write idxNum d init) ->
+getAllMethodsRegFileList :: [T.RegFileBase] -> [(String, (T.Kind, T.Kind))]
+getAllMethodsRegFileList ls = concat (map (\(T.Build_RegFileBase isWrMask num dataArray readLs write idxNum d init) ->
                                               (write, (T.coq_WriteRq idxNum d, T.Bit 0)) :
                                               (map (\x -> (fst x, (T.Bit (log2_up idxNum), d)))
                                                (case readLs of
-                                                  T.RtlAsync reads -> map (\(x, _) -> (x, (T.Bit (log2_up idxNum), d))) reads
-                                                  T.RtlSync _ reads -> map (\(T.Build_RtlSyncRead (T.Build_SyncRead rq rs _) _ _) -> (rq, (T.Bit (log2_up idxNum), T.Bit 0))) reads ++
-                                                                       map (\(T.Build_RtlSyncRead (T.Build_SyncRead rq rs _) _ _) -> (rs, (T.Bit 0, d))) reads
+                                                  T.Async reads -> map (\(x) -> (x, (T.Bit (log2_up idxNum), d))) reads
+                                                  T.Sync _ reads -> map (\(T.Build_SyncRead rq rs _) -> (rq, (T.Bit (log2_up idxNum), T.Bit 0))) reads ++
+                                                                       map (\(T.Build_SyncRead rq rs _) -> (rs, (T.Bit 0, d))) reads
                                                ))) ls)
-
 
 ppRtlInstance :: T.RtlModule -> String
 ppRtlInstance m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
@@ -372,15 +382,15 @@ ppFullFormat (T.FArray n k f) = "[ " ++ concatMap (\i -> show i ++ "=" ++ ppFull
 ppExprList :: T.Kind -> T.RtlExpr -> [T.RtlExpr]
 ppExprList T.Bool e = [e]
 ppExprList (T.Bit n) e = [e]
-ppExprList (T.Struct n fk fs) e = concatMap (\i -> ppExprList (fk i) (T.RtlReadStruct n fk fs e i)) (T.getFins n)
-ppExprList (T.Array n k) e = concatMap (\i -> ppExprList k (T.RtlReadArrayConst n k e i)) (T.getFins n)
+ppExprList (T.Struct n fk fs) e = concatMap (\i -> ppExprList (fk i) (T.ReadStruct n fk fs e i)) (T.getFins n)
+ppExprList (T.Array n k) e = concatMap (\i -> ppExprList k (T.ReadArrayConst n k e i)) (T.getFins n)
 
-ppRtlSys :: T.RtlSysT -> State (H.Map String (Int, T.Kind)) String
-ppRtlSys (T.RtlDispString s) = return $ "        $write(\"" ++ deformat s ++ "\");\n"
-ppRtlSys (T.RtlDispExpr k e f) = do
+ppRtlSys :: T.SysT T.Coq_rtl_ty -> State (H.Map String (Int, T.Kind)) String
+ppRtlSys (T.DispString s) = return $ "        $write(\"" ++ deformat s ++ "\");\n"
+ppRtlSys (T.DispExpr k e f) = do
   printExprs <- mapM (\i -> ppRtlExpr "sys" i) (ppExprList k e)
   return $ "        $write(\"" ++ ppFullFormat f ++ "\"" ++ concatMap (\x -> ", " ++ x) printExprs ++ ");\n"
-ppRtlSys (T.RtlFinish) = return $ "        $finish();\n"
+ppRtlSys (T.Finish) = return $ "        $finish();\n"
 
 ppRtlModule :: T.RtlModule -> String
 ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
@@ -412,7 +422,7 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
                                                  _ -> "") regInits ++
   "    end\n" ++
   "    else begin\n" ++
-  concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ sexpr ++ ";\n")) regExprs ++
+  concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ sexpr ++ ";\n")) (map (\(s1,(k,s2)) -> (s1,(kind_of_fullKind k,s2))) regExprs) ++
   concatMap (\(pred, sys) -> "      if(" ++ pred ++ ") begin\n" ++ sys ++ "      end\n") sys ++
   "    end\n" ++
   "  end\n" ++
@@ -422,7 +432,7 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
     outs = removeDups outs'
     regInits = removeDups regInits'
     regWrites = removeDups regWrites'
-    assigns = removeDups assigns'
+    assigns = removeDups $ map (\(p,(k,x)) -> (p,(kind_of_fullKind k,x))) assigns'
     convAssigns =
       mapM (\(nm, (ty, expr)) ->
               do
@@ -506,4 +516,5 @@ ppRfFile (((name, reads), write), ((idxType, dataType), T.ConstArray num k fv)) 
 ppRfName :: (((String, [(String, Bool)]), String), ((Int, T.Kind), T.ConstT)) -> String
 ppRfName (((name, reads), write), ((idxType, dataType), T.ConstArray num k fv)) = ppName name ++ ".mem"
 
+main :: IO()
 main = putStrLn $ ppTopModule T.rtlMod
