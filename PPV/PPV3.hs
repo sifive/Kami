@@ -362,7 +362,7 @@ get_range_ptwise f idx num = undefined
 readmap_query_resp :: T.FullKind -> Int -> Name -> Name -> RME -> T.RtlExpr'
 readmap_query_resp k num dataArray readPort m =
   let rd_idx = rd_addr $ readMap_query_read k readPort m in
-  let wr_idx = wr_addr $ readMap_query_write k dataArray m in
+  let wr_idx = wr_addr $ readMap_query_write k dataArray m in undefined
 
 
 type RME = T.RME_simple T.Coq_rtl_ty RegMapTy
