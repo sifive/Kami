@@ -90,4 +90,3 @@ Proof.
 Qed.
   
 (* End PropertiesSimple *)
-
