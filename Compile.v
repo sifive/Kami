@@ -4,8 +4,7 @@ Require Import Kami.Syntax Kami.Notations RecordUpdate.RecordSet Kami.Rtl Kami.S
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
-Local Notation NoneVal := (Some 0: option nat).
-Local Notation InitVal := (1: nat).
+Local Notation NoneVal := (None: option nat).
 
 Local Open Scope string.
 
@@ -32,7 +31,7 @@ Section Compile.
 
   Definition getRtlDisp (d: RtlSysT) := d.
 
-  Local Definition inc ns := S ns.
+  Local Notation inc ns := (S ns).
 
   Definition RtlExpr' k := (RtlExpr (SyntaxKind k)).
   
@@ -205,8 +204,8 @@ Section PerRule.
       ruleSysCs: list (RtlExpr' Bool * list RtlSysT) }.
   
   Definition getRtlExprsForRule :=
-    fst (run (convertActionToRtl (fst rule) (snd rule rtl_ty) InitVal)
-             (inc InitVal)).
+    fst (run (convertActionToRtl (fst rule) (snd rule rtl_ty) 0)
+             1).
 
   Definition getTempWiresForRule (regs: list (Attribute Kind)) :=
     let '(Build_RtlExprs tw rw mc sc g) := getRtlExprsForRule in
@@ -360,8 +359,8 @@ Definition rtlModCreate (bm: list string * (list RegFileBase * BaseModule))
      regFiles := rfs ;
      inputs := ins ;
      outputs := outs;
-     regInits := getRegisters m ;
-     regWrites := map (fun '(x,y) => (x, convertRtl y)) regWr ;
+     regInits := map (fun '(x,y) => (x, None, y)) (getRegisters m) ;
+     regWrites := map (fun '(x,y) => (x, None, convertRtl y)) regWr ;
      wires := map (fun '(x,y,z) => (x, y, convertRtl z)) temps ;
      sys := syss |}.
 

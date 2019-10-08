@@ -13,8 +13,8 @@ Record RtlModule :=
     regFiles: list RegFileBase;
     inputs: list (VarType * Kind);
     outputs: list (VarType * Kind);
-    regInits: list (string * sigT RegInitValT);
-    regWrites: list (string * sigT RtlExpr);
+    regInits: list (VarType * sigT RegInitValT);
+    regWrites: list (VarType * sigT RtlExpr);
     wires: list (VarType * sigT RtlExpr);
     sys: list (RtlExpr (SyntaxKind Bool) * list RtlSysT)
   }.
