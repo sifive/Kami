@@ -288,6 +288,7 @@ ppRfModule (rf@(T.Build_RegFileBase isWrMask num name reads write idxNum dataTyp
        "    $readmem" ++ (if isAscii then "h" else "b") ++ "(" ++ (if isArg then "_fileName" else "\"" ++ file ++ "\"") ++ ", " ++ ppName name ++ "$_data);\n" ++
        "  end\n\n"
      _ -> "") ++
+<<<<<<< HEAD
   let writeByps readAddr i = 
         concatMap (\j -> "(" ++ 
                          "(" ++ ppName write ++ "$_enable && (" ++
@@ -299,6 +300,8 @@ ppRfModule (rf@(T.Build_RegFileBase isWrMask num name reads write idxNum dataTyp
                          ") ? " ++
                          ppDealSize0 dataType "0" (ppName write ++ "$_argument.data[" ++ show j ++ "]") ++ " : 0) | ")
         [0 .. (num-1)] in
+=======
+>>>>>>> pp_regfile
     let readResponse readResp readAddr =
           ppDealSize0 (T.Array num dataType) "" ("  assign " ++ ppName readResp ++ " = " ++ "{" ++
                                                 intercalate ", " (map (\i ->
@@ -391,6 +394,29 @@ ppRtlSys (T.DispExpr k e f) = do
   printExprs <- mapM (\i -> ppRtlExpr "sys" i) (ppExprList k e)
   return $ "        $write(\"" ++ ppFullFormat f ++ "\"" ++ concatMap (\x -> ", " ++ x) printExprs ++ ");\n"
 ppRtlSys (T.Finish) = return $ "        $finish();\n"
+<<<<<<< HEAD
+=======
+
+regfiles :: T.RegFileBase -> String
+regfiles (rf@(T.Build_RegFileBase isWrMask num name reads write idxNum dataType init)) =
+  (case reads of
+     T.Async readLs ->
+       concatMap (\(read) ->
+                    ("  " ++ ppDeclType (ppName read ++ "$_enable") T.Bool ++ ";\n") ++
+                   (ppDealSize0 (T.Bit (log2_up idxNum)) "" ("  " ++ ppDeclType (ppName read ++ "$_argument") (T.Bit (log2_up idxNum)) ++ ";\n")) ++
+                   ppDealSize0 (T.Array num dataType) "" ("  " ++ ppDeclType (ppName read ++ "$_return") (T.Array num dataType) ++ ";\n")) readLs
+     T.Sync isAddr readLs ->
+       concatMap (\(T.Build_SyncRead readRq readRs readReg) ->
+                    ("  " ++ ppDeclType (ppName readRq ++ "$_enable") T.Bool ++ ";\n") ++
+                   (ppDealSize0 (T.Bit (log2_up idxNum)) "" ("  " ++ ppDeclType (ppName readRq ++ "$_argument") (T.Bit (log2_up idxNum)) ++ ";\n")) ++
+                   ("  " ++ ppDeclType (ppName readRs ++ "$_enable") T.Bool ++ ";\n") ++
+                   ppDealSize0 (T.Array num dataType) "" ("  " ++ ppDeclType (ppName readRs ++ "$_return") (T.Array num dataType) ++ ";\n")) readLs) ++
+  ("  " ++ ppDeclType (ppName write ++ "$_enable") T.Bool ++ ";\n") ++
+  let writeType = if isWrMask then T.coq_WriteRqMask idxNum num dataType else T.coq_WriteRq idxNum (T.Array num dataType) in
+    ppDealSize0 writeType "" ("  " ++ ppDeclType (ppName write ++ "$_argument") writeType ++ ";\n")
+         
+
+>>>>>>> pp_regfile
 
 ppRtlModule :: T.RtlModule -> String
 ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
@@ -401,6 +427,7 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   "  input CLK,\n" ++
   "  input RESET\n" ++
   ");\n" ++
+  concatMap regfiles regFs ++
   concatMap (\(nm, (T.SyntaxKind ty, init)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppName nm) ty ++ ";\n")) regInits ++ "\n" ++
 
   concatMap (\(nm, (ty, expr)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) assigns ++ "\n" ++
@@ -482,8 +509,9 @@ ppTopModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   "  input CLK,\n" ++
   "  input RESET\n" ++
   ");\n" ++
-  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) ins ++ "\n" ++
-  concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) outs ++ "\n" ++
+  concatMap regfiles regFs ++
+  --concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) ins ++ "\n" ++
+  --concatMap (\(nm, ty) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) outs ++ "\n" ++
   concatMap ppRfInstance regFs ++
   ppRtlInstance m ++
   "endmodule\n"

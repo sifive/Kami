@@ -238,9 +238,9 @@ type Name = String
 
 data RegMapTy = RegMapTy {
     reg_counters :: H.Map Name Int
-  --, async_counters ::  H.Map (Name,Name) Int
   , async_read_counters :: H.Map Name Int
   , write_counters :: H.Map Name Int
+  , async_counters ::  H.Map (Name,Name) Int
   , isAddr_counters :: H.Map Name Int
   , not_isAddr_counters :: H.Map Name Int
   , isAddr_reg_counters :: H.Map Name Int
@@ -272,6 +272,10 @@ data WritePort = WritePort {
 
 has_mask :: Name -> Bool
 has_mask dataArray = undefined
+{- we need some global association between the dataArray names and whether or not they 
+   have a mask.  Probably a lookup on getregfiles followed by accessing iswrmask or something
+-}
+
 
 var :: T.FullKind -> Name -> Int -> T.RtlExpr'
 var k n i = T.Var k $ T.unsafeCoerce (n, Just i)
@@ -289,32 +293,32 @@ writeMap_query_read k readPort m = case m of
   T.UpdReg _ _ _ _ m' -> writeMap_query_read k readPort m'
   T.UpdRegFile _ _ _ _ _ _ _ _ wm rm _ -> writeMap_query_read k readPort wm
   T.UpdReadReq _ _ _ _ _ _ _ _ wm rm _ -> writeMap_query_read k readPort wm
-  T.AsyncRead idxNum num readPort' dataArray idx _ m' ->
+  T.AsyncRead idxNum num readPort' dataArray idx pred _ m' ->
     if readPort == readPort' then ReadPort {
           rd_pred = undefined
         , rd_addr = idx
       } else writeMap_query_read k readPort m'
   T.CompactRME m' -> writeMap_query_read k readPort m'
 
-writeMap_query_write :: T.FullKind -> Name -> RME -> WriteMap
+writeMap_query_write :: T.FullKind -> Name -> RME -> WritePort
 writeMap_query_write k dataArray m = case m of
   T.VarRME rmt -> let i = (write_counters rmt) H.! dataArray in
     WritePort {
-        rd_pred = var k (dataArray ++ "__pred__") i
-      , rd_addr = var k (dataArray ++ "__addr__") i
-      , rd_mask = if has_mask dataArray then Just $ var k (dataArray ++ "__mask__") i else None
-      , rd_data = var k (dataArray ++ "__data__") i
+        wr_pred = var k (dataArray ++ "__pred__") i
+      , wr_addr = var k (dataArray ++ "__addr__") i
+      , wr_mask = if has_mask dataArray then Just $ var k (dataArray ++ "__mask__") i else Nothing
+      , wr_data = var k (dataArray ++ "__data__") i
     }
-  T.UpdReg _ _ _ _ m' -> writeMap_query_read k dataArray m'
+  T.UpdReg _ _ _ _ m' -> writeMap_query_write k dataArray m'
   T.UpdRegFile idxNum num dataArray' idx k val mask pred wm rm _ ->
     if dataArray == dataArray' then WritePort {
         wr_pred = pred
       , wr_addr = idx
       , wr_mask = mask
       , wr_data = val
-    } else writeMap_query_write k dataArray wm
+    } else writeMap_query_write (T.SyntaxKind k) dataArray wm
   T.UpdReadReq _ _ _ _ _ _ _ _ wm rm _ -> writeMap_query_write k dataArray wm
-  T.AsyncRead _ _ _ _ _ _ m' -> writeMap_query_write k dataArray m'
+  T.AsyncRead _ _ _ _ _ _ _ m' -> writeMap_query_write k dataArray m'
   T.CompactRME m' -> writeMap_query_write k dataArray m'
 
 readMap_query_read :: T.FullKind -> Name -> RME -> ReadPort
@@ -327,43 +331,54 @@ readMap_query_read k readPort m = case m of
   T.UpdReg _ _ _ _ m' -> readMap_query_read k readPort m'
   T.UpdRegFile _ _ _ _ _ _ _ _ wm rm _ -> readMap_query_read k readPort rm
   T.UpdReadReq _ _ _ _ _ _ _ _ wm rm _ -> readMap_query_read k readPort rm
-  T.AsyncRead idxNum num readPort' dataArray idx _ m' ->
+  T.AsyncRead idxNum num readPort' dataArray idx pred _ m' ->
     if readPort == readPort' then ReadPort {
-          rd_pred = undefined
+          rd_pred = pred
         , rd_addr = idx
       } else readMap_query_read k readPort m'
   T.CompactRME m' -> readMap_query_read k readPort m'
 
-readMap_query_write :: T.FullKind -> Name -> RME -> WriteMap
+readMap_query_write :: T.FullKind -> Name -> RME -> WritePort
 readMap_query_write k dataArray m = case m of
   T.VarRME rmt -> let i = (write_counters rmt) H.! dataArray in
     WritePort {
-        rd_pred = var k (dataArray ++ "__pred__") i
-      , rd_addr = var k (dataArray ++ "__addr__") i
-      , rd_mask = if has_mask dataArray then Just $ var k (dataArray ++ "__mask__") i else None
-      , rd_data = var k (dataArray ++ "__data__") i
+        wr_pred = var k (dataArray ++ "__pred__") i
+      , wr_addr = var k (dataArray ++ "__addr__") i
+      , wr_mask = if has_mask dataArray then Just $ var k (dataArray ++ "__mask__") i else Nothing
+      , wr_data = var k (dataArray ++ "__data__") i
     }
-  T.UpdReg _ _ _ _ m' -> readMap_query_read k dataArray m'
+  T.UpdReg _ _ _ _ m' -> readMap_query_write k dataArray m'
   T.UpdRegFile idxNum num dataArray' idx k val mask pred wm rm _ ->
     if dataArray == dataArray' then WritePort {
         wr_pred = pred
       , wr_addr = idx
       , wr_mask = mask
       , wr_data = val
-    } else readMap_query_write k dataArray rm
+    } else readMap_query_write (T.SyntaxKind k) dataArray rm
   T.UpdReadReq _ _ _ _ _ _ _ _ wm rm _ -> readMap_query_write k dataArray rm
-  T.AsyncRead _ _ _ _ _ _ m' -> readMap_query_write k dataArray m'
+  T.AsyncRead _ _ _ _ _ _ _ m' -> readMap_query_write k dataArray m'
   T.CompactRME m' -> readMap_query_write k dataArray m'
 
 get_range_ptwise :: (T.RtlExpr' -> T.RtlExpr') -> T.RtlExpr' -> Int -> T.RtlExpr'
 get_range_ptwise f idx num = undefined
-  {- { f idx, f (idx+1), ..., f (idx+num-1) } -}
+  {- should produce the array { f idx, f (idx+1), ..., f (idx+num-1) } -}
+
+between :: T.RtlExpr' -> T.RtlExpr' -> T.RtlExpr' -> T.RtlExpr'
+between = undefined -- the boolean expr e1 < e2 < e3
 
 readmap_query_resp :: T.FullKind -> Int -> Name -> Name -> RME -> T.RtlExpr'
 readmap_query_resp k num dataArray readPort m =
+  let wp = readMap_query_write k dataArray m in
   let rd_idx = rd_addr $ readMap_query_read k readPort m in
-  let wr_idx = wr_addr $ readMap_query_write k dataArray m in undefined
-
+  let wr_idx = wr_addr wp in
+  let pred = wr_pred wp in
+  let mask = wr_mask wp in
+  let val = wr_data wp in
+    get_range_ptwise (\i -> T.ITE k (between rd_idx i undefined) undefined undefined) wr_idx num
+    {- 
+       I didn't get these written yet but the logic involving being in the correct range,
+       the mask, and the pred should go here
+    -}
 
 type RME = T.RME_simple T.Coq_rtl_ty RegMapTy
 
