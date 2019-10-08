@@ -56,9 +56,8 @@ ppType v@(T.Array i k) =
 ppType (T.Struct n fk fs) =
   "{" ++ concatMap (\i -> ppDealSize0 (fk i) "" (' ' : ppDeclType (ppName $ fs i) (fk i) ++ ";")) (T.getFins n) ++ "}"
 
-ppPrintVar :: (String, Maybe Int) -> String
-ppPrintVar (s, Just v) = ppName $ s ++ if v /= 0 then '#' : show v else []
-ppPrintVar (s, Nothing) = ppName s
+ppPrintVar :: (String, Int) -> String
+ppPrintVar (s, v) = ppName $ s ++ if v /= 0 then '#' : show v else []
 
 padwith :: a -> Int -> [a] -> [a]
 padwith x n xs = let m = n - length xs in
@@ -412,7 +411,7 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   "  input RESET\n" ++
   ");\n" ++
   concatMap regfiles regFs ++
-  concatMap (\(nm, (T.SyntaxKind ty, init)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) regInits ++ "\n" ++
+  concatMap (\(nm, (T.SyntaxKind ty, init)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppName nm) ty ++ ";\n")) regInits ++ "\n" ++
 
   concatMap (\(nm, (ty, expr)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) assigns ++ "\n" ++
 
@@ -429,11 +428,11 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   "  always @(posedge CLK) begin\n" ++
   "    if(RESET) begin\n" ++
   concatMap (\(nm, (T.SyntaxKind ty, init)) -> case init of
-                                                 Just (T.SyntaxConst _ v) -> ppDealSize0 ty "" ("      " ++ ppPrintVar nm ++ " <= " ++ ppConst v ++ ";\n")
+                                                 Just (T.SyntaxConst _ v) -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ ppConst v ++ ";\n")
                                                  _ -> "") regInits ++
   "    end\n" ++
   "    else begin\n" ++
-  concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("      " ++ ppPrintVar nm ++ " <= " ++ sexpr ++ ";\n")) (map (\(s1,(k,s2)) -> (s1,(kind_of_fullKind k,s2))) regExprs) ++
+  concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("      " ++ ppName nm ++ " <= " ++ sexpr ++ ";\n")) (map (\(s1,(k,s2)) -> (s1,(kind_of_fullKind k,s2))) regExprs) ++
   concatMap (\(pred, sys) -> "      if(" ++ pred ++ ") begin\n" ++ sys ++ "      end\n") sys ++
   "    end\n" ++
   "  end\n" ++
