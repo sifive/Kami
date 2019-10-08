@@ -11,22 +11,13 @@ Local Open Scope string.
 
 Definition getRegActionRead a s := (a ++ "#" ++ s ++ "#_read", NoneVal).
 Definition getRegActionWrite a s := (a ++ "#" ++ s ++ "#_tempwrite", NoneVal).
-Definition getRegActionFinalWrite a s := (a ++ "#" ++ s ++ "#_write", NoneVal).
 Definition getRegActionEn a s := (a ++ "#" ++ s ++ "#_en", NoneVal).
-
-Definition getRegRead s := (s ++ "#_read", NoneVal).
-Definition getRegWrite s := (s ++ "#_write", NoneVal).
-
-Definition getMethActionArg a f := (a ++ "#" ++ f ++ "#_argument", NoneVal).
-Definition getMethActionEn a f := (a ++ "#" ++ f ++ "#_enable", NoneVal).
 
 Definition getMethRet f := (f ++ "#_return", NoneVal).
 Definition getMethArg f := (f ++ "#_argument", NoneVal).
 Definition getMethEn f := (f ++ "#_enable", NoneVal).
-Definition getMethGuard f := (f ++ "#_guard", NoneVal).
 
 Definition getActionGuard r := (r ++ "#_guard", NoneVal).
-Definition getActionEn r := (r ++ "#_enable", NoneVal).
 
 Local Close Scope string.
 Definition RtlReadWire k s := @Var rtl_ty (SyntaxKind k) s.
@@ -348,7 +339,6 @@ Local Open Scope string.
 Definition getMethRet' f := (f ++ "#_return", 0).
 Definition getMethArg' f := (f ++ "#_argument", 0).
 Definition getMethEn' f := (f ++ "#_enable", 0).
-Definition getMethGuard' f := (f ++ "#_guard", 0).
 Local Close Scope string.
 
 Definition convertRtl (e : {x : Kind & RtlExpr' x}) : {x : FullKind & RtlExpr x} :=
