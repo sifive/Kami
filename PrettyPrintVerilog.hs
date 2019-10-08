@@ -56,8 +56,9 @@ ppType v@(T.Array i k) =
 ppType (T.Struct n fk fs) =
   "{" ++ concatMap (\i -> ppDealSize0 (fk i) "" (' ' : ppDeclType (ppName $ fs i) (fk i) ++ ";")) (T.getFins n) ++ "}"
 
-ppPrintVar :: (String, Int) -> String
-ppPrintVar (s, v) = ppName $ s ++ if v /= 0 then '#' : show v else []
+ppPrintVar :: (String, Maybe Int) -> String
+ppPrintVar (s, Just v) = ppName $ s ++ if v /= 0 then '#' : show v else []
+ppPrintVar (s, Nothing) = ppName $ s
 
 padwith :: a -> Int -> [a] -> [a]
 padwith x n xs = let m = n - length xs in
@@ -83,7 +84,7 @@ optionAddToTrunc who k e =
 
         Just n -> case k' of
           T.Bit 0 -> return $ "0"
-          _ -> return $ ppPrintVar (s,n)
+          _ -> return $ ppPrintVar (s,Just n)
 
     _ -> do
       x <- ppRtlExpr who e
@@ -116,7 +117,7 @@ ppRtlExpr who e =
     --T.RtlReadWire k var -> return $ ppDealSize0 k "0" (ppPrintVar var)
     T.Var (T.SyntaxKind k) x -> case T.unsafeCoerce x of
       (s,Nothing) -> return $ ppDealSize0 k "0" (ppName s)
-      (s,Just n) -> return $ ppDealSize0 k "0" (ppPrintVar (s,n))
+      (s,Just n) -> return $ ppDealSize0 k "0" (ppPrintVar (s,Just n))
     T.Var (T.NativeKind _) _ -> error "NativeKind encountered."
     T.Const k c -> return $ ppDealSize0 k "0" (ppConst c)
     T.UniBool T.Neg e -> uniExpr "~" e

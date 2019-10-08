@@ -9,12 +9,12 @@ Definition RtlExpr := (Expr rtl_ty).
 Definition RtlSysT := (SysT rtl_ty).
 
 Record RtlModule :=
-  { hiddenWires: list (string * nat);
+  { hiddenWires: list VarType;
     regFiles: list RegFileBase;
-    inputs: list (string * nat * Kind);
-    outputs: list (string * nat * Kind);
+    inputs: list (VarType * Kind);
+    outputs: list (VarType * Kind);
     regInits: list (string * sigT RegInitValT);
     regWrites: list (string * sigT RtlExpr);
-    wires: list (string * nat * sigT RtlExpr);
+    wires: list (VarType * sigT RtlExpr);
     sys: list (RtlExpr (SyntaxKind Bool) * list RtlSysT)
   }.

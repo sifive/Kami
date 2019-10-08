@@ -335,12 +335,6 @@ Section order.
 
 End order.
 
-Local Open Scope string.
-Definition getMethRet' f := (f ++ "#_return", 0).
-Definition getMethArg' f := (f ++ "#_argument", 0).
-Definition getMethEn' f := (f ++ "#_enable", 0).
-Local Close Scope string.
-
 Definition convertRtl (e : {x : Kind & RtlExpr' x}) : {x : FullKind & RtlExpr x} :=
   match e with
   | existT x val => existT _ (SyntaxKind x) val
@@ -357,21 +351,18 @@ Definition rtlModCreate (bm: list string * (list RegFileBase * BaseModule))
                                 end)) (getKindAttr (getRegisters m)) in
   let calls := getCallsWithSignPerMod m in
   let '(Build_RuleOutput temps syss, regWr) := allWires rules regs order in
-  let ins := map (fun x => (getMethRet' (fst x), (snd (snd x)))) calls in
-  let outs := map (fun x => (getMethArg' (fst x), (fst (snd x)))) calls ++
-                  map (fun x => (getMethEn' (fst x), Bool)) calls in
-  {| hiddenWires := map (fun x => getMethArg' x) hides ++
-                        map (fun x => getMethEn' x) hides ++
-                        map (fun x => getMethRet' x) hides ;
+  let ins := map (fun x => (getMethRet (fst x), (snd (snd x)))) calls in
+  let outs := map (fun x => (getMethArg (fst x), (fst (snd x)))) calls ++
+                  map (fun x => (getMethEn (fst x), Bool)) calls in
+  {| hiddenWires := map (fun x => getMethArg x) hides ++
+                        map (fun x => getMethEn x) hides ++
+                        map (fun x => getMethRet x) hides ;
      regFiles := rfs ;
      inputs := ins ;
      outputs := outs;
      regInits := getRegisters m ;
      regWrites := map (fun '(x,y) => (x, convertRtl y)) regWr ;
-     wires := map (fun '(x,y,z) => (x, match y with
-                                       | None => 0
-                                       | Some y' => y'
-                                       end, convertRtl z)) temps ;
+     wires := map (fun '(x,y,z) => (x, y, convertRtl z)) temps ;
      sys := syss |}.
 
 Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) :=
