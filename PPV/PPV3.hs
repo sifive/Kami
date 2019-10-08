@@ -295,7 +295,7 @@ writeMap_query_read k readPort m = case m of
   T.UpdReadReq _ _ _ _ _ _ _ _ wm rm _ -> writeMap_query_read k readPort wm
   T.AsyncRead idxNum num readPort' dataArray idx pred _ m' ->
     if readPort == readPort' then ReadPort {
-          rd_pred = undefined
+          rd_pred = pred
         , rd_addr = idx
       } else writeMap_query_read k readPort m'
   T.CompactRME m' -> writeMap_query_read k readPort m'
