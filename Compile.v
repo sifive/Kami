@@ -4,9 +4,9 @@ Require Import Kami.Syntax Kami.Notations RecordUpdate.RecordSet Kami.Rtl Kami.S
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
-Local Notation VarType := nat.
-Local Notation NoneVal := (Some 0: option VarType).
-Local Notation InitVal := (1: VarType).
+Local Notation nat := nat.
+Local Notation NoneVal := (Some 0: option nat).
+Local Notation InitVal := (1: nat).
 
 Local Open Scope string.
 
@@ -46,7 +46,7 @@ Section Compile.
 
   Definition RtlExpr' k := (RtlExpr (SyntaxKind k)).
   
-  Record RtlExprs := { tempWires : list (string * option VarType * sigT RtlExpr') ;
+  Record RtlExprs := { tempWires : list (string * option nat * sigT RtlExpr') ;
                        regsWrite : string -> forall k, option (RtlExpr' Bool * RtlExpr' k) ;
                        methCalls : string -> forall k, option (RtlExpr' Bool * RtlExpr' k) ;
                        systCalls : list (RtlExpr' Bool * list RtlSysT) ;
@@ -107,7 +107,7 @@ Section Compile.
   Local Notation add proj rec val := (rec <| proj ::== (cons val) |>).
   Definition getTemp num := (name, Some num : option nat).
 
-  Fixpoint convertActionToRtl k (a: ActionT rtl_ty k) (retVar: VarType) : State VarType RtlExprs :=
+  Fixpoint convertActionToRtl k (a: ActionT rtl_ty k) (retVar: nat) : State nat RtlExprs :=
     match a in ActionT _ _ with
     | MCall meth argRetK argExpr cont =>
       (do curr <- get ;
@@ -128,7 +128,7 @@ Section Compile.
     | LetExpr k' expr cont =>
       match k' return Expr rtl_ty k' ->
                       (fullType rtl_ty k' -> ActionT rtl_ty k) ->
-                      State VarType RtlExprs with
+                      State nat RtlExprs with
       | SyntaxKind k => fun expr cont =>
                           (do curr <- get ;
                              do _ <- put (inc curr) ;
@@ -144,7 +144,7 @@ Section Compile.
          ret (combineRtlExprs final1 final2))
     | ReadNondet k' cont =>
       match k' return (fullType rtl_ty k' -> ActionT rtl_ty k) ->
-                      State VarType RtlExprs with
+                      State nat RtlExprs with
       | SyntaxKind k => fun cont =>
                           (do curr <- get ;
                              do _ <- put (inc curr) ;
@@ -154,7 +154,7 @@ Section Compile.
       end cont
     | ReadReg r k' cont =>
       match k' return (fullType rtl_ty k' -> ActionT rtl_ty k) ->
-                      State VarType RtlExprs with
+                      State nat RtlExprs with
       | SyntaxKind k => fun cont =>
                           (do curr <- get ;
                              do _ <- put (inc curr) ;
@@ -163,7 +163,7 @@ Section Compile.
       | _ => fun _ => ret defRtlExprs
       end cont
     | WriteReg r k' expr cont =>
-      match k' return Expr rtl_ty k' -> State VarType RtlExprs with
+      match k' return Expr rtl_ty k' -> State nat RtlExprs with
       | SyntaxKind k =>
         fun expr =>
           (do final <- convertActionToRtl cont retVar ;
@@ -211,7 +211,7 @@ Section PerRule.
   Local Definition calls := getCallsWithSignPerRule rule.
 
   Record RuleOutput :=
-    { ruleTemps: list (string * option VarType * sigT RtlExpr') ;
+    { ruleTemps: list (string * option nat * sigT RtlExpr') ;
       ruleSysCs: list (RtlExpr' Bool * list RtlSysT) }.
   
   Definition getRtlExprsForRule :=
@@ -273,7 +273,7 @@ Section ThreadRules.
                              (RtlReadWire (snd x) (getRegActionWrite rule (fst x)))
                              (RtlReadWire (snd x) (getRegActionRead rule (fst x)))).
   
-  Definition threadTogether curr next : list (string * option VarType * sigT RtlExpr') :=
+  Definition threadTogether curr next : list (string * option nat * sigT RtlExpr') :=
     map (fun x => (getRegActionRead next (fst x), getRuleWrite curr x)) regs.
 
   Fixpoint threadAllTemps (order: list string) {struct order} :=
@@ -345,13 +345,6 @@ Section order.
 
 End order.
 
-Local Open Scope string.
-Definition getMethRet' f := (f ++ "#_return", 0).
-Definition getMethArg' f := (f ++ "#_argument", 0).
-Definition getMethEn' f := (f ++ "#_enable", 0).
-Definition getMethGuard' f := (f ++ "#_guard", 0).
-Local Close Scope string.
-
 Definition convertRtl (e : {x : Kind & RtlExpr' x}) : {x : FullKind & RtlExpr x} :=
   match e with
   | existT x val => existT _ (SyntaxKind x) val
@@ -368,21 +361,18 @@ Definition rtlModCreate (bm: list string * (list RegFileBase * BaseModule))
                                 end)) (getKindAttr (getRegisters m)) in
   let calls := getCallsWithSignPerMod m in
   let '(Build_RuleOutput temps syss, regWr) := allWires rules regs order in
-  let ins := map (fun x => (getMethRet' (fst x), (snd (snd x)))) calls in
-  let outs := map (fun x => (getMethArg' (fst x), (fst (snd x)))) calls ++
-                  map (fun x => (getMethEn' (fst x), Bool)) calls in
-  {| hiddenWires := map (fun x => getMethArg' x) hides ++
-                        map (fun x => getMethEn' x) hides ++
-                        map (fun x => getMethRet' x) hides ;
+  let ins := map (fun x => (getMethRet (fst x), (snd (snd x)))) calls in
+  let outs := map (fun x => (getMethArg (fst x), (fst (snd x)))) calls ++
+                  map (fun x => (getMethEn (fst x), Bool)) calls in
+  {| hiddenWires := map (fun x => getMethArg x) hides ++
+                        map (fun x => getMethEn x) hides ++
+                        map (fun x => getMethRet x) hides ;
      regFiles := rfs ;
      inputs := ins ;
      outputs := outs;
-     regInits := getRegisters m ;
-     regWrites := map (fun '(x,y) => (x, convertRtl y)) regWr (*regWr*) ;
-     wires := map (fun '(x,y,z) => (x, match y with
-                                       | None => 0
-                                       | Some y' => y'
-                                       end, convertRtl z)) temps (*temps*) ;
+     regInits := map (fun '(x,y) => (x, None, y)) (getRegisters m) ;
+     regWrites := map (fun '(x,y) => (x, None, convertRtl y)) regWr ;
+     wires := map (fun '(x,y,z) => (x, y, convertRtl z)) temps ;
      sys := syss |}.
 
 Definition getRtl (bm: (list string * (list RegFileBase * BaseModule))) :=
