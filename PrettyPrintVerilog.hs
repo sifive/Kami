@@ -466,19 +466,6 @@ ppTopModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
     isHidden (x, _) = not (elem x hiddenWires)
     insFiltered = Data.List.filter isHidden ins
     outsFiltered = Data.List.filter isHidden outs
-              
-ppConstMem :: T.ConstT -> String
-ppConstMem (T.ConstBool b) = if b then "1" else "0"
-ppConstMem (T.ConstBit sz w) = if sz == 0 then "0" else ppWord w
-ppConstMem (T.ConstStruct num fk fs fv) = Data.List.concatMap ppConstMem (Data.List.map fv (T.getFins num))
-ppConstMem (T.ConstArray num k fv) = Data.List.concatMap ppConstMem (Data.List.map fv (reverse $ T.getFins num))
-
-ppRfFile :: (((String, [(String, Bool)]), String), ((Int, T.Kind), T.ConstT)) -> String
-ppRfFile (((name, reads), write), ((idxType, dataType), T.ConstArray num k fv)) =
-  concatMap (\v -> ppConstMem v ++ "\n") (Data.List.map fv (reverse $ T.getFins num)) ++ "\n"
-
-ppRfName :: (((String, [(String, Bool)]), String), ((Int, T.Kind), T.ConstT)) -> String
-ppRfName (((name, reads), write), ((idxType, dataType), T.ConstArray num k fv)) = ppName name ++ ".mem"
 
 main :: IO()
 main = putStrLn $ ppTopModule T.rtlMod
