@@ -1,4 +1,4 @@
-Require Import Kami.All.
+Require Import Kami.All Kami.CompileVerifiable.
 Require Import Kami.Notations.
 
 Section Simple.
@@ -8,22 +8,24 @@ Section Simple.
 
   Inductive RME_simple :=
   | VarRME (v : regMapTy) : RME_simple
-  | UpdReg (r : string)(pred : Bool @# ty)(k : FullKind)(val : Expr ty k)(regMap : RME_simple) : RME_simple
-  | UpdRegFile (idxNum num : nat) (dataArray : string) (idx  : Bit (Nat.log2_up idxNum) @# ty) (Data : Kind)
-               (val : Array num Data @# ty)
-               (mask : option (Array num Bool @# ty)) (pred : Bool @# ty) (writeMap readMap : RME_simple)
-               (arr : Array idxNum Data @# ty) : RME_simple
-  | UpdReadReq (idxNum num : nat) (readReg dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty) (Data : Kind)
+  | UpdRegRME (r : string)(pred : Bool @# ty)(k : FullKind)(val : Expr ty k)(regMap : RME_simple) : RME_simple
+  | WriteRME (idxNum num : nat) (writePort dataArray : string) (idx  : Bit (Nat.log2_up idxNum) @# ty) (Data : Kind)
+             (val : Array num Data @# ty)
+             (mask : option (Array num Bool @# ty)) (pred : Bool @# ty) (writeMap readMap : RME_simple)
+             (arr : Array idxNum Data @# ty) : RME_simple
+  | ReadReqRME (idxNum num : nat) (readReq readReg dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty) (Data : Kind)
                (isAddr : bool) (pred : Bool @# ty) (writeMap readMap : RME_simple)
                (arr : Array idxNum Data @# ty) : RME_simple
-  | AsyncRead (idxNum num : nat) (readPort dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty) (pred : Bool @# ty)
-              (k : Kind)(readMap : RME_simple) : RME_simple
+  | ReadRespRME (idxNum num : nat) (readResp readReg dataArray : string) (Data : Kind)
+               (isAddr : bool) (readMap : RME_simple) : RME_simple
+  | AsyncReadRME (idxNum num : nat) (readPort dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty) (pred : Bool @# ty)
+                 (k : Kind)(readMap : RME_simple) : RME_simple
   | CompactRME (regMap: RME_simple): RME_simple.
 
   Fixpoint RME_simple_of_RME(x : RegMapExpr ty regMapTy) : RME_simple :=
     match x with
     | VarRegMap v => VarRME v
-    | UpdRegMap r pred k val regMap => UpdReg r pred val (RME_simple_of_RME regMap)
+    | UpdRegMap r pred k val regMap => UpdRegRME r pred val (RME_simple_of_RME regMap)
     | CompactRegMap x' => CompactRME (RME_simple_of_RME x')
     end.
 
@@ -43,12 +45,12 @@ Section Simple.
                          (k : Kind)
                          (readMap : RME_simple) lret
                          (cont : fullType ty (SyntaxKind (Array num k)) -> CA_simple lret) : CA_simple lret
-  | CompSyncReadRes_simple (idxNum num : nat) (readReg dataArray : string) (Data : Kind) (isAddr : bool)
+  | CompSyncReadRes_simple (idxNum num : nat) (readResp readReg dataArray : string) (Data : Kind) (isAddr : bool)
                            (readMap : RME_simple) lret
                            (cont : fullType ty (SyntaxKind (Array num Data)) -> CA_simple lret) : CA_simple lret
-  | CompWrite_simple (idxNum : nat) (Data : Kind) (dataArray : string) (readMap : RME_simple) lret
+  | CompWrite_simple (idxNum : nat) (Data : Kind) (writePort dataArray : string) (readMap : RME_simple) lret
                      (cont : ty (Array idxNum Data) -> CA_simple lret) : CA_simple lret
-  | CompSyncReadReq_simple (idxNum num : nat) (Data : Kind) (dataArray readReg : string) (isAddr : bool)
+  | CompSyncReadReq_simple (idxNum num : nat) (Data : Kind) (readReq readReg dataArray : string) (isAddr : bool)
                            (readMap : RME_simple) lret
                            (cont : ty (Array idxNum Data) -> CA_simple lret) : CA_simple lret.
 
@@ -64,28 +66,28 @@ Section Simple.
     | CompLetFull k a lret cont => CompLetFull_simple (CA_simple_of_CA a) (fun x y => CA_simple_of_CA (cont x y))
     | CompAsyncRead idxNum num readPort dataArray idx pred k readMap lret cont =>
       CompLetFull_simple (CompRet_simple (($$WO)%kami_expr : Void @# ty)
-                                         (AsyncRead idxNum num readPort dataArray idx pred k (RME_simple_of_RME readMap)))
-                                         (fun _ y => CompAsyncRead_simple idxNum readPort dataArray idx pred (VarRME y)
-                                                                          (fun arr => CA_simple_of_CA (cont arr)))
-    | CompWrite idxNum num dataArray idx Data val mask pred writeMap readMap lret cont =>
-      @CompWrite_simple idxNum Data dataArray (RME_simple_of_RME readMap) lret
+                                         (AsyncReadRME idxNum num readPort dataArray idx pred k (RME_simple_of_RME readMap)))
+                         (fun _ y => CompAsyncRead_simple idxNum readPort dataArray idx pred (VarRME y)
+                                                          (fun arr => CA_simple_of_CA (cont arr)))
+    | CompWrite idxNum num writePort dataArray idx Data val mask pred writeMap readMap lret cont =>
+      @CompWrite_simple idxNum Data writePort dataArray (RME_simple_of_RME readMap) lret
                         (fun arr => 
                            CompLetFull_simple (CompRet_simple (($$ WO)%kami_expr : Void @# ty)
-                                                              (@UpdRegFile idxNum num dataArray idx Data val mask pred
-                                                                           (RME_simple_of_RME writeMap)
-                                                                           (RME_simple_of_RME readMap) (#arr)%kami_expr))
+                                                              (@WriteRME idxNum num writePort dataArray idx Data val mask pred
+                                                                         (RME_simple_of_RME writeMap)
+                                                                         (RME_simple_of_RME readMap) (#arr)%kami_expr))
                                               (fun _ y => CA_simple_of_CA (cont y)))
-    | CompSyncReadReq idxNum num readReg dataArray idx Data isAddr pred writeMap readMap lret cont =>
-      @CompSyncReadReq_simple idxNum num Data dataArray readReg isAddr (RME_simple_of_RME readMap) lret
+    | CompSyncReadReq idxNum num readReq readReg dataArray idx Data isAddr pred writeMap readMap lret cont =>
+      @CompSyncReadReq_simple idxNum num Data readReq readReg dataArray isAddr (RME_simple_of_RME readMap) lret
                               (fun x => CompLetFull_simple (CompRet_simple (($$ WO)%kami_expr : Void @# ty)
-                                                                           (@UpdReadReq idxNum num readReg dataArray
+                                                                           (@ReadReqRME idxNum num readReq readReg dataArray
                                                                                         idx Data isAddr pred
                                                                                         (RME_simple_of_RME writeMap)
                                                                                         (RME_simple_of_RME readMap)
                                                                                         (#x)%kami_expr))
                                                            (fun _ y => CA_simple_of_CA (cont y)))
-    | CompSyncReadRes idxNum num readReg dataArray Data isAddr readMap lret cont =>
-      CompSyncReadRes_simple idxNum readReg dataArray isAddr (RME_simple_of_RME readMap)
+    | CompSyncReadRes idxNum num readResp readReg dataArray Data isAddr readMap lret cont =>
+      CompSyncReadRes_simple idxNum readResp readReg dataArray isAddr (@ReadRespRME idxNum num readResp readReg dataArray Data isAddr (RME_simple_of_RME readMap))
                              (fun x => CA_simple_of_CA (cont x))
     end.
 

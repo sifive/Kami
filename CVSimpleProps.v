@@ -1,9 +1,9 @@
 Require Import Kami.All.
 Require Import Kami.Notations.
-Require Import Kami.PPV.CVSimpleSem.
-Require Import Kami.PPV.CVSimple.
+Require Import Kami.CVSimpleSem.
+Require Import Kami.CVSimple.
 Require Import Kami.CVProperties.
-(* Section PropertiesSimple *)
+Require Import Kami.CompileVerifiable.
 
 Lemma RME_Simple_RME_Equiv map:
   forall old upds,
@@ -60,7 +60,11 @@ Proof.
     econstructor 13; eauto using RME_Simple_RME_Equiv.
     econstructor; eauto using RME_Simple_RME_Equiv.
   - econstructor 14; eauto using RME_Simple_RME_Equiv.
+    inv HReadMap.
+    apply RME_Simple_RME_Equiv; auto.
   - econstructor 15; eauto using RME_Simple_RME_Equiv.
+    inv HReadMap.
+    apply RME_Simple_RME_Equiv; auto.
 Qed.
 
 Lemma CA_Simple_Trace_CA_Trace_Equiv {k : Kind} (ca : CompActionT type (RegsT * list RegsT) k) :
@@ -88,5 +92,3 @@ Lemma CA_Simple_TraceEquiv (b : BaseModule) (lrf : list RegFileBase) o :
 Proof.
   intros; eapply CompTraceEquiv; eauto using CA_Simple_Trace_CA_Trace_Equiv.
 Qed.
-  
-(* End PropertiesSimple *)

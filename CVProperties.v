@@ -2776,7 +2776,7 @@ Proof.
     + revert Heqrf'.
       inv H0; simpl in *; EqDep_subst.
       inv HESemAction; simpl in *; EqDep_subst.
-      * specialize (H _ _ _ _ _ HESemAction0); dest; inv H8.
+      * specialize (H _ _ _ _ _ HESemAction0); dest; inv H9.
         intro.
         exists ( Meth (meth, existT SignT (WriteRqMask (Nat.log2_up rfIdxNum) rfNum rfData, Void) (evalExpr e, WO))::x); split.
         -- econstructor 5; auto.
@@ -2812,7 +2812,7 @@ Proof.
     + revert Heqrf'.
       inv H0; EqDep_subst.
       inv HESemAction; simpl in *; EqDep_subst; [discriminate|].
-      * specialize (H _ _ _ _ _ HESemAction0); dest; inv H8.
+      * specialize (H _ _ _ _ _ HESemAction0); dest; inv H9.
         intro.
         exists ( Meth (meth, existT SignT (WriteRq (Nat.log2_up rfIdxNum) (Array rfNum rfData), Void) (evalExpr e, WO))::x); split.
         -- econstructor 5; auto.
@@ -3094,7 +3094,7 @@ Proof.
   - destruct String.eqb, rfIsWrMask;
       [destruct Signature_dec | destruct Signature_dec | | ]; simpl in *.
     + inv H0; EqDep_subst.
-      inv HESemAction; EqDep_subst; inv H8.
+      inv HESemAction; EqDep_subst; inv H9.
       econstructor; simpl; auto.
       * instantiate (1 := newUml).
         instantiate (1 := (Upd

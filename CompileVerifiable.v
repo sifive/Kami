@@ -28,13 +28,13 @@ Section Compile.
   | CompLetFull k (a: CompActionT k) lret (cont: fullType ty (SyntaxKind k) -> regMapTy -> CompActionT lret): CompActionT lret
   | CompAsyncRead (idxNum num : nat) (readPort dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty) (pred : Bool @# ty) (k : Kind) (readMap : RegMapExpr) lret
                   (cont : fullType ty (SyntaxKind (Array num k)) -> CompActionT lret) : CompActionT lret
-  | CompWrite (idxNum num : nat) (dataArray : string) (idx  : Bit (Nat.log2_up idxNum) @# ty) (Data : Kind) (val : Array num Data @# ty)
+  | CompWrite (idxNum num : nat) (writePort dataArray : string) (idx  : Bit (Nat.log2_up idxNum) @# ty) (Data : Kind) (val : Array num Data @# ty)
               (mask : option (Array num Bool @# ty)) (pred : Bool @# ty) (writeMap readMap : RegMapExpr) lret
               (cont : regMapTy -> CompActionT lret) : CompActionT lret
-  | CompSyncReadReq (idxNum num : nat) (readReg dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty) (Data : Kind)
+  | CompSyncReadReq (idxNum num : nat) (readReq readReg dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty) (Data : Kind)
                     (isAddr : bool) (pred : Bool @# ty) (writeMap readMap : RegMapExpr) lret
                     (cont : regMapTy -> CompActionT lret) : CompActionT lret
-  | CompSyncReadRes (idxNum num : nat) (readReg dataArray : string) (Data : Kind) (isAddr : bool) (readMap : RegMapExpr) lret
+  | CompSyncReadRes (idxNum num : nat) (readResp readReg dataArray : string) (Data : Kind) (isAddr : bool) (readMap : RegMapExpr) lret
                     (cont : fullType ty (SyntaxKind (Array num Data)) -> CompActionT lret) : CompActionT lret.
 
   Inductive EActionT (lretT : Kind) : Type :=
@@ -50,12 +50,12 @@ Section Compile.
   | EReturn (e : Expr ty (SyntaxKind lretT)) : EActionT lretT
   | EAsyncRead (idxNum num : nat) (readPort dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty)
                       (k : Kind) (cont : fullType ty (SyntaxKind (Array num k)) -> EActionT lretT) : EActionT lretT
-  | EWrite (idxNum num : nat) (dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty)
+  | EWrite (idxNum num : nat) (write dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty)
                   (Data : Kind) (val : Array num Data @# ty) (mask : option (Array num Bool @# ty))
                   (cont : EActionT lretT) : EActionT lretT
-  | ESyncReadReq (idxNum num : nat) (readReg dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty)
+  | ESyncReadReq (idxNum num : nat) (readReq readReg dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty)
                         (Data : Kind) (isAddr : bool) (cont : EActionT lretT) : EActionT lretT
-  | ESyncReadRes (idxNum num : nat) (readReg dataArray : string) (Data : Kind) (isAddr : bool)
+  | ESyncReadRes (idxNum num : nat) (readRes readReg dataArray : string) (Data : Kind) (isAddr : bool)
                         (cont : fullType ty (SyntaxKind (Array num Data)) -> EActionT lretT) : EActionT lretT.
   
   Fixpoint Action_EAction (lretT : Kind) (a : ActionT ty lretT) :  EActionT lretT :=
@@ -136,14 +136,14 @@ Section Compile.
       | EAsyncRead idxNum num readPort dataArray idx k cont =>
         CompAsyncRead idxNum readPort dataArray idx pred (VarRegMap readMap)
                       (fun array => @EcompileAction _ (cont array) pred writeMap)
-      | EWrite idxNum num dataArray idx Data val mask cont =>
-        CompWrite idxNum dataArray idx val mask pred writeMap (VarRegMap readMap)
+      | EWrite idxNum num writePort dataArray idx Data val mask cont =>
+        CompWrite idxNum writePort  dataArray idx val mask pred writeMap (VarRegMap readMap)
                   (fun writeMap' => @EcompileAction _ cont pred (VarRegMap writeMap'))
-      | ESyncReadReq idxNum num readReg dataArray idx Data isAddr cont =>
-        CompSyncReadReq idxNum num readReg dataArray idx Data isAddr pred writeMap (VarRegMap readMap)
+      | ESyncReadReq idxNum num readReq readReg dataArray idx Data isAddr cont =>
+        CompSyncReadReq idxNum num readReq readReg dataArray idx Data isAddr pred writeMap (VarRegMap readMap)
                         (fun writeMap' => @EcompileAction _ cont pred (VarRegMap writeMap'))
-      | ESyncReadRes idxNum num readReg dataArray Data isAddr cont =>
-        CompSyncReadRes idxNum readReg dataArray isAddr (VarRegMap readMap)
+      | ESyncReadRes idxNum num readResp readReg dataArray Data isAddr cont =>
+        CompSyncReadRes idxNum readResp readReg dataArray isAddr (VarRegMap readMap)
                         (fun array => @EcompileAction _ (cont array) pred writeMap)
       end.
 
@@ -159,7 +159,7 @@ Section Compile.
               | left isEq =>
                 let inValue := (match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with | eq_refl => arg end) in
                 ELetExpr ($$ WO)%kami_expr
-                         (fun v => EWrite _idxNum _dataArray (inValue @% "addr")%kami_expr (inValue @% "data")%kami_expr
+                         (fun v => EWrite _idxNum _write _dataArray (inValue @% "addr")%kami_expr (inValue @% "data")%kami_expr
                                           (Some (inValue @% "mask")%kami_expr) (inlineWriteFile rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with
                                                                                                     | eq_refl => cont
                                                                                                     end v)))
@@ -170,7 +170,7 @@ Section Compile.
               | left isEq =>
                 let inValue := (match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with | eq_refl => arg end) in
                 ELetExpr ($$ WO)%kami_expr
-                         (fun v => EWrite _idxNum _dataArray (inValue @% "addr")%kami_expr (inValue @% "data")%kami_expr
+                         (fun v => EWrite _idxNum _write _dataArray (inValue @% "addr")%kami_expr (inValue @% "data")%kami_expr
                                           None (inlineWriteFile rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with
                                                                     | eq_refl => cont
                                                                     end v)))
@@ -188,12 +188,12 @@ Section Compile.
         | EReturn e => EReturn e
         | EAsyncRead idxNum num readPort dataArray idx k cont =>
           EAsyncRead idxNum readPort dataArray idx (fun ret => inlineWriteFile rf (cont ret))
-        | EWrite idxNum num dataArray idx Data val mask cont =>
-          EWrite idxNum dataArray idx val mask (inlineWriteFile rf cont)
-        | ESyncReadReq idxNum num readReg dataArray idx Data isAddr cont =>
-          ESyncReadReq idxNum num readReg dataArray idx Data isAddr (inlineWriteFile rf cont)
-        | ESyncReadRes idxNum num readReg dataArray Data isAddr cont =>
-          ESyncReadRes idxNum readReg dataArray isAddr (fun v => inlineWriteFile rf (cont v))
+        | EWrite idxNum num writePort dataArray idx Data val mask cont =>
+          EWrite idxNum writePort dataArray idx val mask (inlineWriteFile rf cont)
+        | ESyncReadReq idxNum num readReq readReg dataArray idx Data isAddr cont =>
+          ESyncReadReq idxNum num readReq readReg dataArray idx Data isAddr (inlineWriteFile rf cont)
+        | ESyncReadRes idxNum num readResp readReg dataArray Data isAddr cont =>
+          ESyncReadRes idxNum readResp readReg dataArray isAddr (fun v => inlineWriteFile rf (cont v))
         end
       end.
     
@@ -211,7 +211,7 @@ Section Compile.
                 match Signature_dec sign (Bit (Nat.log2_up _idxNum), Array _num _Data) with
                 | left isEq =>
                   let inValue := (match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with | eq_refl => arg end) in
-                  EAsyncRead _idxNum g _dataArray inValue (fun array => inlineAsyncReadFile  read rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with
+                  EAsyncRead _idxNum read _dataArray inValue (fun array => inlineAsyncReadFile  read rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with
                                                                                                       | eq_refl => cont
                                                                                                       end array))
                 | right _ => EMCall g sign arg (fun ret => inlineAsyncReadFile read rf (cont ret))
@@ -228,12 +228,12 @@ Section Compile.
             | EReturn e => EReturn e
             | EAsyncRead idxNum num readPort dataArray idx k cont =>
               EAsyncRead idxNum readPort dataArray idx (fun ret => inlineAsyncReadFile read rf (cont ret))
-            | EWrite idxNum num dataArray idx Data val mask cont =>
-              EWrite idxNum dataArray idx val mask (inlineAsyncReadFile read rf cont)
-            | ESyncReadReq idxNum num readReg dataArray idx Data isAddr cont =>
-              ESyncReadReq idxNum num readReg dataArray idx Data isAddr (inlineAsyncReadFile read rf cont)
-            | ESyncReadRes idxNum num readReg dataArray Data isAddr cont =>
-              ESyncReadRes idxNum readReg dataArray isAddr (fun v => inlineAsyncReadFile read rf (cont v))
+            | EWrite idxNum num writePort dataArray idx Data val mask cont =>
+              EWrite idxNum writePort dataArray idx val mask (inlineAsyncReadFile read rf cont)
+            | ESyncReadReq idxNum num readReq readReg dataArray idx Data isAddr cont =>
+              ESyncReadReq idxNum num readReq readReg dataArray idx Data isAddr (inlineAsyncReadFile read rf cont)
+            | ESyncReadRes idxNum num readResp readReg dataArray Data isAddr cont =>
+              ESyncReadRes idxNum readResp readReg dataArray isAddr (fun v => inlineAsyncReadFile read rf (cont v))
             end
           | false => a
           end
@@ -282,7 +282,7 @@ Section Compile.
               | true =>
                 match Signature_dec sign (Void, Array _num _Data) with
                 | left isEq =>
-                  ESyncReadRes _idxNum _readRegName _dataArray isAddr (fun array => inlineSyncResFile read rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with | eq_refl => cont end array))
+                  ESyncReadRes _idxNum _readResName _readRegName _dataArray isAddr (fun array => inlineSyncResFile read rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with | eq_refl => cont end array))
                 | right _ => EMCall g sign arg (fun ret => inlineSyncResFile read rf (cont ret))
                 end 
               | false => EMCall g sign arg (fun ret => inlineSyncResFile read rf (cont ret))
@@ -297,12 +297,12 @@ Section Compile.
             | EReturn e => EReturn e
             | EAsyncRead idxNum num readPort dataArray idx k cont =>
               EAsyncRead idxNum readPort dataArray idx (fun ret => inlineSyncResFile read rf (cont ret))
-            | EWrite idxNum num dataArray idx Data val mask cont =>
-              EWrite idxNum dataArray idx val mask (inlineSyncResFile read rf cont)
-            | ESyncReadReq idxNum num readReg dataArray idx Data isAddr cont =>
-              ESyncReadReq idxNum num readReg dataArray idx Data isAddr (inlineSyncResFile read rf cont)
-            | ESyncReadRes idxNum num readReg dataArray Data isAddr cont =>
-              ESyncReadRes idxNum readReg dataArray isAddr (fun v => inlineSyncResFile read rf (cont v))
+            | EWrite idxNum num writePort dataArray idx Data val mask cont =>
+              EWrite idxNum writePort dataArray idx val mask (inlineSyncResFile read rf cont)
+            | ESyncReadReq idxNum num readReq readReg dataArray idx Data isAddr cont =>
+              ESyncReadReq idxNum num readReq readReg dataArray idx Data isAddr (inlineSyncResFile read rf cont)
+            | ESyncReadRes idxNum num readResp readReg dataArray Data isAddr cont =>
+              ESyncReadRes idxNum readResp readReg dataArray isAddr (fun v => inlineSyncResFile read rf (cont v))
             end
           | false => a
           end
@@ -328,7 +328,7 @@ Section Compile.
                 | left isEq =>
                   let inValue := (match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with | eq_refl => arg end) in
                   ELetExpr ($$ WO)%kami_expr
-                           (fun v => ESyncReadReq _idxNum _num _readRegName _dataArray inValue _Data isAddr (inlineSyncReqFile read rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with
+                           (fun v => ESyncReadReq _idxNum _num _readReqName _readRegName _dataArray inValue _Data isAddr (inlineSyncReqFile read rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with
                                                                                                        | eq_refl => cont
                                                                                                        end v)))
                 | right _ => EMCall g sign arg (fun ret => inlineSyncReqFile read rf (cont ret))
@@ -345,12 +345,12 @@ Section Compile.
             | EReturn e => EReturn e
             | EAsyncRead idxNum num readPort dataArray idx k cont =>
               EAsyncRead idxNum readPort dataArray idx (fun ret => inlineSyncReqFile read rf (cont ret))
-            | EWrite idxNum num dataArray idx Data val mask cont =>
-              EWrite idxNum dataArray idx val mask (inlineSyncReqFile read rf cont)
-            | ESyncReadReq idxNum num readReg dataArray idx Data isAddr cont =>
-              ESyncReadReq idxNum num readReg dataArray idx Data isAddr (inlineSyncReqFile read rf cont)
-            | ESyncReadRes idxNum num readReg dataArray Data isAddr cont =>
-              ESyncReadRes idxNum readReg dataArray isAddr (fun v => inlineSyncReqFile read rf (cont v))
+            | EWrite idxNum num writePort dataArray idx Data val mask cont =>
+              EWrite idxNum writePort dataArray idx val mask (inlineSyncReqFile read rf cont)
+            | ESyncReadReq idxNum num readReq readReg dataArray idx Data isAddr cont =>
+              ESyncReadReq idxNum num readReq readReg dataArray idx Data isAddr (inlineSyncReqFile read rf cont)
+            | ESyncReadRes idxNum num readResp readReg dataArray Data isAddr cont =>
+              ESyncReadRes idxNum readResp readReg dataArray isAddr (fun v => inlineSyncReqFile read rf (cont v))
             end
           | false => a
           end
@@ -584,7 +584,7 @@ Section Semantics.
                                                                    Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                      (HSemCompActionT : SemCompActionT (cont (evalExpr contArray)) regMap calls val):
       SemCompActionT (@CompAsyncRead _ _  idxNum num readPort dataArray idx pred Data readMap lret cont) regMap calls val
-  | SemCompWriteSome num (dataArray : string) idxNum (idx  : Bit (Nat.log2_up idxNum) @# type) Data (array : Array num Data @# type)
+  | SemCompWriteSome num (writePort dataArray : string) idxNum (idx  : Bit (Nat.log2_up idxNum) @# type) Data (array : Array num Data @# type)
                      (optMask : option (Array num Bool @# type)) (writeMap readMap : RegMapExpr type RegMapType) lret mask
                      (HMask : optMask = Some mask)
                      updatedRegs readMapValOld readMapValUpds regVal
@@ -606,8 +606,8 @@ Section Semantics.
                                                         writeMap) regMapVal)
                      cont regMap_cont calls val
                      (HSemCompActionT : SemCompActionT (cont regMapVal) regMap_cont calls val):
-      SemCompActionT (@CompWrite _ _ idxNum num dataArray idx Data array optMask pred writeMap readMap lret cont) regMap_cont calls val
-  | SemCompWriteNone num (dataArray : string) idxNum (idx  : Bit (Nat.log2_up idxNum) @# type) Data (array : Array num Data @# type)
+      SemCompActionT (@CompWrite _ _ idxNum num writePort dataArray idx Data array optMask pred writeMap readMap lret cont) regMap_cont calls val
+  | SemCompWriteNone num (writePort dataArray : string) idxNum (idx  : Bit (Nat.log2_up idxNum) @# type) Data (array : Array num Data @# type)
                      (optMask : option (Array num Bool @# type)) (writeMap readMap : RegMapExpr type RegMapType) lret
                      (HMask : optMask = None)
                      updatedRegs readMapValOld readMapValUpds regVal
@@ -626,16 +626,16 @@ Section Semantics.
                                                         writeMap) regMapVal)
                      cont regMap_cont calls val
                      (HSemCompActionT : SemCompActionT (cont regMapVal) regMap_cont calls val):
-      SemCompActionT (@CompWrite _ _ idxNum num dataArray idx Data array optMask pred writeMap readMap lret cont) regMap_cont calls val
-  | SemCompSyncReadReqTrue num idxNum readRegName dataArray (idx : Bit (Nat.log2_up idxNum) @# type) k (isAddr : bool)
+      SemCompActionT (@CompWrite _ _ idxNum num writePort dataArray idx Data array optMask pred writeMap readMap lret cont) regMap_cont calls val
+  | SemCompSyncReadReqTrue num idxNum readReqName readRegName dataArray (idx : Bit (Nat.log2_up idxNum) @# type) k (isAddr : bool)
                            (writeMap : RegMapExpr type RegMapType) readMap lret cont
                            regMapVal pred
                            (HisAddr : isAddr = true)
                            (HWriteMap : WfRegMapExpr (UpdRegMap readRegName pred (Var type (SyntaxKind _) (evalExpr idx)) writeMap) regMapVal)
                            regMap_cont calls val
                            (HSemCompActionT : SemCompActionT (cont regMapVal) regMap_cont calls val):
-      SemCompActionT (@CompSyncReadReq _ _ idxNum num readRegName dataArray idx k isAddr pred writeMap readMap lret cont) regMap_cont calls val
-  | SemCompSyncReadReqFalse num idxNum readRegName dataArray (idx : Bit (Nat.log2_up idxNum) @# type) Data (isAddr : bool)
+      SemCompActionT (@CompSyncReadReq _ _ idxNum num readReqName readRegName dataArray idx k isAddr pred writeMap readMap lret cont) regMap_cont calls val
+  | SemCompSyncReadReqFalse num idxNum readReqName readRegName dataArray (idx : Bit (Nat.log2_up idxNum) @# type) Data (isAddr : bool)
                             (writeMap : RegMapExpr type RegMapType) readMap lret cont
                             regMapVal pred
                             (HisAddr : isAddr = false)
@@ -652,8 +652,8 @@ Section Semantics.
                                                                                        Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil)))) writeMap) regMapVal)
                             regMap_cont calls val
                             (HSemCompActionT : SemCompActionT (cont regMapVal) regMap_cont calls val):
-      SemCompActionT (@CompSyncReadReq _ _ idxNum num readRegName dataArray idx Data isAddr pred writeMap readMap lret cont) regMap_cont calls val
-  | SemCompSyncReadResTrue num idxNum readRegName dataArray Data isAddr readMap lret cont
+      SemCompActionT (@CompSyncReadReq _ _ idxNum num readReqName readRegName dataArray idx Data isAddr pred writeMap readMap lret cont) regMap_cont calls val
+  | SemCompSyncReadResTrue num idxNum readRespName readRegName dataArray Data isAddr readMap lret cont
                            (HisAddr : isAddr = true)
                            updatedRegs readMapValOld readMapValUpds regVal idx
                            (HReadMap : SemRegMapExpr readMap (readMapValOld, readMapValUpds))
@@ -669,8 +669,8 @@ Section Semantics.
                                                                          Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                            regMap calls val
                            (HSemCompActionT : SemCompActionT (cont (evalExpr contArray)) regMap calls val):
-      SemCompActionT (@CompSyncReadRes _ _ idxNum num readRegName dataArray Data isAddr readMap lret cont) regMap calls val
-  | SemCompSyncReadResFalse num idxNum readRegName dataArray Data isAddr readMap lret cont
+      SemCompActionT (@CompSyncReadRes _ _ idxNum num readRespName readRegName dataArray Data isAddr readMap lret cont) regMap calls val
+  | SemCompSyncReadResFalse num idxNum readRespName readRegName dataArray Data isAddr readMap lret cont
                             (HisAddr : isAddr = false)
                             updatedRegs readMapValOld readMapValUpds regVal
                             (HReadMap : SemRegMapExpr readMap (readMapValOld, readMapValUpds))
@@ -678,7 +678,7 @@ Section Semantics.
                             (HIn1 : In (readRegName, (existT _ (SyntaxKind (Array num Data)) regVal)) updatedRegs)
                             regMap calls val
                             (HSemCompActionT : SemCompActionT (cont regVal) regMap calls val):
-      SemCompActionT (@CompSyncReadRes _ _ idxNum num readRegName dataArray Data isAddr readMap lret cont) regMap calls val.
+      SemCompActionT (@CompSyncReadRes _ _ idxNum num readRespName readRegName dataArray Data isAddr readMap lret cont) regMap calls val.
 
   Variable (k : Kind) (a : CompActionT type RegMapType k) (regInits : list RegInitT).
   
@@ -799,7 +799,7 @@ Section EActionT_Semantics.
                                                                 Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                   (HESemAction : ESemAction (cont (evalExpr contArray)) newUml fret):
       ESemAction (EAsyncRead idxNum num readPort dataArray idx Data cont) newUml fret
-  | ESemWriteSome (idxNum num : nat) (dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (Data : Kind) (array : Array num Data @# type)
+  | ESemWriteSome (idxNum num : nat) (writePort dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (Data : Kind) (array : Array num Data @# type)
                   (optMask : option (Array num Bool @# type)) (retK : Kind) (fret : type retK) (cont : EActionT type retK) (newUml : UpdOrMeths)
                   (anewUml : list UpdOrMeth) (regV : fullType type (SyntaxKind (Array idxNum Data))) (mask : Array num Bool @# type)
                   (HRegVal : In (dataArray, (existT _ (SyntaxKind (Array idxNum Data)) regV)) o)
@@ -818,8 +818,8 @@ Section EActionT_Semantics.
                                                                            (Var type (SyntaxKind (Array idxNum Data)) regV))))) :: newUml)
                   (HDisjRegs : key_not_In dataArray (UpdOrMeths_RegsT newUml))
                   (HESemAction : ESemAction cont newUml fret) :
-      ESemAction (EWrite idxNum dataArray idx array optMask cont) anewUml fret
-  | ESemWriteNone (idxNum num : nat) (dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (Data : Kind) (array : Array num Data @# type)
+      ESemAction (EWrite idxNum writePort dataArray idx array optMask cont) anewUml fret
+  | ESemWriteNone (idxNum num : nat) (writePort dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (Data : Kind) (array : Array num Data @# type)
                   (optMask : option (Array num Bool @# type)) (retK : Kind) (fret : type retK) (cont : EActionT type retK) (newUml : UpdOrMeths)
                   (anewUml : list UpdOrMeth) (regV : fullType type (SyntaxKind (Array idxNum Data)))
                   (HRegVal : In (dataArray, (existT _ (SyntaxKind (Array idxNum Data)) regV)) o)
@@ -835,16 +835,16 @@ Section EActionT_Semantics.
                                                                            (Var type (SyntaxKind (Array idxNum Data)) regV))))) :: newUml)
                   (HDisjRegs : key_not_In dataArray (UpdOrMeths_RegsT newUml))
                   (HESemAction : ESemAction cont newUml fret) :
-      ESemAction (EWrite idxNum dataArray idx array optMask cont) anewUml fret
-  | ESemSyncReadReqTrue (idxNum num : nat) (readRegName dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (Data : Kind) (isAddr : bool)
+      ESemAction (EWrite idxNum writePort dataArray idx array optMask cont) anewUml fret
+  | ESemSyncReadReqTrue (idxNum num : nat) (readReqName readRegName dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (Data : Kind) (isAddr : bool)
                         (retK : Kind) (fret : type retK) (cont : EActionT type retK) (newUml : UpdOrMeths) (anewUml : list UpdOrMeth)
                         (HisAddr : isAddr = true)
                         (HRegVal : In (readRegName, (SyntaxKind (Bit (Nat.log2_up idxNum)))) (getKindAttr o))
                         (HDisjRegs : key_not_In readRegName (UpdOrMeths_RegsT newUml))
                         (HANewUml : anewUml = (Upd (readRegName, existT _ _ (evalExpr idx))) :: newUml)
                         (HESemAction : ESemAction cont newUml fret):
-      ESemAction (ESyncReadReq idxNum num readRegName dataArray idx Data isAddr cont) anewUml fret
-  | ESemSyncReadReqFalse (idxNum num : nat) (readRegName dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (Data : Kind) (isAddr : bool)
+      ESemAction (ESyncReadReq idxNum num readReqName readRegName dataArray idx Data isAddr cont) anewUml fret
+  | ESemSyncReadReqFalse (idxNum num : nat) (readReqName readRegName dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (Data : Kind) (isAddr : bool)
                          (retK : Kind) (fret : type retK) (cont : EActionT type retK) (newUml : UpdOrMeths) (anewUml : list UpdOrMeth)
                          (regV : fullType type (SyntaxKind (Array idxNum Data)))
                          (HisAddr : isAddr = false)
@@ -860,8 +860,8 @@ Section EActionT_Semantics.
                                                        (CABit Add (Var type (SyntaxKind _) (evalExpr idx) ::
                                                                        Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))))) :: newUml)
                          (HESemAction : ESemAction cont newUml fret):
-      ESemAction (ESyncReadReq idxNum num readRegName dataArray idx Data isAddr cont) anewUml fret
-  | ESemSyncReadResTrue (idxNum num : nat) (readRegName dataArray : string) (Data : Kind) (isAddr : bool) (retK : Kind) (fret : type retK)
+      ESemAction (ESyncReadReq idxNum num readReqName readRegName dataArray idx Data isAddr cont) anewUml fret
+  | ESemSyncReadResTrue (idxNum num : nat) (readRespName readRegName dataArray : string) (Data : Kind) (isAddr : bool) (retK : Kind) (fret : type retK)
                         (regVal : fullType type (SyntaxKind (Array idxNum Data))) (idx : fullType type (SyntaxKind (Bit (Nat.log2_up idxNum))))
                         (cont : type (Array num Data) -> EActionT type retK)
                         (HisAddr : isAddr = true)
@@ -876,14 +876,14 @@ Section EActionT_Semantics.
                                                                          Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                         (newUml : UpdOrMeths) 
                         (HESemAction : ESemAction (cont (evalExpr contArray)) newUml fret):
-      ESemAction (ESyncReadRes idxNum num readRegName dataArray Data isAddr cont)  newUml fret
-  | ESemSyncReadResFalse (idxNum num : nat) (readRegName dataArray : string) (Data : Kind) (isAddr : bool) (retK : Kind) (fret : type retK)
+      ESemAction (ESyncReadRes idxNum num readRespName readRegName dataArray Data isAddr cont)  newUml fret
+  | ESemSyncReadResFalse (idxNum num : nat) (readRespName readRegName dataArray : string) (Data : Kind) (isAddr : bool) (retK : Kind) (fret : type retK)
                          (regVal : fullType type (SyntaxKind (Array num Data))) (cont : type (Array num Data) -> EActionT type retK)
                          (HisAddr : isAddr = false)
                          (HRegVal : In (readRegName, existT _ (SyntaxKind (Array num Data)) regVal) o)
                          (newUml : UpdOrMeths) 
                          (HESemAction : ESemAction (cont regVal) newUml fret):
-      ESemAction (ESyncReadRes idxNum num readRegName dataArray Data isAddr cont) newUml fret.
+      ESemAction (ESyncReadRes idxNum num readRespName readRegName dataArray Data isAddr cont) newUml fret.
                       
 End EActionT_Semantics.
 
