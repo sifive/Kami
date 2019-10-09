@@ -682,21 +682,24 @@ Section Semantics.
 
   Variable (k : Kind) (a : CompActionT type RegMapType k) (regInits : list RegInitT).
   
-  Inductive SemCompTrace: RegsT -> list UpdRegsT -> list MethsT -> Prop :=
-  | SemCompTraceInit (oInit : RegsT) (lupds : list UpdRegsT) (lcalls : list MethsT)
-                     (HNoUpds : lupds = nil) (HNoCalls : lcalls = nil)
-                     (HInitRegs : Forall2 regInit oInit regInits) :
-      SemCompTrace oInit lupds lcalls
-  | SemCompTraceCont (o o' : RegsT) (lupds lupds' : list UpdRegsT) (upds : UpdRegsT)
-                     (lcalls lcalls' : list MethsT) (calls : MethsT) val
-                     (HOldTrace : SemCompTrace o lupds lcalls)
-                     (HSemAction : SemCompActionT a (o, upds) calls val)
-                     (HNewUpds : lupds' = upds :: lupds)
-                     (HNewCalls : lcalls' = calls :: lcalls)
-                     (HPriorityUpds : PriorityUpds o upds o') :
-      SemCompTrace o' lupds' lcalls'.
-  
-    
+
+  Section Loop.
+    Variable f: RegsT -> CompActionT type RegMapType Void.
+
+    Inductive SemCompTrace: RegsT -> list UpdRegsT -> list MethsT -> Prop :=
+    | SemCompTraceInit (oInit : RegsT) (lupds : list UpdRegsT) (lcalls : list MethsT)
+                       (HNoUpds : lupds = nil) (HNoCalls : lcalls = nil)
+                       (HInitRegs : Forall2 regInit oInit regInits) :
+        SemCompTrace oInit lupds lcalls
+    | SemCompTraceCont (o o' : RegsT) (lupds lupds' : list UpdRegsT) (upds : UpdRegsT)
+                       (lcalls lcalls' : list MethsT) (calls : MethsT) val
+                       (HOldTrace : SemCompTrace o lupds lcalls)
+                       (HSemAction : SemCompActionT (f o) (o, upds) calls val)
+                       (HNewUpds : lupds' = upds :: lupds)
+                       (HNewCalls : lcalls' = calls :: lcalls)
+                       (HPriorityUpds : PriorityUpds o upds o') :
+        SemCompTrace o' lupds' lcalls'.
+  End Loop.
 End Semantics.
 
 Section EActionT_Semantics.

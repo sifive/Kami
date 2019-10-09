@@ -5495,7 +5495,7 @@ Lemma CompTraceEquiv (b : BaseModule) (lrf : list RegFileBase) o :
          (HWfMod : WfMod (mergeSeparatedSingle b lrf))
          (HNoSelfCallsBase : NoSelfCallBaseModule b),
     SubList rules (getRules b) ->
-    SemCompTrace (compileRulesRf type (o, nil) rules lrf) regInits o lupds lcalls ->
+    SemCompTrace regInits (fun s => compileRulesRf type (s, nil) rules lrf) o lupds lcalls ->
     (forall upds u, In upds lupds -> In u upds -> (NoDup (map fst u)) /\ SubList (getKindAttr u) (getKindAttr o)) /\
     exists (lss : list (list (list FullLabel))),
       Forall2 (fun x y => x = (map getLabelUpds y)) lupds lss /\
@@ -5522,7 +5522,7 @@ Proof.
   - rewrite <-(rev_involutive rules) in HSemAction.
     specialize (ESameOldLoop _ _ _ HSemAction) as TMP; subst.
     rewrite rev_involutive in HSemAction.
-    specialize (EEquivLoop' HWfMod H5 HNoSelfCallsBase H HSemAction) as TMP; dest.
+    specialize (EEquivLoop' HWfMod H5 HNoSelfCallsBase H HSemAction) as TMP2; dest.
     unfold m; exists (x1 :: x); repeat split; auto.
     + intros; inv H12; eauto.
     + simpl; enough (o' = x0).
