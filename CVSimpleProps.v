@@ -67,10 +67,10 @@ Proof.
     apply RME_Simple_RME_Equiv; auto.
 Qed.
 
-Lemma CA_Simple_Trace_CA_Trace_Equiv {k : Kind} (ca : CompActionT type (RegsT * list RegsT) k) :
+Lemma CA_Simple_Trace_CA_Trace_Equiv (ca : RegsT -> CompActionT type (RegsT * list RegsT) Void) :
   forall regInits o lupds lcalls,
-    SemCA_simple_Trace (CA_simple_of_CA ca) regInits o lupds lcalls ->
-    SemCompTrace ca regInits o lupds lcalls.
+    SemCA_simple_Trace regInits (fun s => CA_simple_of_CA (ca s)) o lupds lcalls ->
+    SemCompTrace regInits ca o lupds lcalls.
 Proof.
   induction 1;[econstructor 1 | econstructor 2]; eauto using CA_Simple_CA_Equiv.
 Qed.
@@ -82,8 +82,11 @@ Lemma CA_Simple_TraceEquiv (b : BaseModule) (lrf : list RegFileBase) o :
          (HWfMod : WfMod (mergeSeparatedSingle b lrf))
          (HNoSelfCallsBase : NoSelfCallBaseModule b),
     SubList rules (getRules b) ->
-    SemCA_simple_Trace (CA_simple_of_CA (compileRulesRf type (o, nil) rules lrf)) regInits o lupds lcalls ->
-    (forall upds u, In upds lupds -> In u upds -> (NoDup (map fst u)) /\ SubList (getKindAttr u) (getKindAttr o)) /\
+    SemCA_simple_Trace regInits (fun s => CA_simple_of_CA
+                                            (compileRulesRf type (s, nil)
+                                                            rules lrf)) o lupds lcalls ->
+    (forall upds u, In upds lupds -> In u upds -> (NoDup (map fst u)) /\
+                                                  SubList (getKindAttr u) (getKindAttr o)) /\
     exists (lss : list (list (list FullLabel))),
       Forall2 (fun x y => x = (map getLabelUpds y)) lupds lss /\
       (forall x, In x lss -> (map Rle (map fst (rev rules))) = getLabelExecs (concat x)) /\ 
