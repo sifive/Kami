@@ -73,6 +73,30 @@ ppConst (T.ConstBit sz w) = show sz ++ "\'b" ++ ppWord w
 ppConst (T.ConstArray n k fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (reverse $ T.getFins n))) ++ "}"
 ppConst (T.ConstStruct n fk fs fv) = '{' : intercalate ", " (snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins n)) (Data.List.map ppConst (Data.List.map fv (T.getFins n))))))) ++ "}"
 
+ppBitFormat :: T.BitFormat -> String
+ppBitFormat T.Binary = "b"
+ppBitFormat T.Decimal = "d"
+ppBitFormat T.Hex = "x"
+
+ppFullFormat :: T.FullFormat -> String
+ppFullFormat (T.FBool sz bf) = "%" ++ show sz ++ ppBitFormat bf
+ppFullFormat (T.FBit n sz bf) = "%" ++ show sz ++ ppBitFormat bf
+ppFullFormat (T.FStruct n fk fs ff) = "{ " ++ concatMap (\i -> fs i ++ ":" ++ ppFullFormat (ff i) ++ "; ") (T.getFins n) ++ "}"
+ppFullFormat (T.FArray n k f) = "[ " ++ concatMap (\i -> show i ++ "=" ++ ppFullFormat f ++ "; ") [0 .. (n-1)] ++ "]"
+
+ppExprList :: T.Kind -> T.RtlExpr -> [T.RtlExpr]
+ppExprList T.Bool e = [e]
+ppExprList (T.Bit n) e = [e]
+ppExprList (T.Struct n fk fs) e = concatMap (\i -> ppExprList (fk i) (T.ReadStruct n fk fs e i)) (T.getFins n)
+ppExprList (T.Array n k) e = concatMap (\i -> ppExprList k (T.ReadArrayConst n k e i)) (T.getFins n)
+
+ppRtlSys :: T.SysT T.Coq_rtl_ty -> State (H.Map String (Int, T.Kind)) String
+ppRtlSys (T.DispString s) = return $ "        $write(\"" ++ deformat s ++ "\");\n"
+ppRtlSys (T.DispExpr k e f) = do
+  printExprs <- mapM (\i -> ppRtlExpr "sys" i) (ppExprList k e)
+  return $ "        $write(\"" ++ ppFullFormat f ++ "\"" ++ concatMap (\x -> ", " ++ x) printExprs ++ ");\n"
+ppRtlSys (T.Finish) = return $ "        $finish();\n"
+
 optionAddToTrunc :: String -> T.Kind -> T.RtlExpr -> State (H.Map String (Int, T.Kind)) String
 optionAddToTrunc who k e =
   case e of
@@ -333,45 +357,11 @@ kind_of_fullKind (T.NativeKind _) = error "NativeKind encountered"
 removeDups :: Eq a => [(a, b)] -> [(a, b)]
 removeDups = nubBy (\(a, _) (b, _) -> a == b)
 
-getAllMethodsRegFileList :: [T.RegFileBase] -> [(String, (T.Kind, T.Kind))]
-getAllMethodsRegFileList ls = concat (map (\(T.Build_RegFileBase isWrMask num dataArray readLs write idxNum d init) ->
-                                              (write, (T.coq_WriteRq idxNum d, T.Bit 0)) :
-                                              (map (\x -> (fst x, (T.Bit (log2_up idxNum), d)))
-                                               (case readLs of
-                                                  T.Async reads -> map (\(x) -> (x, (T.Bit (log2_up idxNum), d))) reads
-                                                  T.Sync _ reads -> map (\(T.Build_SyncRead rq rs _) -> (rq, (T.Bit (log2_up idxNum), T.Bit 0))) reads ++
-                                                                       map (\(T.Build_SyncRead rq rs _) -> (rs, (T.Bit 0, d))) reads
-                                               ))) ls)
-
 ppRtlInstance :: T.RtlModule -> String
 ppRtlInstance m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
   "  _design _designInst(.CLK(CLK), .RESET(RESET)" ++
   concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ "(" ++ ppPrintVar nm ++ ")")) (removeDups (ins' ++ outs')) ++ ");\n"
               
-ppBitFormat :: T.BitFormat -> String
-ppBitFormat T.Binary = "b"
-ppBitFormat T.Decimal = "d"
-ppBitFormat T.Hex = "x"
-
-ppFullFormat :: T.FullFormat -> String
-ppFullFormat (T.FBool sz bf) = "%" ++ show sz ++ ppBitFormat bf
-ppFullFormat (T.FBit n sz bf) = "%" ++ show sz ++ ppBitFormat bf
-ppFullFormat (T.FStruct n fk fs ff) = "{ " ++ concatMap (\i -> fs i ++ ":" ++ ppFullFormat (ff i) ++ "; ") (T.getFins n) ++ "}"
-ppFullFormat (T.FArray n k f) = "[ " ++ concatMap (\i -> show i ++ "=" ++ ppFullFormat f ++ "; ") [0 .. (n-1)] ++ "]"
-
-ppExprList :: T.Kind -> T.RtlExpr -> [T.RtlExpr]
-ppExprList T.Bool e = [e]
-ppExprList (T.Bit n) e = [e]
-ppExprList (T.Struct n fk fs) e = concatMap (\i -> ppExprList (fk i) (T.ReadStruct n fk fs e i)) (T.getFins n)
-ppExprList (T.Array n k) e = concatMap (\i -> ppExprList k (T.ReadArrayConst n k e i)) (T.getFins n)
-
-ppRtlSys :: T.SysT T.Coq_rtl_ty -> State (H.Map String (Int, T.Kind)) String
-ppRtlSys (T.DispString s) = return $ "        $write(\"" ++ deformat s ++ "\");\n"
-ppRtlSys (T.DispExpr k e f) = do
-  printExprs <- mapM (\i -> ppRtlExpr "sys" i) (ppExprList k e)
-  return $ "        $write(\"" ++ ppFullFormat f ++ "\"" ++ concatMap (\x -> ", " ++ x) printExprs ++ ");\n"
-ppRtlSys (T.Finish) = return $ "        $finish();\n"
-
 regfiles :: T.RegFileBase -> String
 regfiles (rf@(T.Build_RegFileBase isWrMask num name reads write idxNum dataType init)) =
   (case reads of
@@ -456,23 +446,6 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
     (sys, sysTruncs') = runState convSys H.empty
     sysTruncs = H.toList sysTruncs'
 
-ppGraph :: [(String, [String])] -> String
-ppGraph x = case x of
-              [] -> ""
-              (a, b) : ys -> "(" ++ show a ++ ", " ++ show b ++ ", " ++ show (Data.List.length b) ++ "),\n" ++ ppGraph ys
-
-
-maxOutEdge :: [(String, [String])] -> Int
-maxOutEdge x = case x of
-                 [] -> 0
-                 (a, b) : ys -> Prelude.max (Data.List.length b) (maxOutEdge ys)
-
-sumOutEdge :: [(String, [String])] -> Int
-sumOutEdge x = case x of
-                 [] -> 0
-                 (a, b) : ys -> Data.List.length b + sumOutEdge ys
-
-
 ppTopModule :: T.RtlModule -> String
 ppTopModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
   concatMap ppRfModule regFs ++
@@ -494,15 +467,6 @@ ppTopModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
     insFiltered = Data.List.filter isHidden ins
     outsFiltered = Data.List.filter isHidden outs
               
-printDiff :: [(String, [String])] -> [(String, [String])] -> IO ()
-printDiff (x:xs) (y:ys) =
-  do
-    if x == y
-    then printDiff xs ys
-    else putStrLn $ (show x) ++ " " ++ (show y)
-printDiff [] [] = return ()
-printDiff _ _ = putStrLn "Wrong lengths"
-
 ppConstMem :: T.ConstT -> String
 ppConstMem (T.ConstBool b) = if b then "1" else "0"
 ppConstMem (T.ConstBit sz w) = if sz == 0 then "0" else ppWord w
