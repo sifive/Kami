@@ -7,6 +7,8 @@ Definition VarType := (string * option nat)%type.
 Definition rtl_ty := (fun (_ : Kind) => VarType).
 Definition RtlExpr := (Expr rtl_ty).
 Definition RtlSysT := (SysT rtl_ty).
+Definition RtlExpr' k := (RtlExpr (SyntaxKind k)).
+  
 
 Record RtlModule :=
   { hiddenWires: list VarType;

@@ -33,8 +33,6 @@ Section Compile.
 
   Local Notation inc ns := (S ns).
 
-  Definition RtlExpr' k := (RtlExpr (SyntaxKind k)).
-  
   Record RtlExprs := { tempWires : list (string * option nat * sigT RtlExpr') ;
                        regsWrite : string -> forall k, option (RtlExpr' Bool * RtlExpr' k) ;
                        methCalls : string -> forall k, option (RtlExpr' Bool * RtlExpr' k) ;
