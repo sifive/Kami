@@ -12,10 +12,9 @@ import Numeric
 
 type Name = String
 
-
-{-
-data RegMapTy = RegMapTy {
-    reg_counters :: H.Map Name Int
+data RegMapTy =
+  RegMapTy
+  { reg_counters :: H.Map Name Int
   , async_read_counters :: H.Map Name Int
   , async_write_counters :: H.Map Name Int
   , isAddr_read_req_counters :: H.Map Name Int
@@ -23,8 +22,34 @@ data RegMapTy = RegMapTy {
   , isAddr_read_reg_counters :: H.Map Name Int
   , not_isAddr_read_req_counters :: H.Map Name Int
   , not_isAddr_write_counters :: H.Map Name Int
-  , not_isAddr_read_reg_counters :: H.Map Name Int
-}
+  , not_isAddr_read_reg_counters :: H.Map Name Int }
+
+data CommonInfo =
+  CommonInfo
+  { common_IdxNum :: Int
+  , common_Num :: Int
+  , common_dataArray :: String
+  , common_write :: String
+  , common_Kind :: Kind
+  , common_mask :: Bool
+  , common_init :: T.RegFileInitT }
+
+
+--     Record RegFileBase := { rfIsWrMask : bool ;
+--                         rfNum: nat ;
+--                         rfDataArray: string ;
+--                         rfRead: RegFileReaders ;
+--                         rfWrite: string ;
+--                         rfIdxNum: nat ;
+--                         rfData: Kind ;
+--                         rfInit: RegFileInitT rfIdxNum rfData }.
+                       
+
+
+-- data AsyncInfo =
+--   AsyncInfo
+--   { 
+  
 
 data ExprState = ExprState {
     let_counter :: Int
@@ -36,6 +61,7 @@ data ExprState = ExprState {
   , all_not_isAddrs :: [(Name,[Name,Name,Name],Bool)]
 }
 
+{-
 data ReadReqPort = ReadReqPort {
     rd_req_pred :: T.RtlExpr
   , rd_req_addr :: T.RtlExpr

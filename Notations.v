@@ -32,16 +32,16 @@ Fixpoint makeModule'  (xs: list ModuleElt) :=
   | nil => (nil, nil, nil)
   end.
 
-Definition makeModule (im : Tree ModuleElt) :=
-  let '(regs, rules, meths) := makeModule' (flattenTree im) in
+Definition makeModule (im : list ModuleElt) :=
+  let '(regs, rules, meths) := makeModule' im in
   BaseMod regs rules meths.
 
 Definition makeConst k (c: ConstT k): ConstFullT (SyntaxKind k) := SyntaxConst c.
 
-Fixpoint getOrder'  (xs: list ModuleElt) :=
+Fixpoint getOrder  (xs: list ModuleElt) :=
   match xs with
   | e :: es =>
-    let names := getOrder' es in
+    let names := getOrder es in
     match e with
     | MERegister _ => names
     | MERule mrule => fst mrule :: names
@@ -50,7 +50,7 @@ Fixpoint getOrder'  (xs: list ModuleElt) :=
   | nil => nil
   end.
 
-Definition getOrder (im : Tree ModuleElt) := getOrder' (flattenTree im).
+(* Definition getOrder (im : Tree ModuleElt) := getOrder' (flattenTree im). *)
 
 (** Notations for Struct **)
 
@@ -322,50 +322,50 @@ Delimit Scope kami_struct_initial_scope with struct_initial.
 Delimit Scope kami_scope with kami.
 
 Notation "'RegisterN' name : type <- init" :=
-  (Leaf ((MERegister (name%string, existT RegInitValT type (Some ((NativeConst init)%kami_init)%word))) :: nil))
+  (((MERegister (name%string, existT RegInitValT type (Some ((NativeConst init)%kami_init)%word))) :: nil))
     (at level 13, name at level 99) : kami_scope.
 
 Notation "'RegisterNDef' name : type <- init" :=
-  (MERegister (name%string, existT RegInitValT (@NativeKind type init)%kami_init (Some ((NativeConst init)%kami_init))))
+  ((MERegister (name%string, existT RegInitValT (@NativeKind type init)%kami_init (Some ((NativeConst init)%kami_init))) :: nil))
     (at level 13, name at level 99) : kami_scope.
 
 Notation "'Register' name : type <- init" :=
-  (Leaf ((MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst ((init)%kami_init)%word)))) :: nil))
+  (((MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst ((init)%kami_init)%word)))) :: nil))
     (at level 13, name at level 99) : kami_scope.
 
 Notation "'RegisterU' name : type" :=
-  (Leaf ((MERegister (name%string, existT RegInitValT (SyntaxKind type) None)) :: nil))
+  (((MERegister (name%string, existT RegInitValT (SyntaxKind type) None)) :: nil))
     (at level 13, name at level 99) : kami_scope.
 
 Notation "'Method' name () : retT := c" :=
-  (Leaf ((MEMeth (name%string, existT MethodT (Void, retT)
+  (((MEMeth (name%string, existT MethodT (Void, retT)
                                      (fun ty (_: ty Void) => c%kami_action : ActionT ty retT))) :: nil))
     (at level 13, name at level 9) : kami_scope.
 
 Notation "'Method' name ( param : dom ) : retT := c" :=
-  (Leaf ((MEMeth (name%string, existT MethodT (dom, retT)
+  (((MEMeth (name%string, existT MethodT (dom, retT)
                                       (fun ty (param : ty dom) => c%kami_action : ActionT ty retT))) :: nil))
     (at level 13, name at level 9, param at level 99) : kami_scope.
 
 Notation "'Rule' name := c" :=
-  (Leaf ((MERule (name%string, fun ty => (c)%kami_action : ActionT ty Void)) :: nil))
+  (((MERule (name%string, fun ty => (c)%kami_action : ActionT ty Void)) :: nil))
     (at level 13) : kami_scope.
 
 Notation "'MODULE' { m1 'with' .. 'with' mN }" :=
-  (makeModule (Node (cons m1%kami .. (cons mN%kami nil) ..)))
+  (makeModule ((app m1%kami .. (app mN%kami nil) ..)))
     (only parsing).
 
 
 Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
-  {| baseModuleWf := {| baseModule := (makeModule (Node (cons m1%kami .. (cons mN%kami nil) ..))) ;
+  {| baseModuleWf := {| baseModule := (makeModule ((app m1%kami .. (app mN%kami nil) ..))) ;
                         wfBaseModule := ltac:(discharge_wf) |} ;
-     baseModuleOrd := getOrder (Node (cons m1%kami .. (cons mN%kami nil) ..)) |}
+     baseModuleOrd := getOrder ((app m1%kami .. (app mN%kami nil) ..)) |}
     (only parsing).
 
 Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
-  {| modWf := {| module := Base (makeModule (Node (cons m1%kami .. (cons mN%kami nil) ..))) ;
+  {| modWf := {| module := Base (makeModule ((app m1%kami .. (app mN%kami nil) ..))) ;
                  wfMod := ltac:(discharge_wf) |} ;
-     modOrd := getOrder (Node (cons m1%kami .. (cons mN%kami nil) ..)) |}
+     modOrd := getOrder ((app m1%kami .. (app mN%kami nil) ..)) |}
     (only parsing).
 
 (* Notation "'RegisterVec' name 'using' nums : type <- init" := *)
@@ -407,7 +407,7 @@ Section mod_test.
   Variable a: string.
   Local Notation "^ x" := (a ++ "." ++ x)%string (at level 0).
   Local Example test := MOD_WF{
-                              (Node [Register (^"x") : Bool <- true; Register (^"z") : Bool <- false])
+                              (concat [Register (^"x") : Bool <- true; Register (^"z") : Bool <- false])
                                 with Register (^"y") : Bool <- false
                                 with Rule (^"r1") := ( Read y: Bool <- ^"y";
                                                          Write (^"x"): Bool <- #y;
@@ -415,14 +415,20 @@ Section mod_test.
                           }.
 
   Local Example test1 := MODULE_WF{
-                             (Node [Register (^"x") : Bool <- true; Register (^"w"): Bool <- true;
-                                Node [Register (^"t"): Bit 0 <- WO]])
+                             (concat [Register (^"x") : Bool <- true; Register (^"w"): Bool <- true;
+                                        Register (^"t"): Bit 0 <- WO])
                                with Register (^"y") : Bool <- false
                                with Rule (^"r1") := ( Read y: Bool <- ^"y";
                                                         Write (^"x"): Bool <- #y;
                                                         Retv )
                            }.
 End mod_test.
+
+Definition Registers := (map MERegister).
+
+Definition Rules := (map MERule).
+
+Definition Methods := (map MEMeth).
 
 Require Import Vector.
 Import VectorNotations.
