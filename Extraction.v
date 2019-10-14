@@ -1,6 +1,8 @@
 Require Export List String Ascii.
 Require Export Kami.Syntax Kami.Compile Kami.Rtl.
 
+Require Import Kami.Notations.
+
 Require Coq.extraction.Extraction.
 
 Require Export ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString.
@@ -44,6 +46,74 @@ Extract Constant Fin.cast => "(\_ x _ -> x)".
 Extract Constant Fin.of_nat_lt => "(\i n -> (n Prelude.- 1,i))".
 Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)".
 Extract Inlined Constant getBool => "Prelude.id".
+
+Section Ty.
+  Variable ty: Kind -> Type.
+  Local Open Scope kami_expr.
+  Definition pred_pack k (pred: Bool @# ty) (val: k @# ty) :=
+    (IF pred
+     then pack val
+     else $0).
+
+  Definition or_kind k (ls: list (Bit (size k) @# ty)) := unpack k (CABit Bor ls).
+
+  Definition createWriteRq ty (idxNum num: nat) (k: Kind) (idx: Bit (Nat.log2_up idxNum) @# ty) (val: Array num k @# ty): WriteRq (Nat.log2_up idxNum) (Array num k) @# ty :=
+    STRUCT { "addr" ::= idx ;
+             "data" ::= val }.
+
+  Definition createWriteRqMask ty (idxNum num: nat) (k: Kind) (idx: Bit (Nat.log2_up idxNum) @# ty) (val: Array num k @# ty) (mask: Array num Bool @# ty): WriteRqMask (Nat.log2_up idxNum) num k @# ty :=
+    STRUCT { "addr" ::= idx ;
+             "data" ::= val ;
+             "mask" ::= mask }.
+
+  Definition pointwiseIntersectionNoMask (idxNum num: nat) (k: Kind)
+             (readPred: Bool @# ty) (readAddr: Bit (Nat.log2_up idxNum) @# ty)
+             (readVals: Array num k @# ty)
+             (writePred: Bool @# ty) (writeRq: WriteRq (Nat.log2_up idxNum) (Array num k) @# ty)
+    : Array num k @# ty
+    := BuildArray
+         (fun i =>
+            let readAddr_i := readAddr + $(proj1_sig (Fin.to_nat i)) in
+            ReadArrayConst (IF writePred &&
+                               (writeRq @% "addr" <= readAddr_i) &&
+                               (readAddr_i < writeRq @% "addr" + $num)
+                            then writeRq @% "data"
+                            else readVals) i).
+  
+  Definition pointwiseIntersectionMask (idxNum num: nat) (k: Kind)
+             (readPred: Bool @# ty) (readAddr: Bit (Nat.log2_up idxNum) @# ty)
+             (readVals: Array num k @# ty)
+             (writePred: Bool @# ty) (writeRq: WriteRqMask (Nat.log2_up idxNum) num k @# ty)
+    : Array num k @# ty
+    := BuildArray
+         (fun i =>
+            let readAddr_i := readAddr + $(proj1_sig (Fin.to_nat i)) in
+            ReadArrayConst (IF writePred &&
+                               (ReadArrayConst (writeRq @% "mask") i) &&
+                               (writeRq @% "addr" <= readAddr_i) &&
+                               (readAddr_i < writeRq @% "addr" + $num)
+                            then writeRq @% "data"
+                            else readVals) i).
+  
+  Definition pointwiseIntersection (idxNum num: nat) (k: Kind) (isMask: bool)
+             (readPred: Bool @# ty) (readAddr: Bit (Nat.log2_up idxNum) @# ty)
+             (readVals: Array num k @# ty)
+             (writePred: Bool @# ty) (writeRq: if isMask
+                                               then WriteRqMask (Nat.log2_up idxNum) num k @# ty
+                                               else WriteRq (Nat.log2_up idxNum) (Array num k) @# ty)
+    : Array num k @# ty :=
+    match isMask return (if isMask
+                         then WriteRqMask (Nat.log2_up idxNum) num k @# ty
+                         else WriteRq (Nat.log2_up idxNum) (Array num k) @# ty) -> Array num k @# ty
+    with
+    | true => fun writeRq =>
+                pointwiseIntersectionMask idxNum readPred readAddr readVals writePred writeRq
+    | false => fun writeRq =>
+                 pointwiseIntersectionNoMask idxNum readPred readAddr readVals writePred writeRq
+    end writeRq.
+
+  Local Close Scope kami_expr.
+End Ty.
 
 (*
 Extract Inlined Constant concat => "Prelude.concat".
