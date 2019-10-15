@@ -67,7 +67,7 @@ Section Ty.
              "mask" ::= mask }.
 
   Definition pointwiseIntersectionNoMask (idxNum num: nat) (k: Kind)
-             (readPred: Bool @# ty) (readAddr: Bit (Nat.log2_up idxNum) @# ty)
+             (readAddr: Bit (Nat.log2_up idxNum) @# ty)
              (readVals: Array num k @# ty)
              (writePred: Bool @# ty) (writeRq: WriteRq (Nat.log2_up idxNum) (Array num k) @# ty)
     : Array num k @# ty
@@ -81,7 +81,7 @@ Section Ty.
                             else readVals) i).
   
   Definition pointwiseIntersectionMask (idxNum num: nat) (k: Kind)
-             (readPred: Bool @# ty) (readAddr: Bit (Nat.log2_up idxNum) @# ty)
+             (readAddr: Bit (Nat.log2_up idxNum) @# ty)
              (readVals: Array num k @# ty)
              (writePred: Bool @# ty) (writeRq: WriteRqMask (Nat.log2_up idxNum) num k @# ty)
     : Array num k @# ty
@@ -96,7 +96,7 @@ Section Ty.
                             else readVals) i).
   
   Definition pointwiseIntersection (idxNum num: nat) (k: Kind) (isMask: bool)
-             (readPred: Bool @# ty) (readAddr: Bit (Nat.log2_up idxNum) @# ty)
+             (readAddr: Bit (Nat.log2_up idxNum) @# ty)
              (readVals: Array num k @# ty)
              (writePred: Bool @# ty) (writeRq: if isMask
                                                then WriteRqMask (Nat.log2_up idxNum) num k @# ty
@@ -107,9 +107,9 @@ Section Ty.
                          else WriteRq (Nat.log2_up idxNum) (Array num k) @# ty) -> Array num k @# ty
     with
     | true => fun writeRq =>
-                pointwiseIntersectionMask idxNum readPred readAddr readVals writePred writeRq
+                pointwiseIntersectionMask idxNum readAddr readVals writePred writeRq
     | false => fun writeRq =>
-                 pointwiseIntersectionNoMask idxNum readPred readAddr readVals writePred writeRq
+                 pointwiseIntersectionNoMask idxNum readAddr readVals writePred writeRq
     end writeRq.
 
   Local Close Scope kami_expr.

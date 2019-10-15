@@ -130,9 +130,41 @@ queryAsyncRead name idxNum isWrite regMap =
     query (T.CompactRME regMap) =
       query regMap
 
-queryReadResp :: String -> String -> Int -> Int -> T.Kind -> Bool -> T.RME_simple T.Coq_rtl_ty RegMapTy -> T.RtlExpr' -> T.RtlExpr'
-queryReadResp name writeName idxNum num k isMask regMap defRead =
-  T.pointwiseIntersection idxNum num k isMask (pred_val readcall) (call_val readcall) defRead (pred_val writecall) (T.unsafeCoerce $ call_val writecall)
+querySyncRead :: String -> Int -> Bool -> T.RME_simple T.Coq_rtl_ty RegMapTy -> PredCall
+querySyncRead name idxNum isWrite regMap =
+  PredCall (T.CABool T.Or preds) (T.or_kind (T.Bit $ log2_up idxNum) calls)
   where
+    (preds, calls) = query regMap
+    query (T.VarRME v) =
+      let count = async_read_counters v H.! name in
+        ([T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (name ++ "#_enable", Just count)], [T.Var (T.SyntaxKind (T.Bit (log2_up idxNum))) $ T.unsafeCoerce (name ++ "#_argument", Just count)])
+    query (T.UpdRegRME r pred k val regMap') = query regMap'
+    query (T.WriteRME idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) =
+      query (if isWrite then writeMap else readMap)
+    query (T.ReadReqRME idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
+      let (restPred, restAddr) = query (if isWrite then writeMap else readMap) in
+        if readReq == name
+        then (pred : restPred, T.pred_pack (T.Bit (log2_up idxNum)) pred idx : restAddr)
+        else (restPred, restAddr)
+    query (T.ReadRespRME idxNum num readResp readReg dataArray dataK isAddr readMap) =
+      query readMap
+    query (T.AsyncReadRME idxNum num readPort dataArray idx pred k readMap) =
+      query readMap
+    query (T.CompactRME regMap) =
+      query regMap
+
+queryAsyncReadResp :: String -> String -> Int -> Int -> T.Kind -> Bool -> T.RME_simple T.Coq_rtl_ty RegMapTy -> T.RtlExpr'
+queryAsyncReadResp name writeName idxNum num k isMask regMap =
+  T.pointwiseIntersection idxNum num k isMask (call_val readcall) respVal (pred_val writecall) (T.unsafeCoerce $ call_val writecall)
+  where
+    respVal = (T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (name ++ "#_return", Nothing)))
     readcall = queryAsyncRead name idxNum False regMap
+    writecall = queryWrite writeName idxNum num k isMask False regMap
+
+queryIsAddrReadResp :: String -> String -> String -> Int -> Int -> T.Kind -> Bool -> T.RME_simple T.Coq_rtl_ty RegMapTy -> T.RtlExpr'
+queryIsAddrReadResp name writeName regName idxNum num k isMask regMap =
+  T.pointwiseIntersection idxNum num k isMask readAddr respVal (pred_val writecall) (T.unsafeCoerce $ call_val writecall)
+  where
+    respVal = (T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (name ++ "#_return", Nothing)))
+    readAddr = T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (regName, Nothing))
     writecall = queryWrite writeName idxNum num k isMask False regMap
