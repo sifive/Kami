@@ -35,10 +35,11 @@ Fixpoint makeModule'  (xs: list ModuleElt) :=
 Fixpoint makeModule_regs'  (xs: list ModuleElt) :=
   match xs with
   | e :: es =>
+    let iregs := makeModule_regs' es in
     match e with
-    | MERegister mreg => mreg :: (makeModule_regs' es)
-    | MERule mrule => makeModule_regs' es
-    | MEMeth mmeth => makeModule_regs' es
+    | MERegister mreg => mreg :: iregs
+    | MERule mrule => iregs
+    | MEMeth mmeth => iregs
     end
   | nil => nil
   end.
@@ -46,10 +47,11 @@ Fixpoint makeModule_regs'  (xs: list ModuleElt) :=
 Fixpoint makeModule_rules'  (xs: list ModuleElt) :=
   match xs with
   | e :: es =>
+    let irules := makeModule_rules' es in
     match e with
-    | MERegister mreg => makeModule_rules' es
-    | MERule mrule => mrule :: (makeModule_rules' es)
-    | MEMeth mmeth => makeModule_rules' es
+    | MERegister mreg => irules
+    | MERule mrule => mrule :: irules
+    | MEMeth mmeth => irules
     end
   | nil => nil
   end.
@@ -57,10 +59,11 @@ Fixpoint makeModule_rules'  (xs: list ModuleElt) :=
 Fixpoint makeModule_meths'  (xs: list ModuleElt) :=
   match xs with
   | e :: es =>
+    let imeths := makeModule_meths' es in
     match e with
-    | MERegister mreg => makeModule_meths' es
-    | MERule mrule => makeModule_meths' es
-    | MEMeth mmeth => mmeth :: (makeModule_meths' es)
+    | MERegister mreg => imeths
+    | MERule mrule => imeths
+    | MEMeth mmeth => mmeth :: imeths
     end
   | nil => nil
   end.
