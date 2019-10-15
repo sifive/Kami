@@ -5,6 +5,16 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+Section NubBy.
+  Variable A : Type.
+  Variable f: A -> A -> bool.
+
+  Definition nubBy (ls: list A) :=
+    fold_right (fun x acc => if existsb (f x) acc
+                             then acc
+                             else x :: acc) nil ls.
+End NubBy.
+
 Section Tree.
   Inductive Tree (A: Type): Type :=
   | Leaf (_: list A)
