@@ -69,8 +69,7 @@ Fixpoint makeModule_meths'  (xs: list ModuleElt) :=
   end.
 
 Definition makeModule (im : list ModuleElt) :=
-  let '(regs, rules, meths) := (makeModule_regs' im, makeModule_rules' im, makeModule_meths' im) in
-  BaseMod regs rules meths.
+  BaseMod (makeModule_regs' im) (makeModule_rules' im) (makeModule_meths' im).
 
 Definition makeConst k (c: ConstT k): ConstFullT (SyntaxKind k) := SyntaxConst c.
 
