@@ -130,8 +130,8 @@ queryAsyncRead name idxNum isWrite regMap =
     query (T.CompactRME regMap) =
       query regMap
 
-querySyncRead :: String -> Int -> Bool -> T.RME_simple T.Coq_rtl_ty RegMapTy -> PredCall
-querySyncRead name idxNum isWrite regMap =
+querySyncReadReq :: String -> Int -> Bool -> T.RME_simple T.Coq_rtl_ty RegMapTy -> PredCall
+querySyncReadReq name idxNum isWrite regMap =
   PredCall (T.CABool T.Or preds) (T.or_kind (T.Bit $ log2_up idxNum) calls)
   where
     (preds, calls) = query regMap
@@ -165,6 +165,17 @@ queryIsAddrReadResp :: String -> String -> String -> Int -> Int -> T.Kind -> Boo
 queryIsAddrReadResp name writeName regName idxNum num k isMask regMap =
   T.pointwiseIntersection idxNum num k isMask readAddr respVal (pred_val writecall) (T.unsafeCoerce $ call_val writecall)
   where
-    respVal = (T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (name ++ "#_return", Nothing)))
+    respVal = T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (name ++ "#_return", Nothing))
     readAddr = T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (regName, Nothing))
     writecall = queryWrite writeName idxNum num k isMask False regMap
+
+queryIsAddrRegWrite :: String -> Int -> Bool -> T.RME_simple T.Coq_rtl_ty RegMapTy -> PredCall
+queryIsAddrRegWrite name idxNum isMask regMap = querySyncReadReq name idxNum True regMap
+
+queryNotIsAddrReadResp :: String -> String -> String -> Int -> T.Kind -> T.RtlExpr'
+queryNotIsAddrReadResp name regName regValid num k =
+  T.pointwiseBypass num k bypassValid bypass respVal
+  where
+    bypassValid = T.Var (T.SyntaxKind (T.Array num T.Bool)) (T.unsafeCoerce (regValid, Nothing))
+    bypass = T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (regName, Nothing))
+    respVal = T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (name ++ "#_return", Nothing))

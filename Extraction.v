@@ -74,11 +74,11 @@ Section Ty.
     := BuildArray
          (fun i =>
             let readAddr_i := readAddr + $(proj1_sig (Fin.to_nat i)) in
-            ReadArrayConst (IF writePred &&
-                               (writeRq @% "addr" <= readAddr_i) &&
-                               (readAddr_i < writeRq @% "addr" + $num)
-                            then writeRq @% "data"
-                            else readVals) i).
+            (IF writePred &&
+                (writeRq @% "addr" <= readAddr_i) &&
+                (readAddr_i < writeRq @% "addr" + $num)
+             then ReadArrayConst (writeRq @% "data") i
+             else ReadArrayConst readVals i)).
   
   Definition pointwiseIntersectionMask (idxNum num: nat) (k: Kind)
              (readAddr: Bit (Nat.log2_up idxNum) @# ty)
@@ -88,12 +88,12 @@ Section Ty.
     := BuildArray
          (fun i =>
             let readAddr_i := readAddr + $(proj1_sig (Fin.to_nat i)) in
-            ReadArrayConst (IF writePred &&
-                               (ReadArrayConst (writeRq @% "mask") i) &&
-                               (writeRq @% "addr" <= readAddr_i) &&
-                               (readAddr_i < writeRq @% "addr" + $num)
-                            then writeRq @% "data"
-                            else readVals) i).
+            (IF writePred &&
+                (ReadArrayConst (writeRq @% "mask") i) &&
+                (writeRq @% "addr" <= readAddr_i) &&
+                (readAddr_i < writeRq @% "addr" + $num)
+             then ReadArrayConst (writeRq @% "data") i
+             else ReadArrayConst readVals i)).
   
   Definition pointwiseIntersection (idxNum num: nat) (k: Kind) (isMask: bool)
              (readAddr: Bit (Nat.log2_up idxNum) @# ty)
@@ -111,6 +111,13 @@ Section Ty.
     | false => fun writeRq =>
                  pointwiseIntersectionNoMask idxNum readAddr readVals writePred writeRq
     end writeRq.
+
+  Definition pointwiseBypass (num: nat) (k: Kind) (bypassValid: Array num Bool @# ty) (bypass: Array num k @# ty) (resp: Array num k @# ty)
+    : Array num k @# ty :=
+    BuildArray
+      (fun i => (IF (ReadArrayConst bypassValid i)
+                 then ReadArrayConst bypass i
+                 else ReadArrayConst resp i)).
 
   Local Close Scope kami_expr.
 End Ty.
