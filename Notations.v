@@ -32,8 +32,44 @@ Fixpoint makeModule'  (xs: list ModuleElt) :=
   | nil => (nil, nil, nil)
   end.
 
+Fixpoint makeModule_regs'  (xs: list ModuleElt) :=
+  match xs with
+  | e :: es =>
+    let iregs := makeModule_regs' es in
+    match e with
+    | MERegister mreg => mreg :: iregs
+    | MERule mrule => iregs
+    | MEMeth mmeth => iregs
+    end
+  | nil => nil
+  end.
+
+Fixpoint makeModule_rules'  (xs: list ModuleElt) :=
+  match xs with
+  | e :: es =>
+    let irules := makeModule_rules' es in
+    match e with
+    | MERegister mreg => irules
+    | MERule mrule => mrule :: irules
+    | MEMeth mmeth => irules
+    end
+  | nil => nil
+  end.
+
+Fixpoint makeModule_meths'  (xs: list ModuleElt) :=
+  match xs with
+  | e :: es =>
+    let imeths := makeModule_meths' es in
+    match e with
+    | MERegister mreg => imeths
+    | MERule mrule => imeths
+    | MEMeth mmeth => mmeth :: imeths
+    end
+  | nil => nil
+  end.
+
 Definition makeModule (im : list ModuleElt) :=
-  let '(regs, rules, meths) := makeModule' im in
+  let '(regs, rules, meths) := (makeModule_regs' im, makeModule_rules' im, makeModule_meths' im) in
   BaseMod regs rules meths.
 
 Definition makeConst k (c: ConstT k): ConstFullT (SyntaxKind k) := SyntaxConst c.
