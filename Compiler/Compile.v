@@ -1,4 +1,4 @@
-Require Import Kami.Syntax Kami.Notations RecordUpdate.RecordSet Kami.Rtl Kami.StateMonad.
+Require Import Kami.Syntax Kami.Notations RecordUpdate.RecordSet Kami.Compiler.Rtl Kami.StateMonad.
 
 
 Set Implicit Arguments.

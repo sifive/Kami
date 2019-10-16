@@ -1,6 +1,6 @@
-Require Import Kami.All Kami.CompileVerifiable.
+Require Import Kami.All Kami.Compiler.Compiler.
 Require Import Kami.Notations.
-Require Import Kami.CVSimple.
+Require Import Kami.Compiler.CompilerSimple.
 
 Section SemSimple.
   Local Notation UpdRegT := RegsT.
@@ -8,24 +8,24 @@ Section SemSimple.
 
   Local Notation RegMapType := (RegsT * UpdRegsT)%type.
   
-  Inductive Sem_RME_simple: (RME_simple type RegMapType) -> RegMapType -> Prop :=
+  Inductive Sem_RmeSimple: (RmeSimple type RegMapType) -> RegMapType -> Prop :=
   | SemVarRME v:
-      Sem_RME_simple (VarRME _ v) v
+      Sem_RmeSimple (VarRME _ v) v
   | SemUpdRegRMETrue r (pred: Bool @# type) k val regMap
                   (HPredTrue: evalExpr pred = true)
                   old upds
-                  (HSem_RME_simple : Sem_RME_simple regMap (old, upds))
+                  (HSem_RmeSimple : Sem_RmeSimple regMap (old, upds))
                   upds'
                   (HEqual : upds' = (hd nil upds ++ ((r, existT _ k (evalExpr val)) :: nil)) :: tl upds):
-      Sem_RME_simple (@UpdRegRME _ _ r pred k val regMap) (old, upds')
+      Sem_RmeSimple (@UpdRegRME _ _ r pred k val regMap) (old, upds')
   | SemUpdRegRMEFalse r (pred: Bool @# type) k val regMap
                    (HPredFalse: evalExpr pred = false)
                    old upds
-                   (HSem_RME_simple: Sem_RME_simple regMap (old, upds)):
-      Sem_RME_simple (@UpdRegRME _ _ r pred k val regMap) (old, upds)
+                   (HSem_RmeSimple: Sem_RmeSimple regMap (old, upds)):
+      Sem_RmeSimple (@UpdRegRME _ _ r pred k val regMap) (old, upds)
   | SemWriteRMESome idxNum num writePort dataArray idx Data val optMask mask pred writeMap readMap arr old upds
                       (HMask : optMask = Some mask)
-                      (HUpdate : Sem_RME_simple
+                      (HUpdate : Sem_RmeSimple
                                    (UpdRegRME dataArray pred
                                            (fold_left (fun newArr i =>
                                                          ITE
@@ -38,10 +38,10 @@ Section SemSimple.
                                                       ) (getFins num)
                                                       arr)
                                            writeMap) (old, upds)):
-                      Sem_RME_simple (@WriteRME _ _ idxNum num writePort dataArray idx Data val optMask pred writeMap readMap arr) (old, upds)
+                      Sem_RmeSimple (@WriteRME _ _ idxNum num writePort dataArray idx Data val optMask pred writeMap readMap arr) (old, upds)
   | SemWriteRMENone idxNum num writePort dataArray idx Data val optMask pred writeMap readMap arr old upds
                       (HMask : optMask = None)
-                      (HUpdate : Sem_RME_simple
+                      (HUpdate : Sem_RmeSimple
                                    (UpdRegRME dataArray pred
                                               (fold_left (fun newArr i =>
                                                             (UpdateArray newArr
@@ -51,14 +51,14 @@ Section SemSimple.
                                                          ) (getFins num)
                                                          arr)
                                               writeMap) (old, upds)):
-                      Sem_RME_simple (@WriteRME _ _ idxNum num writePort dataArray idx Data val optMask pred writeMap readMap arr) (old, upds)
+                      Sem_RmeSimple (@WriteRME _ _ idxNum num writePort dataArray idx Data val optMask pred writeMap readMap arr) (old, upds)
   | SemReadReqRMETrue idxNum num readReq readReg dataArray idx Data isAddr pred writeMap readMap arr old upds
                    (HisAddr : isAddr = true)
-                   (HWriteMap : Sem_RME_simple (UpdRegRME readReg pred (Var type (SyntaxKind _) (evalExpr idx)) writeMap) (old, upds)):
-                   Sem_RME_simple (@ReadReqRME _ _ idxNum num readReq readReg dataArray idx Data isAddr pred writeMap readMap arr) (old, upds)
+                   (HWriteMap : Sem_RmeSimple (UpdRegRME readReg pred (Var type (SyntaxKind _) (evalExpr idx)) writeMap) (old, upds)):
+                   Sem_RmeSimple (@ReadReqRME _ _ idxNum num readReq readReg dataArray idx Data isAddr pred writeMap readMap arr) (old, upds)
   | SemReadReqRMEFalse idxNum num readReq readReg dataArray idx Data isAddr pred writeMap readMap arr old upds
                    (HisAddr : isAddr = false)
-                   (HWriteMap : Sem_RME_simple
+                   (HWriteMap : Sem_RmeSimple
                                   (UpdRegRME readReg pred
                                              (BuildArray (fun i : Fin.t num =>
                                                             ReadArray
@@ -66,73 +66,73 @@ Section SemSimple.
                                                               (CABit Add (Var type (SyntaxKind _) (evalExpr idx) ::
                                                                               Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                                              writeMap) (old, upds)):
-      Sem_RME_simple (@ReadReqRME _ _ idxNum num readReq readReg dataArray idx Data isAddr pred writeMap readMap arr) (old, upds)
+      Sem_RmeSimple (@ReadReqRME _ _ idxNum num readReq readReg dataArray idx Data isAddr pred writeMap readMap arr) (old, upds)
   | SemReadRespRME idxNum num readResp readReg dataArray Data isAddr readMap old upds
-                       (HWriteMap : Sem_RME_simple readMap (old, upds)):
-      Sem_RME_simple (@ReadRespRME _ _ idxNum num readResp readReg dataArray Data isAddr readMap) (old, upds)
-  | SemAsyncReadRME (idxNum num : nat) (readPort dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (pred : Bool @# type) (k : Kind) (readMap : RME_simple type RegMapType)
-                 old upds (HNoOp : Sem_RME_simple readMap (old, upds)):
-      Sem_RME_simple (@AsyncReadRME _ _ idxNum num readPort dataArray idx pred k readMap) (old, upds)
-  | SemCompactRME old upds regMap (HSemRegMap: Sem_RME_simple regMap (old, upds)):
-      Sem_RME_simple (@CompactRME _ _ regMap) (old, nil::upds).
+                       (HWriteMap : Sem_RmeSimple readMap (old, upds)):
+      Sem_RmeSimple (@ReadRespRME _ _ idxNum num readResp readReg dataArray Data isAddr readMap) (old, upds)
+  | SemAsyncReadRME (idxNum num : nat) (readPort dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (pred : Bool @# type) (k : Kind) (readMap : RmeSimple type RegMapType)
+                 old upds (HNoOp : Sem_RmeSimple readMap (old, upds)):
+      Sem_RmeSimple (@AsyncReadRME _ _ idxNum num readPort dataArray idx pred k readMap) (old, upds)
+  | SemCompactRME old upds regMap (HSemRegMap: Sem_RmeSimple regMap (old, upds)):
+      Sem_RmeSimple (@CompactRME _ _ regMap) (old, nil::upds).
 
-  Definition WfRME_simple (regMapExpr : RME_simple type RegMapType) (regMap : RegMapType) :=
-    Sem_RME_simple regMapExpr regMap /\
+  Definition WfRmeSimple (regMapExpr : RmeSimple type RegMapType) (regMap : RegMapType) :=
+    Sem_RmeSimple regMapExpr regMap /\
     let '(old, new) := regMap in
     forall u, In u new -> NoDup (map fst u) /\ SubList (getKindAttr u) (getKindAttr old).
   
-  Inductive SemCA_simple: forall k, CA_simple type RegMapType k -> RegMapType ->  MethsT -> type k -> Prop :=
+  Inductive SemCompActionSimple: forall k, CompActionSimple type RegMapType k -> RegMapType ->  MethsT -> type k -> Prop :=
   | SemCompCall_simple_True (f: string) (argRetK: Kind * Kind) (pred: Bool @# type)
                             (arg: fst argRetK @# type)
-                            lret (cont: fullType type (SyntaxKind (snd argRetK)) -> CA_simple _ _ lret)
+                            lret (cont: fullType type (SyntaxKind (snd argRetK)) -> CompActionSimple _ _ lret)
                             (ret: fullType type (SyntaxKind (snd argRetK)))
                             regMap calls val newCalls
                             (HNewCalls : newCalls = (f, existT _ argRetK (evalExpr arg, ret)) :: calls)
-                            (HSemCA_simple: SemCA_simple (cont ret) regMap calls val)
+                            (HSemCompActionSimple: SemCompActionSimple (cont ret) regMap calls val)
                             (HPred : evalExpr pred = true):
-      SemCA_simple (@CompCall_simple _ _ f argRetK pred arg lret cont) regMap newCalls val
+      SemCompActionSimple (@CompCall_simple _ _ f argRetK pred arg lret cont) regMap newCalls val
   | SemCompCall_simple_False (f: string) (argRetK: Kind * Kind) (pred: Bool @# type)
                              (arg: fst argRetK @# type)
-                             lret (cont: fullType type (SyntaxKind (snd argRetK)) -> CA_simple _ _ lret)
+                             lret (cont: fullType type (SyntaxKind (snd argRetK)) -> CompActionSimple _ _ lret)
                              (ret: fullType type (SyntaxKind (snd argRetK)))
                              regMap calls val
-                             (HSemCA_simple: SemCA_simple (cont ret) regMap calls val)
+                             (HSemCompActionSimple: SemCompActionSimple (cont ret) regMap calls val)
                              (HPred : evalExpr pred = false):
-      SemCA_simple (@CompCall_simple _ _ f argRetK pred arg lret cont) regMap calls val
+      SemCompActionSimple (@CompCall_simple _ _ f argRetK pred arg lret cont) regMap calls val
   | SemCompLetExpr_simple k e lret cont
                           regMap calls val
-                          (HSemCA_simple: SemCA_simple (cont (evalExpr e)) regMap calls val):
-      SemCA_simple (@CompLetExpr_simple _ _ k e lret cont) regMap calls val
+                          (HSemCompActionSimple: SemCompActionSimple (cont (evalExpr e)) regMap calls val):
+      SemCompActionSimple (@CompLetExpr_simple _ _ k e lret cont) regMap calls val
   | SemCompNondet_simple k lret cont
                          ret regMap calls val
-                         (HSemCA_simple: SemCA_simple (cont ret) regMap calls val):
-      SemCA_simple (@CompNondet_simple _ _ k lret cont) regMap calls val
+                         (HSemCompActionSimple: SemCompActionSimple (cont ret) regMap calls val):
+      SemCompActionSimple (@CompNondet_simple _ _ k lret cont) regMap calls val
   | SemCompSys_simple pred ls lret cont
                regMap calls val
-               (HSemCA_simple: SemCA_simple cont regMap calls val):
-      SemCA_simple (@CompSys_simple _ _ pred ls lret cont) regMap calls val
+               (HSemCompActionSimple: SemCompActionSimple cont regMap calls val):
+      SemCompActionSimple (@CompSys_simple _ _ pred ls lret cont) regMap calls val
   | SemCompReadReg_simple r k readMap lret cont
                           regMap calls val regVal
                           updatedRegs readMapValOld readMapValUpds
-                          (HReadMap: Sem_RME_simple readMap (readMapValOld, readMapValUpds))
+                          (HReadMap: Sem_RmeSimple readMap (readMapValOld, readMapValUpds))
                           (HUpdatedRegs: PriorityUpds readMapValOld readMapValUpds updatedRegs)
                           (HIn: In (r, (existT _ k regVal)) updatedRegs)
-                          (HSemCompActionT: SemCA_simple (cont regVal) regMap calls val):
-      SemCA_simple (@CompReadReg_simple _ _ r k readMap lret cont) regMap calls val
+                          (HSemCompActionT: SemCompActionSimple (cont regVal) regMap calls val):
+      SemCompActionSimple (@CompReadReg_simple _ _ r k readMap lret cont) regMap calls val
   | SemCompRet_simple lret e regMap regMapVal calls
                       (HCallsNil : calls = nil)
-                      (HRegMapWf: WfRME_simple regMap regMapVal):
-      SemCA_simple (@CompRet_simple _ _ lret e regMap) regMapVal calls (evalExpr e)
+                      (HRegMapWf: WfRmeSimple regMap regMapVal):
+      SemCompActionSimple (@CompRet_simple _ _ lret e regMap) regMapVal calls (evalExpr e)
   | SemCompLetFull_simple k a lret cont
                           regMap_a calls_a val_a
-                          (HSemCA_simple_a: SemCA_simple a regMap_a calls_a val_a)
+                          (HSemCompActionSimple_a: SemCompActionSimple a regMap_a calls_a val_a)
                           regMap_cont calls_cont val_cont newCalls
                           (HNewCalls : newCalls = calls_a ++ calls_cont)
-                          (HSemCA_simple_cont: SemCA_simple (cont val_a regMap_a) regMap_cont calls_cont val_cont):
-      SemCA_simple (@CompLetFull_simple _ _ k a lret cont) regMap_cont newCalls val_cont
-  | SemCompAsyncReadRME_simple num (readPort dataArray : string) idxNum (idx : Bit (Nat.log2_up idxNum) @# type) pred Data readMap lret
+                          (HSemCompActionSimple_cont: SemCompActionSimple (cont val_a regMap_a) regMap_cont calls_cont val_cont):
+      SemCompActionSimple (@CompLetFull_simple _ _ k a lret cont) regMap_cont newCalls val_cont
+  | SemCompAsyncReadRmeSimple num (readPort dataArray : string) idxNum (idx : Bit (Nat.log2_up idxNum) @# type) pred Data readMap lret
                             updatedRegs readMapValOld readMapValUpds regVal regMap
-                            (HReadMap : Sem_RME_simple readMap (readMapValOld, readMapValUpds))
+                            (HReadMap : Sem_RmeSimple readMap (readMapValOld, readMapValUpds))
                             (HUpdatedRegs : PriorityUpds readMapValOld readMapValUpds updatedRegs)
                             (HIn :  In (dataArray, (existT _ (SyntaxKind (Array idxNum Data)) regVal)) updatedRegs)
                             cont calls val contArray
@@ -142,36 +142,36 @@ Section SemSimple.
                                                           (Var type _ regVal)
                                                           (CABit Add (Var type (SyntaxKind _) (evalExpr idx) ::
                                                                           Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
-                            (HSemCA_simple : SemCA_simple (cont (evalExpr contArray)) regMap calls val):
-      SemCA_simple (@CompAsyncRead_simple _ _ idxNum num readPort dataArray idx pred Data readMap lret cont) regMap calls val
-  | SemCompWrite_simple (writePort dataArray : string) idxNum Data (readMap : RME_simple type RegMapType) lret
+                            (HSemCompActionSimple : SemCompActionSimple (cont (evalExpr contArray)) regMap calls val):
+      SemCompActionSimple (@CompAsyncRead_simple _ _ idxNum num readPort dataArray idx pred Data readMap lret cont) regMap calls val
+  | SemCompWrite_simple (writePort dataArray : string) idxNum Data (readMap : RmeSimple type RegMapType) lret
                      updatedRegs readMapValOld readMapValUpds regVal
-                     (HReadMap : Sem_RME_simple readMap (readMapValOld, readMapValUpds))
+                     (HReadMap : Sem_RmeSimple readMap (readMapValOld, readMapValUpds))
                      (HUpdatedRegs : PriorityUpds readMapValOld readMapValUpds updatedRegs)
                      (HIn : In (dataArray, (existT _ (SyntaxKind (Array idxNum Data)) regVal)) updatedRegs)
                      cont regMap_cont calls val
-                     (HSemCA_simple : SemCA_simple (cont regVal) regMap_cont calls val):
-      SemCA_simple (@CompWrite_simple _ _ idxNum Data writePort dataArray readMap lret cont) regMap_cont calls val
+                     (HSemCompActionSimple : SemCompActionSimple (cont regVal) regMap_cont calls val):
+      SemCompActionSimple (@CompWrite_simple _ _ idxNum Data writePort dataArray readMap lret cont) regMap_cont calls val
   | SemCompSyncReadReq_simple_True num idxNum readReq readReg dataArray k (isAddr : bool) readMap lret cont
                                    regMapVal
                                    (HisAddr : isAddr = true)
                                    regMap_cont calls val
-                                   (HSemCA_simple : SemCA_simple (cont regMapVal) regMap_cont calls val):
-      SemCA_simple (@CompSyncReadReq_simple _ _ idxNum num k readReq readReg dataArray isAddr readMap lret cont) regMap_cont calls val
+                                   (HSemCompActionSimple : SemCompActionSimple (cont regMapVal) regMap_cont calls val):
+      SemCompActionSimple (@CompSyncReadReq_simple _ _ idxNum num k readReq readReg dataArray isAddr readMap lret cont) regMap_cont calls val
   | SemCompSyncReadReq_simple_False num idxNum readReq readReg dataArray (idx : Bit (Nat.log2_up idxNum) @# type) Data (isAddr : bool)
                                     (writeMap : RegMapExpr type RegMapType) readMap lret cont
                                     (HisAddr : isAddr = false)
                                     updatedRegs readMapValOld readMapValUpds regV 
-                                    (HReadMap : Sem_RME_simple readMap (readMapValOld, readMapValUpds))
+                                    (HReadMap : Sem_RmeSimple readMap (readMapValOld, readMapValUpds))
                                     (HUpdatedRegs : PriorityUpds readMapValOld readMapValUpds updatedRegs)
                                     (HRegVal : In (dataArray, (existT _ (SyntaxKind (Array idxNum Data)) regV)) updatedRegs)
                                     regMap_cont calls val
-                                    (HSemCA_simple : SemCA_simple (cont regV) regMap_cont calls val):
-      SemCA_simple (@CompSyncReadReq_simple _ _ idxNum num Data readReq readReg dataArray isAddr readMap lret cont) regMap_cont calls val
+                                    (HSemCompActionSimple : SemCompActionSimple (cont regV) regMap_cont calls val):
+      SemCompActionSimple (@CompSyncReadReq_simple _ _ idxNum num Data readReq readReg dataArray isAddr readMap lret cont) regMap_cont calls val
   | SemCompSyncReadRes_simple_True num idxNum readResp readRegName dataArray Data isAddr readMap lret cont
                                    (HisAddr : isAddr = true)
                                    updatedRegs readMapValOld readMapValUpds regVal idx
-                                   (HReadMap : Sem_RME_simple readMap (readMapValOld, readMapValUpds))
+                                   (HReadMap : Sem_RmeSimple readMap (readMapValOld, readMapValUpds))
                                    (HUpdatedRegs : PriorityUpds readMapValOld readMapValUpds updatedRegs)
                                    (HRegVal1 : In (readRegName, existT _ (SyntaxKind (Bit (Nat.log2_up idxNum))) idx) updatedRegs)
                                    (HRegVal2 : In (dataArray, existT _ (SyntaxKind (Array idxNum Data)) regVal) updatedRegs)
@@ -183,35 +183,35 @@ Section SemSimple.
                                                                  (CABit Add (Var type (SyntaxKind _) idx ::
                                                                                  Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                                    regMap calls val
-                                   (HSemCA_simple : SemCA_simple (cont (evalExpr contArray)) regMap calls val):
-      SemCA_simple (@CompSyncReadRes_simple _ _ idxNum num readResp readRegName dataArray Data isAddr readMap lret cont) regMap calls val
+                                   (HSemCompActionSimple : SemCompActionSimple (cont (evalExpr contArray)) regMap calls val):
+      SemCompActionSimple (@CompSyncReadRes_simple _ _ idxNum num readResp readRegName dataArray Data isAddr readMap lret cont) regMap calls val
   | SemCompSyncReadRes_simple_False num idxNum readResp readRegName dataArray Data isAddr readMap lret cont
                                     (HisAddr : isAddr = false)
                                     updatedRegs readMapValOld readMapValUpds regVal
-                                    (HReadMap : Sem_RME_simple readMap (readMapValOld, readMapValUpds))
+                                    (HReadMap : Sem_RmeSimple readMap (readMapValOld, readMapValUpds))
                                     (HUpdatedRegs : PriorityUpds readMapValOld readMapValUpds updatedRegs)
                                     (HIn1 : In (readRegName, (existT _ (SyntaxKind (Array num Data)) regVal)) updatedRegs)
                                     regMap calls val
-                                    (HSemCA_simple : SemCA_simple (cont regVal) regMap calls val):
-      SemCA_simple (@CompSyncReadRes_simple _ _ idxNum num readResp readRegName dataArray Data isAddr readMap lret cont) regMap calls val.
-  Variable (k : Kind) (a : CA_simple type RegMapType k) (regInits : list RegInitT).
+                                    (HSemCompActionSimple : SemCompActionSimple (cont regVal) regMap calls val):
+      SemCompActionSimple (@CompSyncReadRes_simple _ _ idxNum num readResp readRegName dataArray Data isAddr readMap lret cont) regMap calls val.
+  Variable (k : Kind) (a : CompActionSimple type RegMapType k) (regInits : list RegInitT).
   
 
   Section Loop.
-    Variable f: RegsT -> CA_simple type RegMapType Void.
+    Variable f: RegsT -> CompActionSimple type RegMapType Void.
 
-    Inductive SemCA_simple_Trace: RegsT -> list UpdRegsT -> list MethsT -> Prop :=
-    | SemCA_simple_TraceInit (oInit : RegsT) (lupds : list UpdRegsT) (lcalls : list MethsT)
+    Inductive SemCompActionSimple_Trace: RegsT -> list UpdRegsT -> list MethsT -> Prop :=
+    | SemCompActionSimple_TraceInit (oInit : RegsT) (lupds : list UpdRegsT) (lcalls : list MethsT)
                              (HNoUpds : lupds = nil) (HNoCalls : lcalls = nil)
                              (HInitRegs : Forall2 regInit oInit regInits) :
-        SemCA_simple_Trace oInit lupds lcalls
-    | SemCA_simple_TraceCont (o o' : RegsT) (lupds lupds' : list UpdRegsT) (upds : UpdRegsT)
+        SemCompActionSimple_Trace oInit lupds lcalls
+    | SemCompActionSimple_TraceCont (o o' : RegsT) (lupds lupds' : list UpdRegsT) (upds : UpdRegsT)
                              (lcalls lcalls' : list MethsT) (calls : MethsT) val
-                             (HOldTrace : SemCA_simple_Trace o lupds lcalls)
-                             (HSemAction : SemCA_simple (f o) (o, upds) calls val)
+                             (HOldTrace : SemCompActionSimple_Trace o lupds lcalls)
+                             (HSemAction : SemCompActionSimple (f o) (o, upds) calls val)
                              (HNewUpds : lupds' = upds :: lupds)
                              (HNewCalls : lcalls' = calls :: lcalls)
                              (HPriorityUpds : PriorityUpds o upds o') :
-        SemCA_simple_Trace o' lupds' lcalls'.
+        SemCompActionSimple_Trace o' lupds' lcalls'.
   End Loop.
 End SemSimple.

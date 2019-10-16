@@ -1,5 +1,5 @@
 Require Export List String Ascii.
-Require Export Kami.Syntax Kami.Compile Kami.Rtl.
+Require Export Kami.Syntax Kami.Compiler.Compile Kami.Compiler.CompilerSimple Kami.Compiler.Compiler Kami.Compiler.Rtl.
 
 Require Import Kami.Notations.
 
@@ -50,12 +50,12 @@ Extract Inlined Constant getBool => "Prelude.id".
 Section Ty.
   Variable ty: Kind -> Type.
   Local Open Scope kami_expr.
-  Definition pred_pack k (pred: Bool @# ty) (val: k @# ty) :=
+  Definition predPack k (pred: Bool @# ty) (val: k @# ty) :=
     (IF pred
      then pack val
      else $0).
 
-  Definition or_kind k (ls: list (Bit (size k) @# ty)) := unpack k (CABit Bor ls).
+  Definition orKind k (ls: list (Bit (size k) @# ty)) := unpack k (CABit Bor ls).
 
   Definition createWriteRq ty (idxNum num: nat) (k: Kind) (idx: Bit (Nat.log2_up idxNum) @# ty) (val: Array num k @# ty): WriteRq (Nat.log2_up idxNum) (Array num k) @# ty :=
     STRUCT { "addr" ::= idx ;
