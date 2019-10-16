@@ -77,7 +77,7 @@ Section Ty.
             (IF writePred &&
                 (writeRq @% "addr" <= readAddr_i) &&
                 (readAddr_i < writeRq @% "addr" + $num)
-             then ReadArrayConst (writeRq @% "data") i
+             then (writeRq @% "data")@[readAddr - writeRq @% "addr" + $(proj1_sig (Fin.to_nat i))]
              else ReadArrayConst readVals i)).
   
   Definition pointwiseIntersectionMask (idxNum num: nat) (k: Kind)
@@ -89,10 +89,10 @@ Section Ty.
          (fun i =>
             let readAddr_i := readAddr + $(proj1_sig (Fin.to_nat i)) in
             (IF writePred &&
-                (ReadArrayConst (writeRq @% "mask") i) &&
+                ((writeRq @% "mask")@[readAddr - writeRq @% "addr" + $(proj1_sig (Fin.to_nat i))]) &&
                 (writeRq @% "addr" <= readAddr_i) &&
                 (readAddr_i < writeRq @% "addr" + $num)
-             then ReadArrayConst (writeRq @% "data") i
+             then (writeRq @% "data")@[readAddr - writeRq @% "addr" + $(proj1_sig (Fin.to_nat i))]
              else ReadArrayConst readVals i)).
   
   Definition pointwiseIntersection (idxNum num: nat) (k: Kind) (isMask: bool)
