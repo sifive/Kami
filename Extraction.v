@@ -1,5 +1,5 @@
 Require Export List String Ascii.
-Require Export Kami.Syntax Kami.Compiler.Compile Kami.Compiler.CompilerSimple Kami.Compiler.Compiler Kami.Compiler.Rtl.
+Require Export Kami.Syntax Kami.Compiler.Compile Kami.Compiler.CompilerSimple Kami.Compiler.Compiler Kami.Compiler.Rtl Kami.LibStruct.
 
 Require Import Kami.Notations.
 
@@ -67,58 +67,57 @@ Section Ty.
              "mask" ::= mask }.
 
   Definition pointwiseIntersectionNoMask (idxNum num: nat) (k: Kind)
+             (readPred: Bool @# ty)
              (readAddr: Bit (Nat.log2_up idxNum) @# ty)
-             (readVals: Array num k @# ty)
              (writePred: Bool @# ty) (writeRq: WriteRq (Nat.log2_up idxNum) (Array num k) @# ty)
-    : Array num k @# ty
+    : Array num (Maybe k) @# ty
     := BuildArray
          (fun i =>
             let readAddr_i := readAddr + $(proj1_sig (Fin.to_nat i)) in
-            (IF writePred &&
-                (writeRq @% "addr" <= readAddr_i) &&
-                (readAddr_i < writeRq @% "addr" + $num)
-             then (writeRq @% "data")@[readAddr - writeRq @% "addr" + $(proj1_sig (Fin.to_nat i))]
-             else ReadArrayConst readVals i)).
+            STRUCT { "valid" ::= (readPred
+                                    && writePred
+                                    && (writeRq @% "addr" <= readAddr_i)
+                                    && (readAddr_i < writeRq @% "addr" + $num));
+                     "data" ::= (writeRq @% "data")@[readAddr - writeRq @% "addr" + $(proj1_sig (Fin.to_nat i))] } : Maybe k @# ty).
   
   Definition pointwiseIntersectionMask (idxNum num: nat) (k: Kind)
+             (readPred: Bool @# ty)
              (readAddr: Bit (Nat.log2_up idxNum) @# ty)
-             (readVals: Array num k @# ty)
              (writePred: Bool @# ty) (writeRq: WriteRqMask (Nat.log2_up idxNum) num k @# ty)
-    : Array num k @# ty
+    : Array num (Maybe k) @# ty
     := BuildArray
          (fun i =>
             let readAddr_i := readAddr + $(proj1_sig (Fin.to_nat i)) in
-            (IF writePred &&
-                ((writeRq @% "mask")@[readAddr - writeRq @% "addr" + $(proj1_sig (Fin.to_nat i))]) &&
-                (writeRq @% "addr" <= readAddr_i) &&
-                (readAddr_i < writeRq @% "addr" + $num)
-             then (writeRq @% "data")@[readAddr - writeRq @% "addr" + $(proj1_sig (Fin.to_nat i))]
-             else ReadArrayConst readVals i)).
+            STRUCT { "valid" ::= (readPred
+                                    && writePred
+                                    && ((writeRq @% "mask")@[readAddr - writeRq @% "addr" + $(proj1_sig (Fin.to_nat i))])
+                                    && (writeRq @% "addr" <= readAddr_i)
+                                    && (readAddr_i < writeRq @% "addr" + $num));
+                     "data" ::= (writeRq @% "data")@[readAddr - writeRq @% "addr" + $(proj1_sig (Fin.to_nat i))] } : Maybe k @# ty).
   
   Definition pointwiseIntersection (idxNum num: nat) (k: Kind) (isMask: bool)
+             (readPred: Bool @# ty)
              (readAddr: Bit (Nat.log2_up idxNum) @# ty)
-             (readVals: Array num k @# ty)
              (writePred: Bool @# ty) (writeRq: if isMask
                                                then WriteRqMask (Nat.log2_up idxNum) num k @# ty
                                                else WriteRq (Nat.log2_up idxNum) (Array num k) @# ty)
-    : Array num k @# ty :=
+    : Array num (Maybe k) @# ty :=
     match isMask return (if isMask
                          then WriteRqMask (Nat.log2_up idxNum) num k @# ty
-                         else WriteRq (Nat.log2_up idxNum) (Array num k) @# ty) -> Array num k @# ty
+                         else WriteRq (Nat.log2_up idxNum) (Array num k) @# ty) -> Array num (Maybe k) @# ty
     with
     | true => fun writeRq =>
-                pointwiseIntersectionMask idxNum readAddr readVals writePred writeRq
+                pointwiseIntersectionMask idxNum readPred readAddr writePred writeRq
     | false => fun writeRq =>
-                 pointwiseIntersectionNoMask idxNum readAddr readVals writePred writeRq
+                 pointwiseIntersectionNoMask idxNum readPred readAddr writePred writeRq
     end writeRq.
 
-  Definition pointwiseBypass (num: nat) (k: Kind) (bypassValid: Array num Bool @# ty) (bypass: Array num k @# ty) (resp: Array num k @# ty)
+  Definition pointwiseBypass (num: nat) (k: Kind) (bypass: Array num (Maybe k) @# ty) (resp: Array num k @# ty)
     : Array num k @# ty :=
     BuildArray
-      (fun i => (IF (ReadArrayConst bypassValid i)
-                 then ReadArrayConst bypass i
+      (fun i => (IF (ReadArrayConst bypass i) @% "valid"
+                 then (ReadArrayConst bypass i) @% "data"
                  else ReadArrayConst resp i)).
-
   Local Close Scope kami_expr.
 End Ty.
 
