@@ -56,6 +56,20 @@ data ExprState = ExprState
   , all_isAddrs :: [Sync]
   , all_not_isAddrs :: [Sync] }
 
+async_of_readName :: String -> State ExprState Async
+async_of_readName readName = do
+  s <- get
+  case find (\a -> readName `elem` asyncNames a) (all_asyncs s) of
+    Just a -> return a
+    Nothing -> error $ "Name " ++ readName ++ " not found in all_asyncs."
+
+sync_of_readResp :: String -> State ExprState Sync
+sync_of_readResp readResp = do
+  s <- get
+  case find (\sy -> readResp `elem` (map (\(T.Build_SyncRead _ r _) -> r) $ isAddrNames sy)) (all_isAddrs s) of
+    Just sy -> return sy
+    Nothing -> error $ "Name " ++ readResp ++ " not found in all_isAddrs."
+
 data PredCall =
   PredCall
   { pred_val :: T.RtlExpr'
@@ -316,21 +330,47 @@ do_writes m = do
   monad_concat $ map (\(r, idxNum, num, k, isMask) -> do_write r idxNum num k isMask m)
     (all_writes s)
 
+do_async_read :: String -> Int -> Bool -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
+do_async_read writeName idxNum isWrite regMap = case queryAsyncReadReq writeName idxNum isWrite regMap of
+  PredCall (T.Var _ _) (T.Var _ _) -> return []
+  PredCall e1 e2 -> do
+    i <- async_read_count writeName
+    return [((writeName ++ "#_enable", Just i), e1), ((writeName ++ "#_argument", Just i), e2)]
+
 do_async_reads :: RME -> State ExprState [(T.VarType, T.RtlExpr')]
-do_async_reads m = undefined
+do_async_reads m = do
+  s <- get
+  monad_concat $ map (\(Async common _) -> do_async_read (commonWrite common) (commonIdxNum common) False m) $ all_asyncs s
+
+do_isAddr_read_req :: String -> Int -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
+do_isAddr_read_req name idxNum regMap = case queryIsAddrRegWrite name idxNum regMap of
+  T.Var _ _ -> return []
+  e -> do
+    i <- isAddr_read_req_count name
+    return [((name, Just i),e)]
 
 do_isAddr_read_reqs :: RME -> State ExprState [(T.VarType, T.RtlExpr')]
-do_isAddr_read_reqs m = undefined
+do_isAddr_read_reqs m = do
+  s <- get
+  monad_concat $ map (\(Sync common _) -> do_isAddr_read_req (commonWrite common) (commonIdxNum common) m) $ all_isAddrs s
+
+do_isAddr_read_reg :: String -> String -> String -> Int -> Int -> T.Kind -> Bool -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
+do_isAddr_read_reg name writeName regName idxNum num k isMask regMap = case queryIsAddrReadResp name writeName regName idxNum num k isMask regMap of
+  T.Var _ _ -> return []
+  e -> do
+    i <- isAddr_read_reg_count name
+    return [((name, Just i), e)]
 
 do_isAddr_read_regs :: RME -> State ExprState [(T.VarType, T.RtlExpr')]
-do_isAddr_read_regs m = undefined
+do_isAddr_read_regs m = do
+  s <- get
+  monad_concat $ map (\(Sync common _) -> do_isAddr_read_reg undefined (commonWrite common) undefined (commonIdxNum common) (commonNum common) undefined (commonIsWrMask common) m) $ all_not_isAddrs s
 
 do_not_isAddr_read_reqs :: RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_not_isAddr_read_reqs m = undefined
 
 do_not_isAddr_read_regs :: RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_not_isAddr_read_regs m = undefined
-
 
 get_all_upds :: RME -> State ExprState [(T.VarType, T.RtlExpr')]
 get_all_upds m = do
@@ -408,15 +448,17 @@ ppCAS (T.CompLetFull_simple _  a _ cont) = do
 ppCAS (T.CompAsyncRead_simple idxNum num readPort dataArray idx pred k readMap _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ tmp_var j)
+  a <- async_of_readName readPort
   return $ y {
-    assign_exprs = (tmp_var j, queryAsyncReadResp readPort undefined idxNum num k undefined readMap) : assign_exprs y
+    assign_exprs = (tmp_var j, queryAsyncReadResp readPort (commonWrite $ asyncCommon a) idxNum num k (commonIsWrMask $ asyncCommon a) readMap) : assign_exprs y
   }
 
 ppCAS (T.CompSyncReadRes_simple idxNum num readResp readReg dataArray k True readMap _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ tmp_var j)
+  sy <- sync_of_readResp readResp
   return $ y {
-    assign_exprs = (tmp_var j, queryIsAddrReadResp readResp undefined readReg idxNum num k undefined readMap) : assign_exprs y
+    assign_exprs = (tmp_var j, queryIsAddrReadResp readResp (commonWrite $ isAddrCommon sy) readReg idxNum num k (commonIsWrMask $ isAddrCommon sy) readMap) : assign_exprs y
   }
 ppCAS (T.CompSyncReadRes_simple idxNum num readResp readReg dataArray k False readMap _ cont) = do
   j <- let_count
