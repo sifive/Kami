@@ -24,6 +24,14 @@ Section utila.
 
     Variable ty : Kind -> Type.
 
+    Fixpoint tagFrom val T (xs : list T) :=
+      match xs with
+      | nil => nil
+      | y :: ys => (val, y) :: tagFrom (S val) ys
+      end.
+
+    Definition tag := @tagFrom 0.
+
     (* I. Kami Expression Definitions *)
 
     Definition msb
@@ -78,11 +86,13 @@ Section utila.
 
     Definition utila_all
       :  list (Bool @# ty) -> Bool @# ty
-      := fold_right (fun x acc => x && acc) ($$true).
+      (* := fold_right (fun x acc => x && acc) ($$true). *)
+      := CABool And.
 
     Definition utila_any
       :  list (Bool @# ty) -> Bool @# ty
-      := fold_right (fun x acc => x || acc) ($$false).
+      (* := fold_right (fun x acc => x || acc) ($$false). *)
+      := CABool Or.
 
     (*
       Note: [f] must only return true for exactly one value in
@@ -93,11 +103,14 @@ Section utila.
       (f : k @# ty -> Bool @# ty)
       (xs : list (k @# ty))
       :  k @# ty
+(*
       := unpack k
            (fold_right
              (fun x acc => ((ITE (f x) (pack x) ($0)) | acc))
              ($0)
              xs).
+*)
+      := unpack k (CABit Bor (map (fun x => IF f x then pack x else $0) xs)).
 
     (*
       Note: exactly one of the packets must be valid.
@@ -445,98 +458,183 @@ Section utila.
 
     Let utila_is_true (x : Bool @# type) := x ==> true.
 
+    Lemma fold_left_andb_forall'
+      :  forall (xs : list (Bool @# type)) a,
+        fold_left andb (map (@evalExpr _)  xs) a = true <->
+        Forall utila_is_true xs /\ a = true.
+    Proof.
+      induction xs; simpl; auto; split; intros; auto.
+      - tauto.
+      - rewrite IHxs in H.
+        rewrite andb_true_iff in H.
+        split; try tauto.
+        constructor; simpl; tauto.
+      - dest.
+        inv H.
+        unfold utila_is_true in *; simpl in *.
+        pose proof (conj H4 H3).
+        rewrite <- IHxs in H.
+        auto.
+    Qed.
+        
+    Theorem fold_left_andb_forall
+      :  forall xs : list (Bool @# type),
+        fold_left andb (map (@evalExpr _)  xs) true = true <->
+        Forall utila_is_true xs.
+    Proof.
+      intros.
+      rewrite fold_left_andb_forall'.
+      tauto.
+    Qed.
+ 
     Theorem utila_all_correct
       :  forall xs : list (Bool @# type),
         utila_all xs ==> true <-> Forall utila_is_true xs.
-    Proof
-      fun xs
-      => conj
-           (list_ind
-              (fun ys => utila_all ys ==> true -> Forall utila_is_true ys)
-              (fun _ => Forall_nil utila_is_true)
-              (fun y0 ys
-                   (F : utila_all ys ==> true -> Forall utila_is_true ys)
-                   (H : utila_all (y0 :: ys) ==> true)
-               => let H0
-                      :  y0 ==> true /\ utila_all ys ==> true
-                      := andb_prop {{y0}} {{utila_all ys}} H in
-                  Forall_cons y0 (proj1 H0) (F (proj2 H0)))
-              xs)
-           (@Forall_ind
-              (Bool @# type)
-              (==> true)
-              (fun ys => utila_all ys ==> true)
-              (eq_refl true)
-              (fun y0 ys
-                   (H : y0 ==> true)
-                   (H0 : Forall utila_is_true ys)
-                   (F : utila_all ys ==> true)
-               => andb_true_intro (conj H F))
-              xs).
+    Proof.
+      apply fold_left_andb_forall.
+    Qed.
+
+    Theorem fold_left_andb_forall_false'
+      :  forall (xs : list (Bool @# type)) a,
+        fold_left andb (map (@evalExpr _)  xs) a = false <->
+        Exists (fun x : Expr type (SyntaxKind Bool)
+                 => evalExpr x = false) xs \/ a = false.
+    Proof.
+      induction xs; simpl; auto; intros; split; try tauto.
+      - intros; auto.
+        destruct H; auto.
+        inv H.
+      - rewrite IHxs.
+        intros.
+        rewrite andb_false_iff in H.
+        destruct H.
+        + left.
+          right; auto.
+        + destruct H.
+          * auto.
+          * left.
+            left.
+            auto.
+      - intros.
+        rewrite IHxs.
+        rewrite andb_false_iff.
+        destruct H.
+        + inv H; auto.
+        + auto.
+    Qed.
+      
+    Theorem fold_left_andb_forall_false
+      :  forall xs : list (Bool @# type),
+        fold_left andb (map (@evalExpr _)  xs) true = false <->
+        Exists (fun x : Expr type (SyntaxKind Bool)
+                 => evalExpr x = false) xs.
+    Proof.
+      intros.
+      rewrite fold_left_andb_forall_false'.
+      split; intros.
+      - destruct H; congruence.
+      - auto.
+    Qed.
+
+    Theorem utila_all_correct_false
+      :  forall xs : list (Bool @# type),
+        utila_all xs ==> false <->
+        Exists (fun x : Expr type (SyntaxKind Bool)
+                 => evalExpr x = false) xs.
+    Proof.
+      apply fold_left_andb_forall_false.
+    Qed.
+
+    Theorem fold_left_orb_exists'
+      :  forall (xs : list (Bool @# type)) a,
+        fold_left orb (map (@evalExpr _)  xs) a = true <->
+          Exists utila_is_true xs \/ a = true.
+    Proof.
+      induction xs; simpl; auto; split; intros; try discriminate.
+      - auto.
+      - destruct H; auto.
+        inv H.
+      - rewrite IHxs in H.
+        rewrite orb_true_iff in H.
+        destruct H.
+        + left.
+          right.
+          auto.
+        + destruct H; auto.
+      - assert (sth: Exists utila_is_true xs \/ (a0||evalExpr a)%bool = true). {
+          destruct H.
+          - inv H.
+            + right.
+              rewrite orb_true_iff.
+              auto.
+            + auto.
+          - right.
+            rewrite orb_true_iff.
+            auto.
+        }
+        rewrite <- IHxs in sth.
+        auto.
+    Qed.
+        
+
+    Theorem fold_left_orb_exists
+      :  forall xs : list (Bool @# type),
+        fold_left orb (map (@evalExpr _)  xs) false = true <->
+          Exists utila_is_true xs.
+    Proof.
+      intros.
+      rewrite fold_left_orb_exists'.
+      split; intros; auto.
+      destruct H; congruence.
+    Qed.
+        
 
     Theorem utila_any_correct
       :  forall xs : list (Bool @# type),
         utila_any xs ==> true <-> Exists utila_is_true xs.
-    Proof
-      fun xs
-      => conj
-           (list_ind
-              (fun ys => utila_any ys ==> true -> Exists utila_is_true ys)
-              (fun H : false = true
-               => False_ind
-                    (Exists utila_is_true nil)
-                    (diff_false_true H))
-              (fun y0 ys
-                   (F : utila_any ys ==> true -> Exists utila_is_true ys)
-                   (H : utila_any (y0 :: ys) ==> true)
-               => let H0
-                      :  y0 ==> true \/ utila_any ys ==> true
-                      := orb_prop {{y0}} {{utila_any ys}} H in
-                  match H0 with
-                  | or_introl H1
-                    => Exists_cons_hd utila_is_true y0 ys H1 
-                  | or_intror H1
-                    => Exists_cons_tl y0 (F H1)
-                  end)
-              xs)
-           (@Exists_ind 
-              (Bool @# type)
-              (==> true)
-              (fun ys => utila_any ys ==> true)
-              (fun y0 ys
-                   (H : y0 ==> true)
-               => eq_ind
-                    true
-                    (fun z : bool => (orb z {{utila_any ys}}) = true)
-                    (orb_true_l {{utila_any ys}})
-                    {{y0}}
-                    (eq_sym H))
-              (fun y0 ys
-                   (H : Exists utila_is_true ys)
-                   (F : utila_any ys ==> true)
-               => eq_ind_r
-                    (fun z => orb {{y0}} z = true)
-                    (orb_true_r {{y0}})
-                    F)
-              xs).
+    Proof.
+      apply fold_left_orb_exists.
+    Qed.
+
+    Theorem fold_left_orb_exists_false'
+      :  forall (xs : list (Bool @# type)) a,
+        fold_left orb (map (@evalExpr _)  xs) a = false <->
+        Forall (fun x : Expr type (SyntaxKind Bool)
+                 => evalExpr x = false) xs /\ a = false.
+    Proof.
+      induction xs; simpl; split; auto; intros.
+      - inv H; auto.
+      - rewrite IHxs in H.
+        rewrite orb_false_iff in H.
+        split; try tauto.
+        constructor; tauto.
+      - dest.
+        inv H.
+        rewrite IHxs.
+        rewrite orb_false_iff.
+        repeat split; auto.
+    Qed.
+
+    Theorem fold_left_orb_exists_false
+      :  forall xs : list (Bool @# type),
+        fold_left orb (map (@evalExpr _)  xs) false = false <->
+        Forall (fun x : Expr type (SyntaxKind Bool)
+                 => evalExpr x = false) xs.
+    Proof.
+      intros.
+      rewrite fold_left_orb_exists_false'.
+      split; intros; dest; auto.
+    Qed.
 
     Lemma utila_any_correct_false:
       forall xs : list (Expr type (SyntaxKind Bool)),
-        evalExpr (utila_any xs) = false <-> Forall (fun x : Expr type (SyntaxKind Bool) => evalExpr x = false) xs.
+        evalExpr (utila_any xs) = false <->
+        Forall (fun x : Expr type (SyntaxKind Bool)
+                 => evalExpr x = false) xs.
     Proof.
-      intros; split; intros.
-      - induction xs; simpl; auto.
-        simpl in *.
-        rewrite orb_false_iff in H; dest.
-        specialize (IHxs H0).
-        constructor; auto.
-      - induction xs; simpl; auto.
-        simpl in *.
-        inv H.
-        specialize (IHxs H3).
-        rewrite IHxs, H2.
-        auto.
+      apply fold_left_orb_exists_false.
     Qed.
+
   End ver.
 
   (* VI. Denotational semantics for monadic expressions. *)
@@ -612,7 +710,7 @@ Section utila.
   Arguments utila_sem_foldr_cons_correct {u} {j} {k}.
 
   Section monad_ver.
-
+(*
     Import EqIndNotations.
 
     Variable sem : utila_sem_type.
@@ -792,10 +890,11 @@ Section utila.
       reflexivity.
 
     Qed.
+*)
   End monad_ver.
 
   Section expr_ver.
-
+(*
     Import EqIndNotations.
 
     Local Notation "{{ X }}" := (evalExpr X).
@@ -1181,7 +1280,7 @@ Section utila.
            (fun y : Maybe k @# type => y @% "valid") xs.
 
     Close Scope kami_expr.
-
+*)
   End expr_ver.
 
   (* Conversions between list and Array *)
@@ -1198,7 +1297,7 @@ Section utila.
 
     Definition list_to_array {ty} (xs: list (A @# ty)) : ArrTy ty (length xs) :=
       BuildArray (fun i => nth_Fin xs i).
-
+(*
     Lemma array_to_list_len {ty} : forall n (xs: ArrTy ty n),
       n = length (array_to_list xs).
     Proof.
@@ -1281,10 +1380,10 @@ Section utila.
       - induction ys; constructor; inv Hall; auto.
       - induction ys; constructor; inv Hall; auto.
     Qed.
-
+*)
     Definition fin_to_bit {ty n} (i: Fin.t n) : Bit (Nat.log2_up n) @# ty :=
       Const _ (natToWord _ (proj1_sig (Fin.to_nat i))).
-
+(*
     Definition array_forall_except {ty n}
         (f: A @# ty -> Bool @# ty)
         (xs: ArrTy ty n)
@@ -1317,6 +1416,7 @@ Section utila.
         rewrite orb_true_iff in *.
         destruct (getBool _); intuition.
     Qed.
+*)
   End ArrayList.
 
 End utila.
