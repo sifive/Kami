@@ -47,6 +47,17 @@ data RegMapTy =
   , not_isAddr_read_req_counters :: H.Map String Int
   , not_isAddr_read_reg_counters :: H.Map String Int }
 
+init_rmt :: [Register] -> [Async] -> [Sync] -> [Sync] -> RegMapTy
+init_rmt regs asyncs isAddrs notIsAddrs = RegMapTy {
+    reg_counters = foldr (\r m -> H.insert (registerName r) 1 m) H.empty regs
+  , write_counters = undefined
+  , async_read_counters = foldr (\r m -> H.insert r 1 m) H.empty $ concatMap asyncNames asyncs
+  , isAddr_read_req_counters = foldr (\r m -> H.insert r 1 m) H.empty $ concatMap (\s -> map T.readReqName $ isAddrNames s) isAddrs
+  , isAddr_read_reg_counters = foldr (\r m -> H.insert r 1 m) H.empty $ concatMap (\s -> map T.readRegName $ isAddrNames s) isAddrs
+  , not_isAddr_read_req_counters = undefined
+  , not_isAddr_read_reg_counters = undefined
+}
+
 data ExprState = ExprState
   { let_counter :: Int
   , regmap_counters :: RegMapTy
@@ -55,6 +66,21 @@ data ExprState = ExprState
   , all_asyncs :: [Async]
   , all_isAddrs :: [Sync]
   , all_not_isAddrs :: [Sync] }
+
+initialize_state :: [Register] -> [Async] -> [Sync] -> [Sync] -> [String] -> ExprState
+initialize_state regs asyncs isAddrs notIsAddrs meths = ExprState {
+    let_counter = 0
+  , regmap_counters = init_rmt regs asyncs isAddrs notIsAddrs
+  , meth_counters = foldr (\meth m -> H.insert meth 1 m) H.empty meths
+  , all_regs = regs
+  , all_asyncs = asyncs
+  , all_isAddrs = isAddrs
+  , all_not_isAddrs = notIsAddrs
+}
+
+
+
+
 
 async_of_readName :: String -> State ExprState Async
 async_of_readName readName = do
@@ -480,3 +506,8 @@ ppCAS (T.CompSyncReadReq_simple idxNum num k readReq readReg dataArray isAddr re
   return $ y {
     assign_exprs = (tmp_var j, T.Const (T.Bit 0) $ T.getDefaultConst (T.Bit 0)) : assign_exprs y
   }
+
+get_final_assigns :: State ExprState [(T.VarType, T.RtlExpr')]
+get_final_assigns = do
+  s <- get
+  return $ map (\(Register r k) -> ((r,Nothing), T.Var k $ T.unsafeCoerce (r, reg_counters (regmap_counters s) H.! r))) $ all_regs s
