@@ -103,13 +103,6 @@ Section utila.
       (f : k @# ty -> Bool @# ty)
       (xs : list (k @# ty))
       :  k @# ty
-(*
-      := unpack k
-           (fold_right
-             (fun x acc => ((ITE (f x) (pack x) ($0)) | acc))
-             ($0)
-             xs).
-*)
       := unpack k (CABit Bor (map (fun x => IF f x then pack x else $0) xs)).
 
     (*
@@ -418,13 +411,32 @@ Section utila.
 
     Definition utila_acts_foldr := @utila_mfoldr utila_act_monad.
 
-    Definition utila_acts_all := @utila_mall utila_act_monad.
+    Definition utila_acts_all
+      (xs : list (ActionT ty Bool))
+      :  ActionT ty Bool
+      := GatherActions xs as ys;
+         Ret (CABool And ys).
 
-    Definition utila_acts_any := @utila_many utila_act_monad.
+    Definition utila_acts_any
+      (xs : list (ActionT ty Bool))
+      :  ActionT ty Bool
+      := GatherActions xs as ys;
+         Ret (CABool Or ys).
 
-    Definition utila_acts_find := @utila_mfind utila_act_monad.
+    Definition utila_acts_find
+      (k : Kind)
+      (f : k @# ty -> Bool @# ty)
+      (xs : list (ActionT ty k))
+      :  ActionT ty k
+      := GatherActions xs as ys;
+         Ret (utila_find f ys).
 
-    Definition utila_acts_find_pkt := @utila_mfind_pkt utila_act_monad.
+    Definition utila_acts_find_pkt
+      (k : Kind)
+      (xs : list (ActionT ty (Maybe k)))
+      :  ActionT ty (Maybe k)
+      := GatherActions xs as ys;
+         Ret (utila_find_pkt ys).
 
     Close Scope kami_action.
 
@@ -710,7 +722,7 @@ Section utila.
   Arguments utila_sem_foldr_cons_correct {u} {j} {k}.
 
   Section monad_ver.
-(*
+
     Import EqIndNotations.
 
     Variable sem : utila_sem_type.
@@ -757,37 +769,25 @@ Section utila.
     Theorem utila_mall_correct
       :  forall xs : list (m Bool),
            [[utila_mall xs]] = true <-> Forall utila_is_true xs.
-    Proof
-      fun xs
-        => conj
-             (list_ind
-               (fun ys => [[utila_mall ys]] = true -> Forall utila_is_true ys)
-               (fun _ => Forall_nil utila_is_true)
-               (fun y0 ys
-                 (F : [[utila_mall ys]] = true -> Forall utila_is_true ys)
-                 (H : [[utila_mall (y0 :: ys)]] = true)
-                 => let H0
-                      :  [[y0]] = true /\ [[utila_mall ys]] = true
-                      := andb_prop [[y0]] [[utila_mall ys]]
-                           (eq_sym
-                             (utila_mall_cons y0 ys
-                              || X = _ @X by <- H)) in
-                    Forall_cons y0
-                      (proj1 H0)
-                      (F (proj2 H0)))
-               xs)
-             (@Forall_ind
-               (m Bool)
-               utila_is_true
-               (fun ys => [[utila_mall ys]] = true)
-               utila_mall_nil
-               (fun y0 ys
-                 (H : [[y0]] = true)
-                 (H0 : Forall utila_is_true ys)
-                 (F : [[utila_mall ys]] = true)
-                 => andb_true_intro (conj H F)
-                    || X = true @X by utila_mall_cons y0 ys)
-               xs).
+    Proof.
+      intro.
+      split.
+        - induction xs.
+          + intro; exact (Forall_nil utila_is_true).
+          + intro H; assert (H0 : [[a]] = true /\ [[utila_mall xs]] = true).
+            apply (@andb_prop [[a]] [[utila_mall xs]]).
+            rewrite <- (utila_mall_cons a xs).
+            assumption.
+            apply (Forall_cons a).
+            apply H0.
+            apply IHxs; apply H0.
+        - apply (Forall_ind (fun ys => [[utila_mall ys]] = true)).
+          + apply utila_mall_nil.
+          + intros y0 ys H H0 F.
+            rewrite utila_mall_cons.
+            apply andb_true_intro.
+            auto.
+      Qed.
 
     Lemma utila_many_nil
       :  [[utila_many ([] : list (m Bool)) ]] = false.
@@ -890,11 +890,11 @@ Section utila.
       reflexivity.
 
     Qed.
-*)
+
   End monad_ver.
 
   Section expr_ver.
-(*
+
     Import EqIndNotations.
 
     Local Notation "{{ X }}" := (evalExpr X).
@@ -1280,7 +1280,7 @@ Section utila.
            (fun y : Maybe k @# type => y @% "valid") xs.
 
     Close Scope kami_expr.
-*)
+
   End expr_ver.
 
   (* Conversions between list and Array *)
@@ -1297,7 +1297,7 @@ Section utila.
 
     Definition list_to_array {ty} (xs: list (A @# ty)) : ArrTy ty (length xs) :=
       BuildArray (fun i => nth_Fin xs i).
-(*
+
     Lemma array_to_list_len {ty} : forall n (xs: ArrTy ty n),
       n = length (array_to_list xs).
     Proof.
@@ -1380,10 +1380,10 @@ Section utila.
       - induction ys; constructor; inv Hall; auto.
       - induction ys; constructor; inv Hall; auto.
     Qed.
-*)
+
     Definition fin_to_bit {ty n} (i: Fin.t n) : Bit (Nat.log2_up n) @# ty :=
       Const _ (natToWord _ (proj1_sig (Fin.to_nat i))).
-(*
+
     Definition array_forall_except {ty n}
         (f: A @# ty -> Bool @# ty)
         (xs: ArrTy ty n)
@@ -1416,7 +1416,7 @@ Section utila.
         rewrite orb_true_iff in *.
         destruct (getBool _); intuition.
     Qed.
-*)
+
   End ArrayList.
 
 End utila.
