@@ -411,13 +411,32 @@ Section utila.
 
     Definition utila_acts_foldr := @utila_mfoldr utila_act_monad.
 
-    Definition utila_acts_all := @utila_mall utila_act_monad.
+    Definition utila_acts_all
+      (xs : list (ActionT ty Bool))
+      :  ActionT ty Bool
+      := GatherActions xs as ys;
+         Ret (CABool And ys).
 
-    Definition utila_acts_any := @utila_many utila_act_monad.
+    Definition utila_acts_any
+      (xs : list (ActionT ty Bool))
+      :  ActionT ty Bool
+      := GatherActions xs as ys;
+         Ret (CABool Or ys).
 
-    Definition utila_acts_find := @utila_mfind utila_act_monad.
+    Definition utila_acts_find
+      (k : Kind)
+      (f : k @# ty -> Bool @# ty)
+      (xs : list (ActionT ty k))
+      :  ActionT ty k
+      := GatherActions xs as ys;
+         Ret (utila_find f ys).
 
-    Definition utila_acts_find_pkt := @utila_mfind_pkt utila_act_monad.
+    Definition utila_acts_find_pkt
+      (k : Kind)
+      (xs : list (ActionT ty (Maybe k)))
+      :  ActionT ty (Maybe k)
+      := GatherActions xs as ys;
+         Ret (utila_find_pkt ys).
 
     Close Scope kami_action.
 
