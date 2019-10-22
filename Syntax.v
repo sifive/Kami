@@ -1630,9 +1630,12 @@ Definition getCallsWithSignPerMeth (meth: DefMethT) :=
 Definition getCallsWithSignPerMod (m: Mod) :=
   concat (map getCallsWithSignPerRule (getAllRules m)) ++ concat (map getCallsWithSignPerMeth (getAllMethods m)).
 
-Definition getCallsPerMod (m: Mod) := map fst (getCallsWithSignPerMod m).
-
-
+Fixpoint getCallsPerMod (m: Mod) :=
+  (* This match exists so that the concatenated list groups names by module*)
+  match m with
+  | ConcatMod m1 m2 => (getCallsPerMod m1)++(getCallsPerMod m2)
+  | m => map fst (getCallsWithSignPerMod m)
+  end.
 
 Fixpoint getRegWrites k (a: ActionT (fun _ => unit) k) :=
   match a in ActionT _ _ with
