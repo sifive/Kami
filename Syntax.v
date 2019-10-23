@@ -998,7 +998,6 @@ Definition Signature_dec (s1 s2: Signature): {s1 = s2} + {s1 <> s2}.
   - exact (f_equal fst x).
   - exact (f_equal fst x).
 Defined.
-
 *)
 
 Definition Signature_dec (s1 s2 : Signature) : {s1 = s2} + {s1 <> s2}.
@@ -1627,12 +1626,14 @@ Definition getCallsWithSignPerRule (rule: Attribute (Action Void)) :=
 Definition getCallsWithSignPerMeth (meth: DefMethT) :=
   getCallsWithSign (projT2 (snd meth) _ tt).
 
-Definition getCallsWithSignPerMod (m: Mod) :=
-  concat (map getCallsWithSignPerRule (getAllRules m)) ++ concat (map getCallsWithSignPerMeth (getAllMethods m)).
+Fixpoint getCallsWithSignPerMod (mm: Mod) :=
+  match mm with
+  | Base m => concat (map getCallsWithSignPerRule (getRules m))++ concat (map getCallsWithSignPerMeth (getMethods m))
+  | HideMeth m _ => getCallsWithSignPerMod m
+  | ConcatMod m1 m2 => getCallsWithSignPerMod m1 ++ getCallsWithSignPerMod m2
+  end.
 
 Definition getCallsPerMod (m: Mod) := map fst (getCallsWithSignPerMod m).
-
-
 
 Fixpoint getRegWrites k (a: ActionT (fun _ => unit) k) :=
   match a in ActionT _ _ with
@@ -2238,3 +2239,4 @@ Hint Unfold
 (* TODO
    + PUAR: Linux/Certikos
  *)
+
