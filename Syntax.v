@@ -1634,13 +1634,7 @@ Fixpoint getCallsWithSignPerMod (mm: Mod) :=
   | ConcatMod m1 m2 => getCallsWithSignPerMod m1 ++ getCallsWithSignPerMod m2
   end.
 
-Definition getCallsPerMod (m: Mod) :=
-   map fst (getCallsWithSignPerMod m).
-  (* This match exists so that the concatenated list groups names by module*)
-  (*match m with
-  | ConcatMod m1 m2 => (getCallsPerMod m1)++(getCallsPerMod m2)
-  | m => map fst (getCallsWithSignPerMod m)
-  end.*)
+Definition getCallsPerMod (m: Mod) := map fst (getCallsWithSignPerMod m).
 
 Fixpoint getRegWrites k (a: ActionT (fun _ => unit) k) :=
   match a in ActionT _ _ with
