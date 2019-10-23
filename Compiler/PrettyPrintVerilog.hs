@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -XStandaloneDeriving #-}
 
+module PrettyPrintVerilog where
+
 import qualified Target as T
 import Data.List
 import Data.Char

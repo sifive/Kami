@@ -103,3 +103,5 @@ Section TestMod.
 
   Definition TestMod : Mod := let md := (fold_right ConcatMod TestBaseMod (map (fun m => Base (BaseRegFile m))
    [rf_a;rf_b;rf_c])) in createHideMod md (map fst (getAllMethods md)).
+
+End TestMod.
