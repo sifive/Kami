@@ -347,8 +347,27 @@ Qed.
      reflexivity.
   Qed.
 
-  Theorem missing_prop: forall x y, (x=y)=(x<->y).
-  Admitted.
+  Axiom EquivThenEqual: prop_extensionality.
+
+  Theorem equiv_rewrite: forall x y, (x=y)=(x<->y).
+  Proof.
+    intros.
+    apply EquivThenEqual.
+    split.
+    + intros.
+      subst.
+      split.
+      - intros.
+        apply H.
+      - intros.
+        apply H.
+    + intros.
+      inversion H; subst; clear H.
+      apply EquivThenEqual.
+      split.
+      - apply H0.
+      - apply H1.
+  Qed.
 
   Theorem DisjKey_Cons1:
     forall T Q (a:(T*Q)) x z, DisjKey (a::x) z = ((~(List.In (fst a) (List.map fst z))) /\ DisjKey x z).
@@ -356,7 +375,7 @@ Qed.
     intros.
     unfold DisjKey.
     simpl.
-    rewrite missing_prop.
+    rewrite equiv_rewrite.
     split.
     + intros.
       split.
@@ -399,7 +418,7 @@ Proof.
   intros.
   unfold DisjKey.
   simpl.
-  rewrite missing_prop.
+  rewrite equiv_rewrite.
   split.
   + intros.
     split.
@@ -444,7 +463,7 @@ Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q))
     + simpl.
       unfold DisjKey.
       simpl.
-      rewrite missing_prop.
+      rewrite equiv_rewrite.
       split.
       - intros.
         * split.
@@ -455,7 +474,7 @@ Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q))
         apply H1.
     + simpl.
       rewrite ?DisjKey_Cons1.
-      rewrite missing_prop.
+      rewrite equiv_rewrite.
       split.
       intros.
       inversion H; subst; clear H.
@@ -488,7 +507,7 @@ Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q))
   Proof.
     intros.
     induction y.
-    rewrite missing_prop.
+    rewrite equiv_rewrite.
     + simpl.
       unfold DisjKey.
       split.
@@ -500,7 +519,7 @@ Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q))
         apply H1.
     + simpl.
       rewrite ?DisjKey_Cons1.
-      rewrite missing_prop.
+      rewrite equiv_rewrite.
       split.
       - intros.
         rewrite DisjKey_Cons2.
