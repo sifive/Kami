@@ -729,12 +729,15 @@ mkRtlMod input@(((strs,rfbs),basemod),cas) =
   {- wires       -} (map (\(v,e) -> (v,(kind_of_expr e,e))) $ assign_exprs vexprs)
   {- sys         -} (if_begin_end_exprs vexprs)
 
-mk_main :: Int -> IO()
-mk_main bitwidth = let cas = if bitwidth == 32 then T.cas_model32 else T.cas_model64 in
-                   let km = if bitwidth == 32 then T.kami_model32 else T.kami_model64 in
+mkRtlFull ::  ([String], ([T.RegFileBase], T.BaseModule)) -> T.RtlModule
+mkRtlFull (hides, (rfs, bm)) = mkRtlMod (hides, rfs, bm, T.CAS_RulesRf (regmap_counter $ init_state (rfs, bm)) (T.getRules bm) rfs)
 
-  putStrLn $ ppTopModule $ mkRtlMod $ cas $ regmap_counters $ init_state km
+-- mk_main :: Int -> IO()
+-- mk_main bitwidth = let cas = if bitwidth == 32 then T.cas_model32 else T.cas_model64 in
+--                    let km = if bitwidth == 32 then T.kami_model32 else T.kami_model64 in
+
+--   putStrLn $ ppTopModule $ mkRtlMod $ cas $ regmap_counters $ init_state km
 
 main :: IO()
-main = putStrLn $ ppTopModule $ mkRtlMod $ T.cas_test $ regmap_counters $ init_state T.kami_test
+main = putStrLn $ ppTopModule $ mkRtlFull rtlMod
 
