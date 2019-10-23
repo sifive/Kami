@@ -89,10 +89,10 @@ Fixpoint getOrder  (xs: list ModuleElt) :=
 
 (** Notations for Struct **)
 
-Declare Scope kami_expr_scope.
+(*Declare Scope kami_expr_scope.*)
 Delimit Scope kami_expr_scope with kami_expr.
 
-Declare Scope kami_struct_scope.
+(*Declare Scope kami_struct_scope.*)
 Notation "name :: ty" := (name%string,  ty) (only parsing) : kami_struct_scope.
 Delimit Scope kami_struct_scope with kami_struct.
 
@@ -173,7 +173,7 @@ Notation "v '@[' idx <- val ] " := (UpdateArray v idx val) (at level 38) : kami_
 Notation "s @% f" := ltac:(struct_get_field_ltac s%kami_expr f%string)
                             (at level 38, only parsing): kami_expr_scope.
 
-Declare Scope kami_struct_init_scope.
+(*Declare Scope kami_struct_init_scope.*)
 Notation "name ::= value" :=
   (existT (fun a : Attribute Kind => Expr _ (SyntaxKind (snd a)))
           (name%string, _) value) (at level 50) : kami_struct_init_scope.
@@ -184,7 +184,7 @@ Notation "'STRUCT' { s1 ; .. ; sN }" :=
                       (cons sN%struct_init nil) ..))
   : kami_expr_scope.
 
-Declare Scope kami_switch_init_scope.
+(*Declare Scope kami_switch_init_scope.*)
 Notation "name ::= value" :=
   (name, value) (only parsing): kami_switch_init_scope.
 Delimit Scope kami_switch_init_scope with switch_init.
@@ -240,7 +240,7 @@ Notation "k ## ty" := (LetExprSyntax ty k) (no associativity, at level 98, only 
 
 (** Notations for action *)
 
-Declare Scope kami_action_scope.
+(*Declare Scope kami_action_scope.*)
 Notation "'Call' meth ( a : argT ) ; cont " :=
   (MCall meth%string (argT, Void) a%kami_expr (fun _ => cont))
     (at level 13, right associativity, meth at level 0, a at level 99) : kami_action_scope.
@@ -346,7 +346,7 @@ Notation "'CallToList' names 'of' k 'as' val ; cont" :=
   (gatherActions (callNames _ k names) (fun val => cont))
     (at level 13, right associativity, val at level 99): kami_action_scope.
 
-Declare Scope kami_init_scope.
+(*Declare Scope kami_init_scope.*)
 Notation "'WriteToList' names 'of' k 'using' vals ; cont" :=
   (gatherActions (@writeNames _ k (List.combine names vals)) (fun _ => cont))
     (at level 13, right associativity, vals at level 99) : kami_action_scope.
@@ -356,13 +356,13 @@ Notation "'ARRAY' { x1 ; .. ; xn }" :=
   (BuildArray (nth_Fin (cons x1%kami_init .. (cons xn%kami_init nil) ..)))
   : kami_expr_scope.
 
-Declare Scope kami_struct_initial_scope.
+(*Declare Scope kami_struct_initial_scope.*)
 Notation "name ::= value" :=
   (existT (fun a : Attribute Kind => ConstT (snd a))
           (name%string, _) value) (at level 50) : kami_struct_initial_scope.
 Delimit Scope kami_struct_initial_scope with struct_initial.
 
-Declare Scope kami_scope.
+(*Declare Scope kami_scope.*)
 Delimit Scope kami_scope with kami.
 
 Notation "'RegisterN' name : type <- init" :=
