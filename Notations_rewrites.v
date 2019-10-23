@@ -323,7 +323,6 @@ Proof.
   + simpl.
     rewrite IHl.
     rewrite app_nil_r.
-    rewrite <- getCallsPerMod_Base.
     rewrite getCallsPerMod_BaseRegFile.
     reflexivity.
 Qed.
@@ -334,34 +333,14 @@ Qed.
     induction l.
     + reflexivity.
     + simpl.
-      rewrite IHl.
-      rewrite app_assoc.
+      rewrite <- app_assoc.
+      rewrite <- IHl.
+      rewrite getCallsPerMod_ConcatMod.
       reflexivity. 
 Qed.
-     
-  (*Lemma getCallsPerMod_BaseRegFile: forall m, getCallsPerMod (BaseRegFile m)=[].
-  Admitted.*)
-
-  Definition isSubModule (x: Mod) (y: Mod) := False.
-
-  Theorem isSubModule_ConcatMod1: forall m x y, isSubModule m x -> isSubModule m (ConcatMod x y).
-  Admitted.
-
-  Theorem isSubModule_ConcatMod2: forall m x y,  isSubModule m y -> isSubModule m (ConcatMod x y).
-  Admitted.
-
-  Theorem isSubModule_fold_right_ConcatMod: forall m x yl, isSubModule m x -> isSubModule m (List.fold_right ConcatMod x yl).
-  Admitted.
-
-  Theorem isSubModule_self: forall m n, m=n -> isSubModule m n.
-  Admitted.
-
-  Theorem wfMod_createHideMod : forall x m, isSubModule m x -> WfMod x -> WfMod (createHideMod x (getCallsPerMod m)).
-  Admitted.
-
+ 
   Hint Rewrite map1 getAllRules_ConcatMod getAllMethods_ConcatMod getCallsPerMod_ConcatMod map_getCallsPerMod_map_BaseRegFile : kami_rewrite_db.
-  Hint Rewrite getCallsPerMod_fold_right_ConcatMod getCallsPerMod_BaseRegFile isSubModule_ConcatMod1 isSubModule_ConcatMod2 : kami_rewrite_db.
-  Hint Rewrite isSubModule_fold_right_ConcatMod isSubModule_self : kami_rewrite_db.
+  Hint Rewrite getCallsPerMod_fold_right_ConcatMod getCallsPerMod_BaseRegFile : kami_rewrite_db.
 
   Theorem getAllRegisters_ConcatMod: forall a b, getAllRegisters (ConcatMod a b)=getAllRegisters(a)++getAllRegisters(b).
   Proof.
@@ -414,6 +393,50 @@ Qed.
       apply H3.
 Qed.
 
+Theorem DisjKey_Cons2:
+    forall T Q (a:(T*Q)) x z, DisjKey x (a::z) = ((~(List.In (fst a) (List.map fst x))) /\ DisjKey x z).
+Proof.
+  intros.
+  unfold DisjKey.
+  simpl.
+  rewrite missing_prop.
+  split.
+  + intros.
+    split.
+    - assert (~ List.In (fst a) (List.map fst x) \/
+              ~ (fst a = fst a \/ List.In (fst a) (List.map fst z))).
+      apply H.
+      inversion H0; subst; clear H0.
+      tauto.
+      tauto.
+    - simpl.
+      intros.
+      assert (
+              ~ List.In k (List.map fst x) \/
+              ~(fst a=k \/ List.In k (List.map fst z))).
+      apply H.
+      inversion H0; subst; clear H0.
+      left.
+      apply H1.
+      apply not_or_and in H1.
+      inversion H1; subst; clear H1.
+      right.
+      apply H2.
+  + intros.
+    inversion H; subst; clear H.
+    assert (~ List.In k (List.map fst x) \/ ~ List.In k (List.map fst z)).
+    apply H1.
+    classical_left.
+    apply NNPP in H2.
+    inversion H2; subst; clear H2.
+    - apply H0.
+    - simpl.
+      inversion H; subst; clear H.
+      apply H2.
+      apply H2 in H3.
+      inversion H3.
+Qed.
+
 Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q)), DisjKey (x++y) z=(DisjKey x z /\ DisjKey y z).
   Proof.
     intros.
@@ -450,23 +473,82 @@ Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q))
         intros.
         inversion H; subst; clear H.
         split.
-        * 
-  Admitted.
+        * inversion H0; subst; clear H0.
+          apply H.
+        * simpl.
+          rewrite IHx.
+          split.
+          ++ inversion H0; subst; clear H0.
+             apply H2.
+          ++ simpl.
+             apply H1.
+  Qed.
 
   Theorem DisjKey_Append2: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q)), DisjKey x (y++z)=(DisjKey x y /\ DisjKey x z).
-  Admitted.
+  Proof.
+    intros.
+    induction y.
+    rewrite missing_prop.
+    + simpl.
+      unfold DisjKey.
+      split.
+      - intros.
+        tauto.
+      - simpl.
+        intros.
+        inversion H; subst; clear H.
+        apply H1.
+    + simpl.
+      rewrite ?DisjKey_Cons1.
+      rewrite missing_prop.
+      split.
+      - intros.
+        rewrite DisjKey_Cons2.
+        rewrite DisjKey_Cons2 in H.
+        inversion H; subst; clear H.
+        rewrite and_assoc.
+        rewrite <- IHy.
+        split.
+        * apply H0.
+        * apply H1.
+      - rewrite ?DisjKey_Cons2.
+        rewrite ?DisjKey_Cons2 in IHy.
+        rewrite and_assoc.
+        rewrite <- IHy.
+        intros.
+        apply H.
+  Qed.
 
   Theorem DisjKey_In_map2: forall A B a (k:A) r l, @DisjKey A B a ((k,r)::l)=(~List.In k (List.map fst a) /\ (DisjKey a l)).
-  Admitted.
+  Proof.
+    intros.
+    rewrite DisjKey_Cons2.
+    simpl.
+    reflexivity.
+  Qed.
     
   Theorem DisjKey_In_map1: forall A B b (k:A) r l, @DisjKey A B ((k,r)::l) b=(~List.In k (List.map fst b) /\ (DisjKey l b)).
-  Admitted.
+  Proof.
+    intros.
+    rewrite DisjKey_Cons1.
+    simpl.
+    reflexivity.
+  Qed.
 
   Theorem DisjKey_In_map_fst2: forall A B a (f:(A*B)) l, @DisjKey A B a (f::l)=(~List.In (fst f) (List.map fst a) /\ (DisjKey a l)).
-  Admitted.
+  Proof.
+    intros.
+    rewrite DisjKey_Cons2.
+    reflexivity.
+  Qed.
+
     
   Theorem DisjKey_In_map_fst1: forall A B b (f:(A*B)) l, @DisjKey A B (f::l) b=(~List.In (fst f) (List.map fst b) /\ (DisjKey l b)).
-  Admitted.
+  Proof.
+    intros.
+    rewrite DisjKey_Cons1.
+    reflexivity.
+  Qed.
 
   Hint Rewrite getAllRegisters_ConcatMod DisjKey_Append1 DisjKey_Append2 DisjKey_In_map2 DisjKey_In_map1 : kami_rewrite_db.
   Hint Rewrite DisjKey_In_map_fst2 DisjKey_In_map_fst1: kami_rewrite_db.
