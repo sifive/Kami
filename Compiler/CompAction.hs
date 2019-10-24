@@ -525,18 +525,18 @@ do_not_isAddr_read_reqs m = do
   s <- get
   monad_concat $ concatMap (\(Sync common reads) -> map (\(T.Build_SyncRead r _ _) -> do_not_isAddr_read_req r (commonIdxNum common) m) reads) $ all_not_isAddrs s
 
-do_not_isAddr_read_reg :: String -> String -> Int -> Int -> T.Kind -> Bool -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
-do_not_isAddr_read_reg writeName readReqName idxNum num k isMask regMap = case queryNotIsAddrRegWrite writeName readReqName idxNum num k isMask regMap of
+do_not_isAddr_read_reg :: String -> String -> String -> Int -> Int -> T.Kind -> Bool -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
+do_not_isAddr_read_reg regName writeName readReqName idxNum num k isMask regMap = case queryNotIsAddrRegWrite writeName readReqName idxNum num k isMask regMap of
   T.Var _ _ -> return []
   e -> do
-    i <- not_isAddr_read_req_count readReqName
-    return [((readReqName, Just i), e)]
+    i <- not_isAddr_read_reg_count regName
+    return [((regName, Just i), e)]
 
 do_not_isAddr_read_regs :: RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_not_isAddr_read_regs m = do
   s <- get
-  monad_concat $ concatMap (\(Sync common reads) -> map (\(T.Build_SyncRead reqName _ _) ->
-    do_not_isAddr_read_reg (commonWrite common) reqName (commonIdxNum common) (commonNum common) (commonData common) (commonIsWrMask common) m) reads) $ all_not_isAddrs s
+  monad_concat $ concatMap (\(Sync common reads) -> map (\(T.Build_SyncRead reqName _ regName) ->
+    do_not_isAddr_read_reg regName (commonWrite common) reqName (commonIdxNum common) (commonNum common) (commonData common) (commonIsWrMask common) m) reads) $ all_not_isAddrs s
 
 get_all_upds :: RME -> State ExprState [(T.VarType, T.RtlExpr')]
 get_all_upds m = do
