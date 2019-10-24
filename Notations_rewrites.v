@@ -186,6 +186,13 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma fold_right1: forall A B (f : B -> A -> A) (a0 : A) (h : B) (t : list B), List.fold_right f a0 (h::t)=f h (List.fold_right f a0 t).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
 Lemma getAllRules_ConcatMod : forall a b, getAllRules (ConcatMod a b)=getAllRules a++getAllRules b.
 Proof.
   intros.
@@ -339,7 +346,7 @@ Qed.
       reflexivity. 
 Qed.
  
-  Hint Rewrite map1 getAllRules_ConcatMod getAllMethods_ConcatMod getCallsPerMod_ConcatMod map_getCallsPerMod_map_BaseRegFile : kami_rewrite_db.
+  Hint Rewrite map1 fold_right1 getAllRules_ConcatMod getAllMethods_ConcatMod getCallsPerMod_ConcatMod map_getCallsPerMod_map_BaseRegFile : kami_rewrite_db.
   Hint Rewrite getCallsPerMod_fold_right_ConcatMod getCallsPerMod_BaseRegFile : kami_rewrite_db.
 
   Theorem getAllRegisters_ConcatMod: forall a b, getAllRegisters (ConcatMod a b)=getAllRegisters(a)++getAllRegisters(b).
