@@ -70,10 +70,10 @@ type RME = T.RmeSimple T.Coq_rtl_ty RegMapTy
 --ModInput without the CAS
 type PreModInput = ([T.RegFileBase], T.BaseModule)
 
-type ModInput = ((([String], [T.RegFileBase]), T.BaseModule), T.CompActionSimple T.Coq_rtl_ty RegMapTy)
+type ModInput = ([String], [T.RegFileBase], T.BaseModule, T.CompActionSimple T.Coq_rtl_ty RegMapTy)
 
 get_premodinput :: ModInput -> PreModInput
-get_premodinput (((a,b),c),d) = (b,c)
+get_premodinput (a,b,c,d) = (b,c)
 
 regs_of_basemod :: T.BaseModule -> [Register]
 regs_of_basemod basemod = map (\(reg,(k,_)) -> Register reg k) (T.getRegisters basemod)
@@ -94,7 +94,7 @@ all_not_isAddr_shadows :: [Sync] -> [Register]
 all_not_isAddr_shadows notIsAddrs = concatMap (\(Sync common names) -> map (\(T.Build_SyncRead _ _ name) -> Register name $ T.SyntaxKind $ T.Array (commonNum common) $ T.coq_Maybe (commonData common)) names) notIsAddrs
 
 all_regs_of_modinput :: ModInput -> [Register]
-all_regs_of_modinput (((_,rfbs),basemod),cas) = let (asyncs,isAddrs,notIsAddrs) = process_rfbs rfbs in
+all_regs_of_modinput (_,rfbs,basemod,cas) = let (asyncs,isAddrs,notIsAddrs) = process_rfbs rfbs in
      regs_of_basemod basemod
   ++ all_isAddr_shadows isAddrs
   ++ all_not_isAddr_shadows notIsAddrs
@@ -107,7 +107,7 @@ get_calls_from_basemod :: T.BaseModule -> [String]
 get_calls_from_basemod basemod = map fst (get_normal_meth_calls_with_sign $ T.Base basemod)
 
 all_initialize :: ModInput -> [(T.VarType, T.RtlExpr')]
-all_initialize modinput@(((_,rfbs),basemod),_) =
+all_initialize modinput@(_,rfbs,basemod,_) =
   let regs = all_regs_of_modinput modinput in
   let (asyncs,isAddrs,notIsAddrs) = process_rfbs rfbs in
 
@@ -230,9 +230,15 @@ queryReg name k isWrite regMap =
     query (T.CompactRME regMap) =
       query regMap
 
+createPredCall :: String -> T.Kind -> [T.RtlExpr'] -> [T.RtlExpr'] -> PredCall
+createPredCall s k [a@(T.Var _ pred)] [b@(T.Var _ call)] = PredCall a b
+createPredCall _ k preds calls = PredCall (T.CABool T.Or preds) (T.CABit (T.size k) T.Bor calls)
+  
+
 queryRfWrite :: String -> Int -> Int -> T.Kind -> Bool -> Bool -> RME -> PredCall
 queryRfWrite name idxNum num k isMask isWrite regMap =
-  PredCall (T.CABool T.Or preds) (T.orKind writeType calls)
+  createPredCall name writeType preds calls
+  -- PredCall (T.CABool T.Or preds) (T.orKind writeType calls)
   where
     writeType = if isMask then T.coq_WriteRqMask (log2_up idxNum) num k else T.coq_WriteRq (log2_up idxNum) (T.Array num k)
     addrSize = log2_up idxNum
@@ -259,7 +265,8 @@ queryRfWrite name idxNum num k isMask isWrite regMap =
 
 queryAsyncReadReq :: String -> Int -> Bool -> RME -> PredCall
 queryAsyncReadReq name idxNum isWrite regMap =
-  PredCall (T.CABool T.Or preds) (T.orKind (T.Bit $ log2_up idxNum) calls)
+  createPredCall name (T.Bit (log2_up idxNum)) preds calls
+  -- PredCall (T.CABool T.Or preds) (T.orKind (T.Bit $ log2_up idxNum) calls)
   where
     (preds, calls) = query regMap
     query (T.VarRME v) =
@@ -282,7 +289,8 @@ queryAsyncReadReq name idxNum isWrite regMap =
 
 querySyncReadReq :: String -> Int -> Bool -> RME -> PredCall
 querySyncReadReq name idxNum isWrite regMap =
-  PredCall (T.CABool T.Or preds) (T.orKind (T.Bit $ log2_up idxNum) calls)
+  createPredCall name (T.Bit (log2_up idxNum)) preds calls
+  -- PredCall (T.CABool T.Or preds) (T.orKind (T.Bit $ log2_up idxNum) calls)
   where
     (preds, calls) = query regMap
     query (T.VarRME v) =
@@ -679,7 +687,7 @@ get_final_rfmeth_assigns rfbs s = let (asyncs,isAddrs,notIsAddrs) = process_rfbs
  
 
 all_verilog :: ModInput -> (VerilogExprs, [(T.VarType, T.RtlExpr')])
-all_verilog input@(((strs,rfbs),basemod),cas) =
+all_verilog input@(strs,rfbs,basemod,cas) =
   let (vexprs,final_state) = runState (ppCAS $ cas) (init_state $ get_premodinput input) in
   let final_assigns = get_final_assigns final_state rfbs in
   let final_meth_assigns = get_final_meth_assigns basemod final_state in
@@ -704,7 +712,7 @@ kind_of_expr (T.ReadArrayConst _ k _ _) = T.SyntaxKind k
 kind_of_expr (T.BuildArray n k _) = T.SyntaxKind $ T.Array n k
 
 mkInits :: ModInput -> [(T.VarType, (T.FullKind,T.RegInitValT))]
-mkInits (((strs,rfbs),basemod),cas) = let (_,isAddrs,notIsAddrs) = process_rfbs rfbs in
+mkInits (strs,rfbs,basemod,cas) = let (_,isAddrs,notIsAddrs) = process_rfbs rfbs in
 
   --regular inits
      map (\(r,p) -> ((r,Nothing),p)) (T.getRegisters basemod)
@@ -717,7 +725,7 @@ mkInits (((strs,rfbs),basemod),cas) = let (_,isAddrs,notIsAddrs) = process_rfbs 
 
 
 mkRtlMod :: ModInput -> T.RtlModule
-mkRtlMod input@(((strs,rfbs),basemod),cas) =
+mkRtlMod input@(strs,rfbs,basemod,cas) =
   let (vexprs,fin_assigns) = all_verilog input in
                   T.Build_RtlModule
   {- hiddenWires -} (concatMap (\f -> [(f ++ "#_enable",Nothing), (f ++ "#_return",Nothing), (f ++ "#_argument",Nothing)]) strs)
@@ -730,7 +738,7 @@ mkRtlMod input@(((strs,rfbs),basemod),cas) =
   {- sys         -} (if_begin_end_exprs vexprs)
 
 mkRtlFull ::  ([String], ([T.RegFileBase], T.BaseModule)) -> T.RtlModule
-mkRtlFull (hides, (rfs, bm)) = mkRtlMod (hides, rfs, bm, T.CAS_RulesRf (regmap_counter $ init_state (rfs, bm)) (T.getRules bm) rfs)
+mkRtlFull (hides, (rfs, bm)) = mkRtlMod (hides, rfs, bm, T.coq_CAS_RulesRf (regmap_counters $ init_state (rfs, bm)) (T.getRules bm) rfs)
 
 -- mk_main :: Int -> IO()
 -- mk_main bitwidth = let cas = if bitwidth == 32 then T.cas_model32 else T.cas_model64 in
@@ -739,5 +747,5 @@ mkRtlFull (hides, (rfs, bm)) = mkRtlMod (hides, rfs, bm, T.CAS_RulesRf (regmap_c
 --   putStrLn $ ppTopModule $ mkRtlMod $ cas $ regmap_counters $ init_state km
 
 main :: IO()
-main = putStrLn $ ppTopModule $ mkRtlFull rtlMod
+main = putStrLn $ ppTopModule $ mkRtlFull T.rtlMod
 

@@ -443,5 +443,3 @@ ppTopModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
     insFiltered = Data.List.filter isHidden ins
     outsFiltered = Data.List.filter isHidden outs
 
-main_old :: IO()
-main_old = putStrLn $ ppTopModule T.rtlMod
