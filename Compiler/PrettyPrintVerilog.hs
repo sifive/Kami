@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -XStandaloneDeriving #-}
 
+module PrettyPrintVerilog where
+
 import qualified Target as T
 import Data.List
 import Data.Char
@@ -441,5 +443,3 @@ ppTopModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
     insFiltered = Data.List.filter isHidden ins
     outsFiltered = Data.List.filter isHidden outs
 
-main :: IO()
-main = putStrLn $ ppTopModule T.rtlMod

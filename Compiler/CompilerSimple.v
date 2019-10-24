@@ -91,4 +91,7 @@ Section Simple.
                              (fun x => CompActionSimple_of_CA (cont x))
     end.
 
+  Definition CAS_RulesRf(readMap : regMapTy) (rules : list RuleT) (lrf : list RegFileBase) :=
+    CompActionSimple_of_CA (compileRulesRf ty readMap rules lrf).
+
 End Simple.
