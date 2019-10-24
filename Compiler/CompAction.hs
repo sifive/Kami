@@ -9,6 +9,7 @@ import Debug.Trace
 import Numeric
 import PrettyPrintVerilog
 
+{-
 --show instances for debugging
 deriving instance Show T.SyncRead
 
@@ -740,11 +741,10 @@ mkRtlMod input@(strs,rfbs,basemod,cas) =
 mkRtlFull ::  ([String], ([T.RegFileBase], T.BaseModule)) -> T.RtlModule
 mkRtlFull (hides, (rfs, bm)) = mkRtlMod (hides, rfs, bm, T.coq_CAS_RulesRf (regmap_counters $ init_state (rfs, bm)) (T.getRules bm) rfs)
 
--- mk_main :: Int -> IO()
--- mk_main bitwidth = let cas = if bitwidth == 32 then T.cas_model32 else T.cas_model64 in
---                    let km = if bitwidth == 32 then T.kami_model32 else T.kami_model64 in
+-}
 
---   putStrLn $ ppTopModule $ mkRtlMod $ cas $ regmap_counters $ init_state km
+mkRtlFull ::  ([String], ([T.RegFileBase], T.BaseModule)) -> T.RtlModule
+mkRtlFull m = T.getRtl m
 
 main :: IO()
 main = putStrLn $ ppTopModule $ mkRtlFull T.rtlMod
