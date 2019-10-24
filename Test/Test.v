@@ -10,7 +10,7 @@ Section TestMod.
     rfIsWrMask := false;
     rfNum := 10;
     rfDataArray := "dataArray_a";
-    rfRead := Async ["read_a_1"; "read_a_2"];
+    rfRead := Async ["read_a_1"; "read_a_2_nc"];
     rfWrite := "write_a";
     rfIdxNum := 100;
     rfData := Bit 3;
@@ -22,9 +22,9 @@ Section TestMod.
     rfNum := 5;
     rfDataArray := "dataArray_b";
     rfRead := Sync false [
-      {| readReqName := "readRq_b_1";
-         readResName := "readRs_b_1";
-         readRegName := "readRg_b_1"
+      {| readReqName := "readRq_b_1_nc";
+         readResName := "readRs_b_1_nc";
+         readRegName := "readRg_b_1_nc"
       |};
       {| readReqName := "readRq_b_2";
          readResName := "readRs_b_2";
@@ -46,9 +46,9 @@ Section TestMod.
          readResName := "readRs_c_1";
          readRegName := "readRg_c_1"
       |};
-      {| readReqName := "readRq_c_2";
-         readResName := "readRs_c_2";
-         readRegName := "readRg_c_2"
+      {| readReqName := "readRq_c_2_nc";
+         readResName := "readRs_c_2_nc";
+         readRegName := "readRg_c_2_nc"
       |}
       ];
     rfWrite := "write_c";
@@ -59,10 +59,10 @@ Section TestMod.
 
   Definition TestBaseMod :=
     MODULE {
-      Register "reg" : Bool <- false
+      Register "my_reg" : Bool <- false
       with Rule "rule1" := (
-        Read x <- "reg";
-        Write "reg" <- (!#x);
+        Read x <- "my_reg";
+        Write "my_reg" <- (!#x);
         Retv
         )
       with Rule "rule2" := (

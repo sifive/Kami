@@ -284,8 +284,8 @@ ppRfModule (rf@(T.Build_RegFileBase isWrMask num name reads write idxNum dataTyp
        concatMap (\(T.Build_SyncRead readRq readRs readReg) ->
                     if isAddr
                     then ppDealSize0 (T.Bit (log2_up idxNum)) "" ("  " ++ ppDeclType (ppName readReg) (T.Bit (log2_up idxNum)) ++ ";\n")
-                    else ppDealSize0 (T.Array num dataType) "" ("  " ++ ppDeclType (ppName readReg) (T.Array num dataType)) ++
-                         ppDealSize0 (T.Array num dataType) "" ("  " ++ ppDeclType (ppName (readReg ++ "$_temp")) (T.Array num dataType))
+                    else ppDealSize0 (T.Array num dataType) "" ("  " ++ ppDeclType (ppName readReg) (T.Array num dataType) ++ ";\n") ++
+                         ppDealSize0 (T.Array num dataType) "" ("  " ++ ppDeclType (ppName (readReg ++ "$_temp")) (T.Array num dataType) ++ ";\n")
                  ) readLs
      _ -> "") ++
   "\n" ++
@@ -312,8 +312,8 @@ ppRfModule (rf@(T.Build_RegFileBase isWrMask num name reads write idxNum dataTyp
            concatMap (\(T.Build_SyncRead readRq readRs readReg) -> 
                         if isAddr
                         then readResponse (readRs ++ "$_return") (ppName readReg)
-                        else readResponse (readReg ++ "$_temp") readRq ++
-                             ppDealSize0 (T.Array num dataType) "" ("  assign " ++ ppName readRs ++ " = " ++ ppName readReg)
+                        else readResponse (readReg ++ "$_temp") (readRq ++ "$_argument") ++
+                             ppDealSize0 (T.Array num dataType) "" ("  assign " ++ ppName readRs ++ "$_return = " ++ ppName readReg ++ ";\n")
                      ) readLs) ++
   "  always@(posedge CLK) begin\n" ++
   "    if(RESET) begin\n" ++
