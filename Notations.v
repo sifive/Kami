@@ -32,10 +32,10 @@ Fixpoint makeModule'  (xs: list ModuleElt) :=
   | nil => (nil, nil, nil)
   end.
 
-Fixpoint makeModule_regs'  (xs: list ModuleElt) :=
+Fixpoint makeModule_regs  (xs: list ModuleElt) :=
   match xs with
   | e :: es =>
-    let iregs := makeModule_regs' es in
+    let iregs := makeModule_regs es in
     match e with
     | MERegister mreg => mreg :: iregs
     | MERule mrule => iregs
@@ -44,10 +44,10 @@ Fixpoint makeModule_regs'  (xs: list ModuleElt) :=
   | nil => nil
   end.
 
-Fixpoint makeModule_rules'  (xs: list ModuleElt) :=
+Fixpoint makeModule_rules  (xs: list ModuleElt) :=
   match xs with
   | e :: es =>
-    let irules := makeModule_rules' es in
+    let irules := makeModule_rules es in
     match e with
     | MERegister mreg => irules
     | MERule mrule => mrule :: irules
@@ -56,10 +56,10 @@ Fixpoint makeModule_rules'  (xs: list ModuleElt) :=
   | nil => nil
   end.
 
-Fixpoint makeModule_meths'  (xs: list ModuleElt) :=
+Fixpoint makeModule_meths  (xs: list ModuleElt) :=
   match xs with
   | e :: es =>
-    let imeths := makeModule_meths' es in
+    let imeths := makeModule_meths es in
     match e with
     | MERegister mreg => imeths
     | MERule mrule => imeths
@@ -69,7 +69,7 @@ Fixpoint makeModule_meths'  (xs: list ModuleElt) :=
   end.
 
 Definition makeModule (im : list ModuleElt) :=
-  BaseMod (makeModule_regs' im) (makeModule_rules' im) (makeModule_meths' im).
+  BaseMod (makeModule_regs im) (makeModule_rules im) (makeModule_meths im).
 
 Definition makeConst k (c: ConstT k): ConstFullT (SyntaxKind k) := SyntaxConst c.
 
