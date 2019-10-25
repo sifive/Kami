@@ -361,6 +361,7 @@ Notation "name ::= value" :=
           (name%string, _) value) (at level 50) : kami_struct_initial_scope.
 Delimit Scope kami_struct_initial_scope with struct_initial.
 
+Declare Scope kami_scope.
 Delimit Scope kami_scope with kami.
 
 Notation "'RegisterN' name : type <- init" :=
