@@ -237,17 +237,17 @@ getRegFileNames (rf@(T.Build_RegFileBase isWrMask num name reads write idxNum da
   (case reads of
      T.Async readLs ->
        concatMap (\(read) ->
-                    [(True, T.Bool, ppName read ++ "$_enable"),
-                     (True, T.Bit (log2_up idxNum), ppName read ++ "$_argument"),
-                     (False, T.Array num dataType, ppName read ++ "$_return")]) readLs
+                    [(True, T.Bool, read ++ "#_enable"),
+                     (True, T.Bit (log2_up idxNum), read ++ "#_argument"),
+                     (False, T.Array num dataType, read ++ "#_return")]) readLs
      T.Sync isAddr readLs ->
        concatMap (\(T.Build_SyncRead readRq readRs readReg) ->
-                    [(True, T.Bool, ppName readRq ++ "$_enable"),
-                     (True, T.Bit (log2_up idxNum), ppName readRq ++ "$_argument"),
-                     (True, T.Bool, ppName readRs ++ "$_enable"),
-                     (False, T.Array num dataType, ppName readRs ++ "$_return")]) readLs) ++
-  [(True, T.Bool, ppName write ++ "$_enable"),
-   (True, writeType, ppName write ++ "$_argument")]
+                    [(True, T.Bool, readRq ++ "#_enable"),
+                     (True, T.Bit (log2_up idxNum), readRq ++ "#_argument"),
+                     (True, T.Bool, readRs ++ "#_enable"),
+                     (False, T.Array num dataType, readRs ++ "#_return")]) readLs) ++
+  [(True, T.Bool, write ++ "#_enable"),
+   (True, writeType, write ++ "#_argument")]
   where writeType = if isWrMask then T.coq_WriteRqMask idxNum num dataType else T.coq_WriteRq idxNum (T.Array num dataType)
   
 
@@ -263,7 +263,7 @@ ppRfModule (rf@(T.Build_RegFileBase isWrMask num name reads write idxNum dataTyp
   let getInput isInput = if isInput then "  input " else "  output " in
     
   "module " ++ ppName name ++ "(\n" ++
-  concatMap (\(isInput, k, name) -> ppDealSize0 k "" (getInput isInput ++ ppDeclType name k) ++ ",\n") (getRegFileNames rf) ++
+  concatMap (\(isInput, k, name) -> ppDealSize0 k "" (getInput isInput ++ ppDeclType (ppName name) k) ++ ",\n") (getRegFileNames rf) ++
   "  input logic CLK,\n" ++
   "  input logic RESET\n" ++
   ");\n" ++
@@ -356,7 +356,7 @@ removeDups = nubBy (\(a, _) (b, _) -> a == b)
 ppRtlInstance :: T.RtlModule -> String
 ppRtlInstance m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
   "  _design _designInst(.CLK(CLK), .RESET(RESET)" ++
-  concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ "(" ++ ppPrintVar nm ++ ")")) (removeDups (ins' ++ outs')) ++ ");\n"
+  concatMap (\(nm, ty) -> ppDealSize0 ty "" (", ." ++ ppPrintVar nm ++ "(" ++ ppPrintVar nm ++ ")")) (removeDups (ins' ++ outs' ++ (map (\(_,k,name) -> ((name,Nothing),k)) $ concatMap getRegFileNames regFs))) ++ ");\n"
 
 ppRtlModule :: T.RtlModule -> String
 ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrites' assigns' sys') =
@@ -367,7 +367,7 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   "  input CLK,\n" ++
   "  input RESET\n" ++
   ");\n" ++
-  concatMap (\rf -> concatMap (\(isInput, k, name) -> ppDealSize0 k "" ("  " ++ ppDeclType name k) ++ ";\n") (getRegFileNames rf)) regFs ++
+  -- concatMap (\rf -> concatMap (\(isInput, k, name) -> ppDealSize0 k "" ("  " ++ ppDeclType name k) ++ ";\n") (getRegFileNames rf)) regFs ++ "\n" ++
   concatMap (\(nm, (T.SyntaxKind ty, init)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) regInits ++ "\n" ++
 
   concatMap (\(nm, (ty, expr)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) assigns ++ "\n" ++
@@ -395,8 +395,9 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   "  end\n" ++
   "endmodule\n\n"
   where
-    ins = removeDups ins'
-    outs = removeDups outs'
+    (regFsOuts,regFsIns) = partition (\(isInput,_,_) -> isInput) (concatMap getRegFileNames regFs)
+    ins = removeDups (ins' ++ map (\(_,k,name) -> ((name,Nothing),k)) regFsIns)
+    outs = removeDups (outs' ++ map (\(_,k,name) -> ((name,Nothing),k)) regFsOuts)
     regInits = removeDups regInits'
     regWrites = removeDups regWrites'
     assigns = removeDups $ map (\(p,(k,x)) -> (p,(kind_of_fullKind k,x))) assigns'
@@ -432,7 +433,7 @@ ppTopModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   "  input CLK,\n" ++
   "  input RESET\n" ++
   ");\n" ++
-  concatMap (\rf -> concatMap (\(isInput, k, name) -> ppDealSize0 k "" ("  " ++ ppDeclType name k) ++ ";\n") (getRegFileNames rf)) regFs ++
+  concatMap (\rf -> concatMap (\(isInput, k, name) -> ppDealSize0 k "" ("  " ++ ppDeclType (ppName name) k) ++ ";\n") (getRegFileNames rf)) regFs ++
   concatMap ppRfInstance regFs ++
   ppRtlInstance m ++
   "endmodule\n"
