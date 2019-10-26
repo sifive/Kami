@@ -735,8 +735,8 @@ mkRtlMod input@(strs,rfbs,basemod,cas) =
   {- sys         -} (if_begin_end_exprs vexprs)
 
 mkRtlFull ::  ([String], ([T.RegFileBase], T.BaseModule)) -> T.RtlModule
-mkRtlFull (hides, (rfs, bm)) = mkRtlMod (hides, rfs, bm, T.coq_CAS_RulesRf (regmap_counters $ init_state (rfs, bm)) (T.getRules bm) rfs)
---mkRtlFull m = T.getRtl m
+-- mkRtlFull (hides, (rfs, bm)) = mkRtlMod (hides, rfs, bm, T.coq_CAS_RulesRf (regmap_counters $ init_state (rfs, bm)) (T.getRules bm) rfs)
+mkRtlFull m = T.getRtl m
 
 main :: IO()
 main = putStrLn $ ppTopModule $ mkRtlFull T.rtlMod
