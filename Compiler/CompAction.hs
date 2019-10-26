@@ -9,7 +9,6 @@ import Debug.Trace
 import Numeric
 import PrettyPrintVerilog
 
-{-
 --show instances for debugging
 deriving instance Show T.SyncRead
 
@@ -652,15 +651,13 @@ get_final_assigns :: ExprState -> [T.RegFileBase] -> [(T.VarType, T.RtlExpr')]
 get_final_assigns s rfbs = let (_,isAddrs,notIsAddrs) = process_rfbs rfbs in
 
   -- regular regs
-     (map (\(Register r k) -> ((r,Nothing), T.Var k $ T.unsafeCoerce (r, reg_counters (regmap_counters s) !!! r))) $ all_regs s)
+     (map (\(Register r k) -> ((r,Nothing), T.Var k $ T.unsafeCoerce (r, Just $ reg_counters (regmap_counters s) !!! r))) $ all_regs s)
 
   -- isAddr shadow regs
-  ++ (map (\(Register r k) -> ((r,Nothing), T.Var k $ T.unsafeCoerce (r, isAddr_read_reg_counters (regmap_counters s) !!! r))) $ all_isAddr_shadows isAddrs)
+  ++ (map (\(Register r k) -> ((r,Nothing), T.Var k $ T.unsafeCoerce (r, Just $ isAddr_read_reg_counters (regmap_counters s) !!! r))) $ all_isAddr_shadows isAddrs)
 
   -- notIsAddr shadow regs
-  ++ (map (\(Register r k) -> ((r,Nothing), T.Var k $ T.unsafeCoerce (r, not_isAddr_read_reg_counters (regmap_counters s) !!! r))) $ all_not_isAddr_shadows isAddrs)
-
- -- TODO: also include shadowregs
+  ++ (map (\(Register r k) -> ((r,Nothing), T.Var k $ T.unsafeCoerce (r, Just $ not_isAddr_read_reg_counters (regmap_counters s) !!! r))) $ all_not_isAddr_shadows notIsAddrs)
 
 get_final_meth_assigns :: T.BaseModule -> ExprState -> [(T.VarType, T.RtlExpr')]
 get_final_meth_assigns basemod s = do
@@ -738,9 +735,9 @@ mkRtlMod input@(strs,rfbs,basemod,cas) =
   {- wires       -} (map (\(v,e) -> (v,(kind_of_expr e,e))) $ assign_exprs vexprs)
   {- sys         -} (if_begin_end_exprs vexprs)
 
+{-
 mkRtlFull ::  ([String], ([T.RegFileBase], T.BaseModule)) -> T.RtlModule
 mkRtlFull (hides, (rfs, bm)) = mkRtlMod (hides, rfs, bm, T.coq_CAS_RulesRf (regmap_counters $ init_state (rfs, bm)) (T.getRules bm) rfs)
-
 -}
 
 mkRtlFull ::  ([String], ([T.RegFileBase], T.BaseModule)) -> T.RtlModule
@@ -748,4 +745,3 @@ mkRtlFull m = T.getRtl m
 
 main :: IO()
 main = putStrLn $ ppTopModule $ mkRtlFull T.rtlMod
-

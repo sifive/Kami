@@ -70,8 +70,7 @@ Section TestMod.
       with Rule "rule1" := (
         Read x: Bool <- "my_reg";          
         Write "my_reg" <- (!#x);
-        System ([DispString _ "read "; DispHex #x; DispString _ "\nrule0 write ";
-                 DispHex (!#x)]);
+        System ([DispString _ "read "; DispHex #x; DispString _ "\nrule0 write "; DispHex (!#x)]);
         Retv
         )
 
@@ -79,31 +78,38 @@ Section TestMod.
         Call x : Array 10 (Bit 3) <- "read_async_1"($13 : Bit (Nat.log2_up 100));
         Retv
         )
+
       with Rule "rule3" := (
         Call "write_async"(@createWriteRq _ 100 10 (Bit 3) ($33) (Const _ (getDefaultConst _)) : _);
         System ([DispString _ "executed rule3"]);
         Retv
         )
+
       with Rule "rule4" := (
         Call "readRq_notIsAddr_2"($5 : Bit (Nat.log2_up 20));
         Retv
         )
+
       with Rule "rule5" := (
         Call x : Array 5 Bool <- "readRs_notIsAddr_2"();
         Retv
         )
+
       with Rule "rule6" := (
         Call "write_notIsAddr" (@createWriteRq _ 20 5 Bool ($4) (Const _ (getDefaultConst _)) : _);
         Retv
         )
+
       with Rule "rule7" := (
         Call "readRq_isAddr_1"($3 : Bit (Nat.log2_up 128));
         Retv
         )
+
       with Rule "rule8" := (
         Call x : Array 7 (Array 10 (Bit 5)) <- "readRs_isAddr_1"();
         Retv
         )
+
       with Rule "rule9" := (
         Call "write_isAddr"(@createWriteRq _ 128 7 (Array 10 (Bit 5)) ($11) (Const _ (getDefaultConst _)) : _);
         Retv

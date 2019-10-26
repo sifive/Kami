@@ -367,7 +367,7 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   "  input CLK,\n" ++
   "  input RESET\n" ++
   ");\n" ++
-  -- concatMap (\rf -> concatMap (\(isInput, k, name) -> ppDealSize0 k "" ("  " ++ ppDeclType name k) ++ ";\n") (getRegFileNames rf)) regFs ++ "\n" ++
+  concatMap (\rf -> concatMap (\(isInput, k, name) -> ppDealSize0 k "" ("  " ++ ppDeclType (ppName name) k) ++ ";\n") (getRegFileNames rf)) regFs ++ "\n" ++
   concatMap (\(nm, (T.SyntaxKind ty, init)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) regInits ++ "\n" ++
 
   concatMap (\(nm, (ty, expr)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) assigns ++ "\n" ++
@@ -376,17 +376,18 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$reg$" ++ show pos) ty ++ ";\n")) regTruncs ++ "\n" ++
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$sys$" ++ show pos) ty ++ ";\n")) sysTruncs ++ "\n" ++
 
+  concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("  assign " ++ ppPrintVar nm ++ " = " ++ sexpr ++ ";\n")) assignExprs ++ "\n" ++
+
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  assign " ++ "_trunc$wire$" ++ show pos ++ " = " ++ sexpr ++ ";\n")) assignTruncs ++ "\n" ++
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  assign " ++ "_trunc$reg$" ++ show pos ++ " = " ++ sexpr ++ ";\n")) regTruncs ++ "\n" ++
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  assign " ++ "_trunc$sys$" ++ show pos ++ " = " ++ sexpr ++ ";\n")) sysTruncs ++ "\n" ++
   
-  concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("  assign " ++ ppPrintVar nm ++ " = " ++ sexpr ++ ";\n")) assignExprs ++ "\n" ++
-
   "  always @(posedge CLK) begin\n" ++
   "    if(RESET) begin\n" ++
-  concatMap (\(nm, (T.SyntaxKind ty, init)) -> case init of
-                                                 Just (T.SyntaxConst _ v) -> ppDealSize0 ty "" ("      " ++ ppPrintVar nm ++ " <= " ++ ppConst v ++ ";\n")
-                                                 _ -> "") regInits ++
+  concatMap (\(nm, (T.SyntaxKind ty, init)) ->
+               case init of
+                 Just (T.SyntaxConst _ v) -> ppDealSize0 ty "" ("      " ++ ppPrintVar nm ++ " <= " ++ ppConst v ++ ";\n")
+                 _ -> "") regInits ++
   "    end\n" ++
   "    else begin\n" ++
   concatMap (\(nm, (ty, sexpr)) -> ppDealSize0 ty "" ("      " ++ ppPrintVar nm ++ " <= " ++ sexpr ++ ";\n")) (map (\(s1,(k,s2)) -> (s1,(kind_of_fullKind k,s2))) regExprs) ++
@@ -398,9 +399,9 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
     (regFsOuts,regFsIns) = partition (\(isInput,_,_) -> isInput) (concatMap getRegFileNames regFs)
     ins = removeDups (ins' ++ map (\(_,k,name) -> ((name,Nothing),k)) regFsIns)
     outs = removeDups (outs' ++ map (\(_,k,name) -> ((name,Nothing),k)) regFsOuts)
-    regInits = removeDups regInits'
-    regWrites = removeDups regWrites'
-    assigns = removeDups $ map (\(p,(k,x)) -> (p,(kind_of_fullKind k,x))) assigns'
+    regInits = regInits'
+    regWrites = regWrites'
+    assigns = map (\(p,(k,x)) -> (p,(kind_of_fullKind k,x))) assigns'
     convAssigns =
       mapM (\(nm, (ty, expr)) ->
               do
