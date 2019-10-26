@@ -34,11 +34,10 @@ get_rfr_meths (T.Sync _ reads) = concatMap (\(T.Build_SyncRead r1 r2 r3) -> [r1,
 get_rf_meths :: T.RegFileBase -> [String]
 get_rf_meths (T.Build_RegFileBase _ _ _ readers write _ _ _) = write : get_rfr_meths readers
 
-get_normal_meth_calls_with_sign :: T.Mod -> [(String,(T.Kind,T.Kind))]
-get_normal_meth_calls_with_sign m =
-  let (_,(rfbs,_)) = T.separateModRemove m in
+get_normal_meth_calls_with_sign :: T.BaseModule -> [T.RegFileBase] -> [(String,(T.Kind,T.Kind))]
+get_normal_meth_calls_with_sign m rfbs =
   let rf_meths = concatMap get_rf_meths rfbs in
-    filter (\(f,_) -> not $ f `elem` rf_meths) $ T.getCallsWithSignPerMod m
+    filter (\(f,_) -> not $ f `elem` rf_meths) $ nubBy (\(x, _) (y, _) -> x == y) (T.getCallsWithSignPerMod (T.Base m))
 
 get_write_meths_with_arg :: [T.RegFileBase] -> [(String,T.Kind)]
 get_write_meths_with_arg rfbs = map (\(T.Build_RegFileBase isWrMask num _ _ write idxNum k _) -> 
@@ -103,8 +102,8 @@ en_arg_initialize :: String -> T.Kind -> [(T.VarType, T.RtlExpr')]
 en_arg_initialize f k = [((f ++ "#_enable",Just 0), T.Const T.Bool $ T.ConstBool False),
                    ((f ++ "#_argument",Just 0), T.Const k $ T.getDefaultConst k)]
 
-get_calls_from_basemod :: T.BaseModule -> [String]
-get_calls_from_basemod basemod = map fst (get_normal_meth_calls_with_sign $ T.Base basemod)
+get_calls_from_basemod :: T.BaseModule -> [T.RegFileBase] -> [String]
+get_calls_from_basemod basemod rfbs = map fst (get_normal_meth_calls_with_sign basemod rfbs)
 
 all_initialize :: ModInput -> [(T.VarType, T.RtlExpr')]
 all_initialize modinput@(_,rfbs,basemod,_) =
@@ -118,7 +117,7 @@ all_initialize modinput@(_,rfbs,basemod,_) =
   ++ concatMap (\(f,argk) -> en_arg_initialize f argk) (get_write_meths_with_arg rfbs ++ get_async_reads_with_arg asyncs ++ get_sync_readReqs_with_arg (isAddrs ++ notIsAddrs))
 
     --normal methods
-  ++ concatMap (\(f,(argk,_)) -> en_arg_initialize f argk) (get_normal_meth_calls_with_sign $ T.Base basemod)
+  ++ concatMap (\(f,(argk,_)) -> en_arg_initialize f argk) (get_normal_meth_calls_with_sign basemod rfbs)
 
 data CommonInfo =
   CommonInfo
@@ -188,7 +187,7 @@ init_state_aux regs asyncs isAddrs notIsAddrs meths = ExprState {
 
 init_state :: PreModInput -> ExprState
 init_state (rfbs,basemod) = let (asyncs, isAddrs, notIsAddrs) = process_rfbs rfbs in
- init_state_aux (regs_of_basemod basemod) asyncs isAddrs notIsAddrs (get_calls_from_basemod basemod) 
+ init_state_aux (regs_of_basemod basemod) asyncs isAddrs notIsAddrs (get_calls_from_basemod basemod rfbs) 
 
 async_of_readName :: String -> State ExprState Async
 async_of_readName readName = do
@@ -659,9 +658,9 @@ get_final_assigns s rfbs = let (_,isAddrs,notIsAddrs) = process_rfbs rfbs in
   -- notIsAddr shadow regs
   ++ (map (\(Register r k) -> ((r,Nothing), T.Var k $ T.unsafeCoerce (r, Just $ not_isAddr_read_reg_counters (regmap_counters s) !!! r))) $ all_not_isAddr_shadows notIsAddrs)
 
-get_final_meth_assigns :: T.BaseModule -> ExprState -> [(T.VarType, T.RtlExpr')]
-get_final_meth_assigns basemod s = do
-  (f,(argk,_)) <- get_normal_meth_calls_with_sign $ T.Base basemod
+get_final_meth_assigns :: T.BaseModule -> [T.RegFileBase] -> ExprState -> [(T.VarType, T.RtlExpr')]
+get_final_meth_assigns basemod rfbs s = do
+  (f,(argk,_)) <- get_normal_meth_calls_with_sign basemod rfbs
   let n = (meth_counters s) !!! f
   [((f ++ "#_enable",Nothing), T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (f ++ "#_enable", Just n)),((f ++ "#_argument",Nothing), T.Var (T.SyntaxKind argk) $ T.unsafeCoerce (f ++ "#_argument", Just n))] 
 
@@ -688,7 +687,7 @@ all_verilog :: ModInput -> (VerilogExprs, [(T.VarType, T.RtlExpr')])
 all_verilog input@(strs,rfbs,basemod,cas) =
   let (vexprs,final_state) = runState (ppCAS $ cas) (init_state $ get_premodinput input) in
   let final_assigns = get_final_assigns final_state rfbs in
-  let final_meth_assigns = get_final_meth_assigns basemod final_state in
+  let final_meth_assigns = get_final_meth_assigns basemod rfbs final_state in
   let final_rfmeth_assigns = get_final_rfmeth_assigns rfbs final_state in
     (vexprs { assign_exprs = (all_initialize input) ++ assign_exprs vexprs ++ final_meth_assigns ++ final_rfmeth_assigns }, final_assigns)
 
@@ -735,13 +734,9 @@ mkRtlMod input@(strs,rfbs,basemod,cas) =
   {- wires       -} (map (\(v,e) -> (v,(kind_of_expr e,e))) $ assign_exprs vexprs)
   {- sys         -} (if_begin_end_exprs vexprs)
 
-{-
 mkRtlFull ::  ([String], ([T.RegFileBase], T.BaseModule)) -> T.RtlModule
 mkRtlFull (hides, (rfs, bm)) = mkRtlMod (hides, rfs, bm, T.coq_CAS_RulesRf (regmap_counters $ init_state (rfs, bm)) (T.getRules bm) rfs)
--}
-
-mkRtlFull ::  ([String], ([T.RegFileBase], T.BaseModule)) -> T.RtlModule
-mkRtlFull m = T.getRtl m
+--mkRtlFull m = T.getRtl m
 
 main :: IO()
 main = putStrLn $ ppTopModule $ mkRtlFull T.rtlMod
