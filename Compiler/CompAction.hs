@@ -189,20 +189,6 @@ init_state :: PreModInput -> ExprState
 init_state (rfbs,basemod) = let (asyncs, isAddrs, notIsAddrs) = process_rfbs rfbs in
  init_state_aux (regs_of_basemod basemod) asyncs isAddrs notIsAddrs (get_calls_from_basemod basemod rfbs) 
 
--- async_of_readName :: String -> State ExprState Async
--- async_of_readName readName = do
---   s <- get
---   case find (\a -> readName `elem` asyncNames a) (all_asyncs s) of
---     Just a -> return a
---     Nothing -> error $ "Name " ++ readName ++ " not found in all_asyncs."
-
--- sync_of_readResp :: String -> State ExprState Sync
--- sync_of_readResp readResp = do
---   s <- get
---   case find (\sy -> readResp `elem` (map (\(T.Build_SyncRead _ r _) -> r) $ syncNames sy)) (all_isAddrs s) of
---     Just sy -> return sy
---     Nothing -> error $ "Name " ++ readResp ++ " not found in all_isAddrs."
-
 data PredCall =
   PredCall
   { pred_val :: T.RtlExpr'
