@@ -67,12 +67,12 @@ Section SemSimple.
                                                                               Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                                              writeMap) (old, upds)):
       Sem_RmeSimple (@ReadReqRME _ _ idxNum num readReq readReg dataArray idx Data isAddr pred writeMap readMap arr) (old, upds)
-  | SemReadRespRME idxNum num readResp readReg dataArray Data isAddr readMap old upds
+  | SemReadRespRME idxNum num readResp readReg dataArray writePort isWriteMask Data isAddr readMap old upds
                        (HWriteMap : Sem_RmeSimple readMap (old, upds)):
-      Sem_RmeSimple (@ReadRespRME _ _ idxNum num readResp readReg dataArray Data isAddr readMap) (old, upds)
-  | SemAsyncReadRME (idxNum num : nat) (readPort dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (pred : Bool @# type) (k : Kind) (readMap : RmeSimple type RegMapType)
+      Sem_RmeSimple (@ReadRespRME _ _ idxNum num readResp readReg dataArray writePort isWriteMask Data isAddr readMap) (old, upds)
+  | SemAsyncReadRME (idxNum num : nat) (readPort dataArray : string) writePort isWriteMask (idx : Bit (Nat.log2_up idxNum) @# type) (pred : Bool @# type) (k : Kind) (readMap : RmeSimple type RegMapType)
                  old upds (HNoOp : Sem_RmeSimple readMap (old, upds)):
-      Sem_RmeSimple (@AsyncReadRME _ _ idxNum num readPort dataArray idx pred k readMap) (old, upds)
+      Sem_RmeSimple (@AsyncReadRME _ _ idxNum num readPort dataArray writePort isWriteMask idx pred k readMap) (old, upds)
   | SemCompactRME old upds regMap (HSemRegMap: Sem_RmeSimple regMap (old, upds)):
       Sem_RmeSimple (@CompactRME _ _ regMap) (old, nil::upds).
 
@@ -130,7 +130,7 @@ Section SemSimple.
                           (HNewCalls : newCalls = calls_a ++ calls_cont)
                           (HSemCompActionSimple_cont: SemCompActionSimple (cont val_a regMap_a) regMap_cont calls_cont val_cont):
       SemCompActionSimple (@CompLetFull_simple _ _ k a lret cont) regMap_cont newCalls val_cont
-  | SemCompAsyncReadRmeSimple num (readPort dataArray : string) idxNum (idx : Bit (Nat.log2_up idxNum) @# type) pred Data readMap lret
+  | SemCompAsyncReadRmeSimple num (readPort dataArray : string) writePort isWriteMask idxNum (idx : Bit (Nat.log2_up idxNum) @# type) pred Data readMap lret
                             updatedRegs readMapValOld readMapValUpds regVal regMap
                             (HReadMap : Sem_RmeSimple readMap (readMapValOld, readMapValUpds))
                             (HUpdatedRegs : PriorityUpds readMapValOld readMapValUpds updatedRegs)
@@ -143,7 +143,7 @@ Section SemSimple.
                                                           (CABit Add (Var type (SyntaxKind _) (evalExpr idx) ::
                                                                           Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                             (HSemCompActionSimple : SemCompActionSimple (cont (evalExpr contArray)) regMap calls val):
-      SemCompActionSimple (@CompAsyncRead_simple _ _ idxNum num readPort dataArray idx pred Data readMap lret cont) regMap calls val
+      SemCompActionSimple (@CompAsyncRead_simple _ _ idxNum num readPort dataArray writePort isWriteMask idx pred Data readMap lret cont) regMap calls val
   | SemCompWrite_simple (writePort dataArray : string) idxNum Data (readMap : RmeSimple type RegMapType) lret
                      updatedRegs readMapValOld readMapValUpds regVal
                      (HReadMap : Sem_RmeSimple readMap (readMapValOld, readMapValUpds))
@@ -168,7 +168,7 @@ Section SemSimple.
                                     regMap_cont calls val
                                     (HSemCompActionSimple : SemCompActionSimple (cont regV) regMap_cont calls val):
       SemCompActionSimple (@CompSyncReadReq_simple _ _ idxNum num Data readReq readReg dataArray isAddr readMap lret cont) regMap_cont calls val
-  | SemCompSyncReadRes_simple_True num idxNum readResp readRegName dataArray Data isAddr readMap lret cont
+  | SemCompSyncReadRes_simple_True num idxNum readResp readRegName dataArray writePort isWriteMask Data isAddr readMap lret cont
                                    (HisAddr : isAddr = true)
                                    updatedRegs readMapValOld readMapValUpds regVal idx
                                    (HReadMap : Sem_RmeSimple readMap (readMapValOld, readMapValUpds))
@@ -184,8 +184,8 @@ Section SemSimple.
                                                                                  Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                                    regMap calls val
                                    (HSemCompActionSimple : SemCompActionSimple (cont (evalExpr contArray)) regMap calls val):
-      SemCompActionSimple (@CompSyncReadRes_simple _ _ idxNum num readResp readRegName dataArray Data isAddr readMap lret cont) regMap calls val
-  | SemCompSyncReadRes_simple_False num idxNum readResp readRegName dataArray Data isAddr readMap lret cont
+      SemCompActionSimple (@CompSyncReadRes_simple _ _ idxNum num readResp readRegName dataArray writePort isWriteMask Data isAddr readMap lret cont) regMap calls val
+  | SemCompSyncReadRes_simple_False num idxNum readResp readRegName dataArray writePort isWriteMask Data isAddr readMap lret cont
                                     (HisAddr : isAddr = false)
                                     updatedRegs readMapValOld readMapValUpds regVal
                                     (HReadMap : Sem_RmeSimple readMap (readMapValOld, readMapValUpds))
@@ -193,7 +193,7 @@ Section SemSimple.
                                     (HIn1 : In (readRegName, (existT _ (SyntaxKind (Array num Data)) regVal)) updatedRegs)
                                     regMap calls val
                                     (HSemCompActionSimple : SemCompActionSimple (cont regVal) regMap calls val):
-      SemCompActionSimple (@CompSyncReadRes_simple _ _ idxNum num readResp readRegName dataArray Data isAddr readMap lret cont) regMap calls val.
+      SemCompActionSimple (@CompSyncReadRes_simple _ _ idxNum num readResp readRegName dataArray writePort isWriteMask Data isAddr readMap lret cont) regMap calls val.
   Variable (k : Kind) (a : CompActionSimple type RegMapType k) (regInits : list RegInitT).
   
 

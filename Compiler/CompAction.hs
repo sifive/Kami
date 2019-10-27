@@ -189,20 +189,6 @@ init_state :: PreModInput -> ExprState
 init_state (rfbs,basemod) = let (asyncs, isAddrs, notIsAddrs) = process_rfbs rfbs in
  init_state_aux (regs_of_basemod basemod) asyncs isAddrs notIsAddrs (get_calls_from_basemod basemod rfbs) 
 
-async_of_readName :: String -> State ExprState Async
-async_of_readName readName = do
-  s <- get
-  case find (\a -> readName `elem` asyncNames a) (all_asyncs s) of
-    Just a -> return a
-    Nothing -> error $ "Name " ++ readName ++ " not found in all_asyncs."
-
-sync_of_readResp :: String -> State ExprState Sync
-sync_of_readResp readResp = do
-  s <- get
-  case find (\sy -> readResp `elem` (map (\(T.Build_SyncRead _ r _) -> r) $ syncNames sy)) (all_isAddrs s) of
-    Just sy -> return sy
-    Nothing -> error $ "Name " ++ readResp ++ " not found in all_isAddrs."
-
 data PredCall =
   PredCall
   { pred_val :: T.RtlExpr'
@@ -222,9 +208,9 @@ queryReg name k isWrite regMap =
       query (if isWrite then writeMap else readMap)
     query (T.ReadReqRME idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
       query (if isWrite then writeMap else readMap)
-    query (T.ReadRespRME idxNum num readResp readReg dataArray dataK isAddr readMap) =
+    query (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr readMap) =
       query readMap
-    query (T.AsyncReadRME idxNum num readPort dataArray idx pred k readMap) =
+    query (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k readMap) =
       query readMap
     query (T.CompactRME regMap) =
       query regMap
@@ -255,9 +241,9 @@ queryRfWrite name idxNum num k isMask isWrite regMap =
         else (restPred, restCall)
     query (T.ReadReqRME idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
       query (if isWrite then writeMap else readMap)
-    query (T.ReadRespRME idxNum num readResp readReg dataArray dataK isAddr readMap) =
+    query (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr readMap) =
       query readMap
-    query (T.AsyncReadRME idxNum num readPort dataArray idx pred k readMap) =
+    query (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k readMap) =
       query readMap
     query (T.CompactRME regMap) =
       query regMap
@@ -276,9 +262,9 @@ queryAsyncReadReq name idxNum isWrite regMap =
       query (if isWrite then writeMap else readMap)
     query (T.ReadReqRME idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
       query (if isWrite then writeMap else readMap)
-    query (T.ReadRespRME idxNum num readResp readReg dataArray dataK isAddr readMap) =
+    query (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr readMap) =
       query readMap
-    query (T.AsyncReadRME idxNum num readPort dataArray idx pred k readMap) =
+    query (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k readMap) =
       let (restPred, restAddr) = query readMap in
         if readPort == name
         then (pred : restPred, T.predPack (T.Bit (log2_up idxNum)) pred idx : restAddr)
@@ -305,9 +291,9 @@ querySyncReadReq name idxNum isWrite regMap =
         if readReq == name
         then (pred : restPred, T.predPack (T.Bit (log2_up idxNum)) pred idx : restAddr)
         else (restPred, restAddr)
-    query (T.ReadRespRME idxNum num readResp readReg dataArray dataK isAddr readMap) =
+    query (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr readMap) =
       query readMap
-    query (T.AsyncReadRME idxNum num readPort dataArray idx pred k readMap) =
+    query (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k readMap) =
       query readMap
     query (T.CompactRME regMap) =
       query regMap
@@ -609,23 +595,21 @@ ppCAS (T.CompLetFull_simple _  a _ cont) = do
     , if_begin_end_exprs = if_begin_ends_a ++ if_begin_end_exprs y
   }
 
-ppCAS (T.CompAsyncRead_simple idxNum num readPort dataArray idx pred k readMap _ cont) = do
+ppCAS (T.CompAsyncRead_simple idxNum num readPort dataArray writePort isWrMask idx pred k readMap _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ tmp_var j)
-  a <- async_of_readName readPort
   return $ y {
-    assign_exprs = (tmp_var j, queryAsyncReadResp readPort (commonWrite $ asyncCommon a) idxNum num k (commonIsWrMask $ asyncCommon a) readMap) : assign_exprs y
+    assign_exprs = (tmp_var j, queryAsyncReadResp readPort writePort idxNum num k isWrMask readMap) : assign_exprs y
   }
 
-ppCAS (T.CompSyncReadRes_simple idxNum num readResp readReg dataArray k True readMap _ cont) = do
+ppCAS (T.CompSyncReadRes_simple idxNum num readResp readReg dataArray writePort isWrMask k True readMap _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ tmp_var j)
-  sy <- sync_of_readResp readResp
   return $ y {
-    assign_exprs = (tmp_var j, queryIsAddrReadResp readResp (commonWrite $ syncCommon sy) readReg idxNum num k (commonIsWrMask $ syncCommon sy) readMap) : assign_exprs y
+    assign_exprs = (tmp_var j, queryIsAddrReadResp readResp writePort readReg idxNum num k isWrMask readMap) : assign_exprs y
   }
 
-ppCAS (T.CompSyncReadRes_simple idxNum num readResp readReg dataArray k False readMap _ cont) = do
+ppCAS (T.CompSyncReadRes_simple idxNum num readResp readReg dataArray writePort isWrMask k False readMap _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
