@@ -610,17 +610,15 @@ get_final_assigns s rfbs = let (_,isAddrs,notIsAddrs) = process_rfbs rfbs in
   -- regular regs
      (map (\(Register r k) -> ((r,Nothing), T.Var k $ T.unsafeCoerce (r, Just $ reg_counters (regmap_counters s) !!! r))) $ all_regs s)
 
-get_final_meth_assigns :: T.BaseModule -> [T.RegFileBase] -> ExprState -> [(T.VarType, T.RtlExpr')]
-get_final_meth_assigns basemod rfbs s = do
-  (f,(argk,_)) <- get_normal_meth_calls_with_sign basemod rfbs
-  let n = (meth_counters s) !!! f
-  [((f ++ "#_enable",Nothing), T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (f ++ "#_enable", Just n)),((f ++ "#_argument",Nothing), T.Var (T.SyntaxKind argk) $ T.unsafeCoerce (f ++ "#_argument", Just n))] 
-
 en_arg_final :: String -> T.Kind -> H.Map String Int -> [(T.VarType, T.RtlExpr')]
 en_arg_final f argk counters = let n = counters !!! f in
   [   ((f ++ "#_enable",Nothing), T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (f ++ "#_enable", Just n))
     , ((f ++ "#_argument",Nothing), T.Var (T.SyntaxKind argk) $ T.unsafeCoerce (f ++ "#_argument", Just n))
   ]
+
+get_final_meth_assigns :: T.BaseModule -> [T.RegFileBase] -> ExprState -> [(T.VarType, T.RtlExpr')]
+get_final_meth_assigns basemod rfbs s =
+  concatMap (\(f, (argk, _)) -> en_arg_final f argk $ meth_counters s) (get_normal_meth_calls_with_sign basemod rfbs)
 
 get_final_rfmeth_assigns :: [T.RegFileBase] -> ExprState -> [(T.VarType, T.RtlExpr')]
 get_final_rfmeth_assigns rfbs s = let (asyncs,isAddrs,notIsAddrs) = process_rfbs rfbs in
