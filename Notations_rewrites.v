@@ -193,6 +193,28 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma getAllRegisters_fold_right_ConcatMod : forall (b: Mod) (l:list Mod), getAllRegisters (List.fold_right ConcatMod b l)=(concat (List.map getAllRegisters l))++(getAllRegisters b).
+Proof.
+    induction l.
+    + simpl.
+      reflexivity.
+    + simpl.
+      rewrite IHl.
+      rewrite app_assoc.
+      reflexivity.
+Qed.
+
+Lemma getAllMethods_fold_right_ConcatMod : forall (b: Mod) (l:list Mod), getAllMethods (List.fold_right ConcatMod b l)=(concat (List.map getAllMethods l))++(getAllMethods b).
+Proof.
+    induction l.
+    + simpl.
+      reflexivity.
+    + simpl.
+      rewrite IHl.
+      rewrite app_assoc.
+      reflexivity.
+Qed.
+
 Lemma getAllRules_ConcatMod : forall a b, getAllRules (ConcatMod a b)=getAllRules a++getAllRules b.
 Proof.
   intros.
@@ -576,6 +598,7 @@ Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q))
     reflexivity.
   Qed.
 
+  Hint Rewrite getAllRegisters_fold_right_ConcatMod getAllMethods_fold_right_ConcatMod : kami_rewrite_db.
   Hint Rewrite getAllRegisters_ConcatMod DisjKey_Append1 DisjKey_Append2 DisjKey_In_map2 DisjKey_In_map1 : kami_rewrite_db.
   Hint Rewrite DisjKey_In_map_fst2 DisjKey_In_map_fst1: kami_rewrite_db.
 
