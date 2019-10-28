@@ -419,7 +419,7 @@ do_regs m = do
 
 do_write :: String -> Int -> Int -> T.Kind -> Bool -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_write writeName idxNum num k isMask regMap = case queryRfWrite writeName idxNum num k isMask True regMap of
-  PredCall (T.Var _ _) (T.Var _ _) -> return []
+  PredCall (T.Var _ _) _ -> return []
   PredCall e1 e2 -> do
     i <- write_count writeName
     return [((writeName ++ "#_enable", Just i), e1), ((writeName ++ "#_argument", Just i), e2)]
@@ -437,7 +437,7 @@ do_writes m = do
 
 do_async_read :: String -> Int -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_async_read name idxNum regMap = case queryAsyncReadReq name idxNum True regMap of
-  PredCall (T.Var _ _) (T.Var _ _) -> return []
+  PredCall (T.Var _ _) _ -> return []
   PredCall e1 e2 -> do
     i <- async_read_count name
     return [((name ++ "#_enable", Just i), e1), ((name ++ "#_argument", Just i), e2)]
@@ -449,7 +449,7 @@ do_async_reads m = do
 
 do_isAddr_read_req :: String -> Int -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_isAddr_read_req name idxNum regMap = case querySyncReadReq name idxNum True regMap of
-  PredCall (T.Var _ _) (T.Var _ _) -> return []
+  PredCall (T.Var _ _) _ -> return []
   PredCall e1 e2 -> do
     i <- isAddr_read_req_count name
     return [((name ++ "#_enable", Just i),e1), ((name ++ "#_argument", Just i),e2)]
@@ -473,7 +473,7 @@ do_isAddr_read_regs m = do
 
 do_not_isAddr_read_req :: String -> Int -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_not_isAddr_read_req name idxNum regMap = case querySyncReadReq name idxNum True regMap of
-  PredCall (T.Var _ _) (T.Var _ _) -> return []
+  PredCall (T.Var _ _) _ -> return []
   PredCall e1 e2 -> do
     i <- not_isAddr_read_req_count name
     return [((name ++ "#_enable", Just i),e1), ((name ++ "#_argument", Just i),e2)]
