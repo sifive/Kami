@@ -96,7 +96,7 @@ Section TestMod.
         )
 
       with Rule "rule6" := (
-        Call "write_notIsAddr" (@createWriteRq _ 20 5 Bool ($4) (Const _ (getDefaultConst _)) : _);
+        Call "write_notIsAddr" (@createWriteRqMask _ 20 5 Bool ($4) (Const _ (getDefaultConst _)) (Const _ (ConstArray (fun _ => true))) : _);
         Retv
         )
 
