@@ -2,9 +2,9 @@ Require Import Compare_dec List String.
 Import ListNotations.
 
 Require Import Kami.AllNotations.
-Require Import Kami.CoqSim.Misc.
-Require Import Kami.CoqSim.IO.
-Require Import Kami.CoqSim.TransparentProofs.
+Require Import Kami.Simulator.CoqSim.Misc.
+Require Import Kami.Simulator.CoqSim.IO.
+Require Import Kami.Simulator.CoqSim.TransparentProofs.
 
 Fixpoint eval_Kind(k : Kind) : Type :=
   match k with
