@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-mkdir -p $1/HaskellGen
+mkdir -p $1
 
 cmd="ghc $GHCFLAGS -j -O1 --make ./FixLits.hs"
 
@@ -13,7 +13,7 @@ for file in $(find $1 -maxdepth 1 -name "*.hs")
 do
   baseval=`basename $file`
   ./FixLits $file
-  mv $file $1/HaskellGen
+  mv $file $1
   echo "$file fixed."
 done
 
@@ -25,7 +25,7 @@ case "${unameOut}" in
   *)       SED=sed
 esac
 
-for file in $(grep -l "CustomExtract" $1/HaskellGen/*.hs)
+for file in $(grep -l "CustomExtract" $1/*.hs)
 do
   grep -q "import qualified CustomExtract" $file
   if [ $? -ne 0 ]
@@ -34,7 +34,7 @@ do
   fi
 done
 
-for file in $(grep -l "Data\.Char" $1/HaskellGen/*.hs)
+for file in $(grep -l "Data\.Char" $1/*.hs)
 do
   grep -q "import qualified Data\.Char" $file
   if [ $? -ne 0 ]
@@ -43,7 +43,7 @@ do
   fi
 done
 
-for file in $(grep -l "Data\.Bits" $1/HaskellGen/*.hs)
+for file in $(grep -l "Data\.Bits" $1/*.hs)
 do
   grep -q "import qualified Data\.Bits" $file
   if [ $? -ne 0 ]
@@ -52,7 +52,7 @@ do
   fi
 done
 
-for file in $(grep -l "Data\.List" $1/HaskellGen/*.hs)
+for file in $(grep -l "Data\.List" $1/*.hs)
 do
   grep -q "import qualified Data\.List" $file
   if [ $? -ne 0 ]
