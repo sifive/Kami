@@ -8,12 +8,81 @@ import qualified Data.Map.Lazy as H
 import Debug.Trace
 import Numeric
 import PrettyPrintVerilog
+import CustomExtract
+import System.IO
+import Data.Time.Clock
 
---show instances for debugging
-deriving instance Show T.SyncRead
+{- Show instances for debugging -}
+
+deriving instance Show T.UniBoolOp
+deriving instance Show T.CABoolOp
+deriving instance Show T.UniBitOp
+deriving instance Show T.CABitOp
+deriving instance Show T.BinBitOp
+deriving instance Show T.BitFormat
+deriving instance Show T.RegFileReaders
+deriving instance Show T.RegFileBase
+
+show_finfun :: Show a => Int -> (CustomExtract.EFin -> a) -> String
+show_finfun n f = "{ " ++ intercalate " ; " (map (show . f) $ T.getFins n) ++ " }"
+
+-- data FullFormat =
+--    FBool Prelude.Int BitFormat
+--  | FBit Prelude.Int Prelude.Int BitFormat
+--  | FStruct Prelude.Int (CustomExtract.EFin -> Kind) (CustomExtract.EFin ->
+--                                                     Prelude.String) (CustomExtract.EFin
+--                                                                     ->
+--                                                                     FullFormat)
+--  | FArray Prelude.Int Kind FullFormat
+
+
+instance Show T.FullFormat where
+  show (T.FBool n bf) = "FBool " ++ show n ++ " " ++ show bf
+  show (T.FBit n m bf) = "FBit " ++ show n ++ " " ++ show m ++ " " ++ show bf
+  show (T.FStruct n fk fs ffs) = "FStruct " ++ show n ++ " " ++ show_finfun n fk ++ " " ++ show_finfun n fs ++ " " ++ show_finfun n ffs
+  show (T.FArray n k ff) = "FArray " ++ show n ++ " " ++ show k ++ " " ++ show ff
+ 
+instance Show T.ConstT where
+  show (T.ConstBool b) = "ConstBool " ++ show b
+  show (T.ConstBit n w) = "ConstBit " ++ show n ++ " " ++ show w
+  show (T.ConstStruct n fk fs fc) = "ConstStruct " ++ show n ++ " " ++ show_finfun n fk ++ " " ++ show_finfun n fs ++ " " ++ show_finfun n fc
+  show (T.ConstArray n k fc) = "ConstArray " ++ show n ++ " " ++ show k ++ " " ++ show_finfun n fc
+
+instance Show T.ConstFullT where
+  show (T.SyntaxConst k c) = "SyntaxConst " ++ show k ++ " " ++ show c
+  show (T.NativeConst _) = "NativeConst"
 
 instance Show T.Kind where
-  show _ = "kind"
+  show T.Bool = "Bool"
+  show (T.Bit n) = "Bit " ++ show n
+  show (T.Struct n fk fs) = "Struct " ++ show n ++ " " ++ show_finfun n fk ++ " " ++ show_finfun n fs
+  show (T.Array n k) = "Array " ++ show n ++ " " ++ show k
+
+instance Show T.FullKind where
+  show (T.SyntaxKind k) = "SyntaxKind " ++ show k
+  show (T.NativeKind _) = "FullKind"
+
+instance Show (T.Expr ty) where
+  show (T.Var fk t) = "Var " ++ show fk ++ " " ++ show (T.unsafeCoerce t :: T.VarType)
+  show (T.Const k c) = "Const " ++ show k ++ show c
+  show (T.UniBool o e) = "UniBool " ++ show o ++ " " ++ show e
+  show (T.CABool o es) = "CABool " ++ show o ++ " " ++ show es
+  show (T.UniBit n m o e) = "UniBit " ++ show n ++ " " ++ show m ++ " " ++ show o ++ show e
+  show (T.CABit n o es) = "CABit " ++ show n ++ " " ++ show o ++ " " ++ show es
+  show (T.BinBit n m p o e1 e2) = "BinBit " ++ show n ++ " " ++ show m ++ " " ++ show p ++ " " ++ show o ++ " " ++ show e1 ++ " " ++ show e2
+  show (T.BinBitBool n m o e1 e2) = "BinBitBool " ++ show n ++ " " ++ show m ++ " " ++ show o ++ " " ++ show e1 ++ " " ++ show e2
+  show (T.ITE fk e1 e2 e3) = "ITE " ++ show fk ++ " " ++ show e1 ++ " " ++ show e2 ++ " " ++ show e3
+  show (T.Eq k e1 e2) = "Eq " ++ show k ++ " " ++ show e1 ++ " " ++ show e2
+  show (T.ReadStruct n fk fs e i) = "ReadStruct " ++ show n ++ " " ++ show_finfun n fk ++ " " ++ show_finfun n fs ++ " " ++ show e ++ " " ++ show i
+  show (T.BuildStruct n fk fs fe) = "BuildStruct " ++ show n ++ " " ++ show_finfun n fk ++ " " ++ show_finfun n fs ++ " " ++ show_finfun n fe
+  show (T.ReadArray n m k e1 e2) = "ReadArray " ++ show n ++ " " ++ show m ++ " " ++ show e1 ++ " " ++ show e2
+  show (T.ReadArrayConst n k e i) = "ReadArrayConst " ++ show n ++ " " ++ show k ++ " " ++ show e ++ " " ++ show i
+  show (T.BuildArray n k f) = "BuildArray " ++ show n ++ " " ++ show k ++ " " ++ show_finfun n f
+
+deriving instance Show T.SyncRead
+
+deriving instance Show (T.SysT ty)
+deriving instance Show T.RtlModule
 
 instance Show T.RegFileInitT where
   show _ = "RegFileInitT"
@@ -641,6 +710,7 @@ all_verilog input@((strs,(rfbs,basemod)),cas) =
   let final_rfmeth_assigns = get_final_rfmeth_assigns rfbs final_state in
     (vexprs { assign_exprs = (all_initialize input) ++ assign_exprs vexprs ++ final_meth_assigns ++ final_rfmeth_assigns }, final_assigns)
 
+
 kind_of_expr :: T.Expr ty -> T.FullKind
 kind_of_expr (T.Var k _) = k
 kind_of_expr (T.Const k _) = T.SyntaxKind k
@@ -657,6 +727,32 @@ kind_of_expr (T.BuildStruct n fk fs _) = T.SyntaxKind $ T.Struct n fk fs
 kind_of_expr (T.ReadArray _ _ k _ _) = T.SyntaxKind k
 kind_of_expr (T.ReadArrayConst _ k _ _) = T.SyntaxKind k
 kind_of_expr (T.BuildArray n k _) = T.SyntaxKind $ T.Array n k
+
+data RtlModStats = RtlModStats {
+    num_hiddenWires :: Int
+  , num_regFiles :: Int
+  , num_inputs :: Int
+  , num_outputs :: Int
+  , num_regInits :: Int
+  , num_regWrites :: Int
+  , num_wires :: Int
+  , num_sys :: Int
+} deriving (Show)
+
+get_stats :: T.RtlModule -> RtlModStats
+get_stats (T.Build_RtlModule hw rf ins outs inits writes wires sys) = RtlModStats {
+    num_hiddenWires = length hw
+  , num_regFiles = length rf
+  , num_inputs = length ins
+  , num_outputs = length outs
+  , num_regInits = length inits
+  , num_regWrites = length writes
+  , num_wires = length wires
+  , num_sys = length sys
+}
+
+-- kind_of_expr :: T.Expr ty -> T.FullKind
+-- kind_of_expr _ = T.SyntaxKind $ T.Bool
 
 mkInits :: ModInput -> [(T.VarType, (T.FullKind,T.RegInitValT))]
 mkInits ((strs,(rfbs,basemod)),cas) = let (_,isAddrs,notIsAddrs) = process_rfbs rfbs in
@@ -685,8 +781,29 @@ mkRtlMod input@((strs,(rfbs,basemod)),cas) =
   {- sys         -} (if_begin_end_exprs vexprs)
 
 mkRtlFull ::  ([String], ([T.RegFileBase], T.BaseModule)) -> T.RtlModule
--- mkRtlFull x@(hides, (rfs, bm)) = mkRtlMod (x, T.coq_CAS_RulesRf (regmap_counters $ init_state x) (T.getRules bm) rfs)
+--mkRtlFull x@(hides, (rfs, bm)) = mkRtlMod (x, T.coq_CAS_RulesRf (regmap_counters $ init_state x) (T.getRules bm) rfs)
 mkRtlFull m = T.getRtl m
 
+get_sys (T.Build_RtlModule _ _ _ _ _ _ _ sys) = sys
+
+get_wires (T.Build_RtlModule _ _ _ _ _ _ wires _) = wires
+
+print_ind_elt :: Show a => Int -> a -> IO()
+print_ind_elt i x = do
+  start <- getCurrentTime
+  putStrLn $ show x
+  end <- getCurrentTime
+  let delta = diffUTCTime end start
+  hPutStrLn stderr (show i ++ "; time = " ++ show delta)
+
+output_list :: Show a => [a] -> [IO()]
+output_list xs = let n = length xs in do
+  i <- [0..(n-1)]
+  return $ print_ind_elt i (xs !! i)
+
 main :: IO()
+--main = let sys = map fst $ get_sys $ mkRtlFull T.rtlMod in
+--  hPutStrLn stderr $ show $ sys !! 422
+--  foldr (>>) (return ()) $ output_list sys
 main = putStrLn $ ppTopModule $ mkRtlFull T.rtlMod
+--main = hPutStrLn stderr $ show $ get_stats $ mkRtlFull T.rtlMod
