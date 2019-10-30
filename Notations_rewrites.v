@@ -215,6 +215,17 @@ Proof.
       reflexivity.
 Qed.
 
+Lemma getAllRules_fold_right_ConcatMod : forall (b: Mod) (l:list Mod), getAllRules (List.fold_right ConcatMod b l)=(concat (List.map getAllRules l))++(getAllRules b).
+Proof.
+    induction l.
+    + simpl.
+      reflexivity.
+    + simpl.
+      rewrite IHl.
+      rewrite app_assoc.
+      reflexivity.
+Qed.
+
 Lemma getAllRules_ConcatMod : forall a b, getAllRules (ConcatMod a b)=getAllRules a++getAllRules b.
 Proof.
   intros.
@@ -598,8 +609,71 @@ Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q))
     reflexivity.
   Qed.
 
-  Hint Rewrite getAllRegisters_fold_right_ConcatMod getAllMethods_fold_right_ConcatMod : kami_rewrite_db.
+  Theorem map_getAllRegisters_map_RegFileBase: forall m,
+    (List.map getAllRegisters (List.map (fun mm: RegFileBase =>  (Base (BaseRegFile mm))) m))=
+        (List.map (fun mm: RegFileBase => getRegFileRegisters mm) m).
+  Proof.
+      induction m.
+      + reflexivity.
+      + simpl.
+        rewrite IHm.
+        reflexivity.
+  Qed.
+
+  Theorem map_getAllMethods_map_RegFileBase: forall m,
+    (List.map getAllMethods (List.map (fun mm: RegFileBase =>  (Base (BaseRegFile mm))) m))=
+        (List.map (fun mm: RegFileBase => getRegFileMethods mm) m).
+  Proof.
+      induction m.
+      + reflexivity.
+      + simpl.
+        rewrite IHm.
+        reflexivity.
+  Qed.
+
+  Theorem concat_map_getAllRules_map_RegFileBase: forall m,
+    (concat (List.map getAllRules (List.map (fun mm: RegFileBase =>  (Base (BaseRegFile mm))) m))) = List.nil.
+  Proof.
+      induction m.
+      + reflexivity.
+      + simpl.
+        rewrite IHm.
+        reflexivity.
+  Qed.
+
+  Hint Rewrite getAllRegisters_fold_right_ConcatMod getAllMethods_fold_right_ConcatMod
+       getAllRules_fold_right_ConcatMod
+       concat_map_getAllRules_map_RegFileBase
+       map_getAllMethods_map_RegFileBase map_getAllRegisters_map_RegFileBase : kami_rewrite_db.
   Hint Rewrite getAllRegisters_ConcatMod DisjKey_Append1 DisjKey_Append2 DisjKey_In_map2 DisjKey_In_map1 : kami_rewrite_db.
   Hint Rewrite DisjKey_In_map_fst2 DisjKey_In_map_fst1: kami_rewrite_db.
 
+  Theorem getAllRegisters_BaseMod: forall regs rules dms,
+      getAllRegisters (BaseMod regs rules dms)=regs.
+  Proof.
+      simpl.
+      reflexivity.
+  Qed.
+  
+  Theorem append_equal_prefix: forall T (a: list T) (b: list T) (c: list T), (a++b=a++c)->(b=c).
+  Proof.
+    intros.
+    induction a.
+    + rewrite ?app_nil_l.
+      apply H.
+    + inversion H; subst; clear H.
+      apply IHa.
+      apply H1.
+  Qed.
+  
+  (*Theorem append_nequal_prefix: forall T (a: list T) (b: list T) (c: list T), (List.app a b<>List.app a c)<>(b=c).
+  Proof.
+      induction a.
+      + reflexivity.
+      + intros.
+        simpl.
+        destruct eq.
+  Admitted.*)
+    
+  Hint Rewrite getAllRegisters_BaseMod append_equal_prefix : kami_rewrite_db.
 
