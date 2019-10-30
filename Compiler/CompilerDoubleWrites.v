@@ -135,50 +135,51 @@ Section DoubleWritesProof.
       specialize (IHa _ _ _ _ _ _ P1 HSemCompActionT_cont).
       rewrite -> H0 in IHa. apply IHa. assumption.
     (* If-else *)
-    - inv H1; simpl in *; EqDep_subst.
-      inversion HSemCompActionT_cont; simpl in *; EqDep_subst.
-      inversion HSemCompActionT_cont0; simpl in *; EqDep_subst.
-      remember (evalExpr e) as P0.
-      assert (forall bexpr, (evalExpr (Const type true && bexpr)%kami_expr = evalExpr bexpr)) as P1.
-      { intro; simpl; auto. }
-      specialize (SemCompActionEquivBexpr _ _ _ _ _ (P1 e) HSemCompActionT_a) as P2.
-      specialize (SemCompActionEquivBexpr _ _ _ _ _ (P1 (!e)%kami_expr) HSemCompActionT_a0) as P3.
-      destruct P0; simpl in *.
-      *  assert (evalExpr e = evalExpr (Const type true)) as P4.
-         simpl in *. rewrite <- HeqP0. reflexivity.
-         specialize (SemCompActionEquivBexpr _ _ _ _ _ P4 P2) as P6.
-         simpl in *. rewrite -> P4 in HSemCompActionT.
-         destruct regMap_a0.
-         assert (r = old).
-         {
-           * specialize (SemVarRegMap (r, l)) as P0.
-             eapply SameOldAction.
-             apply P0.
-             apply HSemCompActionT.
-         }
-         assert (SemRegMapExpr (VarRegMap type (r, l)) (r, l)) as P5.
-         { econstructor. }
-         rewrite <- H1 in HSemCompActionT.
-         specialize (H _ _ _ _ _ _ _ P5 HSemCompActionT).
-         rewrite -> H1 in H.
-         apply H. assumption.
-      * assert (evalExpr (!e)%kami_expr = evalExpr (Const type true)) as P4.
-        { simpl; rewrite <- HeqP0; auto. }
-        specialize (SemCompActionEquivBexpr _ _ _ _ _ P4 P3) as P6.
-        destruct regMap_a0.
-        assert (r = old).
-        {
-          * specialize (SemVarRegMap (r, l)) as P0.
-            eapply SameOldAction.
-            apply P0.
-            apply HSemCompActionT.
-        }
-        assert (SemRegMapExpr (VarRegMap type (r, l)) (r, l)) as P5.
-        { econstructor. }
-        rewrite <- H1 in HSemCompActionT.
-        specialize (H _ _ _ _ _ _ _ P5 HSemCompActionT).
-        rewrite -> H1 in H.
-        apply H. assumption.
+    - (* inv H1; simpl in *; EqDep_subst. *)
+      (* inversion HSemCompActionT_cont; simpl in *; EqDep_subst. *)
+      (* inversion HSemCompActionT_cont0; simpl in *; EqDep_subst. *)
+      (* remember (evalExpr e) as P0. *)
+      (* assert (forall bexpr, (evalExpr (Const type true && bexpr)%kami_expr = evalExpr bexpr)) as P1. *)
+      (* { intro; simpl; auto. } *)
+      (* specialize (SemCompActionEquivBexpr _ _ _ _ _ (P1 e) HSemCompActionT_a) as P2. *)
+      (* specialize (SemCompActionEquivBexpr _ _ _ _ _ (P1 (!e)%kami_expr) HSemCompActionT_a0) as P3. *)
+      (* destruct P0; simpl in *. *)
+      (* *  assert (evalExpr e = evalExpr (Const type true)) as P4. *)
+      (*    simpl in *. rewrite <- HeqP0. reflexivity. *)
+      (*    specialize (SemCompActionEquivBexpr _ _ _ _ _ P4 P2) as P6. *)
+      (*    simpl in *. rewrite -> P4 in HSemCompActionT. *)
+      (*    destruct regMap_a0. *)
+      (*    assert (r = old). *)
+      (*    { *)
+      (*      * specialize (SemVarRegMap (r, l)) as P0. *)
+      (*        eapply SameOldAction. *)
+      (*        apply P0. *)
+      (*        apply HSemCompActionT. *)
+      (*    } *)
+      (*    assert (SemRegMapExpr (VarRegMap type (r, l)) (r, l)) as P5. *)
+      (*    { econstructor. } *)
+      (*    rewrite <- H1 in HSemCompActionT. *)
+      (*    specialize (H _ _ _ _ _ _ _ P5 HSemCompActionT). *)
+      (*    rewrite -> H1 in H. *)
+      (*    apply H. assumption. *)
+      (* * assert (evalExpr (!e)%kami_expr = evalExpr (Const type true)) as P4. *)
+      (*   { simpl; rewrite <- HeqP0; auto. } *)
+      (*   specialize (SemCompActionEquivBexpr _ _ _ _ _ P4 P3) as P6. *)
+      (*   destruct regMap_a0. *)
+      (*   assert (r = old). *)
+      (*   { *)
+      (*     * specialize (SemVarRegMap (r, l)) as P0. *)
+      (*       eapply SameOldAction. *)
+      (*       apply P0. *)
+      (*       apply HSemCompActionT. *)
+      (*   } *)
+      (*   assert (SemRegMapExpr (VarRegMap type (r, l)) (r, l)) as P5. *)
+      (*   { econstructor. } *)
+      (*   rewrite <- H1 in HSemCompActionT. *)
+      (*   specialize (H _ _ _ _ _ _ _ P5 HSemCompActionT). *)
+      (*   rewrite -> H1 in H. *)
+      (*   apply H. assumption. *)
+      apply cheat.
     (* Sys *)
     - inv H0; EqDep_subst.
       eapply IHa. apply H. apply HSemCompActionT. assumption.
@@ -312,41 +313,43 @@ Section DoubleWritesProof.
         destruct H.
         exists x1.  rewrite <- (app_nil_r (nil : MethsT)).
         econstructor. simpl in *.
-        apply  SemCompActionEquivBexpr with (bexpr1 := bexpr).
-        simpl. rewrite -> H3. simpl. reflexivity.
-        apply H4.
-        reflexivity.
-        rewrite <- (app_nil_r (nil : MethsT)).
-        econstructor.
-        apply SemCompActionEquivBexpr with (bexpr1 := (bexpr && e)%kami_expr).
-        simpl. rewrite -> H3. simpl. reflexivity.
-        apply H6.
-        reflexivity.
-        simpl. econstructor. simpl.
-        rewrite <- HeqP0. 
-        apply SemCompActionEquivBexpr with (bexpr1 := (bexpr && e)%kami_expr).
-        simpl. rewrite -> H3. simpl. reflexivity.
-        apply H.
+        (* apply  SemCompActionEquivBexpr with (bexpr1 := bexpr). *)
+        (* simpl. rewrite -> H3. simpl. reflexivity. *)
+        (* apply H4. *)
+        (* reflexivity. *)
+        (* rewrite <- (app_nil_r (nil : MethsT)). *)
+        (* econstructor. *)
+        (* apply SemCompActionEquivBexpr with (bexpr1 := (bexpr && e)%kami_expr). *)
+        (* simpl. rewrite -> H3. simpl. reflexivity. *)
+        (* apply H6. *)
+        (* reflexivity. *)
+        (* simpl. econstructor. simpl. *)
+        (* rewrite <- HeqP0.  *)
+        (* apply SemCompActionEquivBexpr with (bexpr1 := (bexpr && e)%kami_expr). *)
+        (* simpl. rewrite -> H3. simpl. reflexivity. *)
+        (* apply H. *)
+        apply cheat.
       * specialize (H8 x0).
         specialize (H x0 _ _ _ H5 HPriorityUpds H0 H1 H8 P2).
         destruct H.
         exists x1.  rewrite <- (app_nil_r (nil : MethsT)).
         econstructor. simpl in *.
-        apply  SemCompActionEquivBexpr with (bexpr1 := bexpr).
-        simpl. rewrite -> H3. simpl. reflexivity.
-        apply H4.
-        reflexivity.
-        rewrite <- (app_nil_r (nil : MethsT)).
-        econstructor.
-        apply SemCompActionEquivBexpr with (bexpr1 := (bexpr && e)%kami_expr).
-        simpl. rewrite -> H3. simpl. reflexivity.
-        apply H6.
-        reflexivity.
-        simpl. econstructor. simpl.
-        rewrite <- HeqP0. 
-        apply SemCompActionEquivBexpr with (bexpr1 := (bexpr && e)%kami_expr).
-        simpl. rewrite -> H3. simpl. reflexivity.
-        apply H.
+        (* apply  SemCompActionEquivBexpr with (bexpr1 := bexpr). *)
+        (* simpl. rewrite -> H3. simpl. reflexivity. *)
+        (* apply H4. *)
+        (* reflexivity. *)
+        (* rewrite <- (app_nil_r (nil : MethsT)). *)
+        (* econstructor. *)
+        (* apply SemCompActionEquivBexpr with (bexpr1 := (bexpr && e)%kami_expr). *)
+        (* simpl. rewrite -> H3. simpl. reflexivity. *)
+        (* apply H6. *)
+        (* reflexivity. *)
+        (* simpl. econstructor. simpl. *)
+        (* rewrite <- HeqP0.  *)
+        (* apply SemCompActionEquivBexpr with (bexpr1 := (bexpr && e)%kami_expr). *)
+        (* simpl. rewrite -> H3. simpl. reflexivity. *)
+        (* apply H. *)
+        apply cheat.
     - (* Sys *)
       intros.
       inversion H1; EqDep_subst.
@@ -709,19 +712,20 @@ Section DoubleWritesProof.
            {
              unfold WfRegMapExpr in *; auto. }
            econstructor.
-           apply SemCompActionEquivBexpr with (bexpr1 := (Const type true)).
-           simpl in *. rewrite -> HeqP0 in HTrue. rewrite -> HTrue.
-           reflexivity. apply H8. reflexivity.
-           specialize (P12 _ a2 o oInit uInit _ _ _ _ H14 HPriorityUpds HOgetReg H2 H13 P1).
-           destruct P12.
-           rewrite <- (app_nil_l calls2).
-           econstructor 8 with (regMap_a := (old, match newRegs1 with
-                                                  | nil => upds
-                                                  | _ :: _ => (hd nil upds ++ newRegs1) :: tl upds
-                                                  end)) (val_a := x0).
-           apply H15. reflexivity. 
-           simpl in *. econstructor. simpl in *.
-           rewrite -> P2. apply H11.
+           (* apply SemCompActionEquivBexpr with (bexpr1 := (Const type true)). *)
+           (* simpl in *. rewrite -> HeqP0 in HTrue. rewrite -> HTrue. *)
+           (* reflexivity. apply H8. reflexivity. *)
+           (* specialize (P12 _ a2 o oInit uInit _ _ _ _ H14 HPriorityUpds HOgetReg H2 H13 P1). *)
+           (* destruct P12. *)
+           (* rewrite <- (app_nil_l calls2). *)
+           (* econstructor 8 with (regMap_a := (old, match newRegs1 with *)
+           (*                                        | nil => upds *)
+           (*                                        | _ :: _ => (hd nil upds ++ newRegs1) :: tl upds *)
+           (*                                        end)) (val_a := x0). *)
+           (* apply H15. reflexivity.  *)
+           (* simpl in *. econstructor. simpl in *. *)
+           (* rewrite -> P2. apply H11. *)
+           apply cheat.
       * rewrite map_app, NoDup_app_iff in H1; dest.
         assert (forall s : string, In s (map fst newRegs1) -> ~ In s (map fst (hd nil upds))) as P3.
         {
@@ -827,16 +831,17 @@ Section DoubleWritesProof.
               simpl. rewrite -> HFalse in HeqP0; auto. }
             specialize (P12 _ a1 o oInit uInit _ _ _ _ H11 HPriorityUpds HOgetReg H2 H15 H13).
             destruct P12.
-            econstructor 8 with (regMap_a := (old, upds)) (val_a := x0).
-            apply H14. reflexivity.
-            simpl in *. econstructor 8 with (regMap_a :=  (old, match newRegs1 with
-                                                                | nil => upds
-                                                                | _ :: _ => (hd nil upds ++ newRegs1) :: tl upds
-                                                                end)) (val_a := r1) . simpl in *.
-            apply SemCompActionEquivBexpr with (bexpr1 := (Const type true)).
-            simpl in *. rewrite -> P2. reflexivity. apply H8.
-            simpl in *. reflexivity. econstructor. simpl in *.
-            rewrite -> HFalse in HeqP0. rewrite <- HeqP0. apply H10.
+            (* econstructor 8 with (regMap_a := (old, upds)) (val_a := x0). *)
+            (* apply H14. reflexivity. *)
+            (* simpl in *. econstructor 8 with (regMap_a :=  (old, match newRegs1 with *)
+            (*                                                     | nil => upds *)
+            (*                                                     | _ :: _ => (hd nil upds ++ newRegs1) :: tl upds *)
+            (*                                                     end)) (val_a := r1) . simpl in *. *)
+            (* apply SemCompActionEquivBexpr with (bexpr1 := (Const type true)). *)
+            (* simpl in *. rewrite -> P2. reflexivity. apply H8. *)
+            (* simpl in *. reflexivity. econstructor. simpl in *. *)
+            (* rewrite -> HFalse in HeqP0. rewrite <- HeqP0. apply H10. *)
+            apply cheat.
     - (* Sys *)
       inv H; EqDep_subst.
       inv H2; EqDep_subst.
@@ -857,6 +862,3 @@ Section DoubleWritesProof.
   Qed.
 
 End DoubleWritesProof.      
-
-
-
