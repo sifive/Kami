@@ -858,6 +858,7 @@ Proof.
 Qed.
 
 Axiom cheat: forall t, t.
+
 Lemma SemCompActionEEquivBexpr (k : Kind) (ea : EActionT type k):
   forall o calls retl expr1 v' (bexpr1 bexpr2 : Bool @# type),
     evalExpr bexpr1  = evalExpr bexpr2  ->
@@ -885,14 +886,9 @@ Proof.
       * congruence.
       * econstructor 3; eauto.
   - inv H1; EqDep_subst.
-    inv H6; EqDep_subst.
-    inv HSemCompActionT; EqDep_subst.
-    inv H5; EqDep_subst.
-    inv HSemCompActionT0; EqDep_subst.
-    inv HSemCompActionT_cont; EqDep_subst.
-    inv HSemCompActionT_cont0; simpl in *; EqDep_subst.
-    
     apply cheat.
+    (* inv HSemCompActionT_cont; EqDep_subst. *)
+    (* inv HSemCompActionT_cont0; simpl in *; EqDep_subst. *)
     (* econstructor. *)
     (* + eapply IHea1 with (bexpr1 := (bexpr1 && e)%kami_expr); eauto. *)
     (*   simpl; rewrite H0; auto. *)
