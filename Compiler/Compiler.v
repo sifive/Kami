@@ -97,13 +97,19 @@ Section Compile.
         CompLetFull (@compileAction k' a' pred writeMap)
                     (fun retval writeMap' => @compileAction k (cont retval) pred (VarRegMap writeMap'))
       | IfElse pred' k' aT aF cont =>
-        CompLetFull (@compileAction k' aT (pred && pred')%kami_expr writeMap)
-                    (fun valT writesT =>
-                       CompLetFull (@compileAction k' aF (pred && !pred')%kami_expr (VarRegMap writesT))
-                                   (fun valF writesF =>
-                                      CompLetExpr (IF pred' then #valT else #valF)%kami_expr
-                                                  (fun val => (@compileAction k (cont val) pred (VarRegMap writesF)))
-                    ))
+        CompLetExpr
+          (pred && pred')%kami_expr
+          (fun truePred =>
+             CompLetExpr
+               (pred && !pred')%kami_expr
+               (fun falsePred =>
+                  CompLetFull (@compileAction k' aT (#truePred)%kami_expr writeMap)
+                              (fun valT writesT =>
+                                 CompLetFull (@compileAction k' aF (#falsePred)%kami_expr (VarRegMap writesT))
+                                             (fun valF writesF =>
+                                                CompLetExpr (IF pred' then #valT else #valF)%kami_expr
+                                                            (fun val => (@compileAction k (cont val) pred (VarRegMap writesF)))
+                              ))))
       end.
 
     Fixpoint EcompileAction k (a : EActionT k) (pred : Bool @# ty)
@@ -126,13 +132,19 @@ Section Compile.
         CompLetFull (@EcompileAction k' a' pred writeMap)
                     (fun retval writeMap' => @EcompileAction k (cont retval) pred (VarRegMap writeMap'))
       | EIfElse pred' k' aT aF cont =>
-        CompLetFull (@EcompileAction k' aT (pred && pred')%kami_expr writeMap)
-                    (fun valT writesT =>
-                       CompLetFull (@EcompileAction k' aF (pred && !pred')%kami_expr (VarRegMap writesT))
-                                   (fun valF writesF =>
-                                      CompLetExpr (IF pred' then #valT else #valF)%kami_expr
-                                                  (fun val => (@EcompileAction k (cont val) pred (VarRegMap writesF)))
-                    ))
+        CompLetExpr
+          (pred && pred')%kami_expr
+          (fun truePred =>
+             CompLetExpr
+               (pred && !pred')%kami_expr
+               (fun falsePred =>
+                  CompLetFull (@EcompileAction k' aT (#truePred)%kami_expr writeMap)
+                              (fun valT writesT =>
+                                 CompLetFull (@EcompileAction k' aF (#falsePred)%kami_expr (VarRegMap writesT))
+                                             (fun valF writesF =>
+                                                CompLetExpr (IF pred' then #valT else #valF)%kami_expr
+                                                            (fun val => (@EcompileAction k (cont val) pred (VarRegMap writesF)))
+                              ))))
       | EAsyncRead idxNum num readPort dataArray writePort isWriteMask idx k cont =>
         CompAsyncRead idxNum readPort dataArray writePort isWriteMask idx pred (VarRegMap readMap)
                       (fun array => @EcompileAction _ (cont array) pred writeMap)
