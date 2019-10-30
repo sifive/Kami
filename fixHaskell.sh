@@ -9,7 +9,7 @@ echo $cmd
 $cmd
 
 echo "Fixing Literals"
-for file in $(find $1 -maxdepth 1 -name "*.hs")
+for file in $(find $2 -maxdepth 1 -name "*.hs")
 do
   baseval=`basename $file`
   ./FixLits $file
