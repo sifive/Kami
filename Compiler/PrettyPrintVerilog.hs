@@ -367,10 +367,12 @@ ppRtlModule m@(T.Build_RtlModule hiddenWires regFs ins' outs' regInits' regWrite
   "  input CLK,\n" ++
   "  input RESET\n" ++
   ");\n" ++
-  concatMap (\rf -> concatMap (\(isInput, k, name) -> ppDealSize0 k "" ("  " ++ ppDeclType (ppName name) k) ++ ";\n") (getRegFileNames rf)) regFs ++ "\n" ++
   concatMap (\(nm, (T.SyntaxKind ty, init)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) regInits ++ "\n" ++
 
-  concatMap (\(nm, (ty, expr)) -> ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) assigns ++ "\n" ++
+  concatMap (\(nm, (ty, expr)) ->
+               if nm `elem` (map fst outs)
+               then ""
+               else ppDealSize0 ty "" ("  " ++ ppDeclType (ppPrintVar nm) ty ++ ";\n")) assigns ++ "\n" ++
 
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$wire$" ++ show pos) ty ++ ";\n")) assignTruncs ++ "\n" ++
   concatMap (\(sexpr, (pos, ty)) -> ppDealSize0 ty "" ("  " ++ ppDeclType ("_trunc$reg$" ++ show pos) ty ++ ";\n")) regTruncs ++ "\n" ++

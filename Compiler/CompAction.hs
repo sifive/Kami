@@ -781,8 +781,8 @@ mkRtlMod input@((strs,(rfbs,basemod)),cas) =
   {- sys         -} (if_begin_end_exprs vexprs)
 
 mkRtlFull ::  ([String], ([T.RegFileBase], T.BaseModule)) -> T.RtlModule
---mkRtlFull x@(hides, (rfs, bm)) = mkRtlMod (x, T.coq_CAS_RulesRf (regmap_counters $ init_state x) (T.getRules bm) rfs)
-mkRtlFull m = T.getRtl m
+mkRtlFull x@(hides, (rfs, bm)) = mkRtlMod (x, T.coq_CAS_RulesRf (regmap_counters $ init_state x) (T.getRules bm) rfs)
+--mkRtlFull m = T.getRtl m
 
 get_sys (T.Build_RtlModule _ _ _ _ _ _ _ sys) = sys
 
@@ -802,8 +802,4 @@ output_list xs = let n = length xs in do
   return $ print_ind_elt i (xs !! i)
 
 main :: IO()
---main = let sys = map fst $ get_sys $ mkRtlFull T.rtlMod in
---  hPutStrLn stderr $ show $ sys !! 422
---  foldr (>>) (return ()) $ output_list sys
 main = putStrLn $ ppTopModule $ mkRtlFull T.rtlMod
---main = hPutStrLn stderr $ show $ get_stats $ mkRtlFull T.rtlMod
