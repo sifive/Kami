@@ -883,16 +883,20 @@ Proof.
     + inv H0; EqDep_subst.
       * congruence.
       * econstructor 3; eauto.
-  - inv H1; EqDep_subst.
+  - inv H1; simpl in *; EqDep_subst.
+    inv HSemCompActionT; simpl in *; EqDep_subst.
+    inv HSemCompActionT0; simpl in *; EqDep_subst.
     inv HSemCompActionT_cont; EqDep_subst.
     inv HSemCompActionT_cont0; simpl in *; EqDep_subst.
-    econstructor.
-    + eapply IHea1 with (bexpr1 := (bexpr1 && e)%kami_expr); eauto.
-      simpl; rewrite H0; auto.
+    do 3 econstructor.
+    + eapply IHea1 with (bexpr1 := (Var type (SyntaxKind Bool)
+                                        (evalExpr bexpr1 && evalExpr e))); eauto.
+      simpl; rewrite H0; reflexivity.
     + reflexivity.
     + econstructor.
-      * eapply IHea2 with (bexpr1 := (bexpr1 && !e)%kami_expr);eauto.
-        simpl; rewrite H0; auto.
+      * eapply IHea2 with (bexpr1 := (Var type (SyntaxKind Bool)
+                                          (evalExpr (bexpr2 && ! e)%kami_expr))); eauto.
+        simpl; rewrite <- H0; eauto.
       * reflexivity.
       * econstructor; simpl.
         eapply H; eauto.
@@ -951,16 +955,20 @@ Proof.
     + inv H0; EqDep_subst.
       * congruence.
       * econstructor 3; eauto.
-  - inv H1; EqDep_subst.
+  - inv H1; simpl in *; EqDep_subst.
+    inv HSemCompActionT; simpl in *; EqDep_subst.
+    inv HSemCompActionT0; simpl in *; EqDep_subst.
     inv HSemCompActionT_cont; EqDep_subst.
     inv HSemCompActionT_cont0; simpl in *; EqDep_subst.
-    econstructor.
-    + eapply IHa1 with (bexpr1 := (bexpr1 && e)%kami_expr); eauto.
-      simpl; rewrite H0; auto.
+    do 3 econstructor.
+    + eapply IHa1 with (bexpr1 := (Var type (SyntaxKind Bool)
+                                       (evalExpr (bexpr2 && e)%kami_expr))); eauto.
+      simpl; rewrite <- H0; eauto.
     + reflexivity.
     + econstructor.
-      * eapply IHa2 with (bexpr1 := (bexpr1 && !e)%kami_expr);eauto.
-        simpl; rewrite H0; auto.
+      * eapply IHa2 with (bexpr1 := (Var type (SyntaxKind Bool)
+                                         (evalExpr (bexpr2 && ! e)%kami_expr)));eauto.
+        simpl; rewrite <-H0; eauto.
       * reflexivity.
       * econstructor; simpl.
         eapply H; eauto.
@@ -990,11 +998,14 @@ Proof.
     inv HRegMapWf; inv H; EqDep_subst;[congruence|].
     specialize (IHea _ _ _ _ _ _ _ HNbexpr _ (SemVarRegMap _) HSemCompActionT_cont); dest.
     rewrite (SemRegExprVals HRegMap HSemRegMap); auto.
-  - simpl in *; inv H0; EqDep_subst.
+  - inv H0; simpl in *; EqDep_subst.
+    inv HSemCompActionT; simpl in *; EqDep_subst.
+    inv HSemCompActionT0; simpl in *; EqDep_subst.
     inv HSemCompActionT_cont; EqDep_subst.
     inv HSemCompActionT_cont0; EqDep_subst.
     apply Eqdep.EqdepTheory.inj_pair2 in H4; subst; simpl in *.
-    assert (forall b, (evalExpr (bexpr && b)%kami_expr = false)).
+    assert (forall (b : Expr type (SyntaxKind Bool)),
+               (evalExpr (Var type (SyntaxKind Bool) (evalExpr bexpr && evalExpr b)) = false)).
     { intros; simpl; rewrite HNbexpr; auto. }
     specialize (IHea1 _ _ _ _ _ _ _ (H0 e) _ HRegMap HSemCompActionT_a); dest.
     specialize (IHea2 _ _ _ _ _ _ _ (H0 (!e)%kami_expr) _ (SemVarRegMap _) HSemCompActionT_a0); dest.
@@ -1038,11 +1049,14 @@ Proof.
     inv HRegMapWf; inv H; EqDep_subst;[congruence|].
     specialize (IHa _ _ _ _ _ _ _ HNbexpr _ (SemVarRegMap _) HSemCompActionT_cont); dest.
     rewrite (SemRegExprVals HRegMap HSemRegMap); auto.
-  - simpl in *; inv H0; EqDep_subst.
+  - inv H0; simpl in *; EqDep_subst.
+    inv HSemCompActionT; simpl in *; EqDep_subst.
+    inv HSemCompActionT0; simpl in *; EqDep_subst.
     inv HSemCompActionT_cont; EqDep_subst.
     inv HSemCompActionT_cont0; EqDep_subst.
     apply Eqdep.EqdepTheory.inj_pair2 in H4; subst; simpl in *.
-    assert (forall b, (evalExpr (bexpr && b)%kami_expr = false)).
+    assert (forall (b : Expr type (SyntaxKind Bool)),
+               (evalExpr (Var type (SyntaxKind Bool) (evalExpr bexpr && evalExpr b)) = false)).
     { intros; simpl; rewrite HNbexpr; auto. }
     specialize (IHa1 _ _ _ _ _ _ _ (H0 e) _ HRegMap HSemCompActionT_a); dest.
     specialize (IHa2 _ _ _ _ _ _ _ (H0 (!e)%kami_expr) _ (SemVarRegMap _) HSemCompActionT_a0); dest.
@@ -1083,7 +1097,9 @@ Proof.
     + specialize (IHea  _ _ _ _ _ _ _ _ _ _ (SemVarRegMap _) HSemCompActionT_cont).
       specialize (SemRegExprVals HSemRegMap HSemRegMap0) as TMP; inv TMP.
       reflexivity.
-  - inv H0; EqDep_subst; simpl in *.
+  - inv H0; simpl in *; EqDep_subst.
+    inv HSemCompActionT; simpl in *; EqDep_subst.
+    inv HSemCompActionT0; simpl in *; EqDep_subst.
     inv HSemCompActionT_cont; EqDep_subst.
     inv HSemCompActionT_cont0; simpl in *; EqDep_subst.
     destruct regMap_a, regMap_a0.
@@ -1203,19 +1219,38 @@ Proof.
         -- apply (H8 r); clear - H7.
            ++ rewrite in_app_iff; right; left; reflexivity.
            ++ right; rewrite in_map_iff; exists (r, v); split; auto.
-  - inv H0; EqDep_subst.
+  - inv H0; simpl in *; EqDep_subst.
+    inv HSemCompActionT; simpl in *; EqDep_subst.
+    inv HSemCompActionT0; simpl in *; EqDep_subst.
     inv HSemCompActionT_cont; EqDep_subst.
     inv HSemCompActionT_cont0; EqDep_subst.
     remember (evalExpr e) as P0.
     apply Eqdep.EqdepTheory.inj_pair2 in H4.
     rewrite H4 in *.
     clear H4; simpl in *.
-    assert (forall bexpr, (evalExpr (Const type true && bexpr)%kami_expr = evalExpr bexpr)) as P1.
-    { intro; simpl; auto. }
-    specialize (SemCompActionEEquivBexpr _ _ _ _ _ (P1 e) HSemCompActionT_a) as P2.
-    specialize (SemCompActionEEquivBexpr _ _ _ _ _ (P1 (!e)%kami_expr) HSemCompActionT_a0) as P3.
-    destruct P0; simpl in *.
-    + assert (evalExpr e = evalExpr (Const type true)) as P4; simpl; auto.
+    rewrite HeqP0 in HSemCompActionT_a, HSemCompActionT_a0.
+(*    assert (forall bexpr,
+               (evalExpr (Var type (SyntaxKind Bool) bexpr) =
+                evalExpr (Const type true && (Var type (SyntaxKind Bool) bexpr))%kami_expr)) as P1.
+    { intro; simpl; auto. }*)
+(*    assert (forall bexpr, (evalExpr (Const type true && bexpr)%kami_expr = evalExpr bexpr)) as P1.
+    { intro; simpl; auto. } 
+    specialize (SemCompActionEEquivBexpr _ _ _ _ _ (P1 (evalExpr e)) HSemCompActionT_a) as P2.
+    specialize (SemCompActionEEquivBexpr _ _ _ _ _ (P1 (evalExpr (!e)%kami_expr)) HSemCompActionT_a0) as P3.*)
+    destruct P0; rewrite <- HeqP0 in *; simpl in *.
+    + assert (forall b, (evalExpr (Var type (SyntaxKind Bool) b) = (evalExpr (Const type b)))) as Q0; auto.
+      specialize (SemCompActionEEquivBexpr _ _ _ _ _ (Q0 false) HSemCompActionT_a0) as Q1.
+      specialize (SemCompActionEEquivBexpr _ _ _ _ _ (Q0 true) HSemCompActionT_a) as Q2.
+      specialize (IHea1 _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent WfMap _ _ _ Q2); dest.
+      assert (evalExpr (Const type false) = false) as Q3; auto.
+      destruct (EpredFalse_UpdsNil _ _ _ _ Q3 (SemVarRegMap regMap_a) Q1).
+      assert (WfRegMapExpr (VarRegMap type regMap_a0) regMap_a0) as P7.
+      { unfold WfRegMapExpr; split; [constructor|]. subst; eauto. }
+      rewrite <- H4 in P7 at 2.
+      rewrite H1 in P7.
+      specialize (H _ _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P7 _ _ _ HSemCompActionT); dest.
+      split; auto.
+(*    + assert (evalExpr e = evalExpr (Const type true)) as P4; simpl; auto.
       assert (evalExpr (!e)%kami_expr = false) as P5.
       { simpl; rewrite <- HeqP0; auto. }
       specialize (SemCompActionEEquivBexpr _ _ _ _ _ P4 P2) as P6.
@@ -1227,7 +1262,7 @@ Proof.
       rewrite <- H4 in P7 at 2.
       rewrite H1 in P7.
       specialize (H _ _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P7 _ _ _ HSemCompActionT); dest.
-      split; auto.
+      split; auto.*)
       exists (x ++ x0); rewrite UpdOrMeths_RegsT_app, UpdOrMeths_MethsT_app; repeat split; auto.
       * destruct (UpdOrMeths_RegsT x0); simpl; auto.
         -- rewrite app_nil_r; auto.
@@ -1242,19 +1277,23 @@ Proof.
         destruct (NoDup_app_Disj string_dec _ _ H k0); auto.
         left; intro; apply H1.
         rewrite map_app, in_app_iff; auto.
-    + assert (evalExpr (!e)%kami_expr = evalExpr (Const type true)) as P4.
-      { simpl; rewrite <- HeqP0; auto. }
-      specialize (SemCompActionEEquivBexpr _ _ _ _ _ P4 P3) as P6.
+    + assert (forall b, (evalExpr (Var type (SyntaxKind Bool) b) =
+                         (evalExpr (Const type b)))) as Q0; auto.
+(*      assert (evalExpr (!e)%kami_expr = evalExpr (Const type true)) as P4.
+      { simpl; rewrite <- HeqP0; auto. } *)
+(*      specialize (SemCompActionEEquivBexpr _ _ _ _ _ P4 P3) as P6. *)
       remember WfMap as WfMap0.
       inv WfMap0.
-      destruct (EpredFalse_UpdsNil _ _ _ _ (eq_sym HeqP0) H0 P2).
+      assert (evalExpr (Var type (SyntaxKind Bool) false) = false) as Q1; auto.
+      destruct (EpredFalse_UpdsNil _ _ _ _ Q1 H0 HSemCompActionT_a).
       assert (WfRegMapExpr (VarRegMap type regMap_a) (old, upds)) as WfMap0.
       { rewrite <- H2.
         clear - WfMap.
         unfold WfRegMapExpr in *; dest; repeat split;[constructor| |]; eapply H0; eauto.
       }
-      specialize (IHea2 _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent WfMap0 _ _ _ P6); dest.
-      rewrite <- HeqP0 in HSemCompActionT.
+      specialize (SemCompActionEEquivBexpr _ _ _ _ _ (Q0 true) HSemCompActionT_a0) as Q2.
+      specialize (IHea2 _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent WfMap0 _ _ _ Q2); dest.
+(*      rewrite <- HeqP0 in HSemCompActionT. *)
       assert (WfRegMapExpr (VarRegMap type regMap_a0) regMap_a0) as P7.
       { unfold WfRegMapExpr; split; [constructor|]. subst; eauto. }
       rewrite  H5 in P7 at 2.
@@ -1584,9 +1623,12 @@ Proof.
   - inv H0; EqDep_subst; econstructor; eauto.
   - inv H0; EqDep_subst; econstructor; eauto.
   - inv H; simpl in *; EqDep_subst; econstructor; eauto.
-  - inv H0; EqDep_subst; econstructor; eauto.
-    inv HSemCompActionT_cont; EqDep_subst; econstructor; eauto.
-    inv HSemCompActionT_cont0; simpl in *; EqDep_subst; econstructor; eauto.
+  - inv H0; simpl in *; EqDep_subst.
+    inv HSemCompActionT; simpl in *; EqDep_subst.
+    inv HSemCompActionT0; simpl in *; EqDep_subst.
+    inv HSemCompActionT_cont; EqDep_subst.
+    inv HSemCompActionT_cont0; simpl in *; EqDep_subst.
+    repeat econstructor; eauto.
   - inv H; EqDep_subst; econstructor; eauto.
 Qed.
 
@@ -1602,9 +1644,12 @@ Proof.
   - inv H0; EqDep_subst; econstructor; eauto.
   - inv H0; EqDep_subst; econstructor; eauto.
   - inv H; simpl in *; EqDep_subst; econstructor; eauto.
-  - inv H0; EqDep_subst; econstructor; eauto.
-    inv HSemCompActionT_cont; EqDep_subst; econstructor; eauto.
-    inv HSemCompActionT_cont0; simpl in *; EqDep_subst; econstructor; eauto.
+  - inv H0; simpl in *; EqDep_subst.
+    inv HSemCompActionT; simpl in *; EqDep_subst.
+    inv HSemCompActionT0; simpl in *; EqDep_subst.
+    inv HSemCompActionT_cont; EqDep_subst.
+    inv HSemCompActionT_cont0; simpl in *; EqDep_subst.
+    repeat econstructor; eauto.
   - inv H; EqDep_subst; econstructor; eauto.
 Qed.
 
@@ -1679,14 +1724,16 @@ Proof.
     destruct e_val.
     + specialize (H _ _ _ _ _ _ _ _ _ HPriorityUpds HConsistent P0 HRegConsist (H4 x) HFalse); dest.
       exists x1.
-      econstructor; eauto; [reflexivity|].
-      econstructor; eauto; [reflexivity|].
+      do 2 econstructor; eauto.
+      econstructor; eauto using SemCompActionEquivBexpr; [reflexivity|].
+      econstructor; eauto using SemCompActionEquivBexpr; [reflexivity|].
       econstructor; simpl; rewrite <- Heqe_val.
       assumption.
     + specialize (H _ _ _ _ _ _ _ _ _ HPriorityUpds HConsistent P0 HRegConsist (H4 x0) HFalse); dest.
       exists x1.
-      econstructor; eauto; [reflexivity|].
-      econstructor; eauto; [reflexivity|].
+      do 2 econstructor; eauto.
+      econstructor; eauto using SemCompActionEquivBexpr; [reflexivity|].
+      econstructor; eauto using SemCompActionEquivBexpr; [reflexivity|].
       econstructor; simpl; rewrite <- Heqe_val.
       assumption.
   - inv HWf; EqDep_subst.
@@ -1822,9 +1869,21 @@ Proof.
            rewrite in_map_iff in H0; dest; destruct x; subst; simpl in *.
            apply (HDisjRegs s0); assumption.
         -- left; intro; firstorder fail.
-  - inv H3; inv HWf; EqDep_subst;
-      [econstructor
-      | assert (evalExpr (Const type true && e)%kami_expr = false) as P0;
+  - inv H3; inv HWf; EqDep_subst; do 2 econstructor;[econstructor|].
+    + assert (evalExpr (Const type true) =
+              evalExpr (Var type (SyntaxKind Bool)
+                            (evalExpr (Const type true && e)%kami_expr))) as P0; auto.
+      eapply SemCompActionEEquivBexpr; eauto.
+      eapply IHa1 with (old := old) (o := o); auto.
+      * apply WfMap.
+      * apply HRegConsist.
+      * assumption.
+      * instantiate (1 := newUml1).
+        intro; specialize (H2 k0); clear - H2; rewrite UpdOrMeths_RegsT_app, map_app, in_app_iff in H2; firstorder fail.
+      * apply HEAction.
+(*      [do 3 econstructor
+      | assert (evalExpr (Var type (SyntaxKind Bool)
+                              (evalExpr (Const type true && e)%kami_expr)) = false) as P0;
         [simpl; rewrite HFalse; reflexivity
         | specialize (FalseSemCompAction_Ext _ HPriorityUpds HConsistent WfMap HRegConsist H12 P0) as P1;
           setoid_rewrite <- Extension_Compiles_iff in P1;
@@ -1839,7 +1898,7 @@ Proof.
       * assumption.
       * instantiate (1 := newUml1).
         intro; specialize (H2 k0); clear - H2; rewrite UpdOrMeths_RegsT_app, map_app, in_app_iff in H2; firstorder fail.
-      * apply HEAction.
+      * apply HEAction.*)
     + rewrite UpdOrMeths_MethsT_app; reflexivity.
     + assert (evalExpr (Const type true && !e)%kami_expr = false) as P0.
       { simpl; rewrite HTrue; reflexivity. }
@@ -1873,7 +1932,7 @@ Proof.
       specialize (FalseSemCompAction_Ext _ HPriorityUpds HConsistent P1 HRegConsist H13 P0) as P2; dest.
       rewrite <- Extension_Compiles_iff in H0.
       econstructor.
-      * apply H0.
+      * eapply SemCompActionEEquivBexpr with (bexpr1 := (Const type true && ! e)%kami_expr); eauto.
       * reflexivity.
       * rewrite UpdOrMeths_RegsT_app.
         econstructor; simpl; rewrite HTrue.
@@ -1885,49 +1944,56 @@ Proof.
            clear - H2 HDisjRegs.
            intro k; specialize (H2 k); specialize (HDisjRegs k); simpl in *; rewrite map_app, in_app_iff in *.
            firstorder fail.
-    + apply H0.
-    + reflexivity.
-    + rewrite UpdOrMeths_RegsT_app, UpdOrMeths_MethsT_app.
-      assert (WfRegMapExpr (VarRegMap type (old, upds)) (old, upds)) as P1.
-      { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
-      econstructor; simpl.
-      * assert (evalExpr (Const type true) = evalExpr (Const type true && ! e)%kami_expr) as P2.
-        { simpl; rewrite HFalse; auto. }
-        apply (SemCompActionEEquivBexpr _ _ _ _ _ P2).
-        eapply IHa2 with (o := o) (old := old) (upds := upds) (uml := newUml1); eauto.
-        clear - H2; intro k; specialize (H2 k); rewrite UpdOrMeths_RegsT_app, map_app, in_app_iff in H2.
-        firstorder fail.
+    + assert (evalExpr (Const type true && e)%kami_expr = false) as P0.
+      { simpl; rewrite HFalse; reflexivity. }
+      specialize (FalseSemCompAction_Ext _ HPriorityUpds HConsistent WfMap HRegConsist H12 P0) as P2; dest.
+      rewrite <- Extension_Compiles_iff in H0.
+      econstructor 8; eauto.
+      * eapply SemCompActionEEquivBexpr with (bexpr1 := (Const type true && e)%kami_expr);
+          eauto.
       * reflexivity.
-      * econstructor; simpl; rewrite HFalse.
-        eapply H with (upds := match UpdOrMeths_RegsT newUml1 with
+      * rewrite UpdOrMeths_RegsT_app, UpdOrMeths_MethsT_app.
+        assert (WfRegMapExpr (VarRegMap type (old, upds)) (old, upds)) as P1.
+        { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
+        econstructor; simpl.
+        -- assert (evalExpr (Const type true) = evalExpr (Var type (SyntaxKind Bool)
+                                                              (negb (evalExpr e)))) as P2.
+           { simpl; rewrite HFalse; auto. }
+           apply (SemCompActionEEquivBexpr _ _ _ _ _ P2).
+           eapply IHa2 with (o := o) (old := old) (upds := upds) (uml := newUml1); eauto.
+           clear - H2; intro k; specialize (H2 k); rewrite UpdOrMeths_RegsT_app, map_app, in_app_iff in H2.
+           firstorder fail.
+        -- reflexivity.
+        -- econstructor; simpl; rewrite HFalse.
+           eapply H with (upds := match UpdOrMeths_RegsT newUml1 with
                                | [] => upds
                                | _ :: _ => (hd [] upds ++ UpdOrMeths_RegsT newUml1) :: tl upds
                                end); eauto.
-        -- rewrite UpdOrMeths_RegsT_app in *.
-           specialize (ESemAction_NoDup_Upds HEAction) as P3.
-           specialize (ESemAction_SubList_Upds HEAction) as P4.
-           unfold WfRegMapExpr in *; dest; split; [constructor| intros; split].
-           ++ destruct (UpdOrMeths_RegsT newUml1);[apply H6; assumption| inv H7; [| apply H6; destruct upds;[contradiction| right; assumption]]].
-              rewrite map_app, NoDup_app_iff; repeat split; repeat intro; auto.
-              ** destruct upds; [constructor| apply H6; left; reflexivity].
-              ** clear - H2 H7 H8; specialize (H2 a); rewrite map_app, in_app_iff in H2.
-                 firstorder fail.
-              ** clear - H2 H7 H8; specialize (H2 a); rewrite map_app, in_app_iff in H2.
-                 firstorder fail.
-           ++ destruct (UpdOrMeths_RegsT newUml1);[apply H6; assumption| inv H7; [| apply H6; destruct upds;[contradiction| right; assumption]]].
-              rewrite HConsistent in P4.
-              repeat intro; rewrite map_app, in_app_iff in H7; inv H7.
-              ** destruct upds; [contradiction|].
-                 apply (H6 r0 (in_eq _ _)); assumption.
-              ** apply P4; assumption.
-        -- rewrite UpdOrMeths_RegsT_app in *.
-           destruct (UpdOrMeths_RegsT newUml1); simpl in *; auto.
-           destruct (UpdOrMeths_RegsT newUml2); simpl in *; [rewrite app_nil_r| rewrite <-app_assoc, app_comm_cons; simpl];auto.
-        -- rewrite UpdOrMeths_RegsT_app in *.
-           destruct (UpdOrMeths_RegsT newUml1); simpl in *; auto.
-           clear - H2 HDisjRegs.
-           intro k; specialize (H2 k); specialize (HDisjRegs k); simpl in *; rewrite map_app, in_app_iff in *.
-           firstorder fail.
+           ++ rewrite UpdOrMeths_RegsT_app in *.
+              specialize (ESemAction_NoDup_Upds HEAction) as P3.
+              specialize (ESemAction_SubList_Upds HEAction) as P4.
+              unfold WfRegMapExpr in *; dest; split; [constructor| intros; split].
+              ** destruct (UpdOrMeths_RegsT newUml1);[apply H6; assumption| inv H7; [| apply H6; destruct upds;[contradiction| right; assumption]]].
+                 rewrite map_app, NoDup_app_iff; repeat split; repeat intro; auto.
+                 --- destruct upds; [constructor| apply H6; left; reflexivity].
+                 --- clear - H2 H7 H8; specialize (H2 a); rewrite map_app, in_app_iff in H2.
+                     firstorder fail.
+                 --- clear - H2 H7 H8; specialize (H2 a); rewrite map_app, in_app_iff in H2.
+                     firstorder fail.
+              ** destruct (UpdOrMeths_RegsT newUml1);[apply H6; assumption| inv H7; [| apply H6; destruct upds;[contradiction| right; assumption]]].
+                 rewrite HConsistent in P4.
+                 repeat intro; rewrite map_app, in_app_iff in H7; inv H7.
+                 --- destruct upds; [contradiction|].
+                     apply (H6 r0 (in_eq _ _)); assumption.
+                 --- apply P4; assumption.
+           ++ rewrite UpdOrMeths_RegsT_app in *.
+              destruct (UpdOrMeths_RegsT newUml1); simpl in *; auto.
+              destruct (UpdOrMeths_RegsT newUml2); simpl in *; [rewrite app_nil_r| rewrite <-app_assoc, app_comm_cons; simpl];auto.
+           ++ rewrite UpdOrMeths_RegsT_app in *.
+              destruct (UpdOrMeths_RegsT newUml1); simpl in *; auto.
+              clear - H2 HDisjRegs.
+              intro k; specialize (H2 k); specialize (HDisjRegs k); simpl in *; rewrite map_app, in_app_iff in *.
+              firstorder fail.
   - inv H2; inv HWf; EqDep_subst; econstructor; eauto.
   - inv H2; inv HWf; EqDep_subst; econstructor; eauto.
 Qed.
@@ -2052,25 +2118,21 @@ Proof.
         -- rewrite in_app_iff; simpl; auto.
         -- simpl; right; rewrite in_map_iff.
            exists (r, v); simpl; auto.
-  - inv H0; EqDep_subst.
+  - inv H0; simpl in *; EqDep_subst.
+    inv HSemCompActionT; simpl in *; EqDep_subst.
+    inv HSemCompActionT0; simpl in *; EqDep_subst.
     inv HSemCompActionT_cont; EqDep_subst.
     inv HSemCompActionT_cont0; EqDep_subst.
     remember (evalExpr e) as P0.
     apply Eqdep.EqdepTheory.inj_pair2 in H4.
     rewrite H4 in *.
     clear H4; simpl in *.
-    assert (forall bexpr, (evalExpr (Const type true && bexpr)%kami_expr = evalExpr bexpr)) as P1.
-    { intro; simpl; auto. }
-    specialize (SemCompActionEquivBexpr _ _ _ _ _ (P1 e) HSemCompActionT_a) as P2.
-    specialize (SemCompActionEquivBexpr _ _ _ _ _ (P1 (!e)%kami_expr) HSemCompActionT_a0) as P3.
-    destruct P0; simpl in *.
-    + assert (evalExpr e = evalExpr (Const type true)) as P4; simpl; auto.
-      assert (evalExpr (!e)%kami_expr = false) as P5.
-      { simpl; rewrite <- HeqP0; auto. }
-      specialize (SemCompActionEquivBexpr _ _ _ _ _ P4 P2) as P6.
+    destruct P0; rewrite <- HeqP0 in *; simpl in *.
+    + assert (evalExpr (Var type (SyntaxKind Bool) true) = evalExpr (Const type true)) as P4; auto.
+      assert (evalExpr (Var type (SyntaxKind Bool) false) = false) as P5; auto.
+      specialize (SemCompActionEquivBexpr _ _ _ _ _ P4 HSemCompActionT_a) as P6.
       specialize (IHa1 _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent WfMap _ _ _ P6); dest.
-      rewrite <- HeqP0 in HSemCompActionT.
-      destruct (predFalse_UpdsNil _ _ _ _ P5 (SemVarRegMap regMap_a) P3).
+      destruct (predFalse_UpdsNil _ _ _ _ P5 (SemVarRegMap regMap_a) HSemCompActionT_a0).
       assert (WfRegMapExpr (VarRegMap type regMap_a0) regMap_a0) as P7.
       { unfold WfRegMapExpr; split; [constructor|]. subst; eauto. }
       rewrite <- H3 in P7 at 2.
@@ -2095,19 +2157,18 @@ Proof.
         destruct (NoDup_app_Disj string_dec _ _ H k); auto.
         left; intro; apply H1.
         rewrite map_app, in_app_iff; auto.
-    + assert (evalExpr (!e)%kami_expr = evalExpr (Const type true)) as P4.
-      { simpl; rewrite <- HeqP0; auto. }
-      specialize (SemCompActionEquivBexpr _ _ _ _ _ P4 P3) as P6.
+    + assert (evalExpr (Var type (SyntaxKind Bool) true) = evalExpr (Const type true)) as P4; auto.
+      assert (evalExpr (Var type (SyntaxKind Bool) false) = false) as P5; auto.
+      specialize (SemCompActionEquivBexpr _ _ _ _ _ P4 HSemCompActionT_a0) as P6.
       remember WfMap as WfMap0.
       inv WfMap0.
-      destruct (predFalse_UpdsNil _ _ _ _ (eq_sym HeqP0) H0 P2).
+      destruct (predFalse_UpdsNil _ _ _ _ P5 H0 HSemCompActionT_a).
       assert (WfRegMapExpr (VarRegMap type regMap_a) (old, upds)) as WfMap0.
       { rewrite <- H2.
         clear - WfMap.
         unfold WfRegMapExpr in *; dest; repeat split;[constructor| |]; eapply H0; eauto.
       }
       specialize (IHa2 _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent WfMap0 _ _ _ P6); dest.
-      rewrite <- HeqP0 in HSemCompActionT.
       assert (WfRegMapExpr (VarRegMap type regMap_a0) regMap_a0) as P7.
       { unfold WfRegMapExpr; split; [constructor|]. subst; eauto. }
       rewrite  H5 in P7 at 2.
@@ -2174,7 +2235,9 @@ Proof.
     + specialize (IHa  _ _ _ _ _ _ _ _ _ _ (SemVarRegMap _) HSemCompActionT_cont).
       specialize (SemRegExprVals HSemRegMap HSemRegMap0) as TMP; inv TMP.
       reflexivity.
-  - inv H0; EqDep_subst; simpl in *.
+  - inv H0; simpl in *; EqDep_subst.
+    inv HSemCompActionT; simpl in *; EqDep_subst.
+    inv HSemCompActionT0; simpl in *; EqDep_subst.
     inv HSemCompActionT_cont; EqDep_subst.
     inv HSemCompActionT_cont0; simpl in *; EqDep_subst.
     destruct regMap_a, regMap_a0.
