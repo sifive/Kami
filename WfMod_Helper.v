@@ -10,6 +10,7 @@ Require Import Vector.
 Require Import List.
 Require Import Coq.Logic.Classical_Prop.
 Require Import Classical.
+Require Import Coq.Strings.String.
 
 Theorem string_equal_prefix: forall (a: string) (b: string) (c: string), (a++b=a++c)%string->(b=c)%string.
 Proof.
@@ -196,8 +197,58 @@ Proof.
            apply H1.
 Qed.
 
+Theorem NoDup_NubBy_helper: forall T (a:(string * T)) (l:list (string *T)),
+    false = existsb (let '(a0, _) := a in fun '(b, _) => a0 =? b) l ->
+    ~ In (fst a) (map fst l).
+Proof.
+    induction l.
+    + simpl.
+      intros.
+      intro X.
+      elim X.
+    + simpl.
+      intros.
+      apply and_not_or.
+      remember (
+        (let '(a0, _) := a in fun '(b, _) => a0 =? b) a0).
+      destruct b.
+      - simpl in H.
+        inversion H.
+      - simpl in H.
+        split.
+        ++ destruct a0.
+           destruct a.
+           simpl.
+           simpl in Heqb.
+           intro X.
+           subst.
+           rewrite eqb_refl in Heqb.
+           inversion Heqb.
+        ++ apply IHl.
+           rewrite <- H.
+           reflexivity.
+Qed.
+
+       
 Theorem NoDup_NubBy: forall T (x: list (string * T)), NoDup (map fst (nubBy (fun '(a,_) '(b,_) => String.eqb a b) x)).
-Admitted.
+Proof.
+  intros.
+  induction x.
+  + simpl.
+    apply NoDup_nil.
+  + simpl.
+    remember (
+       existsb (let '(a0, _) := a in fun '(b, _) => a0 =? b)
+         (nubBy (fun '(a0, _) '(b, _) => a0 =? b) x)
+    ).
+    destruct b.
+    - apply IHx.
+    - simpl.
+      apply NoDup_cons.
+      apply NoDup_NubBy_helper.
+      apply Heqb.
+      apply IHx.
+Qed.
 
 Ltac ltac_wfMod_ConcatMod :=
   apply ConcatModWf;autorewrite with kami_rewrite_db;repeat split;try assumption;auto with wfMod_ConcatMod_Helper;trivialSolve.
