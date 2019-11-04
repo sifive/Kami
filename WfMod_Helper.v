@@ -78,7 +78,7 @@ Ltac trivialSolve :=
     | _ => idtac
     end.
 
-Theorem ne_disjunction_break: forall a b c, (~(a \/ False) \/ ~(b \/ False)) /\
+Theorem ne_disjunction_break1: forall a b c, (~(a \/ False) \/ ~(b \/ False)) /\
                                        (~(a \/ False) \/ ~c) ->
                                         ~(a \/ False) \/ ~(b \/ c).
 Proof.
@@ -107,10 +107,32 @@ Proof.
         ++ apply H0.
 Qed.
 
+Theorem ne_disjunction_break2: forall a b c, (~(a \/ False) \/ ~c) /\
+                                        (~b \/ ~c) ->
+                                        ~(a \/ b) \/ ~ c.
+Proof.
+    intros.
+    inversion H; subst; clear H.
+    inversion H1; subst; clear H1.
+    + inversion H0; subst; clear H0.
+      - apply not_or_and in H1.
+        inversion H1; subst; clear H1.
+        left.
+        apply and_not_or.
+        split.
+        ++ apply H0.
+        ++ apply H.
+      - right.
+        apply H1.
+    + right.
+      apply H.
+Qed.
+
 Ltac DisjKey_solve :=
   match goal with
   | |- ~((?P++_)%string = _ \/ False) \/ ~((?P++_)%string = _ \/ False) => let X := fresh in try (apply or_diff;intro X;inversion X)
-  | |- ~(_ \/ False) \/ ~(_ \/ _) => apply ne_disjunction_break;split;DisjKey_solve
+  | |- ~(_ \/ False) \/ ~(_ \/ _) => apply ne_disjunction_break1;split;DisjKey_solve
+  | |- ~(_ \/ _ \/ _) \/ ~_ => apply ne_disjunction_break2;split;DisjKey_solve
   | |- DisjKey _ _ => unfold DisjKey; simpl; intros;DisjKey_solve
   | |- _ => trivialSolve
   end.
