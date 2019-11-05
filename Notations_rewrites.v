@@ -677,7 +677,7 @@ Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q))
     
   Hint Rewrite getAllRegisters_BaseMod append_equal_prefix : kami_rewrite_db.
 
-Theorem getAllRegisters_makeModule_MERegister: forall a b, getAllRegisters (makeModule ((MERegister a)::b))=a::getAllRegisters (makeModule b).
+  Theorem getAllRegisters_makeModule_MERegister: forall a b, getAllRegisters (makeModule ((MERegister a)::b))=a::getAllRegisters (makeModule b).
 Proof.
     simpl.
     intros.
@@ -705,5 +705,5 @@ Qed.
 
 Hint Rewrite getAllRegisters_makeModule_MERegister
              getAllRegisters_makeModule_Registers
-             getAllRegisters_makeModule_MERule : kami_rewrite_db.
+           getAllRegisters_makeModule_MERule : kami_rewrite_db.
 
