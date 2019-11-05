@@ -6,6 +6,7 @@ Require Import Kami.Notations.
 Require Import Kami.Notations_rewrites.
 Require Import Kami.Properties.
 Require Import Kami.PProperties.
+Require Import Kami.Syntax.
 Require Import Vector.
 Require Import List.
 Require Import Coq.Strings.String.
@@ -260,19 +261,35 @@ Ltac ltac_wfMod_ConcatMod :=
 
 Ltac WfMod_Solve :=
     match goal with
-    | |- WfMod (Base _) => apply BaseWf;WfMod_Solve
-    | |- WfBaseModule _ => unfold WfBaseModule;simpl;WfMod_Solve  
+    | |- _ => (progress discharge_wf);WfMod_Solve
+    (*| |- WfMod (Base _) => apply BaseWf;WfMod_Solve
+    | |- WfBaseModule _ => unfold WfBaseModule;simpl;WfMod_Solve  *)
     | |- forall _, _ => intros;WfMod_Solve
     | |- _ -> _ => intros;WfMod_Solve
     | |- _ /\ _ => split;WfMod_Solve
     (*| |- WfActionT _ (projT2 (snd _) _ _) => progress simpl;WfMod_Solve*)
-    | |- WfActionT _ (updateNumDataArray _ _ _ _ _ _) => unfold updateNumDataArray;simpl;WfMod_Solve
+    (*| |- WfActionT _ (updateNumDataArray _ _ _ _ _ _) => unfold updateNumDataArray;simpl;WfMod_Solve
     | |- WfActionT _ (buildNumDataArray _ _ _ _ _ _) => unfold buildNumDataArray;simpl;WfMod_Solve
     | |- WfActionT _ (Read _: _ <- _; _) => apply WfReadReg;intros;WfMod_Solve
     | |- WfActionT _ (Write _: _ <- _; _) => apply WfWriteReg;intros;WfMod_Solve
-    | |- WfActionT _ (Ret _ _ _) => apply WfReturn;intros;WfMod_Solve
+    | |- WfActionT _ (Ret _ _ _) => apply WfReturn;intros;WfMod_Solve*)
     | |- In _ _ => simpl;WfMod_Solve
     | |- (_ \/ False) => left;WfMod_Solve
     | |- _ => trivialSolve
+    end.
+
+Ltac WfConcatAction_Solve :=
+    match goal with
+    | |- _ => progress discharge_wf;WfConcatAction_Solve
+    | |- forall _, _ => intros;simpl;WfConcatAction_Solve
+    | H: In _ (getAllMethods _) |- _ => simpl in H;inversion H;subst;clear H;simpl;WfConcatAction_Solve
+    | H: _ \/ _ |- _ => simpl in H;inversion H;subst;clear H;simpl;WfConcatAction_Solve
+    | H: False |- _ => inversion H
+    (*| |- WfConcatActionT (updateNumDataArray _ _ _ _ _ _) _ => unfold updateNumDataArray;simpl;WfConcatAction_Solve
+    | |- WfConcatActionT (buildNumDataArray _ _ _ _ _ _) _ => unfold buildNumDataArray;simpl;WfConcatAction_Solve
+    | |- WfConcatActionT (Read _ : _ <- _;_) _ => apply WfConcatReadReg;intros;WfConcatAction_Solve
+    | |- WfConcatActionT (Write _ : _ <- _;_) _ => apply WfConcatWriteReg;intros;WfConcatAction_Solve
+    | |- WfConcatActionT (Ret _ _ _) _ => apply WfConcatReturn;intros;WfConcatAction_Solve*)
+    | |- _ => idtac
     end.
 
