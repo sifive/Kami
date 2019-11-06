@@ -114,7 +114,7 @@ Ltac DisjKey_solve :=
   | |- _ => trivialSolve
   end.
 
-Theorem DisjKey_NubBy1: forall T (x: list (string * T)) (y: list (string * T)), DisjKey x y -> DisjKey (nubBy (fun '(a,_) '(b,_) => String.eqb a b) x) y.
+Theorem DisjKey_NubBy1: forall T (x: list (string * T)) (y: list (string * T)) (W: forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}), DisjKey x y -> DisjKey (nubBy (fun '(a,_) '(b,_) => String.eqb a b) x) y.
 Proof.
     intros  T x y.
     generalize y.
@@ -130,6 +130,7 @@ Proof.
       - simpl.
         intros.
         apply IHx.
+        apply W.
         unfold DisjKey in H.
         simpl in H.
         unfold DisjKey.
@@ -153,12 +154,14 @@ Proof.
         split.
         ++ apply H0.
         ++ apply IHx.
+           apply W.
            apply H1.
+        ++ repeat (decide equality).
+        ++ repeat (decide equality).
 Qed.
 
-Theorem DisjKey_NubBy2: forall T (x: list (string * T)) (y: list (string * T)), DisjKey x y -> DisjKey x (nubBy (fun '(a,_) '(b,_) => String.eqb a b) y).
+Theorem DisjKey_NubBy2: forall T (x: list (string * T)) (y: list (string * T)) (W: forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}), DisjKey x y -> DisjKey x (nubBy (fun '(a,_) '(b,_) => String.eqb a b) y).
 Proof.
-
     intros T x y.
     generalize x.
     induction y.
@@ -173,6 +176,7 @@ Proof.
       - simpl.
         intros.
         apply IHy.
+        apply W.
         unfold DisjKey in H.
         simpl in H.
         unfold DisjKey.
@@ -196,7 +200,10 @@ Proof.
         split.
         ++ apply H0.
         ++ apply IHy.
+           apply W.
            apply H1.
+        ++ repeat (decide equality).
+        ++ repeat (decide equality).
 Qed.
 
 Theorem NoDup_NubBy_helper: forall T (a:(string * T)) (l:list (string *T)),
@@ -262,17 +269,9 @@ Ltac ltac_wfMod_ConcatMod :=
 Ltac WfMod_Solve :=
     match goal with
     | |- _ => (progress discharge_wf);WfMod_Solve
-    (*| |- WfMod (Base _) => apply BaseWf;WfMod_Solve
-    | |- WfBaseModule _ => unfold WfBaseModule;simpl;WfMod_Solve  *)
     | |- forall _, _ => intros;WfMod_Solve
     | |- _ -> _ => intros;WfMod_Solve
     | |- _ /\ _ => split;WfMod_Solve
-    (*| |- WfActionT _ (projT2 (snd _) _ _) => progress simpl;WfMod_Solve*)
-    (*| |- WfActionT _ (updateNumDataArray _ _ _ _ _ _) => unfold updateNumDataArray;simpl;WfMod_Solve
-    | |- WfActionT _ (buildNumDataArray _ _ _ _ _ _) => unfold buildNumDataArray;simpl;WfMod_Solve
-    | |- WfActionT _ (Read _: _ <- _; _) => apply WfReadReg;intros;WfMod_Solve
-    | |- WfActionT _ (Write _: _ <- _; _) => apply WfWriteReg;intros;WfMod_Solve
-    | |- WfActionT _ (Ret _ _ _) => apply WfReturn;intros;WfMod_Solve*)
     | |- In _ _ => simpl;WfMod_Solve
     | |- (_ \/ False) => left;WfMod_Solve
     | |- _ => trivialSolve
@@ -285,11 +284,6 @@ Ltac WfConcatAction_Solve :=
     | H: In _ (getAllMethods _) |- _ => simpl in H;inversion H;subst;clear H;simpl;WfConcatAction_Solve
     | H: _ \/ _ |- _ => simpl in H;inversion H;subst;clear H;simpl;WfConcatAction_Solve
     | H: False |- _ => inversion H
-    (*| |- WfConcatActionT (updateNumDataArray _ _ _ _ _ _) _ => unfold updateNumDataArray;simpl;WfConcatAction_Solve
-    | |- WfConcatActionT (buildNumDataArray _ _ _ _ _ _) _ => unfold buildNumDataArray;simpl;WfConcatAction_Solve
-    | |- WfConcatActionT (Read _ : _ <- _;_) _ => apply WfConcatReadReg;intros;WfConcatAction_Solve
-    | |- WfConcatActionT (Write _ : _ <- _;_) _ => apply WfConcatWriteReg;intros;WfConcatAction_Solve
-    | |- WfConcatActionT (Ret _ _ _) _ => apply WfConcatReturn;intros;WfConcatAction_Solve*)
     | |- _ => idtac
     end.
 
