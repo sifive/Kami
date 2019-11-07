@@ -159,10 +159,20 @@ Inductive MaskType :=
   | IsWrMask
   | NotIsWrMask.
 
-Inductive Schedule :=
+Inductive ScheduleSync :=
   | WriteFirst
   | WriteSecond
   | WriteThird.
+
+Inductive ScheduleAsync :=
+  | WriteRead
+  | ReadWrite.
+
+Definition Schedule(x : FileType) :=
+  match x with
+  | AsyncF => ScheduleAsync
+  | _ => ScheduleSync
+  end.
 
 Instance toString_FileType : toString FileType := {|
   to_string := fun x => match x with
@@ -187,7 +197,7 @@ Instance toString_MaskType : toString MaskType := {|
                         end
   |}.
 
-Instance toString_Schedule : toString Schedule := {|
+Instance toString_ScheduleSync : toString ScheduleSync := {|
   to_string := fun x => match x with
                         | WriteFirst => "writeFirst"
                         | WriteSecond => "writeSecond"
@@ -195,7 +205,20 @@ Instance toString_Schedule : toString Schedule := {|
                         end
   |}.
 
-Definition FileTuple := (FileType * Schedule * OverlapType * MaskType)%type.
+Instance toString_ScheduleAsync : toString ScheduleAsync := {|
+  to_string := fun x => match x with
+                        | WriteRead => "writeFirst"
+                        | ReadWrite => "writeSecond"
+                        end
+  |}.
+
+Instance toString_Schedule : forall x, toString (Schedule x) :=
+  fun x => match x with
+           | AsyncF => toString_ScheduleAsync
+           | _ => toString_ScheduleSync
+           end.
+
+Definition FileTuple := ({x : FileType & Schedule x} * OverlapType * MaskType)%type.
 
 Definition dataArray_name : FileTuple -> string :=
   fun tup => ("dataArray_" ++ to_string tup)%string.
@@ -215,11 +238,48 @@ Definition readReg_name : FileTuple -> string :=
 Definition write_name : FileTuple -> string :=
   fun tup => ("write_" ++ to_string tup)%string.
 
+(* Definition file_schedules : list {x : FileType & Schedule x} :=
+  @dep_cart_prod FileType Schedule [AsyncF; SyncIsAddr; SyncNotIsAddr] (fun x =>
+    match x with
+    | AsyncF => [WriteRead; ReadWrite]
+    | _ => [WriteFirst; WriteSecond; WriteThird]
+    end).
+
+ *)
+
+Definition async_schedules : list {x : FileType & Schedule x} :=
+  [ existT Schedule AsyncF WriteRead;
+    existT Schedule AsyncF ReadWrite
+  ].
+
+Definition syncIsAddr_schedules : list {x : FileType & Schedule x} :=
+  [ existT Schedule SyncIsAddr WriteFirst;
+    existT Schedule SyncIsAddr WriteSecond;
+    existT Schedule SyncIsAddr WriteThird
+  ].
+
+Definition syncNotIsAddr_schedules : list {x : FileType & Schedule x} :=
+  [ existT Schedule SyncNotIsAddr WriteFirst;
+    existT Schedule SyncNotIsAddr WriteSecond;
+    existT Schedule SyncNotIsAddr WriteThird
+  ].
+
+(*
 Definition file_varieties : list FileTuple :=
-  cart_prod (cart_prod (cart_prod [(*AsyncF;*) SyncIsAddr; SyncNotIsAddr] [WriteFirst; WriteSecond; WriteThird]) [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
+  cart_prod (cart_prod file_schedules [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
+*)
+
+Definition async_file_varieties : list FileTuple :=
+  cart_prod (cart_prod async_schedules [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
+
+Definition syncIsAddr_file_varieties : list FileTuple :=
+  cart_prod (cart_prod syncIsAddr_schedules [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
+
+Definition syncNotIsAddr_file_varieties : list FileTuple :=
+  cart_prod (cart_prod syncNotIsAddr_schedules [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
 
 Definition make_RFB(tup : FileTuple) : RegFileBase :=
-  let '(ft,sch,ot,mt) := tup in
+  let '((existT ft sch),ot,mt) := tup in
     {|
       rfIsWrMask := match mt with
                     | IsWrMask => true
@@ -314,26 +374,26 @@ Definition expected_read_ot_mt(write_val old_val : word Xlen)(wmf omf : Fin.t nu
 Definition expected_read_val_first_cycle : ConstT (Array num Data) :=
   let '(p,ot,mt) := tup in
     match p with
-    | (AsyncF, WriteFirst) => expected_read_ot_mt write_val_1 init_val mask_func1 mask_func2 ot mt
-    | (AsyncF, WriteSecond) => all_init
+    | existT AsyncF WriteRead => expected_read_ot_mt write_val_1 init_val mask_func1 mask_func2 ot mt
+    | existT AsyncF ReadWrite => all_init
     | _ => getDefaultConst (Array num Data)
     end.
 
 Definition expected_read_val_second_cycle : ConstT (Array num Data) :=
   let '(p,ot,mt) := tup in
     match p with
-    | (AsyncF, WriteFirst) => expected_read_ot_mt write_val_2 write_val_1 mask_func2 mask_func1 ot mt
-    | (AsyncF, _) => expected_read_ot_mt write_val_1 init_val mask_func1 (fun _ => true) ot mt
-    | (SyncIsAddr, WriteFirst) => expected_read_ot_mt write_val_2 write_val_1 mask_func2 mask_func1 ot mt
-    | (SyncIsAddr, WriteSecond) => expected_read_ot_mt write_val_1 init_val mask_func1 (fun _ => true) ot mt
-    | (SyncIsAddr, WriteThird) => expected_read_ot_mt write_val_1 init_val mask_func1 (fun _ => true) ot mt
-    | (SyncNotIsAddr, WriteFirst) => expected_read_ot_mt write_val_1 init_val mask_func1 (fun _ => true) ot mt
-    | (SyncNotIsAddr, WriteSecond) => expected_read_ot_mt write_val_1 init_val mask_func1 (fun _ => true) ot mt
-    | (SyncNotIsAddr, WriteThird) => all_init
+    | existT AsyncF WriteRead => expected_read_ot_mt write_val_2 write_val_1 mask_func2 mask_func1 ot mt
+    | existT AsyncF ReadWrite => expected_read_ot_mt write_val_1 init_val mask_func1 (fun _ => true) ot mt
+    | existT SyncIsAddr WriteFirst => expected_read_ot_mt write_val_2 write_val_1 mask_func2 mask_func1 ot mt
+    | existT SyncIsAddr WriteSecond => expected_read_ot_mt write_val_1 init_val mask_func1 (fun _ => true) ot mt
+    | existT SyncIsAddr WriteThird => expected_read_ot_mt write_val_1 init_val mask_func1 (fun _ => true) ot mt
+    | existT SyncNotIsAddr WriteFirst => expected_read_ot_mt write_val_1 init_val mask_func1 (fun _ => true) ot mt
+    | existT SyncNotIsAddr WriteSecond => expected_read_ot_mt write_val_1 init_val mask_func1 (fun _ => true) ot mt
+    | existT SyncNotIsAddr WriteThird => all_init
     end.
 
 Definition make_write : RuleT :=
-  let '(ft,sch,ot,mt) := tup in
+  let '((existT ft sch),ot,mt) := tup in
   match mt with
   | IsWrMask => (("rule_" ++ write_name tup)%string,
       fun ty : (Kind -> Type) =>
@@ -355,7 +415,7 @@ Definition make_write : RuleT :=
   end.
 
 Definition print_comparison{ty k}(val exp_val : Expr ty (SyntaxKind k)) : list (SysT ty) :=
-  [DispString _ "Read Value: ";
+  [DispString _ "Read Value:     ";
    DispHex val;
    DispString _ "\n";
    DispString _ "Expected Value: ";
@@ -373,7 +433,7 @@ Definition print_read{ty}(read_idx : Expr ty (SyntaxKind (Bit (Nat.log2_up idxNu
   ].
 
 Definition make_read : RuleT :=
-  let '(ft,sch,ot,mt) := tup in
+  let '((existT ft sch),ot,mt) := tup in
   let read_index := match ot with
                     | Over => read_over_index
                     | Under => read_under_index
@@ -390,7 +450,7 @@ Definition make_read : RuleT :=
   ).
 
 Definition make_readReq : RuleT :=
-  let '(ft,sch,ot,mt) := tup in
+  let '((existT ft sch),ot,mt) := tup in
   let read_index := match ot with
                     | Over => read_over_index
                     | Under => read_under_index
@@ -419,44 +479,31 @@ Definition make_readResp : RuleT :=
 Definition make_rules : list RuleT :=
   let '(p,ot,mt) := tup in
   match p with
-  | (AsyncF, WriteFirst) => [make_write; make_read]
-  | (AsyncF, WriteSecond) => [make_read; make_write]
-  | (AsyncF, WriteThird) => nil
-  | (SyncIsAddr, WriteFirst) => [make_write; make_readResp; make_readReq]
-  | (SyncIsAddr, WriteSecond) => [make_readResp; make_write; make_readReq]
-  | (SyncIsAddr, WriteThird) => [make_readResp; make_readReq; make_write]
-  | (SyncNotIsAddr, WriteFirst) => [make_write; make_readResp; make_readReq]
-  | (SyncNotIsAddr, WriteSecond) => [make_readResp; make_write; make_readReq]
-  | (SyncNotIsAddr, WriteThird) => [make_readResp; make_readReq; make_write]
+  | existT AsyncF WriteRead => [make_write; make_read]
+  | existT AsyncF ReadWrite => [make_read; make_write]
+  | existT SyncIsAddr WriteFirst => [make_write; make_readResp; make_readReq]
+  | existT SyncIsAddr WriteSecond => [make_readResp; make_write; make_readReq]
+  | existT SyncIsAddr WriteThird => [make_readResp; make_readReq; make_write]
+  | existT SyncNotIsAddr WriteFirst => [make_write; make_readResp; make_readReq]
+  | existT SyncNotIsAddr WriteSecond => [make_readResp; make_write; make_readReq]
+  | existT SyncNotIsAddr WriteThird => [make_readResp; make_readReq; make_write]
   end.
 
 End Rules.
-
-Fixpoint fromStart A (ls: list A) start :=
-  match start with
-  | 0 => ls
-  | S m => fromStart (tail ls) m
-  end.
-
-Fixpoint getSize A (ls: list A) size :=
-  match size with
-  | 0 => nil
-  | S m => match ls with
-           | nil => nil
-           | x :: xs => x :: getSize xs m
-           end
-  end.
-
-Definition fromTo A start finish (ls: list A) :=
-  getSize (fromStart ls start) (finish - start).
 
 Section TestMod.
 
 Local Open Scope kami_expr.
 Local Open Scope kami_action.
 
-Definition all_rf_rules : list RuleT :=
- concat (map make_rules file_varieties).
+Definition all_async_rules : list RuleT :=
+  concat (map make_rules async_file_varieties).
+
+Definition all_syncIsAddr_rules : list RuleT :=
+  concat (map make_rules syncIsAddr_file_varieties).
+
+Definition all_syncNotIsAddr_rules : list RuleT :=
+  concat (map make_rules syncNotIsAddr_file_varieties).
 
 (* registers *)
 (* write then read *)
@@ -539,17 +586,45 @@ Definition counter : RuleT :=
 
 Definition all_reg_rules := [write_reg_WR; read_reg_WR; read_reg_RW; write_reg_RW; reg_3_rule_1; reg_3_rule_2; reg_3_rule_3].
 
-Definition testBaseMod := BaseMod [
+Definition testRegBaseMod := BaseMod [
   ("reg_WR", (existT _ (SyntaxKind _) (Some (SyntaxConst init_val))));
   ("reg_RW", (existT _ (SyntaxKind _) (Some (SyntaxConst init_val))));
   ("reg_3", (existT _ (SyntaxKind _) (Some (SyntaxConst init_val))));
   ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))))
   ]
- (all_reg_rules ++ all_rf_rules ++ [counter]) [].
+ (all_reg_rules ++ [counter]) [].
 
-Definition testRegFiles := map make_RFB file_varieties.
+Definition testAsyncBaseMod := BaseMod [
+  ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))))
+  ]
+  (all_async_rules ++ [counter]) [].
 
-Definition testMod := let md := (fold_right ConcatMod testBaseMod (map (fun m => Base (BaseRegFile m)) testRegFiles)) in
+Definition testSyncIsAddrBaseMod := BaseMod [
+  ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))))
+  ]
+  (all_syncIsAddr_rules ++ [counter]) [].
+
+Definition testSyncNotIsAddrBaseMod := BaseMod [
+  ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))))
+  ]
+  (all_syncNotIsAddr_rules ++ [counter]) [].
+
+Definition testAsyncRFs := map make_RFB async_file_varieties.
+
+Definition testSyncIsAddrRFs := map make_RFB syncIsAddr_file_varieties.
+
+Definition testSyncNotIsAddrRFs := map make_RFB syncNotIsAddr_file_varieties.
+
+Definition mkTestMod(bm : BaseModule)(rfs : list RegFileBase) :=
+  let md := (fold_right ConcatMod bm (map (fun m => Base (BaseRegFile m)) rfs)) in
   createHideMod md (map fst (getAllMethods md)).
+
+Definition testRegMod := mkTestMod testRegBaseMod [].
+
+Definition testAsyncMod := mkTestMod testAsyncBaseMod testAsyncRFs.
+
+Definition testSyncIsAddrMod := mkTestMod testSyncIsAddrBaseMod testSyncIsAddrRFs.
+
+Definition testSyncNotIsAddrMod := mkTestMod testSyncNotIsAddrBaseMod testSyncNotIsAddrRFs.
 
 End TestMod.
