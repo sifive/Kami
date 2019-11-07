@@ -26,13 +26,34 @@ Ltac discharge_NoSelfCall :=
          | _ => constructor; auto; simpl; try intro; discharge_DisjKey
          end.
 
+Ltac unfold_beta_head a :=
+  let new :=
+      lazymatch a with
+      | ?h _ _ _ _ _ _ _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ _ _ _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ _ _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ => eval cbv beta delta [h] in a
+      | ?h _ => eval cbv beta delta [h] in a
+      end in
+    exact new.
+
 Ltac discharge_SemAction :=
   match goal with
   | |- SemAction _ _ _ _ ?meths _ =>
     repeat match goal with
+           | |- SemAction ?o ?act ?reads ?news ?calls ?retv =>
+             let act' := constr:(ltac:(unfold_beta_head act)) in
+             change (SemAction o act' reads news calls retv)
            | |- SemAction _ (If ?p then _ else _ as _; _)%kami_action _ _ _ _ => eapply SemAction_if_split
            | |- if ?P then SemAction _ _ _ _ _ _ else SemAction _ _ _ _ _ _ =>
-             case_eq P; let H := fresh in intros H; rewrite ?H in *; cbn [evalExpr] in *; try discriminate
+             case_eq P;
+             let H := fresh in
+             intros H; rewrite ?H in *; cbn [evalExpr] in *; try discriminate
            | |- SemAction _ (convertLetExprSyntax_ActionT _) _ _ _ _ => eapply convertLetExprSyntax_ActionT_same
            | |- SemAction _ _ _ _ _ _ => econstructor
            end;
@@ -41,7 +62,8 @@ Ltac discharge_SemAction :=
            | |- In _ _ => simpl; auto
            | |- ?a = ?a => reflexivity
            | |- meths = _ => eauto
-           end; simpl in *; try (discriminate || congruence); eauto; simpl in *; discharge_DisjKey
+           end;
+    simpl in *; try (discriminate || congruence); eauto; simpl in *; discharge_DisjKey
   end.
 
 Ltac simplify_simulatingRule name :=
