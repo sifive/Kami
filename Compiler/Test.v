@@ -217,21 +217,13 @@ Definition write_name : FileTuple -> string :=
 
 
 Definition async_schedules : list (FileType * Schedule) :=
-  [ (AsyncF, WriteFirst);
-    (AsyncF, WriteSecond)
-  ].
+  cart_prod [AsyncF] [WriteFirst; WriteSecond].
 
 Definition syncIsAddr_schedules : list (FileType * Schedule) :=
-  [ (SyncIsAddr, WriteFirst);
-    (SyncIsAddr, WriteSecond);
-    (SyncIsAddr, WriteThird)
-  ].
+  cart_prod [SyncIsAddr] [WriteFirst; WriteSecond; WriteThird].
 
 Definition syncNotIsAddr_schedules : list (FileType * Schedule) :=
-  [ (SyncNotIsAddr, WriteFirst);
-    (SyncNotIsAddr, WriteSecond);
-    (SyncNotIsAddr, WriteThird)
-  ].
+  cart_prod [SyncNotIsAddr] [WriteFirst; WriteSecond; WriteThird].
 
 (*
 Definition file_varieties : list FileTuple :=
@@ -455,7 +447,7 @@ Definition make_rules : list RuleT :=
   | (SyncIsAddr, WriteThird) => [make_readResp; make_readReq; make_write]
   | (SyncNotIsAddr, WriteFirst) => [make_write; make_readResp; make_readReq]
   | (SyncNotIsAddr, WriteSecond) => [make_readResp; make_write; make_readReq]
-  | (SyncNotIsAddr,WriteThird) => [make_readResp; make_readReq; make_write]
+  | (SyncNotIsAddr, WriteThird) => [make_readResp; make_readReq; make_write]
   end.
 
 End Rules.
