@@ -57,6 +57,26 @@ file_async_read state file i
     | i < 0 = error "Read out of bounds."
     | otherwise = V.slice i (chunkSize file) (array_of_file state file)
 
+
+file_sync_readreq :: Val -> FileState -> RegFile -> String -> Val
+file_sync_readreq val state file regName = case readers file of
+    T.Async _ -> error "Async encountered when Sync was expected."
+    T.Sync isAddr rs -> if isAddr
+
+        then
+
+            --isAddr = True
+            val
+
+        else
+
+            --isAddr = False
+            ArrayVal $ V.slice (fromIntegral i) (chunkSize file) (array_of_file state file)
+
+                where i = BV.nat $ bvCoerce val
+
+
+
 file_sync_readresp :: FileState -> RegFile -> String -> Val
 file_sync_readresp state file regName = case readers file of
     T.Async _ -> error "Async encountered when Sync was expected."
@@ -90,11 +110,11 @@ file_writes_no_mask file i vals =
 
 rf_methcall :: FileState -> String -> Val -> Maybe (Maybe FileUpd,Val)
 rf_methcall state methName val =
-    case M.lookup methName $ methods state of --maybe use do notation here
+    case M.lookup methName $ methods state of
         Just (fc, fileName) -> 
             case fc of
                 AsyncRead -> Just (Nothing, ArrayVal $ file_async_read state (file_of_fname fileName) arg_index)
-                ReadReq regName -> Just (Just $ IntRegWrite regName val, BVVal $ BV.nil)
+                ReadReq regName -> Just (Just $ IntRegWrite regName $ file_sync_readreq val state (file_of_fname fileName) regName, BVVal $ BV.nil)
                 ReadResp regName -> Just (Nothing, file_sync_readresp state (file_of_fname fileName) regName)
                 Write -> Just (Just $ ArrWrite fileName (writes fileName) , BVVal BV.nil)
         Nothing -> Nothing
