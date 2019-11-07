@@ -499,7 +499,9 @@ del_reg_constant r = do
   let rmc = regmap_counters s
   let rc = reg_constant rmc
   put $ s { regmap_counters = rmc { reg_constant = H.delete r rc } }
-  
+
+convAny :: T.Any -> T.VarType
+convAny x = T.unsafeCoerce x
 
 do_reg :: String -> T.FullKind -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_reg r k m = case queryReg r k True m of
@@ -507,12 +509,17 @@ do_reg r k m = case queryReg r k True m of
     i <- reg_count r
     ins_reg_constant r val
     return [((r, Just i), e)]
-  T.Var _ _ -> do
+  e@(T.Var _ x) -> do
     del_reg_constant r
-    return []
+    let (r', Just _) = convAny x
+    if r == r'
+      then return []
+      else do
+      i <- reg_count r
+      return [((r, Just i),e)]
   e -> do
-    i <- reg_count r
     del_reg_constant r
+    i <- reg_count r
     return [((r, Just i),e)]
 
 do_regs :: RME -> State ExprState [(T.VarType, T.RtlExpr')]
@@ -564,7 +571,13 @@ do_isAddr_read_reqs m = do
 
 do_isAddr_read_reg :: String -> String -> Int -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_isAddr_read_reg name readReqName idxNum regMap = case queryIsAddrRegWrite name readReqName idxNum regMap of
-  T.Var _ _ -> return []
+  e@(T.Var _ x) ->
+    let (name', Just _) = convAny x in
+      if name == name'
+      then return []
+      else do
+        i <- reg_count name
+        return [((name, Just i), e)]
   e -> do
     i <- reg_count name
     return [((name, Just i), e)]
@@ -588,7 +601,13 @@ do_not_isAddr_read_reqs m = do
 
 do_not_isAddr_read_reg :: String -> String -> String -> Int -> Int -> T.Kind -> Bool -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_not_isAddr_read_reg regName writeName readReqName idxNum num k isMask regMap = case queryNotIsAddrRegWrite writeName readReqName idxNum num k isMask regMap of
-  T.Var _ _ -> return []
+  e@(T.Var _ x) ->
+    let (regName', Just _) = convAny x in
+      if regName == regName'
+      then return []
+      else do
+        i <- reg_count regName
+        return [((regName, Just i), e)]
   e -> do
     i <- reg_count regName
     return [((regName, Just i), e)]

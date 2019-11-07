@@ -485,7 +485,7 @@ Local Open Scope kami_expr.
 Local Open Scope kami_action.
 
 Definition all_rf_rules : list RuleT :=
- concat (map make_rules (fromTo 0 5 file_varieties)).
+ concat (map make_rules (fromTo 0 40 file_varieties)).
 
 (* registers *)
 (* write then read *)
