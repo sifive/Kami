@@ -848,68 +848,6 @@ End NoSelfCallBaseModule.
 
 
 (* Semantics *)
-
-Local Ltac Struct_neq :=
-  match goal with
-  | |- Struct _ _ <> Struct _ _ =>
-    let H := fresh in intro H;
-                      injection H;
-                      intros;
-                      repeat (existT_destruct Nat.eq_dec)
-  end.
-
-(*
-Definition Kind_dec (k1: Kind): forall k2, {k1 = k2} + {k1 <> k2}.
-Proof.
-  induction k1; destruct k2; try (right; (intros; abstract congruence)).
-  - left; abstract (reflexivity).
-  - destruct (Nat.eq_dec n n0); [left; abstract (subst; reflexivity) | right; abstract congruence].
-  - destruct (Nat.eq_dec n n0).
-    + subst.
-      induction n0.
-      * left.
-        abstract (f_equal; extensionality x; apply Fin.case0; exact x).
-      * destruct  (IHn0 (fun i => s (Fin.FS i)) (fun i => k (Fin.FS i))
-                         (fun i => H (Fin.FS i)) (fun i => k0 (Fin.FS i))
-                         (fun i => s0 (Fin.FS i))).
-        -- destruct (string_dec (s Fin.F1) (s0 Fin.F1)).
-           ++ destruct (H Fin.F1 (k0 Fin.F1)).
-              ** left.
-                 abstract (
-                 injection e;
-                 intros;
-                 repeat (existT_destruct Nat.eq_dec);
-                 f_equal; extensionality x; apply (Fin.caseS' x); try assumption;
-                 apply equal_f; assumption).
-              ** right.
-                 abstract (Struct_neq;
-                           apply (n eq_refl)).
-           ++ right.
-              abstract (Struct_neq;
-                        apply (n eq_refl)).
-        -- right.
-           abstract (Struct_neq;
-                     apply (n eq_refl)).
-    + right.
-      abstract (intro;
-                injection H0 as H0;
-                intros;
-                apply (n1 H0)).
-  - destruct (Nat.eq_dec n n0).
-    + destruct (IHk1 k2).
-      * left.
-        abstract (subst; reflexivity).
-      * right.
-        abstract (subst; intro;
-                  injection H as H;
-                  apply (n1 H)).
-    + right.
-      abstract (subst; intro;
-                injection H as H;
-                apply (n1 H)).
-Defined.
-*)
-
 Fixpoint Kind_decb(k1 k2 : Kind) : bool.
 Proof.
   refine (
@@ -965,15 +903,14 @@ Proof.
     + rewrite <- H2, IHk1; reflexivity.
 Qed.
 
-Lemma Kind_dec : forall k1 k2 : Kind, {k1 = k2} + {k1 <> k2}.
+Lemma Kind_dec (k1 k2 : Kind): {k1 = k2} + {k1 <> k2}.
 Proof.
-  intros.
   destruct (Kind_decb k1 k2) eqn:G.
-  rewrite Kind_decb_eq in G; auto.
-  right; intro.
-  rewrite <- Kind_decb_eq in H.
-  rewrite H in G; discriminate.
-Qed.
+  left; abstract (rewrite Kind_decb_eq in G; auto).
+  right; abstract (intro;
+                   rewrite <- Kind_decb_eq in H;
+                   rewrite H in G; discriminate).
+Defined.
 
 Definition Signature_decb : Signature -> Signature -> bool :=
   fun '(k,l) '(k',l') => Kind_decb k k' && Kind_decb l l'.
@@ -983,30 +920,13 @@ Proof.
   intros [] []; simpl; rewrite andb_true_iff; repeat rewrite Kind_decb_eq; firstorder congruence.
 Qed.
 
-(*
-Definition Signature_dec (s1 s2: Signature): {s1 = s2} + {s1 <> s2}.
-  refine match s1, s2 with
-         | (k11, k12), (k21, k22) => match Kind_dec k11 k21, Kind_dec k12 k22 with
-                                     | left pf1, left pf2 => left _
-                                     | left pf1, right pf2 => right (fun x => pf2 _)
-                                     | right pf1, left pf2 => right (fun x => pf1 _)
-                                     | right pf1, right pf2 => right (fun x => pf1 _)
-                                     end
-         end.
-  - subst; auto.
-  - exact (f_equal snd x).
-  - exact (f_equal fst x).
-  - exact (f_equal fst x).
-Defined.
-*)
-
 Definition Signature_dec (s1 s2 : Signature) : {s1 = s2} + {s1 <> s2}.
 Proof.
-  intros; destruct (Signature_decb s1 s2) eqn:G.
-  left; rewrite <- Signature_decb_eq; auto.
-  right; intro.
-  rewrite <- Signature_decb_eq in H.
-  rewrite H in G; discriminate.
+  destruct (Signature_decb s1 s2) eqn:G.
+  left; abstract (rewrite <- Signature_decb_eq; auto).
+  right; (intro;
+          rewrite <- Signature_decb_eq in H;
+          rewrite H in G; discriminate).
 Defined.
 
 Lemma isEq k: forall (e1: type k) (e2: type k),

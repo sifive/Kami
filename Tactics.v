@@ -26,7 +26,7 @@ Ltac discharge_NoSelfCall :=
          | _ => constructor; auto; simpl; try intro; discharge_DisjKey
          end.
 
-  Ltac discharge_SemAction :=
+Ltac discharge_SemAction :=
   match goal with
   | |- SemAction _ _ _ _ ?meths _ =>
     repeat match goal with

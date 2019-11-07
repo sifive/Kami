@@ -27,7 +27,7 @@ Definition num := 5.
 Definition idxNum := 20.
 Definition Xlen := 32.
 Definition Data := Bit Xlen.
-Definition Counter := Bit 2.
+Definition Counter := Bit 1.
 Definition init_val : word Xlen := Xlen 'h"abc123".
 
 (* mask = {true; false; false; false; true} *)
@@ -461,30 +461,48 @@ Definition make_rules : list RuleT :=
 
 End Rules.
 
+Fixpoint fromStart A (ls: list A) start :=
+  match start with
+  | 0 => ls
+  | S m => fromStart (tail ls) m
+  end.
+
+Fixpoint getSize A (ls: list A) size :=
+  match size with
+  | 0 => nil
+  | S m => match ls with
+           | nil => nil
+           | x :: xs => x :: getSize xs m
+           end
+  end.
+
+Definition fromTo A start finish (ls: list A) :=
+  getSize (fromStart ls start) (finish - start).
+
 Section TestMod.
 
 Local Open Scope kami_expr.
 Local Open Scope kami_action.
 
 Definition all_rf_rules : list RuleT :=
- concat (map make_rules file_varieties).
+ concat (map make_rules (fromTo 0 5 file_varieties)).
 
 (* registers *)
 (* write then read *)
 
-Definition write_reg_1 : RuleT :=
+Definition write_reg_WR : RuleT :=
   ("write_reg_WR", fun ty : (Kind -> Type) =>
       Read c : Counter <- "counter";
       LET new_val : Data <- ITE (#c == $1) $$write_val_2 $$write_val_1;
       System ([DispString _  ("write_reg_WR: ")%string; DispHex #new_val; DispString _ "\n\n"]);
-      Write "reg_1" <- #new_val;
+      Write "reg_WR" <- #new_val;
       Retv
       ).
 
-Definition read_reg_1 : RuleT :=
+Definition read_reg_WR : RuleT :=
   ("read_reg_WR", fun ty : (Kind -> Type) =>
       Read c : Counter <- "counter";
-      Read val : Data <- "reg_1";
+      Read val : Data <- "reg_WR";
       LET exp_val : Data <- ITE (#c == $1) $$write_val_2 $$write_val_1;
       System ([DispString _ "read_reg_WR:\n"] ++ print_comparison #val #exp_val);
       Retv
@@ -492,21 +510,21 @@ Definition read_reg_1 : RuleT :=
 
 (* read then write *)
 
-Definition read_reg_2 : RuleT :=
+Definition read_reg_RW : RuleT :=
   ("read_reg_RW", fun ty : (Kind -> Type) =>
       Read c : Counter <- "counter";
-      Read val : Data <- "reg_2";
+      Read val : Data <- "reg_RW";
       LET exp_val : Data <- ITE (#c == $1) $$write_val_1 $$init_val;
       System ([DispString _ "read_reg_RW:\n"] ++ print_comparison #val #exp_val);
       Retv
       ).
 
-Definition write_reg_2 : RuleT :=
+Definition write_reg_RW : RuleT :=
   ("write_reg_RW", fun ty : (Kind -> Type) =>
       Read c : Counter <- "counter";
       LET new_val : Data <- ITE (#c == $1) $$write_val_2 $$write_val_1;
       System ([DispString _  "write_reg_RW: "; DispHex #new_val; DispString _ "\n\n"]);
-      Write "reg_2" <- #new_val;
+      Write "reg_RW" <- #new_val;
       Retv
       ).
 
@@ -546,13 +564,13 @@ Definition counter : RuleT :=
       else
         Write "counter" <- #c + $1;
         Retv;
-      Retv).
+        Retv).
 
-Definition all_reg_rules := [write_reg_1; read_reg_1; read_reg_2; write_reg_2; reg_3_rule_1; reg_3_rule_2; reg_3_rule_3].
+Definition all_reg_rules := [write_reg_WR; read_reg_WR; read_reg_RW; write_reg_RW; reg_3_rule_1; reg_3_rule_2; reg_3_rule_3].
 
 Definition testBaseMod := BaseMod [
-  ("reg_1", (existT _ (SyntaxKind _) (Some (SyntaxConst init_val))));
-  ("reg_2", (existT _ (SyntaxKind _) (Some (SyntaxConst init_val))));
+  ("reg_WR", (existT _ (SyntaxKind _) (Some (SyntaxConst init_val))));
+  ("reg_RW", (existT _ (SyntaxKind _) (Some (SyntaxConst init_val))));
   ("reg_3", (existT _ (SyntaxKind _) (Some (SyntaxConst init_val))));
   ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))))
   ]
