@@ -760,3 +760,49 @@ Hint Rewrite getAllRegisters_makeModule_MERegister
              getAllRegisters_makeModule_Registers
            getAllRegisters_makeModule_MERule : kami_rewrite_db.
 
+Theorem in_app: forall T (x:T) (a:List.list T) (b:List.list T), (List.In x (a++b)) <-> (List.In x a)\/(List.In x b).
+Proof.
+    intros.
+    split.
+    + intros.
+      induction a.
+      - simpl in H.
+        right.
+        apply H.
+      - simpl in H.
+        simpl.
+        inversion H; subst; clear H.
+        * left.
+          left.
+          reflexivity.
+        * apply <- or_assoc.
+          right.
+          apply IHa.
+          apply H0.
+    + intros.
+      inversion H; subst; clear H.
+      - induction a.
+        * unfold List.In in H0.
+          inversion H0.
+        * simpl.
+          simpl in H0.
+          inversion H0; subst; clear H0.
+          ++ left.
+             reflexivity.
+          ++ right.
+             apply IHa.
+             apply H.
+      - induction a.
+        * simpl.
+          apply H0.
+        * simpl.
+          right.
+          apply IHa.
+Qed.
+
+Hint Rewrite in_app : kami_rewrite_db.
+
+
+
+          
+

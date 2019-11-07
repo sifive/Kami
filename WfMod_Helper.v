@@ -14,16 +14,21 @@ Require Import Coq.Strings.String.
 Local Open Scope kami_action.
 Local Open Scope kami_expr.
 
-Theorem string_equal_prefix: forall (a: string) (b: string) (c: string), (a++b=a++c)%string->(b=c)%string.
+Theorem string_equal_prefix: forall (a: string) (b: string) (c: string), (a++b=a++c)%string<->(b=c)%string.
 Proof.
-  intros.
-  induction a.
-  + simpl in H.
-    apply H.
-  + inversion H; subst; clear H.
-    apply IHa.
-    apply H1.
+  split.
+  - intros.
+    induction a.
+    + simpl in H.
+      apply H.
+    + inversion H; subst; clear H.
+      apply IHa.
+      apply H1.
+  - intros.
+    subst.
+    reflexivity.
 Qed.
+
 
 Theorem DisjKey_nil2: forall A B (l: list (A*B)), DisjKey l List.nil.
 Proof.
@@ -114,7 +119,7 @@ Ltac DisjKey_solve :=
   | |- _ => trivialSolve
   end.
 
-Theorem DisjKey_NubBy1: forall T (x: list (string * T)) (y: list (string * T)) (W: forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}), DisjKey x y -> DisjKey (nubBy (fun '(a,_) '(b,_) => String.eqb a b) x) y.
+Theorem DisjKey_NubBy1: forall T (x: list (string * T)) (y: list (string * T)), DisjKey x y -> DisjKey (nubBy (fun '(a,_) '(b,_) => String.eqb a b) x) y.
 Proof.
     intros  T x y.
     generalize y.
@@ -130,7 +135,6 @@ Proof.
       - simpl.
         intros.
         apply IHx.
-        apply W.
         unfold DisjKey in H.
         simpl in H.
         unfold DisjKey.
@@ -154,13 +158,12 @@ Proof.
         split.
         ++ apply H0.
         ++ apply IHx.
-           apply W.
            apply H1.
         ++ repeat (decide equality).
         ++ repeat (decide equality).
 Qed.
 
-Theorem DisjKey_NubBy2: forall T (x: list (string * T)) (y: list (string * T)) (W: forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}), DisjKey x y -> DisjKey x (nubBy (fun '(a,_) '(b,_) => String.eqb a b) y).
+Theorem DisjKey_NubBy2: forall T (x: list (string * T)) (y: list (string * T)), DisjKey x y -> DisjKey x (nubBy (fun '(a,_) '(b,_) => String.eqb a b) y).
 Proof.
     intros T x y.
     generalize x.
@@ -176,7 +179,6 @@ Proof.
       - simpl.
         intros.
         apply IHy.
-        apply W.
         unfold DisjKey in H.
         simpl in H.
         unfold DisjKey.
@@ -200,7 +202,6 @@ Proof.
         split.
         ++ apply H0.
         ++ apply IHy.
-           apply W.
            apply H1.
         ++ repeat (decide equality).
         ++ repeat (decide equality).
@@ -266,7 +267,7 @@ Qed.
 Ltac ltac_wfMod_ConcatMod :=
   apply ConcatModWf;autorewrite with kami_rewrite_db;repeat split;try assumption;auto with wfMod_ConcatMod_Helper;trivialSolve.
 
-Ltac WfMod_Solve :=
+(*Ltac WfMod_Solve :=
     match goal with
     | |- _ => (progress discharge_wf);WfMod_Solve
     | |- forall _, _ => intros;WfMod_Solve
@@ -285,5 +286,5 @@ Ltac WfConcatAction_Solve :=
     | H: _ \/ _ |- _ => simpl in H;inversion H;subst;clear H;simpl;WfConcatAction_Solve
     | H: False |- _ => inversion H
     | |- _ => idtac
-    end.
+    end.*)
 
