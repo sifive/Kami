@@ -9,8 +9,6 @@ Require Import Vector.
 Import VectorNotations.
 Import ListNotations.
 Require Import Kami.Notations.
-Require Import Coq.Logic.ClassicalFacts.
-Require Import Coq.Logic.Classical.
 
 Lemma app_rewrite1: forall T (a:T) b c, (a::b)++c=a::(b++c).
 Proof.
@@ -387,7 +385,7 @@ Qed.
      reflexivity.
   Qed.
 
-  Axiom EquivThenEqual: prop_extensionality.
+  (*Axiom EquivThenEqual: prop_extensionality.
 
   Theorem equiv_rewrite: forall x y, (x=y)=(x<->y).
   Proof.
@@ -407,103 +405,114 @@ Qed.
       split.
       - apply H0.
       - apply H1.
-  Qed.
+  Qed.*)
 
   Theorem DisjKey_Cons1:
-    forall T Q (a:(T*Q)) x z, DisjKey (a::x) z = ((~(List.In (fst a) (List.map fst z))) /\ DisjKey x z).
+    forall T Q (a:(T*Q)) x z (W:forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}),
+           DisjKey (a::x) z <-> ((~(List.In (fst a) (List.map fst z))) /\ DisjKey x z).
   Proof.
     intros.
-    unfold DisjKey.
-    simpl.
-    rewrite equiv_rewrite.
+    rewrite ?DisjKeyWeak_same.
     split.
     + intros.
       split.
-      - assert (~(fst a=fst a \/ List.In (fst a) (List.map fst x)) \/
-                ~ List.In (fst a) (List.map fst z)).
+      - unfold DisjKeyWeak in H.
+        assert (List.In (fst a) (List.map fst (a::x)) -> List.In (fst a) (List.map fst z) -> False).
         apply H.
-        inversion H0; subst; clear H0.
-        tauto.
-        tauto.
+        intro X.
+        apply H0.
+        simpl.
+        left.
+        reflexivity.
+        apply X.
       - simpl.
         intros.
-        assert (~(fst a=k \/ List.In k (List.map fst x)) \/
-                ~ List.In k (List.map fst z)).
+        unfold DisjKeyWeak in H.
+        unfold DisjKeyWeak.
+        intros.
+        assert (List.In k (List.map fst (a::x)) -> List.In k (List.map fst z) -> False).
         apply H.
-        inversion H0; subst; clear H0.
-        apply not_or_and in H1.
-        inversion H1; subst; clear H1.
-        left.
         apply H2.
+        simpl.
+        right.
+        apply H0.
+        apply H1.
+    + intros.
+      inversion H; subst; clear H.
+      unfold DisjKeyWeak.
+      unfold DisjKeyWeak in H1.
+      intros.
+      assert (List.In k (List.map fst x) -> List.In k (List.map fst z) -> False).
+      apply H1.
+      simpl in H.
+      inversion H;subst;clear H.
+      - apply H0.
+        apply H2.
+      - apply H3.
+        apply H4.
+        apply H2.
+    + apply W.
+    + apply W.
+Qed.
+
+Theorem DisjKey_Cons2:
+    forall T Q (a:(T*Q)) x z (W:forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}),
+           DisjKey x (a::z) <-> ((~(List.In (fst a) (List.map fst x))) /\ DisjKey x z).
+Proof.
+    intros.
+    rewrite ?DisjKeyWeak_same.
+    split.
+    + intros.
+      split.
+      - intros.
+        unfold DisjKeyWeak in H.
+        assert (List.In (fst a) (List.map fst x) -> List.In (fst a) (List.map fst (a::z)) -> False).
+        apply H.
+        intro X.
+        apply H0.
+        apply X.
+        simpl.
+        left.
+        reflexivity.
+      - simpl.
+        intros.
+        unfold DisjKeyWeak in H.
+        unfold DisjKeyWeak.
+        intros.
+        assert (List.In k (List.map fst x) -> List.In k (List.map fst (a::z)) -> False).
+        apply H.
+        apply H2.
+        apply H0.
+        simpl.
         right.
         apply H1.
     + intros.
       inversion H; subst; clear H.
-      classical_right.
-      apply NNPP in H.
-      inversion H; subst; clear H.
-      - apply H0.
-      - simpl.
-      assert (~ List.In k (List.map fst x) \/ ~ List.In k (List.map fst z)).
-      apply H1.
-      inversion H; subst; clear H.
-      apply H3 in H2.
-      inversion H2.
-      apply H3.
-Qed.
-
-Theorem DisjKey_Cons2:
-    forall T Q (a:(T*Q)) x z, DisjKey x (a::z) = ((~(List.In (fst a) (List.map fst x))) /\ DisjKey x z).
-Proof.
-  intros.
-  unfold DisjKey.
-  simpl.
-  rewrite equiv_rewrite.
-  split.
-  + intros.
-    split.
-    - assert (~ List.In (fst a) (List.map fst x) \/
-              ~ (fst a = fst a \/ List.In (fst a) (List.map fst z))).
-      apply H.
-      inversion H0; subst; clear H0.
-      tauto.
-      tauto.
-    - simpl.
+      unfold DisjKeyWeak.
+      unfold DisjKeyWeak in H1.
       intros.
-      assert (
-              ~ List.In k (List.map fst x) \/
-              ~(fst a=k \/ List.In k (List.map fst z))).
-      apply H.
-      inversion H0; subst; clear H0.
-      left.
-      apply H1.
-      apply not_or_and in H1.
-      inversion H1; subst; clear H1.
-      right.
-      apply H2.
-  + intros.
-    inversion H; subst; clear H.
-    assert (~ List.In k (List.map fst x) \/ ~ List.In k (List.map fst z)).
-    apply H1.
-    classical_left.
-    apply NNPP in H2.
-    inversion H2; subst; clear H2.
-    - apply H0.
-    - simpl.
-      inversion H; subst; clear H.
-      apply H2.
-      apply H2 in H3.
-      inversion H3.
+      inversion H2;subst;clear H2.
+      - apply H0 in H.
+        inversion H.
+      - assert (List.In k (List.map fst x) -> List.In k (List.map fst z) -> False).
+        apply H1.
+        apply H2.
+        apply H.
+        apply H3.
+    +  apply W.
+    + apply W.
 Qed.
 
-Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q)), DisjKey (x++y) z=(DisjKey x z /\ DisjKey y z).
+Theorem DisjKey_Append1:
+  forall T Q (x:list (T*Q)) y z (W:forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}),
+  DisjKey (x++y) z<->(DisjKey x z /\ DisjKey y z).
   Proof.
     intros.
+    rewrite ?DisjKeyWeak_same.
     induction x.
     + simpl.
-      unfold DisjKey.
+      unfold DisjKeyWeak.
       simpl.
-      rewrite equiv_rewrite.
       split.
       - intros.
         * split.
@@ -511,23 +520,25 @@ Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q))
           apply H.
       - intros.
         inversion H. subst. clear H.
+        eapply H3.
+        apply H0.
         apply H1.
     + simpl.
+      repeat (rewrite <- DisjKeyWeak_same).
       rewrite ?DisjKey_Cons1.
-      rewrite equiv_rewrite.
+      rewrite ?DisjKeyWeak_same.
       split.
-      intros.
-      inversion H; subst; clear H.
-      split.
-      - split.
-        apply H0.
-        rewrite IHx in H1.
-        inversion H1; subst; clear H1.
-        apply H.
-      - simpl.
-        rewrite IHx in H1.
-        inversion H1; subst; clear H1.
-        apply H2.
+      - intros.
+        inversion H; subst; clear H.
+        split.
+        * split.
+          ++ apply H0.
+          ++ rewrite IHx in H1.
+             inversion H1; subst; clear H1.
+             apply H.
+        * rewrite IHx in H1.
+          inversion H1; subst; clear H1.
+          apply H2.
       - simpl.
         intros.
         inversion H; subst; clear H.
@@ -541,72 +552,114 @@ Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q))
              apply H2.
           ++ simpl.
              apply H1.
-  Qed.
+      - apply W.
+      - apply W.
+      - apply W.
+      - apply W.
+      - apply W.
+      - apply W.
+      - apply W.
+      - apply W.
+    + apply W.
+    + apply W.
+    + apply W.
+Qed.
 
-  Theorem DisjKey_Append2: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q)), DisjKey x (y++z)=(DisjKey x y /\ DisjKey x z).
+  Theorem DisjKey_Append2:
+    forall T Q (x:list (T*Q)) y z (W:forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}),
+           DisjKey x (y++z)<->(DisjKey x y /\ DisjKey x z).
   Proof.
     intros.
+    rewrite ?DisjKeyWeak_same.
     induction y.
-    rewrite equiv_rewrite.
     + simpl.
-      unfold DisjKey.
+      unfold DisjKeyWeak.
       split.
       - intros.
         tauto.
       - simpl.
         intros.
         inversion H; subst; clear H.
+        assert (List.In k (List.map fst x) -> List.In k (List.map fst z) -> False).
+        apply H3.
+        apply H.
+        apply H0.
         apply H1.
     + simpl.
-      rewrite ?DisjKey_Cons1.
-      rewrite equiv_rewrite.
+      repeat (rewrite <- DisjKeyWeak_same).
+      rewrite ?DisjKey_Cons2.
+      rewrite ?DisjKeyWeak_same.
       split.
       - intros.
-        rewrite DisjKey_Cons2.
-        rewrite DisjKey_Cons2 in H.
         inversion H; subst; clear H.
-        rewrite and_assoc.
-        rewrite <- IHy.
+        * split.
+          ++ split.
+             -- apply H0.
+             -- apply IHy in H1.
+                inversion H1; subst; clear H1.
+                apply H.
+          ++ apply IHy in H1.
+             inversion H1; subst; clear H1.
+             apply H2.
+      - intros.
+        inversion H; subst; clear H.
+        inversion H0; subst; clear H0.
         split.
-        * apply H0.
-        * apply H1.
-      - rewrite ?DisjKey_Cons2.
-        rewrite ?DisjKey_Cons2 in IHy.
-        rewrite and_assoc.
-        rewrite <- IHy.
-        intros.
-        apply H.
+        * apply H.
+        * apply IHy.
+          split.
+          ++ apply H2.
+          ++ apply H1.
+      - apply W.
+      - apply W.
+      - apply W.
+      - apply W.
+      - apply W.
+      - apply W.
+      - apply W.
+      - apply W.
+    + apply W.
+    + apply W.
+    + apply W.
   Qed.
 
-  Theorem DisjKey_In_map2: forall A B a (k:A) r l, @DisjKey A B a ((k,r)::l)=(~List.In k (List.map fst a) /\ (DisjKey a l)).
+  Theorem DisjKey_In_map2:
+    forall A B a (k:A) r l (W:forall (a1:A) (a2:A), {a1=a2}+{a1<>a2}), @DisjKey A B a ((k,r)::l)<->(~List.In k (List.map fst a) /\ (DisjKey a l)).
   Proof.
     intros.
     rewrite DisjKey_Cons2.
     simpl.
     reflexivity.
+    apply W.
   Qed.
     
-  Theorem DisjKey_In_map1: forall A B b (k:A) r l, @DisjKey A B ((k,r)::l) b=(~List.In k (List.map fst b) /\ (DisjKey l b)).
+  Theorem DisjKey_In_map1: forall A B b (k:A) r l (W:forall (a1:A) (a2:A), {a1=a2}+{a1<>a2}),
+                           @DisjKey A B ((k,r)::l) b<->(~List.In k (List.map fst b) /\ (DisjKey l b)).
   Proof.
     intros.
     rewrite DisjKey_Cons1.
     simpl.
     reflexivity.
+    apply W.
   Qed.
 
-  Theorem DisjKey_In_map_fst2: forall A B a (f:(A*B)) l, @DisjKey A B a (f::l)=(~List.In (fst f) (List.map fst a) /\ (DisjKey a l)).
+  Theorem DisjKey_In_map_fst2: forall A B a (f:(A*B)) l (W:forall (a1:A) (a2:A), {a1=a2}+{a1<>a2}),
+                               @DisjKey A B a (f::l)<->(~List.In (fst f) (List.map fst a) /\ (DisjKey a l)).
   Proof.
     intros.
     rewrite DisjKey_Cons2.
     reflexivity.
+    apply W.
   Qed.
 
     
-  Theorem DisjKey_In_map_fst1: forall A B b (f:(A*B)) l, @DisjKey A B (f::l) b=(~List.In (fst f) (List.map fst b) /\ (DisjKey l b)).
+  Theorem DisjKey_In_map_fst1: forall A B b (f:(A*B)) l (W:forall (a1:A) (a2:A), {a1=a2}+{a1<>a2}),
+          @DisjKey A B (f::l) b<->(~List.In (fst f) (List.map fst b) /\ (DisjKey l b)).
   Proof.
     intros.
     rewrite DisjKey_Cons1.
     reflexivity.
+    apply W.
   Qed.
 
   Theorem map_getAllRegisters_map_RegFileBase: forall m,
@@ -677,7 +730,7 @@ Theorem DisjKey_Append1: forall T Q (x:list (T*Q)) (y:list (T*Q)) (z:list (T*Q))
     
   Hint Rewrite getAllRegisters_BaseMod append_equal_prefix : kami_rewrite_db.
 
-Theorem getAllRegisters_makeModule_MERegister: forall a b, getAllRegisters (makeModule ((MERegister a)::b))=a::getAllRegisters (makeModule b).
+  Theorem getAllRegisters_makeModule_MERegister: forall a b, getAllRegisters (makeModule ((MERegister a)::b))=a::getAllRegisters (makeModule b).
 Proof.
     simpl.
     intros.
@@ -705,5 +758,51 @@ Qed.
 
 Hint Rewrite getAllRegisters_makeModule_MERegister
              getAllRegisters_makeModule_Registers
-             getAllRegisters_makeModule_MERule : kami_rewrite_db.
+           getAllRegisters_makeModule_MERule : kami_rewrite_db.
+
+Theorem in_app: forall T (x:T) (a:List.list T) (b:List.list T), (List.In x (a++b)) <-> (List.In x a)\/(List.In x b).
+Proof.
+    intros.
+    split.
+    + intros.
+      induction a.
+      - simpl in H.
+        right.
+        apply H.
+      - simpl in H.
+        simpl.
+        inversion H; subst; clear H.
+        * left.
+          left.
+          reflexivity.
+        * apply <- or_assoc.
+          right.
+          apply IHa.
+          apply H0.
+    + intros.
+      inversion H; subst; clear H.
+      - induction a.
+        * unfold List.In in H0.
+          inversion H0.
+        * simpl.
+          simpl in H0.
+          inversion H0; subst; clear H0.
+          ++ left.
+             reflexivity.
+          ++ right.
+             apply IHa.
+             apply H.
+      - induction a.
+        * simpl.
+          apply H0.
+        * simpl.
+          right.
+          apply IHa.
+Qed.
+
+Hint Rewrite in_app : kami_rewrite_db.
+
+
+
+          
 
