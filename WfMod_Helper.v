@@ -107,7 +107,7 @@ Proof.
     tauto.
 Qed.
 
-Ltac DisjKey_solve :=
+(*Ltac DisjKey_solve :=
   match goal with
   (*| |- ~((?P++_)%string = _ \/ False) \/ ~((?P++_)%string = _ \/ False) => let X := fresh in try (apply or_diff;intro X;inversion X)*)
   | |- ~(_ \/ False) \/ ~(_ \/ _) => apply ne_disjunction_break1;split;DisjKey_solve
@@ -117,7 +117,7 @@ Ltac DisjKey_solve :=
   | |- DisjKeyWeak _ _ => unfold DisjKeyWeak;intros;DisjKey_solve
   | H: In _ (map fst ((_,_)::_)) |- _ => simpl in H;DisjKey_solve
   | |- _ => trivialSolve
-  end.
+  end.*)
 
 Theorem DisjKey_NubBy1: forall T (x: list (string * T)) (y: list (string * T)), DisjKey x y -> DisjKey (nubBy (fun '(a,_) '(b,_) => String.eqb a b) x) y.
 Proof.
