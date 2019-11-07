@@ -87,6 +87,13 @@ deriving instance Show T.RtlModule
 instance Show T.RegFileInitT where
   show _ = "RegFileInitT"
 
+instance Eq T.ConstT where
+  (==) (T.ConstBool x) (T.ConstBool y) = x == y
+  (==) (T.ConstBit n x) (T.ConstBit m y) = and [n == m, x == y]
+  (==) (T.ConstArray n k xs) (T.ConstArray m k' ys) = and ((n == m) : [x == y | x <- map xs $ T.getFins n, y <- map ys $ T.getFins n])
+  (==) (T.ConstStruct n fk fs xs) (T.ConstStruct m fk' fs' ys) = and ((n == m) : [x == y | x <- map xs $ T.getFins n, y <- map ys $ T.getFins n])
+  (==) _ _ = False
+
 --access with helpful error msg
 (!!!) :: (Ord k, Show k, Show v) => H.Map k v -> k -> v
 (!!!) m k = case m H.!? k of
@@ -211,6 +218,7 @@ data Register =
 data RegMapTy =
   RegMapTy
   { reg_counters :: H.Map String Int
+  , reg_constant :: H.Map String T.ConstT
   , write_counters :: H.Map String Int
   , async_read_counters :: H.Map String Int
   , isAddr_read_req_counters :: H.Map String Int
@@ -220,6 +228,7 @@ init_rmt :: [Register] -> [Async] -> [Sync] -> [Sync] -> RegMapTy
 init_rmt regs asyncs isAddrs notIsAddrs = RegMapTy {
     reg_counters = foldr (\r m -> H.insert r 0 m) (foldr (\r m -> H.insert r 0 m) (foldr (\r m -> H.insert (registerName r) 0 m) H.empty regs) (concatMap (\s -> map T.readRegName $ syncNames s) isAddrs))
                    (concatMap (\s -> map T.readRegName $ syncNames s) notIsAddrs)
+  , reg_constant = H.empty
   , write_counters = foldr (\wr m -> H.insert wr 0 m) H.empty (map (commonWrite . asyncCommon) asyncs ++ map (commonWrite . syncCommon) (isAddrs ++ notIsAddrs))
   , async_read_counters = foldr (\r m -> H.insert r 0 m) H.empty $ concatMap asyncNames asyncs
   , isAddr_read_req_counters = foldr (\r m -> H.insert r 0 m) H.empty $ concatMap (\s -> map T.readReqName $ syncNames s) isAddrs
@@ -263,7 +272,10 @@ queryReg name k isWrite regMap =
     query (T.UpdRegRME r pred k val regMap') =
       let restVal = query regMap' in
         if r == name
-        then T.ITE k pred val restVal
+        then
+          case pred of
+            T.Const T.Bool (T.ConstBool True) -> val
+            _ -> T.ITE k pred val restVal
         else restVal
     query (T.WriteRME idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) =
       query (if isWrite then writeMap else readMap)
@@ -474,11 +486,33 @@ not_isAddr_read_req_count r = do
   put $ s { regmap_counters = rmc { not_isAddr_read_req_counters = H.insert r (n+1) rc } }
   return (n+1)
 
+ins_reg_constant :: String -> T.ConstT -> State ExprState ()
+ins_reg_constant r val = do
+  s <- get
+  let rmc = regmap_counters s
+  let rc = reg_constant rmc
+  put $ s { regmap_counters = rmc { reg_constant = H.insert r val rc } }
+  
+del_reg_constant :: String -> State ExprState ()
+del_reg_constant r = do
+  s <- get
+  let rmc = regmap_counters s
+  let rc = reg_constant rmc
+  put $ s { regmap_counters = rmc { reg_constant = H.delete r rc } }
+  
+
 do_reg :: String -> T.FullKind -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_reg r k m = case queryReg r k True m of
-  T.Var _ _ -> return []
+  e@(T.Const k val) -> do
+    i <- reg_count r
+    ins_reg_constant r val
+    return [((r, Just i), e)]
+  T.Var _ _ -> do
+    del_reg_constant r
+    return []
   e -> do
     i <- reg_count r
+    del_reg_constant r
     return [((r, Just i),e)]
 
 do_regs :: RME -> State ExprState [(T.VarType, T.RtlExpr')]
@@ -702,13 +736,14 @@ get_final_rfmeth_assigns rfbs s = let (asyncs,isAddrs,notIsAddrs) = process_rfbs
   ++ concatMap (\(readRq,argk) -> en_arg_final readRq argk $ isAddr_read_req_counters $ regmap_counters s) (get_sync_readReqs_with_arg isAddrs)
  
 
-all_verilog :: ModInput -> (VerilogExprs, [(T.VarType, T.RtlExpr')])
+all_verilog :: ModInput -> (VerilogExprs, [(T.VarType, T.RtlExpr')], H.Map String T.ConstT)
 all_verilog input@((strs,(rfbs,basemod)),cas) =
   let (vexprs,final_state) = runState (ppCAS $ cas) (init_state (fst input)) in
+  let reg_consts = reg_constant $ regmap_counters final_state in
   let final_assigns = get_final_assigns final_state rfbs in
   let final_meth_assigns = get_final_meth_assigns basemod rfbs final_state in
   let final_rfmeth_assigns = get_final_rfmeth_assigns rfbs final_state in
-    (vexprs { assign_exprs = (all_initialize input) ++ assign_exprs vexprs ++ final_meth_assigns ++ final_rfmeth_assigns }, final_assigns)
+    (vexprs { assign_exprs = (all_initialize input) ++ assign_exprs vexprs ++ final_meth_assigns ++ final_rfmeth_assigns }, final_assigns, reg_consts)
 
 
 kind_of_expr :: T.Expr ty -> T.FullKind
@@ -745,6 +780,9 @@ get_stats (T.Build_RtlModule hw rf ins outs inits writes wires sys) = RtlModStat
   , num_regFiles = length rf
   , num_inputs = length ins
   , num_outputs = length outs
+-- filter (\((x, _), _) -> not $ S.member x reg_consts) (
+
+
   , num_regInits = length inits
   , num_regWrites = length writes
   , num_wires = length wires
@@ -766,19 +804,27 @@ mkInits ((strs,(rfbs,basemod)),cas) = let (_,isAddrs,notIsAddrs) = process_rfbs 
   --notIsAddr shadow regs
   ++ (map (\(Register r k) -> ((r,Nothing),(k, Just $ T.getDefaultConstFullKind k ))) $ all_not_isAddr_shadows notIsAddrs)
 
+not_is_reg_constant :: H.Map String T.ConstT -> [(T.VarType, (T.FullKind,T.RegInitValT))] -> T.VarType -> Bool
+not_is_reg_constant reg_consts inits (r, _) =
+  case (H.lookup r reg_consts, find (\((x, _), _) -> x == r) inits) of
+    (Just constVal, Just (_, (_, Just (T.SyntaxConst _ constVal2)))) -> constVal /= constVal2
+    (_, _) -> True
 
 mkRtlMod :: ModInput -> T.RtlModule
 mkRtlMod input@((strs,(rfbs,basemod)),cas) =
-  let (vexprs,fin_assigns) = all_verilog input in
+  let (vexprs,fin_assigns,reg_consts) = all_verilog input in
                   T.Build_RtlModule
   {- hiddenWires -} (concatMap (\f -> [(f ++ "#_enable",Nothing), (f ++ "#_return",Nothing), (f ++ "#_argument",Nothing)]) strs)
   {- regFiles    -} rfbs
   {- inputs      -} (map (\(f,(_,k)) -> ((f ++ "#_return",Nothing),k)) $ T.getCallsWithSignPerMod $ T.Base basemod)
   {- outputs     -} (concatMap (\(f,(k,_)) -> [((f ++ "#_enable",Nothing), T.Bool), ((f ++ "#_argument",Nothing),k)]) $ T.getCallsWithSignPerMod $ T.Base basemod)
-  {- regInits    -} (mkInits input)
-  {- regWrites   -} (map (\(v,e) -> (v,(kind_of_expr e,e))) $ fin_assigns)
+  {- regInits    -} inits
+  {- regWrites   -} (filter (\(x, _) -> not_is_reg_constant reg_consts inits x) (map (\(v,e) -> (v,(kind_of_expr e,e))) $ fin_assigns))
   {- wires       -} (map (\(v,e) -> (v,(kind_of_expr e,e))) $ assign_exprs vexprs)
   {- sys         -} (if_begin_end_exprs vexprs)
+  where
+    inits = mkInits input
+    
 
 mkRtlFull ::  ([String], ([T.RegFileBase], T.BaseModule)) -> T.RtlModule
 mkRtlFull x@(hides, (rfs, bm)) = mkRtlMod (x, T.coq_CAS_RulesRf (regmap_counters $ init_state x) (T.getRules bm) rfs)
