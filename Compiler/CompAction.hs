@@ -491,14 +491,14 @@ ins_reg_constant r val = do
   s <- get
   let rmc = regmap_counters s
   let rc = reg_constant rmc
-  put $ s { regmap_counters = rmc { reg_constant = H.insert r val rc } }
+  put (s { regmap_counters = rmc { reg_constant = H.insert r val rc } })
   
 del_reg_constant :: String -> State ExprState ()
 del_reg_constant r = do
   s <- get
   let rmc = regmap_counters s
   let rc = reg_constant rmc
-  put $ s { regmap_counters = rmc { reg_constant = H.delete r rc } }
+  put (s { regmap_counters = rmc { reg_constant = H.delete r rc } })
 
 convAny :: T.Any -> T.VarType
 convAny x = T.unsafeCoerce x
@@ -510,13 +510,13 @@ do_reg r k m = case queryReg r k True m of
     ins_reg_constant r val
     return [((r, Just i), e)]
   e@(T.Var _ x) -> do
-    del_reg_constant r
     let (r', Just _) = convAny x
     if r == r'
       then return []
       else do
-      i <- reg_count r
-      return [((r, Just i),e)]
+        del_reg_constant r
+        i <- reg_count r
+        return [((r, Just i),e)]
   e -> do
     del_reg_constant r
     i <- reg_count r
