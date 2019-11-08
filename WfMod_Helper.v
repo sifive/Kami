@@ -264,8 +264,8 @@ Proof.
       apply IHx.
 Qed.
 
-Ltac ltac_wfMod_ConcatMod :=
-  apply ConcatModWf;autorewrite with kami_rewrite_db;repeat split;try assumption;auto with wfMod_ConcatMod_Helper;trivialSolve.
+Ltac ltac_wfMod_ConcatMod helper_db :=
+     repeat (apply ConcatModWf;autorewrite with kami_rewrite_db;repeat split;try (auto with helper_db);trivialSolve;try (apply string_dec)).
 
 (*Ltac WfMod_Solve :=
     match goal with
