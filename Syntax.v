@@ -1836,126 +1836,6 @@ Definition baseNoSelfCalls (m : Mod) :=
 
 
 
-Fixpoint struct_get_field_index'
-         (name: string) n
-  := match n return
-         forall (get_name : Fin.t n -> string),
-                option (Fin.t n)
-     with
-     | 0 => fun _ => None
-     | S m => fun get_name =>
-       if String.eqb (get_name Fin.F1) name
-       then Some Fin.F1
-       else match struct_get_field_index' name _ (fun i => get_name (Fin.FS i)) with
-            | Some i => Some (Fin.FS i)
-            | None => None
-            end
-     end.
-
-Definition struct_get_field_index n (kinds: Fin.t n -> Kind) (names: Fin.t n -> string) ty (e: Expr ty (SyntaxKind (Struct kinds names))) name
-  := struct_get_field_index' name names.
-
-Ltac struct_get_field_ltac packet name :=
-  let val := eval cbv in (struct_get_field_index packet name) in
-      match val with
-      | Some ?x => exact (ReadStruct packet x)
-      | None =>
-        let newstr := constr:(("get field not found in struct" ++ name)%string) in
-        fail 0 newstr
-      | _ =>
-        let newstr := constr:(("major error - struct_get_field_index not reducing " ++ name)%string) in
-        fail 0 newstr
-      end.
-
-Ltac struct_set_field_ltac packet name newval :=
-  let val := eval cbv in (struct_get_field_index packet name) in
-      match val with
-      | Some ?x => exact (UpdateStruct packet x newval)
-      | None =>
-        let newstr := constr:(("set field not found in struct " ++ name)%string) in
-        fail 0 newstr
-      | _ =>
-        let newstr := constr:(("major error - struct_set_field_index not reducing " ++ name)%string) in
-        fail 0 newstr
-      end.
-
-
-Local Ltac constructor_simpl :=
-  econstructor; eauto; simpl; unfold not; intros.
-
-Ltac destruct_string_dec :=
-  repeat match goal with
-         | H: context[string_dec ?P%string ?Q%string] |- _ =>
-           destruct (string_dec P Q)
-         | |- context[string_dec ?P%string ?Q%string] =>
-           destruct (string_dec P Q)
-         end.
-
-Local Ltac process_append :=
-  repeat match goal with
-         | H: (_ ++ _)%string = (_ ++ _)%string |- _ =>
-           rewrite <- ?append_assoc in H; cbn [append] in H
-         | |- (_ ++ _)%string = (_ ++ _)%string =>
-           rewrite <- ?append_assoc; cbn [append]
-         end;
-  repeat match goal with
-         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
-           apply append_remove_prefix in H; subst
-         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
-           apply append_remove_suffix in H; subst
-         | |- (?a ++ ?b)%string = (?a ++ ?c)%string =>
-           apply append_remove_prefix
-         | |- (?a ++ ?b)%string = (?c ++ ?b)%string =>
-           apply append_remove_suffix
-         | H: (?a ++ (String ?x ?b))%string = (?c ++ (String ?y ?d))%string |- _ =>
-           apply (f_equal string_rev) in H;
-           rewrite (string_rev_append a (String x b)), (string_rev_append c (String y d)) in H;
-           cbn [string_rev] in H;
-           rewrite <- ?append_assoc in H; cbn [append] in H
-         end.
-
-Local Ltac finish_append :=
-  auto; try (apply InSingleton || discriminate || tauto || congruence).
-
-Ltac discharge_append :=
-  simpl; unfold getBool in *; process_append; finish_append.
-
-Goal forall (a b c: string),
-  (a ++ "a" <> a ++ "b"
-  /\ a ++ "a" ++ b <> c ++ "b" ++ b
-  /\ a ++ "a" ++ "b" <> a ++ "a" ++ "c"
-  /\ "a" ++ a <> "b" ++ b
-  /\ (a ++ "a") ++ b <> a ++ "b" ++ a
-  /\ (a ++ (b ++ "b")) ++ "c" <> (a ++ b) ++ "d")%string.
-Proof. intuition idtac; discharge_append. Qed.
-
-Ltac discharge_DisjKey :=
-  repeat match goal with
-         | |- DisjKey _ _ =>
-           rewrite (DisjKeyWeak_same string_dec); unfold DisjKeyWeak; simpl; intros
-         | H: _ \/ _ |- _ => destruct H; subst
-         end; discharge_append.
-
-Ltac discharge_wf :=
-  repeat match goal with
-         | |- @WfMod _ => constructor_simpl
-         | |- @WfConcat _ _ => constructor_simpl
-         | |- _ /\ _ => constructor_simpl
-         | |- @WfConcatActionT _ _ _ => constructor_simpl
-         | |- @WfBaseModule _ => constructor_simpl
-         | |- @WfActionT _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
-         | |- @WfActionT _ _ _ => constructor_simpl
-         | |- NoDup _ => constructor_simpl
-         | H: _ \/ _ |- _ => destruct H; subst; simpl
-         | |- forall _, _ => intros
-         | |- _ -> _ => intros 
-         | H: In _ (getAllMethods _) |- _ => simpl in H;inversion H;subst;clear H;simpl
-         end;
-  discharge_DisjKey.
-
-
-(* NOTATIONS WERE HERE *)
-
 Section Positive.
   Local Open Scope positive_scope.
   Fixpoint of_pos (p : positive) (rest : string) : string :=
@@ -2024,6 +1904,25 @@ Local Definition option_bind
      end.
 
 Local Notation "X >>- F" := (option_bind X F) (at level 85, only parsing).
+
+Fixpoint struct_get_field_index'
+         (name: string) n
+  := match n return
+         forall (get_name : Fin.t n -> string),
+                option (Fin.t n)
+     with
+     | 0 => fun _ => None
+     | S m => fun get_name =>
+       if String.eqb (get_name Fin.F1) name
+       then Some Fin.F1
+       else match struct_get_field_index' name _ (fun i => get_name (Fin.FS i)) with
+            | Some i => Some (Fin.FS i)
+            | None => None
+            end
+     end.
+
+Definition struct_get_field_index n (kinds: Fin.t n -> Kind) (names: Fin.t n -> string) ty (e: Expr ty (SyntaxKind (Struct kinds names))) name
+  := struct_get_field_index' name names.
 
 Local Definition struct_get_field_aux
   (ty: Kind -> Type)

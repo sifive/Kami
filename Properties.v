@@ -1,4 +1,4 @@
-Require Import Kami.Syntax Kami.Notations Kami.Lib.Fold.
+Require Import Kami.Syntax Kami.Lib.Fold.
 Import Word.Notations.
 Import ListNotations.
 Require Import Coq.Sorting.Permutation.
@@ -432,8 +432,8 @@ Section evalExpr.
     auto.
   Qed.
 
-  Lemma evalExpr_castBits: forall ni no (pf: ni = no) (e: Bit ni @# type), evalExpr (castBits pf e) =
-                                                                           nat_cast (fun n => word n) pf (evalExpr e).
+  Lemma evalExpr_castBits: forall ni no (pf: ni = no) (e: Expr type (SyntaxKind (Bit ni))), evalExpr (castBits pf e) =
+                                                                                            nat_cast (fun n => word n) pf (evalExpr e).
   Proof.
     intros.
     unfold castBits.
@@ -443,8 +443,8 @@ Section evalExpr.
   Qed.
 
   Lemma evalExpr_BinBit: forall kl kr k (op: BinBitOp kl kr k)
-                                (l1 l2: Bit kl @# type)
-                                (r1 r2: Bit kr @# type),
+                                (l1 l2: Expr type (SyntaxKind (Bit kl)))
+                                (r1 r2: Expr type (SyntaxKind (Bit kr))),
     evalExpr l1 = evalExpr l2 ->
     evalExpr r1 = evalExpr r2 ->
     evalExpr (BinBit op l1 r1) = evalExpr (BinBit op l2 r2).
@@ -453,15 +453,15 @@ Section evalExpr.
     induction op; simpl; try congruence.
   Qed.
 
-  Lemma evalExpr_ZeroExtend: forall lsb msb (e1 e2: Bit lsb @# type), evalExpr e1 = evalExpr e2 ->
-                                                                      evalExpr (ZeroExtend msb e1) = evalExpr (ZeroExtend msb e2).
+  Lemma evalExpr_ZeroExtend: forall lsb msb (e1 e2: Expr type (SyntaxKind (Bit lsb))), evalExpr e1 = evalExpr e2 ->
+                                                                                       evalExpr (ZeroExtend msb e1) = evalExpr (ZeroExtend msb e2).
   Proof.
     intros.
     unfold ZeroExtend.
     erewrite evalExpr_BinBit; eauto.
   Qed.
 
-  Lemma evalExpr_pack_Bool: forall (e1 e2: Bool @# type),
+  Lemma evalExpr_pack_Bool: forall (e1 e2: Expr type (SyntaxKind Bool)),
       evalExpr e1 = evalExpr e2 ->
       evalExpr (pack e1) = evalExpr (pack e2).
   Proof.
@@ -509,7 +509,7 @@ Section evalExpr.
     rewrite wordToNat_natToWord_2; lia.
   Qed.
 
-  Lemma eval_ReadArray_in_bounds : forall A n (arr : Array n A @# type) i m,
+  Lemma eval_ReadArray_in_bounds : forall A n (arr : Expr type (SyntaxKind (Array n A))) i m,
     n <= pow2 m ->
     evalExpr
       (ReadArray arr
@@ -525,7 +525,7 @@ Section evalExpr.
     erewrite Fin.of_nat_ext, Fin.of_nat_to_nat_inv; eauto.
   Qed.
 
-  Corollary eval_ReadArray_in_bounds_log : forall A n (arr : Array n A @# type) i,
+  Corollary eval_ReadArray_in_bounds_log : forall A n (arr : Expr type (SyntaxKind (Array n A))) i,
     evalExpr
       (ReadArray arr
         (Var type (SyntaxKind (Bit (Nat.log2_up n)))
@@ -533,7 +533,7 @@ Section evalExpr.
     evalExpr arr i.
   Proof. intros; apply eval_ReadArray_in_bounds, log2_up_pow2. Qed.
 
-  Corollary eval_ReadArray_in_bounds_pow : forall A n (arr : Array (pow2 n) A @# type) i,
+  Corollary eval_ReadArray_in_bounds_pow : forall A n (arr : Expr type (SyntaxKind (Array (pow2 n) A))) i,
     evalExpr
       (ReadArray arr
         (Var type (SyntaxKind (Bit n))
@@ -5703,7 +5703,7 @@ Section SimulationZeroAction.
   Qed.
 End SimulationZeroAction.
 
-Lemma SemAction_if k1 k (e: Bool @# type) (a1 a2: ActionT type k1) (a: type k1 -> ActionT type k) o reads u cs v:
+Lemma SemAction_if k1 k (e: Expr type (SyntaxKind Bool)) (a1 a2: ActionT type k1) (a: type k1 -> ActionT type k) o reads u cs v:
   (if evalExpr e
    then SemAction o (LetAction a1 a) reads u cs v
    else SemAction o (LetAction a2 a) reads u cs v) ->
@@ -5714,7 +5714,7 @@ Proof.
   - econstructor 8; eauto.
 Qed.
 
-Lemma SemAction_if_split k1 k (e: Bool @# type) (a1 a2: ActionT type k1) (a: type k1 -> ActionT type k) o reads1 reads2 u1 u2 cs1 cs2 v1 v2 reads u cs v:
+Lemma SemAction_if_split k1 k (e: Expr type (SyntaxKind Bool)) (a1 a2: ActionT type k1) (a: type k1 -> ActionT type k) o reads1 reads2 u1 u2 cs1 cs2 v1 v2 reads u cs v:
   (if evalExpr e
    then SemAction o (LetAction a1 a) reads1 u1 cs1 v1
    else SemAction o (LetAction a2 a) reads2 u2 cs2 v2) ->
