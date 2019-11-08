@@ -362,7 +362,6 @@ Definition make_write : RuleT :=
         LET write_val <- ITE (#c == $1) $$write_val_2 $$write_val_1;
         LET mask <- ITE (#c == $1) $$mask2 $$mask1;
         Call (write_name tup)(@createWriteRqMask ty idxNum num Data ($write_index) (BuildArray (fun _ => #write_val)) #mask : _);
-        Call (("rule_" ++ write_name tup)%string) (@createWriteRqMask ty idxNum num Data ($write_index) (BuildArray (fun _ => #write_val)) #mask : _);
         Retv
       )
   | NotIsWrMask => (("rule_" ++ write_name tup)%string,
@@ -370,7 +369,6 @@ Definition make_write : RuleT :=
         Read c : Counter <- "counter";
         LET write_val <- ITE (#c == $1) $$write_val_2 $$write_val_1;
         Call (write_name tup)(@createWriteRq ty idxNum num Data ($write_index) (BuildArray (fun _ => #write_val)) : _);
-        Call (("rule_" ++ write_name tup)%string)(@createWriteRq ty idxNum num Data ($write_index) (BuildArray (fun _ => #write_val)) : _);
         Retv
       )
   end.
@@ -403,7 +401,6 @@ Definition make_read : RuleT :=
   (("rule_" ++ read_name tup)%string,
   fun (ty : Kind -> Type) => 
     Call val : Array num Data <- (read_name tup)($read_index : Bit (Nat.log2_up idxNum));
-    Call (("rule_" ++ read_name tup)%string)($read_index : Bit (Nat.log2_up idxNum));
     Read c : Counter <- "counter";
     LET exp_val : Array num Data <- ITE (#c == $1) $$expected_read_val_second_cycle $$expected_read_val_first_cycle;
     System ([DispString _  ("rule_" ++ read_name tup ++ ":\n")%string] ++ print_read ($read_index) ++ print_comparison #val #exp_val);
@@ -420,7 +417,6 @@ Definition make_readReq : RuleT :=
   (("rule_" ++ readReq_name tup)%string,
   fun ty => 
       Call (readReq_name tup)($read_index : Bit (Nat.log2_up idxNum));
-      Call (("rule_" ++ readReq_name tup)%string)($read_index : Bit (Nat.log2_up idxNum));
       System ([DispString _  ("rule_" ++ readReq_name tup ++ ":\n")%string] ++ print_read ($read_index));
       Retv
   ).
@@ -429,7 +425,6 @@ Definition make_readResp : RuleT :=
   (("rule_" ++ readRes_name tup)%string,
   fun (ty : Kind -> Type) =>
     Call val : Array num Data <- (readRes_name tup)();
-    Call (("rule_" ++ readRes_name tup)%string)(#val: _);
     Read c : Counter <- "counter";
     LET exp_val : Array num Data <- ITE (#c == $1) $$expected_read_val_second_cycle $$expected_read_val_first_cycle;
     System [DispString _  ("rule_" ++ readRes_name tup ++ ":\n")%string];
@@ -537,7 +532,6 @@ Definition counter : RuleT :=
   ("counter", fun ty : (Kind -> Type) =>
       Read c : Counter <- "counter";
       System [DispString _ "End of cycle "; DispHex #c; DispString _ "\n"];
-      Call "finished"(#c: Counter);
       If(#c == $1) then
         System [DispString _ "Finished.\n"; Finish _]; Retv
       else
