@@ -755,6 +755,9 @@ get_final_rfmeth_assigns rfbs s = let (asyncs,isAddrs,notIsAddrs) = process_rfbs
   --isAddr readreq
   ++ concatMap (\(readRq,argk) -> en_arg_final readRq argk $ isAddr_read_req_counters $ regmap_counters s) (get_sync_readReqs_with_arg isAddrs)
  
+  --notIsAddr readreq
+  ++ concatMap (\(readRq,argk) -> en_arg_final readRq argk $ not_isAddr_read_req_counters $ regmap_counters s) (get_sync_readReqs_with_arg notIsAddrs)
+ 
 
 all_verilog :: ModInput -> (VerilogExprs, [(T.VarType, T.RtlExpr')], H.Map String T.ConstT)
 all_verilog input@((strs,(rfbs,basemod)),cas) =

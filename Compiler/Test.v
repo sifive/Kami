@@ -27,7 +27,7 @@ Definition num := 5.
 Definition idxNum := 20.
 Definition Xlen := 32.
 Definition Data := Bit Xlen.
-Definition Counter := Bit 1.
+Definition Counter := Bit 2.
 Definition init_val : word Xlen := Xlen 'h"e".
 
 (* mask = {true; false; false; false; true} *)
@@ -532,12 +532,10 @@ Definition counter : RuleT :=
   ("counter", fun ty : (Kind -> Type) =>
       Read c : Counter <- "counter";
       System [DispString _ "End of cycle "; DispHex #c; DispString _ "\n"];
+      Write "counter" <- #c + $1;
       If(#c == $1) then
-        System [DispString _ "Finished.\n"; Finish _]; Retv
-      else
-        Write "counter" <- #c + $1;
-        Retv;
-        Retv).
+        System [DispString _ "Finished.\n"; Finish _]; Retv;
+      Retv).
 
 Definition all_reg_rules := [write_reg_WR; read_reg_WR; read_reg_RW; write_reg_RW; reg_3_rule_1; reg_3_rule_2; reg_3_rule_3].
 
