@@ -728,9 +728,10 @@ ppCAS (T.CompSyncReadReq_simple idxNum num k readReq readReg dataArray isAddr re
 
 get_final_assigns :: ExprState -> [T.RegFileBase] -> [(T.VarType, T.RtlExpr')]
 get_final_assigns s rfbs = let (_,isAddrs,notIsAddrs) = process_rfbs rfbs in
+  map (\(Register r k) -> ((r,Nothing), T.Var k $ T.unsafeCoerce (r, Just $ reg_counters (regmap_counters s) !!! r))) (all_regs s ++
+                                                                                                                        all_isAddr_shadows isAddrs ++
+                                                                                                                        all_not_isAddr_shadows notIsAddrs)
 
-  -- regular regs
-     (map (\(Register r k) -> ((r,Nothing), T.Var k $ T.unsafeCoerce (r, Just $ reg_counters (regmap_counters s) !!! r))) $ all_regs s)
 
 en_arg_final :: String -> T.Kind -> H.Map String Int -> [(T.VarType, T.RtlExpr')]
 en_arg_final f argk counters = let n = counters !!! f in
