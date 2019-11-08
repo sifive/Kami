@@ -373,17 +373,22 @@ Definition make_write : RuleT :=
       )
   end.
 
-Definition print_comparison{ty k}(val exp_val : Expr ty (SyntaxKind k)) : list (SysT ty) :=
-  [DispString _ "Read Value:     ";
-   DispHex val;
-   DispString _ "\n";
-   DispString _ "Expected Value: ";
-   DispHex exp_val;
-   DispString _ "\n";
-   DispString _ "Match: ";
-   DispHex (Eq val exp_val);
-   DispString _ "\n\n"
-  ].
+Definition print_comparison{ty k}(val exp_val : Expr ty (SyntaxKind k)) : ActionT ty Void :=
+  System (
+    [DispString _ "Read Value:     ";
+     DispHex val;
+     DispString _ "\n";
+     DispString _ "Expected Value: ";
+     DispHex exp_val;
+     DispString _ "\n"
+    ]
+  );
+  Read curr_passing : Bool <- "passing";
+  Write "passing" <- #curr_passing && (val == exp_val);
+  If (val == exp_val)
+  then (System [DispString _ "Passed.\n\n"]; Retv)
+  else (System [DispString _ "FAILED FAILED FAILED FAILED FAILED FAILED FAILED FAILED\n\n"]; Retv);
+  Retv.
 
 Definition print_read{ty}(read_idx : Expr ty (SyntaxKind (Bit (Nat.log2_up idxNum)))) : list (SysT ty) :=
   [DispString _ "Read Index: ";
@@ -403,7 +408,8 @@ Definition make_read : RuleT :=
     Call val : Array num Data <- (read_name tup)($read_index : Bit (Nat.log2_up idxNum));
     Read c : Counter <- "counter";
     LET exp_val : Array num Data <- ITE (#c == $1) $$expected_read_val_second_cycle $$expected_read_val_first_cycle;
-    System ([DispString _  ("rule_" ++ read_name tup ++ ":\n")%string] ++ print_read ($read_index) ++ print_comparison #val #exp_val);
+    System ([DispString _  ("rule_" ++ read_name tup ++ ":\n")%string] ++ print_read ($read_index));
+    LETA _ : _ <- (print_comparison #val #exp_val);
     Retv
   ).
 
@@ -428,7 +434,7 @@ Definition make_readResp : RuleT :=
     Read c : Counter <- "counter";
     LET exp_val : Array num Data <- ITE (#c == $1) $$expected_read_val_second_cycle $$expected_read_val_first_cycle;
     System [DispString _  ("rule_" ++ readRes_name tup ++ ":\n")%string];
-    If (#c == $1) then (System (print_comparison #val #exp_val); Retv);
+    If (#c == $1) then (print_comparison #val #exp_val);
     Retv
   ).
 
@@ -478,7 +484,8 @@ Definition read_reg_WR : RuleT :=
       Read c : Counter <- "counter";
       Read val : Data <- "reg_WR";
       LET exp_val : Data <- ITE (#c == $1) $$write_val_2 $$write_val_1;
-      System ([DispString _ "read_reg_WR:\n"] ++ print_comparison #val #exp_val);
+      System [DispString _ "read_reg_WR:\n"];
+      LETA _ : _ <- print_comparison #val #exp_val;
       Retv
       ).
 
@@ -489,7 +496,8 @@ Definition read_reg_RW : RuleT :=
       Read c : Counter <- "counter";
       Read val : Data <- "reg_RW";
       LET exp_val : Data <- ITE (#c == $1) $$write_val_1 $$init_val;
-      System ([DispString _ "read_reg_RW:\n"] ++ print_comparison #val #exp_val);
+      System [DispString _ "read_reg_RW:\n"];
+      LETA _ : _ <- print_comparison #val #exp_val;
       Retv
       ).
 
@@ -506,7 +514,8 @@ Definition reg_3_rule_1 : RuleT :=
   ("reg_3_write_1", fun ty : (Kind -> Type) =>
       Write "reg_3" <- $$write_val_1;
       Read val : Data <- "reg_3";
-      System ([DispString _ "reg_3_write_1:\n"] ++ print_comparison #val $$init_val);
+      System [DispString _ "reg_3_write_1:\n"];
+      LETA _ : _ <- print_comparison #val $$init_val;
       Retv
       ).
 
@@ -514,7 +523,8 @@ Definition reg_3_rule_2 : RuleT :=
   ("reg_3_write_2", fun ty : (Kind -> Type) =>
       Write "reg_3" <- $$write_val_2;
       Read val : Data <- "reg_3";
-      System ([DispString _ "reg_3_write_2:\n"] ++ print_comparison #val $$write_val_1);
+      System [DispString _ "reg_3_write_2:\n"];
+      LETA _ : _ <- print_comparison #val $$write_val_1;
       Retv
       ).
 
@@ -522,7 +532,8 @@ Definition reg_3_rule_3 : RuleT :=
   ("reg_3_init", fun ty : (Kind -> Type) =>
       Write "reg_3" <- $$init_val;
       Read val : Data <- "reg_3";
-      System ([DispString _ "reg_3_init:\n"] ++ print_comparison #val $$write_val_2);
+      System [DispString _ "reg_3_init:\n"];
+      LETA _ : _ <- print_comparison #val $$write_val_2;
       Retv
       ).
 
@@ -534,7 +545,11 @@ Definition counter : RuleT :=
       System [DispString _ "End of cycle "; DispHex #c; DispString _ "\n"];
       Write "counter" <- #c + $1;
       If(#c == $1) then
-        System [DispString _ "Finished.\n"; Finish _]; Retv;
+        (Read passed : Bool <- "passing";
+        If (#passed) 
+        then (System [DispString _ "Test Suite Passed.\n"; Finish _]; Retv)
+        else (System [DispString _ "Test Suite Failed.\n"; Finish _]; Retv);
+        Retv);
       Retv).
 
 Definition all_reg_rules := [write_reg_WR; read_reg_WR; read_reg_RW; write_reg_RW; reg_3_rule_1; reg_3_rule_2; reg_3_rule_3].
@@ -543,22 +558,26 @@ Definition testRegBaseMod := BaseMod [
   ("reg_WR", (existT _ (SyntaxKind _) (Some (SyntaxConst init_val))));
   ("reg_RW", (existT _ (SyntaxKind _) (Some (SyntaxConst init_val))));
   ("reg_3", (existT _ (SyntaxKind _) (Some (SyntaxConst init_val))));
-  ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))))
+  ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))));
+  ("passing", (existT _ (SyntaxKind Bool) (Some (SyntaxConst (ConstBool true)))))
   ]
  (all_reg_rules ++ [counter]) [].
 
 Definition testAsyncBaseMod := BaseMod [
-  ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))))
+  ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))));
+  ("passing", (existT _ (SyntaxKind Bool) (Some (SyntaxConst (ConstBool true)))))
   ]
   (all_async_rules ++ [counter]) [].
 
 Definition testSyncIsAddrBaseMod := BaseMod [
-  ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))))
+  ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))));
+  ("passing", (existT _ (SyntaxKind Bool) (Some (SyntaxConst (ConstBool true)))))
   ]
   (all_syncIsAddr_rules ++ [counter]) [].
 
 Definition testSyncNotIsAddrBaseMod := BaseMod [
-  ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))))
+  ("counter", (existT _ (SyntaxKind (Counter)) (Some (SyntaxConst (getDefaultConst _)))));
+  ("passing", (existT _ (SyntaxKind Bool) (Some (SyntaxConst (ConstBool true)))))
   ]
   (all_syncNotIsAddr_rules ++ [counter]) [].
 
