@@ -207,12 +207,17 @@ data RME2 =
   | ReadReqRME2 Int Int String String String T.RtlExpr' T.Kind Bool T.RtlExpr' RME2 RME2 T.RtlExpr'
   | NilRME2 deriving (Show)
 
-union_RME2 :: RME2 -> RME2 -> RME2
-union_RME2 NilRME2 x = x
-union_RME2 (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) x =
-  WriteRME2 idxNum num writePort dataArray idx dataK val mask pred (union_RME2 writeMap x) (union_RME2 readMap x) arr
-union_RME2 (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) x =
-  ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred (union_RME2 writeMap x) (union_RME2 readMap x) arr
+length_RME2 :: RME2 -> Int
+length_RME2 NilRME2 = 0
+length_RME2 (WriteRME2 _ _ _ _ _ _ _ _ _ m _ _) = 1 + length_RME2 m
+length_RME2 (ReadReqRME2 _ _ _ _ _ _ _ _ _ m _ _) = 1 + length_RME2 m
+
+app_RME2 :: RME2 -> RME2 -> RME2
+app_RME2 NilRME2 x = x
+app_RME2 (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) x =
+  WriteRME2 idxNum num writePort dataArray idx dataK val mask pred (app_RME2 writeMap x) readMap arr
+app_RME2 (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) x =
+  ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred (app_RME2 writeMap x) readMap arr
 
 rme2_to_rme :: RME2 -> RME
 rme2_to_rme (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) =
@@ -230,6 +235,24 @@ data RegMapTy =
   , isAddr_read_req_counters :: H.Map String Int
   , not_isAddr_read_req_counters :: H.Map String Int
   , meth_call_history :: RME2 } deriving (Show)
+
+is_nil_RME2 :: RME2 -> Bool
+is_nil_RME2 NilRME2 = True
+is_nil_RME2 _ = False
+
+is_empty :: RegMapTy -> Bool
+is_empty rmt =
+     (H.null $ reg_counters rmt)
+  && (H.null $ reg_constant rmt)
+  && (H.null $ write_counters rmt)
+  && (H.null $ async_read_counters rmt)
+  && (H.null $ isAddr_read_req_counters rmt)
+  && (H.null $ not_isAddr_read_req_counters rmt)
+  && (is_nil_RME2 $ meth_call_history rmt)
+
+is_nil_RME :: RME -> Bool
+is_nil_RME (T.VarRME rmt) = is_empty rmt
+is_nil_RME _ = False
 
 empty_rmt :: RegMapTy
 empty_rmt = RegMapTy {
@@ -400,7 +423,12 @@ queryNotIsAddrRegWrite :: String -> String -> Int -> Int -> T.Kind -> Bool -> RM
 queryNotIsAddrRegWrite writeName readReqName idxNum num k isMask regMap = pointwise
   where
     (tail,readCall) = querySyncReadReq readReqName idxNum True regMap
-    writeCall = queryRfWrite writeName idxNum num k isMask True tail
+    writeCall = if is_nil_RME tail then 
+      PredCall {
+          pred_val = pred_val readCall
+        , call_val = T.coq_Invalid k
+      } else
+      queryRfWrite writeName idxNum num k isMask True tail
     pointwise = T.pointwiseIntersection idxNum num k isMask (pred_val readCall) (call_val readCall) (pred_val writeCall) (T.unsafeCoerce $ call_val writeCall)
 
 queryAsyncReadResp :: String -> String -> Int -> Int -> T.Kind -> Bool -> RME -> T.RtlExpr'
@@ -633,8 +661,10 @@ flatten_RME_state :: RME -> State ExprState ()
 flatten_RME_state regMap = do
   s <- get
   let rmc = regmap_counters s
-  let mch = meth_call_history rmc
-  put $ s { regmap_counters = rmc { meth_call_history = union_RME2 (flatten_RME regMap) mch} } 
+  let mch1 = meth_call_history rmc
+  let mch2 = flatten_RME regMap
+  let mch' = {- trace ("appending: " ++ (show $ length_RME2 mch2) ++ "  with " ++ (show $ length_RME2  mch1)) $ -} app_RME2 mch2 mch1
+  put $ s { regmap_counters = rmc { meth_call_history = mch' } } 
 
 do_not_isAddr_read_reg :: String -> String -> String -> Int -> Int -> T.Kind -> Bool -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_not_isAddr_read_reg regName writeName readReqName idxNum num k isMask regMap = do
