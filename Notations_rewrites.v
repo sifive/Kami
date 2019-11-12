@@ -802,7 +802,46 @@ Qed.
 
 Hint Rewrite in_app : kami_rewrite_db.
 
+Lemma getAllMethods_makeModule_append: forall a b, getAllMethods (makeModule (a++b))=getAllMethods (makeModule a)++getAllMethods (makeModule b).
+Proof.
+    induction a.
+    + reflexivity.
+    + intros.
+      destruct a.
+      - apply IHa.
+      - apply IHa.
+      - unfold makeModule.
+        simpl.
+        simpl in IHa.
+        rewrite IHa.
+        reflexivity.
+Qed.
 
+Hint Rewrite getAllMethods_makeModule_append : kami_rewrite_db.
 
-          
+Lemma getAllMethods_makeModule_MERegister: forall a b, getAllMethods (makeModule ((MERegister a)::b))=getAllMethods (makeModule b).
+Proof.
+    simpl.
+    reflexivity.
+Qed.
+
+Hint Rewrite getAllMethods_makeModule_MERegister : kami_rewrite_db.
+
+Lemma getAllMethods_makeModule_MERule: forall a b, getAllMethods (makeModule ((MERule a)::b))=getAllMethods (makeModule b).
+Proof.
+    simpl.
+    reflexivity.
+Qed.
+
+Hint Rewrite getAllMethods_makeModule_MERule : kami_rewrite_db.
+
+Lemma getAllMethods_makeModule_Registers: forall a, getAllMethods (makeModule (Registers a))=[].
+Proof.
+    induction a.
+    + reflexivity.
+    + simpl.
+      apply IHa.
+Qed.
+
+Hint Rewrite getAllMethods_makeModule_Registers : kami_rewrite_db.
 
