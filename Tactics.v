@@ -1,4 +1,5 @@
 Require Import Kami.Lib.EclecticLib Kami.Syntax Kami.Properties.
+Require Import List.
 
 Ltac struct_get_field_ltac packet name :=
   let val := eval cbv in (struct_get_field_index packet name) in
@@ -74,12 +75,244 @@ Goal forall (a b c: string),
   /\ (a ++ (b ++ "b")) ++ "c" <> (a ++ b) ++ "d")%string.
 Proof. intuition idtac; discharge_append. Qed.
 
+Theorem DisjKey_nil2: forall A B (l: list (A*B)), DisjKey l List.nil.
+Proof.
+  intros.
+  unfold DisjKey.
+  intros.
+  right.
+  simpl.
+  intro X.
+  elim X.
+Qed.
+
+Theorem DisjKey_nil1: forall A B (l: list (A*B)), DisjKey List.nil l.
+Proof.
+  intros.
+  unfold DisjKey.
+  intros.
+  left.
+  simpl.
+  intro X.
+  elim X.
+Qed.
+
+Ltac trivialSolve :=
+    match goal with
+    | |- forall _, In _ (getAllRules (Base (BaseRegFile _))) -> _ => simpl;intros;trivialSolve
+    | H: False |- _ => elim H
+    (*| |- DisjKey _ List.nil => apply DisjKey_nil2 
+    | |- DisjKey List.nil _ => apply DisjKey_nil1
+    | |- DisjKeyWeak _ List.nil => rewrite <- DisjKeyWeak_same;[apply DisjKey_nil2 | repeat (decide equality)]
+    | |- DisjKeyWeak List.nil _ => rewrite <- DisjKeyWeak_same;[apply DisjKey_nil1 | repeat (decide equality)]*)
+    | |- ~ (List.In _ _) => progress(simpl);trivialSolve
+    | |- ~ (_ \/ _) => let X := fresh in intro X;inversion X;subst;clear X;trivialSolve
+    | |- _ /\ _ => split;trivialSolve
+    | |- ~False => let X := fresh in intro X;inversion X
+    (*| |- (_++_)%string <> (_++_)%string => let X := fresh in try (intro X;apply string_equal_prefix in X; inversion X)*)
+    (*| |- ~((?P++_)%string = _ \/ False) \/ ~((?P++_)%string = _ \/ False) => let X := fresh in try (apply or_diff;intro X;inversion X)*)
+    | |- NoDup (_::_) => econstructor; simpl; trivialSolve
+    | |- NoDup [] => econstructor
+    | H: _ \/ _ |- _ => inversion H;subst;clear H;trivialSolve
+    (*| H: (?P++_)%string=(?P++_)%string |- _ => apply string_equal_prefix in H;inversion H;subst;clear H;trivialSolve*)
+    | H: In _ (map fst _) |- _ => progress(simpl in H);trivialSolve
+    | |- (?P = ?P) => reflexivity
+    | |- _ => discharge_append
+    | _ => idtac
+    end.
+
+  Theorem DisjKey_Cons1:
+    forall T Q (a:(T*Q)) x z (W:forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}),
+           DisjKey (a::x) z <-> ((~(List.In (fst a) (List.map fst z))) /\ DisjKey x z).
+  Proof.
+    intros.
+    rewrite ?DisjKeyWeak_same.
+    split.
+    + intros.
+      split.
+      - unfold DisjKeyWeak in H.
+        assert (List.In (fst a) (List.map fst (a::x)) -> List.In (fst a) (List.map fst z) -> False).
+        apply H.
+        intro X.
+        apply H0.
+        simpl.
+        left.
+        reflexivity.
+        apply X.
+      - simpl.
+        intros.
+        unfold DisjKeyWeak in H.
+        unfold DisjKeyWeak.
+        intros.
+        assert (List.In k (List.map fst (a::x)) -> List.In k (List.map fst z) -> False).
+        apply H.
+        apply H2.
+        simpl.
+        right.
+        apply H0.
+        apply H1.
+    + intros.
+      inversion H; subst; clear H.
+      unfold DisjKeyWeak.
+      unfold DisjKeyWeak in H1.
+      intros.
+      assert (List.In k (List.map fst x) -> List.In k (List.map fst z) -> False).
+      apply H1.
+      simpl in H.
+      inversion H;subst;clear H.
+      - apply H0.
+        apply H2.
+      - apply H3.
+        apply H4.
+        apply H2.
+    + apply W.
+    + apply W.
+Qed.
+
+Theorem DisjKey_Cons2:
+    forall T Q (a:(T*Q)) x z (W:forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}),
+           DisjKey x (a::z) <-> ((~(List.In (fst a) (List.map fst x))) /\ DisjKey x z).
+Proof.
+    intros.
+    rewrite ?DisjKeyWeak_same.
+    split.
+    + intros.
+      split.
+      - intros.
+        unfold DisjKeyWeak in H.
+        assert (List.In (fst a) (List.map fst x) -> List.In (fst a) (List.map fst (a::z)) -> False).
+        apply H.
+        intro X.
+        apply H0.
+        apply X.
+        simpl.
+        left.
+        reflexivity.
+      - simpl.
+        intros.
+        unfold DisjKeyWeak in H.
+        unfold DisjKeyWeak.
+        intros.
+        assert (List.In k (List.map fst x) -> List.In k (List.map fst (a::z)) -> False).
+        apply H.
+        apply H2.
+        apply H0.
+        simpl.
+        right.
+        apply H1.
+    + intros.
+      inversion H; subst; clear H.
+      unfold DisjKeyWeak.
+      unfold DisjKeyWeak in H1.
+      intros.
+      inversion H2;subst;clear H2.
+      - apply H0 in H.
+        inversion H.
+      - assert (List.In k (List.map fst x) -> List.In k (List.map fst z) -> False).
+        apply H1.
+        apply H2.
+        apply H.
+        apply H3.
+    +  apply W.
+    + apply W.
+Qed.
+
+Theorem DisjKey_NubBy1: forall T (x: list (string * T)) (y: list (string * T)), DisjKey x y -> DisjKey (nubBy (fun '(a,_) '(b,_) => String.eqb a b) x) y.
+Proof.
+    intros  T x y.
+    generalize y.
+    induction x.
+    + simpl.
+      intros.
+      apply H.
+    + simpl.
+      remember (
+        existsb (let '(a0, _) := a in fun '(b, _) => a0 =? b)
+         (nubBy (fun '(a0, _) '(b, _) => a0 =? b) x)).
+      destruct b.
+      - simpl.
+        intros.
+        apply IHx.
+        unfold DisjKey in H.
+        simpl in H.
+        unfold DisjKey.
+        intros.
+        assert(
+          ~ (fst a = k \/ In k (map fst x)) \/ ~ In k (map fst y0)
+        ).
+        ++ apply H.
+        ++ inversion H0;subst;clear H0.
+           -- left.
+              intro X. 
+              apply H1.
+              right.
+              apply X.
+           -- right.
+              apply H1.
+      - intros.
+        rewrite DisjKey_Cons1.
+        rewrite DisjKey_Cons1 in H.
+        inversion H;subst;clear H.
+        split.
+        ++ apply H0.
+        ++ apply IHx.
+           apply H1.
+        ++ repeat (decide equality).
+        ++ repeat (decide equality).
+Qed.
+
+Theorem DisjKey_NubBy2: forall T (x: list (string * T)) (y: list (string * T)), DisjKey x y -> DisjKey x (nubBy (fun '(a,_) '(b,_) => String.eqb a b) y).
+Proof.
+    intros T x y.
+    generalize x.
+    induction y.
+    + simpl.
+      intros.
+      apply H.
+    + simpl.
+      remember (
+        existsb (let '(a0, _) := a in fun '(b, _) => a0 =? b)
+          (nubBy (fun '(a0, _) '(b, _) => a0 =? b) y)).
+      destruct b.
+      - simpl.
+        intros.
+        apply IHy.
+        unfold DisjKey in H.
+        simpl in H.
+        unfold DisjKey.
+        intros.
+        assert(
+          ~ In k (map fst x0) \/ ~ (fst a = k \/ In k (map fst y))
+        ).
+        ++ apply H.
+        ++ inversion H0; subst; clear H0.
+           -- left.
+              apply H1.
+           -- right.
+              intro X.
+              apply H1.
+              right.
+              apply X.
+      - intros.
+        rewrite DisjKey_Cons2.
+        rewrite DisjKey_Cons2 in H.
+        inversion H;subst;clear H.
+        split.
+        ++ apply H0.
+        ++ apply IHy.
+           apply H1.
+        ++ repeat (decide equality).
+        ++ repeat (decide equality).
+Qed.
+
 Ltac discharge_DisjKey :=
   repeat match goal with
+         | |- DisjKey _ (nubBy _) => apply DisjKey_NubBy2
+         | |- DisjKey (nubBy _) _ => apply DisjKey_NubBy1
          | |- DisjKey _ _ =>
-           rewrite (DisjKeyWeak_same string_dec); unfold DisjKeyWeak; simpl; intros
+           rewrite (DisjKeyWeak_same string_dec); unfold DisjKeyWeak; let k := fresh in intro k; simpl; intros
          | H: _ \/ _ |- _ => destruct H; subst
-         end; discharge_append.
+         end; trivialSolve.
 
 Ltac discharge_wf :=
   repeat match goal with
@@ -245,3 +478,4 @@ Ltac discharge_simulation mySimRel :=
       | H: mySimRel _ _ |- _ => inv H
       end;
   clean_hyp; auto; clean_hyp.
+

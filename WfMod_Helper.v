@@ -70,7 +70,7 @@ Proof.
   + elim H1.
 Qed.*)
 
-Ltac trivialSolve :=
+(*Ltac trivialSolve :=
     match goal with
     | |- forall _, In _ (getAllRules (Base (BaseRegFile _))) -> _ => simpl;intros;trivialSolve
     | H: False |- _ => elim H
@@ -91,7 +91,7 @@ Ltac trivialSolve :=
     | H: In _ (map fst _) |- _ => simpl in H;trivialSolve
     | |- (?P = ?P) => reflexivity
     | _ => idtac
-    end.
+    end.*)
 
 Theorem ne_disjunction_break1: forall a b c, (~(a \/ False) \/ ~(b \/ False)) /\
                                        (~(a \/ False) \/ ~c) ->
