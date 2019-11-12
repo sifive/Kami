@@ -426,7 +426,7 @@ queryNotIsAddrRegWrite :: String -> String -> Int -> Int -> T.Kind -> Bool -> RM
 queryNotIsAddrRegWrite writeName readReqName idxNum num k isMask regMap = pointwise
   where
     (tail, readCall) = querySyncReadReq readReqName idxNum True regMap
-    writeCall = trace ("TAIL: " ++ show tail ++ "\n\n") $ queryRfWrite writeName idxNum num k isMask True $ rme2_to_rme tail
+    writeCall = queryRfWrite writeName idxNum num k isMask True $ rme2_to_rme tail
     pointwise = T.pointwiseIntersection idxNum num k isMask (pred_val readCall) (call_val readCall) (pred_val writeCall) (T.unsafeCoerce $ call_val writeCall)
 
 queryAsyncReadResp :: String -> String -> Int -> Int -> T.Kind -> Bool -> RME -> T.RtlExpr'
