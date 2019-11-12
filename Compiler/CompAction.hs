@@ -290,10 +290,7 @@ init_state :: PreModInput -> ExprState
 init_state (_,(rfbs,basemod)) = let (asyncs, isAddrs, notIsAddrs) = process_rfbs rfbs in
  init_state_aux (regs_of_basemod basemod) asyncs isAddrs notIsAddrs (get_calls_from_basemod basemod rfbs) 
 
-data PredCall =
-  PredCall
-  { pred_val :: T.RtlExpr'
-  , call_val :: T.RtlExpr' }
+type PredCall = (T.RtlExpr', T.RtlExpr')
 
 queryReg :: String -> T.FullKind -> Bool -> RME -> T.RtlExpr
 queryReg name k isWrite regMap =
@@ -319,34 +316,37 @@ queryReg name k isWrite regMap =
     query (T.CompactRME regMap) =
       query regMap
 
-createPredCall :: String -> T.Kind -> [T.RtlExpr'] -> [T.RtlExpr'] -> PredCall
-createPredCall s k [a@(T.Var _ pred)] [b@(T.Var _ call)] = PredCall a b
-createPredCall _ k preds calls = PredCall (T.CABool T.Or preds) (T.unpack k (T.CABit (T.size k) T.Bor calls))
-  
+createPredCall :: String -> T.Kind -> [PredCall] -> PredCall
+createPredCall s k [a@(T.Var _ pred, T.Var _ call)] = a
+createPredCall _ k predCalls = T.predPackOr k predCalls
+
+getPredCallList :: String -> T.Kind -> Int -> [PredCall]
+getPredCallList name k count =
+  (map (\i -> (T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (name ++ "#_enable", Just i), T.Var (T.SyntaxKind k) $ T.unsafeCoerce (name ++ "#_argument", Just i))) [0..count])
+
 
 queryRfWrite :: String -> Int -> Int -> T.Kind -> Bool -> Bool -> RME -> PredCall
 queryRfWrite name idxNum num k isMask isWrite regMap =
-  createPredCall name writeType preds calls
-  -- PredCall (T.CABool T.Or preds) (T.orKind writeType calls)
+  createPredCall name writeType predCalls
   where
     writeType = if isMask then T.coq_WriteRqMask (log2_up idxNum) num k else T.coq_WriteRq (log2_up idxNum) (T.Array num k)
     addrSize = log2_up idxNum
-    (preds, calls) = query regMap
+    predCalls = query regMap
     query (T.VarRME v) =
       --let count = write_counters v !!! name in
         let count = (case write_counters v H.!? name of
                         Just n -> n
                         Nothing -> 0)
           in
-        ([T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (name ++ "#_enable", Just count)], [T.Var (T.SyntaxKind writeType) $ T.unsafeCoerce (name ++ "#_argument", Just count)])
+          getPredCallList name writeType count
     query (T.UpdRegRME r pred k val regMap') = query regMap'
     query (T.WriteRME idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) =
-      let (restPred, restCall) = query (if isWrite then writeMap else readMap) in
+      let (restPredCall) = query (if isWrite then writeMap else readMap) in
         if writePort == name
-        then (pred : restPred, T.predPack (T.Bit $ T.size writeType) pred (case mask of
-                                                                              Nothing -> T.createWriteRq idxNum num dataK idx val
-                                                                              Just mask' -> T.createWriteRqMask idxNum num dataK idx val mask') : restCall)
-        else (restPred, restCall)
+        then ((pred, T.predPack (T.Bit $ T.size writeType) pred (case mask of
+                                                                    Nothing -> T.createWriteRq idxNum num dataK idx val
+                                                                    Just mask' -> T.createWriteRqMask idxNum num dataK idx val mask')) : restPredCall)
+        else (restPredCall)
     query (T.ReadReqRME idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
       query (if isWrite then writeMap else readMap)
     query (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr readMap) =
@@ -358,13 +358,12 @@ queryRfWrite name idxNum num k isMask isWrite regMap =
 
 queryAsyncReadReq :: String -> Int -> Bool -> RME -> PredCall
 queryAsyncReadReq name idxNum isWrite regMap =
-  createPredCall name (T.Bit (log2_up idxNum)) preds calls
-  -- PredCall (T.CABool T.Or preds) (T.orKind (T.Bit $ log2_up idxNum) calls)
+  createPredCall name (T.Bit (log2_up idxNum)) predCalls
   where
-    (preds, calls) = query regMap
+    (predCalls) = query regMap
     query (T.VarRME v) =
       let count = async_read_counters v !!! name in
-        ([T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (name ++ "#_enable", Just count)], [T.Var (T.SyntaxKind (T.Bit (log2_up idxNum))) $ T.unsafeCoerce (name ++ "#_argument", Just count)])
+        getPredCallList name (T.Bit (log2_up idxNum)) count
     query (T.UpdRegRME r pred k val regMap') = query regMap'
     query (T.WriteRME idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) =
       query (if isWrite then writeMap else readMap)
@@ -373,10 +372,10 @@ queryAsyncReadReq name idxNum isWrite regMap =
     query (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr readMap) =
       query readMap
     query (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k readMap) =
-      let (restPred, restAddr) = query readMap in
+      let (restPredAddr) = query readMap in
         if readPort == name
-        then (pred : restPred, T.predPack (T.Bit (log2_up idxNum)) pred idx : restAddr)
-        else (restPred, restAddr)
+        then ((pred, T.predPack (T.Bit (log2_up idxNum)) pred idx) : restPredAddr)
+        else (restPredAddr)
     query (T.CompactRME regMap) =
       query regMap
 
@@ -392,23 +391,22 @@ querySyncReadReqTail name' regMap2 = query regMap2
 
 querySyncReadReq :: String -> Int -> Bool -> RME -> (RME2, PredCall)
 querySyncReadReq name idxNum isWrite regMap =
-  (tail, createPredCall name (T.Bit (log2_up idxNum)) preds calls)
-  -- PredCall (T.CABool T.Or preds) (T.orKind (T.Bit $ log2_up idxNum) calls)
+  (tail, createPredCall name (T.Bit (log2_up idxNum)) predCalls)
   where
-    (tail, preds, calls) = query regMap
+    (tail, predCalls) = query regMap
     query (T.VarRME v) =
       let count = (case isAddr_read_req_counters v H.!? name of
                       Just c -> c
                       Nothing -> not_isAddr_read_req_counters v !!! name) in
-          (querySyncReadReqTail name $ meth_call_history v, [T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (name ++ "#_enable", Just count)], [T.Var (T.SyntaxKind (T.Bit (log2_up idxNum))) $ T.unsafeCoerce (name ++ "#_argument", Just count)])
+        (querySyncReadReqTail name $ meth_call_history v, getPredCallList name (T.Bit (log2_up idxNum)) count)
     query (T.UpdRegRME r pred k val regMap') = query regMap'
     query (T.WriteRME idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) =
       query (if isWrite then writeMap else readMap)
     query (T.ReadReqRME idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
-      let (tail', restPred, restAddr) = query (if isWrite then writeMap else readMap) in
+      let (tail', restPredAddr) = query (if isWrite then writeMap else readMap) in
         if readReq == name
-        then (flatten_RME (if isWrite then writeMap else readMap), pred : restPred, T.predPack (T.Bit (log2_up idxNum)) pred idx : restAddr)
-        else (tail' ,restPred, restAddr)
+        then ((flatten_RME (if isWrite then writeMap else readMap), (pred, T.predPack (T.Bit (log2_up idxNum)) pred idx) : restPredAddr))
+        else (tail', restPredAddr)
     query (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr readMap) =
       query readMap
     query (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k readMap) =
@@ -417,7 +415,7 @@ querySyncReadReq name idxNum isWrite regMap =
       query regMap
 
 queryIsAddrRegWrite :: String -> String -> Int -> RME -> T.RtlExpr'
-queryIsAddrRegWrite name readReqName idxNum regMap = T.ITE (T.SyntaxKind (T.Bit (log2_up idxNum))) (pred_val readCall) (call_val readCall) regVal
+queryIsAddrRegWrite name readReqName idxNum regMap = T.ITE (T.SyntaxKind (T.Bit (log2_up idxNum))) (fst readCall) (snd readCall) regVal
   where
     (_,readCall) = querySyncReadReq readReqName idxNum True regMap
     regVal = T.Var (T.SyntaxKind (T.Bit (log2_up idxNum))) (T.unsafeCoerce (name, Nothing))
@@ -427,7 +425,7 @@ queryNotIsAddrRegWrite writeName readReqName idxNum num k isMask regMap = pointw
   where
     (tail, readCall) = querySyncReadReq readReqName idxNum True regMap
     writeCall = queryRfWrite writeName idxNum num k isMask True $ rme2_to_rme tail
-    pointwise = T.pointwiseIntersection idxNum num k isMask (pred_val readCall) (call_val readCall) (pred_val writeCall) (T.unsafeCoerce $ call_val writeCall)
+    pointwise = T.pointwiseIntersection idxNum num k isMask (fst readCall) (snd readCall) (fst writeCall) (T.unsafeCoerce $ snd writeCall)
 
 queryAsyncReadResp :: String -> String -> Int -> Int -> T.Kind -> Bool -> RME -> T.RtlExpr'
 queryAsyncReadResp name writeName idxNum num k isMask regMap =
@@ -436,7 +434,7 @@ queryAsyncReadResp name writeName idxNum num k isMask regMap =
     respVal = (T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (name ++ "#_return", Nothing)))
     readCall = queryAsyncReadReq name idxNum False regMap
     writeCall = queryRfWrite writeName idxNum num k isMask False regMap
-    pointwise = T.pointwiseIntersection idxNum num k isMask (pred_val readCall) (call_val readCall) (pred_val writeCall) (T.unsafeCoerce $ call_val writeCall)
+    pointwise = T.pointwiseIntersection idxNum num k isMask (fst readCall) (snd readCall) (fst writeCall) (T.unsafeCoerce $ snd writeCall)
 
 queryIsAddrReadResp :: String -> String -> String -> Int -> Int -> T.Kind -> Bool -> RME -> T.RtlExpr'
 queryIsAddrReadResp name writeName regName idxNum num k isMask regMap =
@@ -445,7 +443,7 @@ queryIsAddrReadResp name writeName regName idxNum num k isMask regMap =
     respVal = T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (name ++ "#_return", Nothing))
     readAddr = T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (regName, Nothing))
     writeCall = queryRfWrite writeName idxNum num k isMask False regMap
-    pointwise = T.pointwiseIntersection idxNum num k isMask (T.Const T.Bool (T.ConstBool True)) readAddr (pred_val writeCall) (T.unsafeCoerce $ call_val writeCall)
+    pointwise = T.pointwiseIntersection idxNum num k isMask (T.Const T.Bool (T.ConstBool True)) readAddr (fst writeCall) (T.unsafeCoerce $ snd writeCall)
 
 queryNotIsAddrReadResp :: String -> String -> Int -> T.Kind -> T.RtlExpr'
 queryNotIsAddrReadResp name regName num k =
@@ -574,8 +572,8 @@ do_regs m = do
 
 do_write :: String -> Int -> Int -> T.Kind -> Bool -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_write writeName idxNum num k isMask regMap = case queryRfWrite writeName idxNum num k isMask True regMap of
-  PredCall (T.Var _ _) _ -> return []
-  PredCall e1 e2 -> do
+  (T.Var _ _, _) -> return []
+  (e1, e2) -> do
     i <- write_count writeName
     return [((writeName ++ "#_enable", Just i), e1), ((writeName ++ "#_argument", Just i), e2)]
 
@@ -592,8 +590,8 @@ do_writes m = do
 
 do_async_read :: String -> Int -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_async_read name idxNum regMap = case queryAsyncReadReq name idxNum True regMap of
-  PredCall (T.Var _ _) _ -> return []
-  PredCall e1 e2 -> do
+  (T.Var _ _, _) -> return []
+  (e1, e2) -> do
     i <- async_read_count name
     return [((name ++ "#_enable", Just i), e1), ((name ++ "#_argument", Just i), e2)]
 
@@ -604,8 +602,8 @@ do_async_reads m = do
 
 do_isAddr_read_req :: String -> Int -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_isAddr_read_req name idxNum regMap = case querySyncReadReq name idxNum True regMap of
-  (_,PredCall (T.Var _ _) _) -> return []
-  (_,PredCall e1 e2) -> do
+  (_, (T.Var _ _, _)) -> return []
+  (_, (e1, e2)) -> do
     i <- isAddr_read_req_count name
     return [((name ++ "#_enable", Just i),e1), ((name ++ "#_argument", Just i),e2)]
 
@@ -634,8 +632,8 @@ do_isAddr_read_regs m = do
 
 do_not_isAddr_read_req :: String -> Int -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_not_isAddr_read_req name idxNum regMap = case querySyncReadReq name idxNum True regMap of
-  (_,PredCall (T.Var _ _) _) -> return []
-  (_,PredCall e1 e2) -> do
+  (_, (T.Var _ _, _)) -> return []
+  (_, (e1, e2)) -> do
     i <- not_isAddr_read_req_count name
     return [((name ++ "#_enable", Just i),e1), ((name ++ "#_argument", Just i),e2)]
 
@@ -797,11 +795,15 @@ get_final_assigns s rfbs = let (_,isAddrs,notIsAddrs) = process_rfbs rfbs in
                                                                                                                         all_not_isAddr_shadows notIsAddrs)
 
 
-en_arg_final :: String -> T.Kind -> H.Map String Int -> [(T.VarType, T.RtlExpr')]
-en_arg_final f argk counters = let n = counters !!! f in
-  [   ((f ++ "#_enable",Nothing), T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (f ++ "#_enable", Just n))
-    , ((f ++ "#_argument",Nothing), T.Var (T.SyntaxKind argk) $ T.unsafeCoerce (f ++ "#_argument", Just n))
+en_arg_helper :: String -> PredCall -> [(T.VarType, T.RtlExpr')]
+en_arg_helper f (pred, call) =
+  [ ((f ++ "#_enable",Nothing), pred)
+  , ((f ++ "#_argument",Nothing), call)
   ]
+
+en_arg_final :: String -> T.Kind -> H.Map String Int -> [(T.VarType, T.RtlExpr')]
+en_arg_final f argk counters =
+  en_arg_helper f (createPredCall f argk (getPredCallList f argk (counters !!! f)))
 
 get_final_meth_assigns :: T.BaseModule -> [T.RegFileBase] -> ExprState -> [(T.VarType, T.RtlExpr')]
 get_final_meth_assigns basemod rfbs s =
@@ -867,9 +869,6 @@ get_stats (T.Build_RtlModule hw rf ins outs inits writes wires sys) = RtlModStat
   , num_regFiles = length rf
   , num_inputs = length ins
   , num_outputs = length outs
--- filter (\((x, _), _) -> not $ S.member x reg_consts) (
-
-
   , num_regInits = length inits
   , num_regWrites = length writes
   , num_wires = length wires
