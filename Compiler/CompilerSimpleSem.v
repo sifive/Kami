@@ -1,7 +1,7 @@
 Require Import Kami.All Kami.Compiler.Compiler.
 Require Import Kami.Notations.
 Require Import Kami.Compiler.CompilerSimple.
-
+(*
 Section SemSimple.
   Local Notation UpdRegT := RegsT.
   Local Notation UpdRegsT := (list UpdRegT).
@@ -215,3 +215,4 @@ Section SemSimple.
         SemCompActionSimple_Trace o' lupds' lcalls'.
   End Loop.
 End SemSimple.
+*)
