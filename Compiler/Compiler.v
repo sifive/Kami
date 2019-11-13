@@ -26,7 +26,8 @@ Section Compile.
   | CompRead (r: string) (k: FullKind) (readMap: RegMapExpr) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
   | CompRet lret (e: lret @# ty) (newMap: RegMapExpr) : CompActionT lret
   | CompLetFull k (a: CompActionT k) lret (cont: fullType ty (SyntaxKind k) -> regMapTy -> CompActionT lret): CompActionT lret
-  | CompAsyncRead (idxNum num : nat) (readPort dataArray writePort: string) (isWriteMask: bool) (idx : Bit (Nat.log2_up idxNum) @# ty) (pred : Bool @# ty) (k : Kind) (readMap : RegMapExpr) lret
+  | CompAsyncRead (idxNum num : nat) (readPort dataArray writePort: string) (isWriteMask: bool)
+                  (idx : Bit (Nat.log2_up idxNum) @# ty) (pred : Bool @# ty) (k : Kind) (readMap : RegMapExpr) lret
                   (cont : fullType ty (SyntaxKind (Array num k)) -> CompActionT lret) : CompActionT lret
   | CompWrite (idxNum num : nat) (writePort dataArray : string) (idx  : Bit (Nat.log2_up idxNum) @# ty) (Data : Kind) (val : Array num Data @# ty)
               (mask : option (Array num Bool @# ty)) (pred : Bool @# ty) (writeMap readMap : RegMapExpr) lret
@@ -34,7 +35,8 @@ Section Compile.
   | CompSyncReadReq (idxNum num : nat) (readReq readReg dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty) (Data : Kind)
                     (isAddr : bool) (pred : Bool @# ty) (writeMap readMap : RegMapExpr) lret
                     (cont : regMapTy -> CompActionT lret) : CompActionT lret
-  | CompSyncReadRes (idxNum num : nat) (readResp readReg dataArray writePort : string) (isWriteMask: bool) (Data : Kind) (isAddr : bool) (readMap : RegMapExpr) lret
+  | CompSyncReadRes (idxNum num : nat) (readResp readReg dataArray writePort : string) (isWriteMask: bool)
+                    (Data : Kind) (isAddr : bool) (readMap : RegMapExpr) lret
                     (cont : fullType ty (SyntaxKind (Array num Data)) -> CompActionT lret) : CompActionT lret.
 
   Inductive EActionT (lretT : Kind) : Type :=
