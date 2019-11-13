@@ -4,7 +4,7 @@ Require Import Kami.Compiler.CompilerSimpleSem.
 Require Import Kami.Compiler.CompilerSimple.
 Require Import Kami.Compiler.CompilerProps.
 Require Import Kami.Compiler.Compiler.
-
+(*
 Lemma RME_Simple_RME_Equiv map:
   forall old upds,
     Sem_RmeSimple (RmeSimple_of_RME map) (old, upds) ->
@@ -95,3 +95,4 @@ Lemma CompActionSimpleTraceEquiv (b : BaseModule) (lrf : list RegFileBase) o :
 Proof.
   intros; eapply CompTraceEquiv; eauto using CA_Simple_Trace_CA_Trace_Equiv.
 Qed.
+*)
