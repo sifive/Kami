@@ -218,8 +218,8 @@ instance Show RME2 where
   show (ReadReqRME2 _ _ f _ _ _ _ _ _ m _ _) = "readreq: " ++ f ++ "\n" ++ show m
   show (AsyncReadRME2 _ _ f _ _ _ _ _ _ m) = "asyncread: " ++ f ++ "\n" ++ show m
 
-instance Show (T.RmeSimple a b) where
-  show (T.VarRME _) = "var\n\n"
+instance Show (T.RmeSimple T.Coq_rtl_ty RegMapTy) where
+  show (T.VarRME v) = "var:\n" ++ show (meth_call_history v) ++ "\n"
   show (T.UpdRegRME r _ _ _ m) = "upd: " ++ r ++ "\n" ++ show m
   show (T.WriteRME _ _ f _ _ _ _ _ _ m _ _) = "write: " ++ f ++ "\n" ++ show m
   show (T.ReadReqRME _ _ f _ _ _ _ _ _ m _ _) = "readreq: " ++ f ++ "\n" ++ show m
@@ -585,6 +585,7 @@ do_not_isAddr_read_regs m = do
 
 get_all_upds :: RME -> State ExprState [(T.VarType, T.RtlExpr')]
 get_all_upds m = let m' = flatten_RME m in do
+  flatten_RME_state m
   assigns1 <- do_regs m
   assigns2 <- do_isAddr_read_regs m'
   assigns3 <- do_not_isAddr_read_regs m'
@@ -645,7 +646,6 @@ ppCAS (T.CompLetFull_simple _  a _ cont) = do
   (VerilogExprs assigns_a if_begin_ends_a ret_a map_a) <- ppCAS a
   j <- let_count
   assigns <- get_all_upds map_a
-  flatten_RME_state map_a
   s <- get
   y <- ppCAS (cont (tmp_var j) $ regmap_counters s)
   return $ y {
