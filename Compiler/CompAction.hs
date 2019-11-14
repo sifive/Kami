@@ -405,26 +405,26 @@ queryRfWrite name idxNum num k isMask isWrite regMap =
             else predpair : restPredCall
           else restPredCall
 
-queryAsyncReadReq :: String -> Int -> Bool -> RME2 -> PredCall
+queryAsyncReadReq :: String -> Int -> Bool -> RME2 -> (RME2,PredCall)
 queryAsyncReadReq name idxNum isWrite regMap =
-  createPredCall name (T.Bit (log2_up idxNum)) predCalls
+  (tail, createPredCall name (T.Bit (log2_up idxNum)) predCalls)
   where
-    predCalls = query regMap
+    (tail, predCalls) = query regMap
 
-    query NilRME2 = []
+    query NilRME2 = (NilRME2,[])
     query (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) = query (if isWrite then writeMap else readMap)
     query (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) = query (if isWrite then writeMap else readMap)
     query (ReadRespRME2 idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr writeMap readMap) = query (if isWrite then writeMap else readMap)
     query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK writeMap readMap) =
-      let restPredAddr = query (if isWrite then writeMap else readMap) in
+      let (tail', restPredAddr) = query (if isWrite then writeMap else readMap) in
       let predpair = (pred, T.predPack (T.Bit (log2_up idxNum)) pred idx) in
       if is_const_false pred
-        then restPredAddr
+        then (tail', restPredAddr)
         else if readPort == name
           then if is_const_true pred
-            then [predpair]
-            else predpair : restPredAddr
-          else restPredAddr
+            then (if isWrite then writeMap else readMap, [predpair])
+            else (if isWrite then writeMap else readMap, predpair : restPredAddr)
+          else (tail', restPredAddr)
 
 querySyncReadReqTail :: String -> RME2 -> RME2
 querySyncReadReqTail name' regMap2 = query regMap2
@@ -477,8 +477,8 @@ queryAsyncReadResp name writeName idxNum num k isMask regMap =
   T.pointwiseBypass num k pointwise respVal
   where
     respVal = (T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (name ++ "#_return", Nothing)))
-    readCall = queryAsyncReadReq name idxNum False regMap
-    writeCall = queryRfWrite writeName idxNum num k isMask False regMap
+    (tail,readCall) = queryAsyncReadReq name idxNum True regMap
+    writeCall = queryRfWrite writeName idxNum num k isMask True tail
     pointwise = T.pointwiseIntersection idxNum num k isMask (fst readCall) (snd readCall) (fst writeCall) (T.unsafeCoerce $ snd writeCall)
 
 queryIsAddrReadResp :: String -> String -> String -> Int -> Int -> T.Kind -> Bool -> RME2 -> T.RtlExpr'
