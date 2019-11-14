@@ -209,29 +209,32 @@ data Register =
 data RME2 = 
     WriteRME2 Int Int String String T.RtlExpr' T.Kind T.RtlExpr' (Maybe T.RtlExpr') T.RtlExpr' RME2 RME2 T.RtlExpr'
   | ReadReqRME2 Int Int String String String T.RtlExpr' T.Kind Bool T.RtlExpr' RME2 RME2 T.RtlExpr'
-  | AsyncReadRME2 Int Int String String String Bool T.RtlExpr' T.RtlExpr' T.Kind RME2
+  | AsyncReadRME2 Int Int String String String Bool T.RtlExpr' T.RtlExpr' T.Kind RME2 RME2
+  | ReadRespRME2 Int Int String String String String Bool T.Kind Bool RME2 RME2
   | NilRME2 --deriving (Show)
 
 instance Show RME2 where
   show NilRME2 = "nil\n\n"
   show (WriteRME2 _ _ f _ _ _ _ _ _ m _ _) = "write: " ++ f ++ "\n" ++ show m
   show (ReadReqRME2 _ _ f _ _ _ _ _ _ m _ _) = "readreq: " ++ f ++ "\n" ++ show m
-  show (AsyncReadRME2 _ _ f _ _ _ _ _ _ m) = "asyncread: " ++ f ++ "\n" ++ show m
+  show (AsyncReadRME2 _ _ f _ _ _ _ _ _ m _) = "asyncread: " ++ f ++ "\n" ++ show m
+  show (ReadRespRME2 _ _ f _ _ _ _ _ _ m _) = "readresp: " ++ f ++ "\n" ++ show m
 
 instance Show (T.RmeSimple T.Coq_rtl_ty RegMapTy) where
   show (T.VarRME v) = "var:\n" ++ show (meth_call_history v) ++ "\n"
   show (T.UpdRegRME r _ _ _ m) = "upd: " ++ r ++ "\n" ++ show m
   show (T.WriteRME _ _ f _ _ _ _ _ _ m _ _) = "write: " ++ f ++ "\n" ++ show m
   show (T.ReadReqRME _ _ f _ _ _ _ _ _ m _ _) = "readreq: " ++ f ++ "\n" ++ show m
-  show (T.ReadRespRME _ _ f _ _ _ _ _ _ m) = "readresp: " ++ f ++ "\n" ++ show m
-  show (T.AsyncReadRME _ _ f _ _ _ _ _ _ m) = "asyncread: " ++ f ++ "\n" ++ show m
+  show (T.ReadRespRME _ _ f _ _ _ _ _ _ m _) = "readresp: " ++ f ++ "\n" ++ show m
+  show (T.AsyncReadRME _ _ f _ _ _ _ _ _ m _) = "asyncread: " ++ f ++ "\n" ++ show m
   show (T.CompactRME m) = "compact\n" ++ show m
 
-length_RME2 :: RME2 -> Int
-length_RME2 NilRME2 = 0
-length_RME2 (WriteRME2 _ _ _ _ _ _ _ _ _ m _ _) = 1 + length_RME2 m
-length_RME2 (ReadReqRME2 _ _ _ _ _ _ _ _ _ m _ _) = 1 + length_RME2 m
-length_RME2 (AsyncReadRME2 _ _ _ _ _ _ _ _ _ m) = 1 + length_RME2 m
+-- length_RME2 :: RME2 -> Int
+-- length_RME2 NilRME2 = 0
+-- length_RME2 (WriteRME2 _ _ _ _ _ _ _ _ _ m _ _) = 1 + length_RME2 m
+-- length_RME2 (ReadReqRME2 _ _ _ _ _ _ _ _ _ m _ _) = 1 + length_RME2 m
+-- length_RME2 (AsyncReadRME2 _ _ _ _ _ _ _ _ _ m) = 1 + length_RME2 m
+
 
 rme2_to_rme :: RME2 -> RME
 rme2_to_rme (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) =
@@ -239,14 +242,16 @@ rme2_to_rme (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred wr
 rme2_to_rme (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
   T.ReadReqRME idxNum num readReq readReg dataArray idx dataK isAddr pred (rme2_to_rme writeMap) (rme2_to_rme readMap) arr
 rme2_to_rme NilRME2 = T.VarRME $ empty_rmt
-rme2_to_rme (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK readMap) =
-  T.AsyncReadRME idxNum num readPort dataArray writePort isWriteMask idx pred dataK (rme2_to_rme readMap)
+rme2_to_rme (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK writeMap readMap) =
+  T.AsyncReadRME idxNum num readPort dataArray writePort isWriteMask idx pred dataK (rme2_to_rme writeMap) (rme2_to_rme readMap)
+rme2_to_rme (ReadRespRME2 idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr writeMap readMap) =
+  T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr (rme2_to_rme writeMap) (rme2_to_rme readMap)
 
 data RegMapTy =
   RegMapTy
   { reg_counters :: H.Map String Int
   , reg_constant :: H.Map String T.ConstT
-  , meth_call_history :: RME2 } deriving (Show)
+  , meth_call_history :: RME2 } --deriving (Show)
 
 is_nil_RME2 :: RME2 -> Bool
 is_nil_RME2 NilRME2 = True
@@ -310,10 +315,10 @@ queryReg name k isWrite regMap =
       query (if isWrite then writeMap else readMap)
     query (T.ReadReqRME idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
       query (if isWrite then writeMap else readMap)
-    query (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr readMap) =
-      query readMap
-    query (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k readMap) =
-      query readMap
+    query (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr writeMap readMap) =
+      query (if isWrite then writeMap else readMap)
+    query (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k writeMap readMap) =
+      query (if isWrite then writeMap else readMap)
     query (T.CompactRME regMap) =
       query regMap
 
@@ -325,23 +330,41 @@ getPredCallList :: String -> T.Kind -> Int -> [PredCall]
 getPredCallList name k count =
   (map (\i -> (T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (name ++ "#_enable", Just i), T.Var (T.SyntaxKind k) $ T.unsafeCoerce (name ++ "#_argument", Just i))) [0..count])
 
+eval_bool_expr :: T.RtlExpr' -> Maybe Bool --three-value logic, Nothing = not statically known
+eval_bool_expr (T.Const T.Bool (T.ConstBool b)) = Just b
+eval_bool_expr (T.UniBool T.Neg e) = liftM not $ eval_bool_expr e
+eval_bool_expr (T.CABool T.And es) = foldr (liftM2 (&&)) (Just True) $ map eval_bool_expr es
+eval_bool_expr (T.CABool T.Or es) = foldr (liftM2 (||)) (Just False) $ map eval_bool_expr es
+eval_bool_expr (T.CABool T.Xor es) = foldr (liftM2 (/=)) (Just False) $ map eval_bool_expr es
+eval_bool_expr _ = Nothing
+
 is_const_true :: T.RtlExpr' -> Bool
-is_const_true (T.Const T.Bool (T.ConstBool True)) = True
-is_const_true (T.UniBool T.Neg e) = is_const_false e
-is_const_true (T.CABool T.And es) = all is_const_true es
-is_const_true (T.CABool T.Or es) = any is_const_true es
-is_const_true (T.CABool T.Xor es) = all (\e -> is_const_true e || is_const_false e) es &&
-  (odd $ length $ filter is_const_true es)
-is_const_true _ = False
+is_const_true e = case eval_bool_expr e of
+  Just True -> True
+  _ -> False
 
 is_const_false :: T.RtlExpr' -> Bool
-is_const_false (T.Const T.Bool (T.ConstBool False)) = True
-is_const_false (T.UniBool T.Neg e) = is_const_true e
-is_const_false (T.CABool T.And es) = any is_const_false es
-is_const_false (T.CABool T.Or es) = all is_const_false es
-is_const_false (T.CABool T.Xor es) = all (\e -> is_const_true e || is_const_false e) es &&
-  (even $ length $ filter is_const_true es)
-is_const_false _ = False
+is_const_false e = case eval_bool_expr e of
+  Just False -> True
+  _ -> False
+
+-- is_const_true :: T.RtlExpr' -> Bool
+-- is_const_true (T.Const T.Bool (T.ConstBool True)) = True
+-- is_const_true (T.UniBool T.Neg e) = is_const_false e
+-- is_const_true (T.CABool T.And es) = all is_const_true es
+-- is_const_true (T.CABool T.Or es) = any is_const_true es
+-- is_const_true (T.CABool T.Xor es) = all (\e -> is_const_true e || is_const_false e) es &&
+--   (odd $ length $ filter is_const_true es)
+-- is_const_true _ = False
+
+-- is_const_false :: T.RtlExpr' -> Bool
+-- is_const_false (T.Const T.Bool (T.ConstBool False)) = True
+-- is_const_false (T.UniBool T.Neg e) = is_const_true e
+-- is_const_false (T.CABool T.And es) = any is_const_false es
+-- is_const_false (T.CABool T.Or es) = all is_const_false es
+-- is_const_false (T.CABool T.Xor es) = all (\e -> is_const_true e || is_const_false e) es &&
+--   (even $ length $ filter is_const_true es)
+-- is_const_false _ = False
 
 flatten_RME :: RME -> RME2
 flatten_RME (T.VarRME v) = meth_call_history v
@@ -350,9 +373,9 @@ flatten_RME (T.WriteRME idxNum num writePort dataArray idx dataK val mask pred w
   WriteRME2 idxNum num writePort dataArray idx dataK val mask pred (flatten_RME writeMap) (flatten_RME readMap) arr
 flatten_RME (T.ReadReqRME idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
   ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred (flatten_RME writeMap) (flatten_RME readMap) arr
-flatten_RME (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr readMap) = flatten_RME readMap
-flatten_RME (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k readMap) = 
-  AsyncReadRME2 idxNum num readPort dataArray writePort isWrMask idx pred k (flatten_RME readMap)
+flatten_RME (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr writeMap readMap) = flatten_RME readMap
+flatten_RME (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k writeMap readMap) = 
+  AsyncReadRME2 idxNum num readPort dataArray writePort isWrMask idx pred k (flatten_RME writeMap) (flatten_RME readMap)
 flatten_RME (T.CompactRME rme) = flatten_RME rme
 
 queryRfWrite :: String -> Int -> Int -> T.Kind -> Bool -> Bool -> RME2 -> PredCall
@@ -365,7 +388,7 @@ queryRfWrite name idxNum num k isMask isWrite regMap =
 
     query NilRME2 = []
     query (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) = query (if isWrite then writeMap else readMap)
-    query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK readMap) = query readMap
+    query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK writeMap readMap) = query (if isWrite then writeMap else readMap)
     query (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) =
       let restPredCall = query (if isWrite then writeMap else readMap) in
       let writeRq = (case mask of
@@ -389,8 +412,8 @@ queryAsyncReadReq name idxNum isWrite regMap =
     query NilRME2 = []
     query (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) = query (if isWrite then writeMap else readMap)
     query (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) = query (if isWrite then writeMap else readMap)
-    query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK readMap) =
-      let restPredAddr = query readMap in
+    query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK writeMap readMap) =
+      let restPredAddr = query (if isWrite then writeMap else readMap) in
       let predpair = (pred, T.predPack (T.Bit (log2_up idxNum)) pred idx) in
       if is_const_false pred
         then restPredAddr
@@ -405,7 +428,7 @@ querySyncReadReqTail name' regMap2 = query regMap2
   where
     query NilRME2 = NilRME2
     query (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) = query writeMap
-    query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK readMap) = query readMap
+    query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK writeMap readMap) = query writeMap
     query (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
       if readReq == name'
         then writeMap
@@ -419,7 +442,7 @@ querySyncReadReq name idxNum isWrite regMap =
 
     query NilRME2 = (NilRME2, [])
     query (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) = query (if isWrite then writeMap else readMap)
-    query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK readMap) = query readMap
+    query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK writeMap readMap) = query (if isWrite then writeMap else readMap)
     query (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
       let (tail', restPredAddr) = query (if isWrite then writeMap else readMap) in
       let predpair = (pred, T.predPack (T.Bit (log2_up idxNum)) pred idx) in
@@ -552,9 +575,15 @@ do_regs m = do
   monad_concat $ map (\(Register r k) -> do_reg r k m) (all_regs s)
 
 do_isAddr_read_reg :: String -> String -> Int -> RME2 -> State ExprState [(T.VarType, T.RtlExpr')]
-do_isAddr_read_reg name readReqName idxNum regMap = 
-  let e = queryIsAddrRegWrite name readReqName idxNum regMap in
-  do
+do_isAddr_read_reg name readReqName idxNum regMap = case queryIsAddrRegWrite name readReqName idxNum regMap of
+  e@(T.Var _ x) ->
+    let (name', Just _) = convAny x in
+      if name == name'
+      then return []
+      else do
+        i <- reg_count name
+        return [((name, Just i), e)]
+  e -> do
     i <- reg_count name
     return [((name, Just i), e)]
 
@@ -571,8 +600,14 @@ flatten_RME_state regMap = do
 
 do_not_isAddr_read_reg :: String -> String -> String -> Int -> Int -> T.Kind -> Bool -> RME2 -> State ExprState [(T.VarType, T.RtlExpr')]
 do_not_isAddr_read_reg regName writeName readReqName idxNum num k isMask regMap = do
-  --flatten_RME_state regMap
   case queryNotIsAddrRegWrite writeName readReqName idxNum num k isMask regMap of
+    e@(T.Var _ x) ->
+      let (regName', Just _) = convAny x in
+        if regName == regName'
+        then return []
+        else do
+          i <- reg_count regName
+          return [((regName, Just i), e)]
     e -> do
       i <- reg_count regName
       return [((regName, Just i), e)]
