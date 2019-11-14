@@ -373,7 +373,8 @@ flatten_RME (T.WriteRME idxNum num writePort dataArray idx dataK val mask pred w
   WriteRME2 idxNum num writePort dataArray idx dataK val mask pred (flatten_RME writeMap) (flatten_RME readMap) arr
 flatten_RME (T.ReadReqRME idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
   ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred (flatten_RME writeMap) (flatten_RME readMap) arr
-flatten_RME (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr writeMap readMap) = flatten_RME readMap
+flatten_RME (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr writeMap readMap) =
+  ReadRespRME2 idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr (flatten_RME writeMap) (flatten_RME readMap)
 flatten_RME (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k writeMap readMap) = 
   AsyncReadRME2 idxNum num readPort dataArray writePort isWrMask idx pred k (flatten_RME writeMap) (flatten_RME readMap)
 flatten_RME (T.CompactRME rme) = flatten_RME rme
@@ -389,6 +390,7 @@ queryRfWrite name idxNum num k isMask isWrite regMap =
     query NilRME2 = []
     query (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) = query (if isWrite then writeMap else readMap)
     query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK writeMap readMap) = query (if isWrite then writeMap else readMap)
+    query (ReadRespRME2 idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr writeMap readMap) = query (if isWrite then writeMap else readMap)
     query (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) =
       let restPredCall = query (if isWrite then writeMap else readMap) in
       let writeRq = (case mask of
@@ -412,6 +414,7 @@ queryAsyncReadReq name idxNum isWrite regMap =
     query NilRME2 = []
     query (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) = query (if isWrite then writeMap else readMap)
     query (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) = query (if isWrite then writeMap else readMap)
+    query (ReadRespRME2 idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr writeMap readMap) = query (if isWrite then writeMap else readMap)
     query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK writeMap readMap) =
       let restPredAddr = query (if isWrite then writeMap else readMap) in
       let predpair = (pred, T.predPack (T.Bit (log2_up idxNum)) pred idx) in
@@ -429,6 +432,7 @@ querySyncReadReqTail name' regMap2 = query regMap2
     query NilRME2 = NilRME2
     query (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) = query writeMap
     query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK writeMap readMap) = query writeMap
+    query (ReadRespRME2 idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr writeMap readMap) = query writeMap
     query (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
       if readReq == name'
         then writeMap
@@ -443,6 +447,7 @@ querySyncReadReq name idxNum isWrite regMap =
     query NilRME2 = (NilRME2, [])
     query (WriteRME2 idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) = query (if isWrite then writeMap else readMap)
     query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK writeMap readMap) = query (if isWrite then writeMap else readMap)
+    query (ReadRespRME2 idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr writeMap readMap) = query (if isWrite then writeMap else readMap)
     query (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
       let (tail', restPredAddr) = query (if isWrite then writeMap else readMap) in
       let predpair = (pred, T.predPack (T.Bit (log2_up idxNum)) pred idx) in
