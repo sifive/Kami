@@ -687,7 +687,8 @@ ppCAS (T.CompLetFull_simple _  a _ cont) = do
   j <- let_count
   assigns <- trace ("RME returned @ CompLetFull_simple:\n" ++ show map_a ++ "\n\n") $ get_all_upds map_a
   s <- get
-  y <- ppCAS (cont (tmp_var j) $ regmap_counters s)
+  let regmaps = trace ("RME updated @ CompLetFull_simple:\n" ++ show (meth_call_history $ regmap_counters s) ++ "\n\n") $ regmap_counters s
+  y <- ppCAS (cont (tmp_var j) regmaps)
   return $ y {
     assign_exprs = assigns_a ++ (tmp_var j, ret_a) : assigns ++ assign_exprs y
     , if_begin_end_exprs = if_begin_ends_a ++ if_begin_end_exprs y
