@@ -4,7 +4,7 @@ Require Import Kami.Compiler.CompilerSimpleSem.
 Require Import Kami.Compiler.CompilerSimple.
 Require Import Kami.Compiler.CompilerProps.
 Require Import Kami.Compiler.Compiler.
-(*
+
 Lemma RME_Simple_RME_Equiv map:
   forall old upds,
     Sem_RmeSimple (RmeSimple_of_RME map) (old, upds) ->
@@ -32,10 +32,9 @@ Proof.
   - econstructor 7; eauto.
     destruct regMap; inv HRegMapWf; econstructor; eauto using RME_Simple_RME_Equiv.
   - econstructor 8; eauto.
-  - inv HSemCompActionSimple_a; simpl in *; EqDep_subst.
-    inv HSemCompActionSimple_cont; simpl in *; EqDep_subst.
+  - inv HSemCompActionSimple; simpl in *; EqDep_subst; rewrite unifyWO in *.
+    inv HSemCompActionSimple_a; simpl in *; EqDep_subst.
     inv HRegMapWf; inv H0; EqDep_subst.
-    inv HReadMap.
     econstructor 9; eauto using RME_Simple_RME_Equiv.
   - inv HSemCompActionSimple; simpl in *; EqDep_subst; rewrite unifyWO in *.
     inv HSemCompActionSimple_a; EqDep_subst.
@@ -59,10 +58,16 @@ Proof.
     destruct regMap_a; inv HRegMapWf; inv H0; EqDep_subst;[discriminate|].
     econstructor 13; eauto using RME_Simple_RME_Equiv.
     econstructor; eauto using RME_Simple_RME_Equiv.
-  - econstructor 14; eauto using RME_Simple_RME_Equiv.
+  - inv HSemCompActionSimple; simpl in *; EqDep_subst; rewrite unifyWO in *.
+    inv HSemCompActionSimple_a; simpl in *; EqDep_subst.
+    inv HRegMapWf; destruct regMap_a.
+    econstructor 14; eauto using RME_Simple_RME_Equiv.
     inv HReadMap.
     apply RME_Simple_RME_Equiv; auto.
-  - econstructor 15; eauto using RME_Simple_RME_Equiv.
+  - inv HSemCompActionSimple; simpl in *; EqDep_subst; rewrite unifyWO in *.
+    inv HSemCompActionSimple_a; simpl in *; EqDep_subst.
+    inv HRegMapWf; destruct regMap_a.
+    econstructor 15; eauto using RME_Simple_RME_Equiv.
     inv HReadMap.
     apply RME_Simple_RME_Equiv; auto.
 Qed.
@@ -95,4 +100,3 @@ Lemma CompActionSimpleTraceEquiv (b : BaseModule) (lrf : list RegFileBase) o :
 Proof.
   intros; eapply CompTraceEquiv; eauto using CA_Simple_Trace_CA_Trace_Equiv.
 Qed.
-*)
