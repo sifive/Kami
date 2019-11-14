@@ -639,7 +639,7 @@ ppCAS (T.CompCall_simple f (_,k) pred arg _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = ((f ++ "#_argument", Just i), arg) :
+    assign_exprs = trace "CompCall_simple\n" ((f ++ "#_argument", Just i), arg) :
                    ((f ++ "#_enable", Just i), pred) :
                    (tmp_var j, T.Var (T.SyntaxKind k) $ T.unsafeCoerce (f ++ "#_return", Nothing)) :
                    assign_exprs y 
@@ -650,7 +650,7 @@ ppCAS (T.CompLetExpr_simple (T.SyntaxKind _) expr _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ T.unsafeCoerce $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, expr) : assign_exprs y
+    assign_exprs = trace "CompLetExpr_simple\n" (tmp_var j, expr) : assign_exprs y
   }
 
 ppCAS (T.CompNondet_simple (T.NativeKind _) _ _) = error "NativeKind encountered."
@@ -658,13 +658,13 @@ ppCAS (T.CompNondet_simple (T.SyntaxKind k) _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ T.unsafeCoerce $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, T.Const k $ T.getDefaultConst k) : assign_exprs y
+    assign_exprs = (tmp_var j, trace "CompNondet_simple\n" T.Const k $ T.getDefaultConst k) : assign_exprs y
   }
 
 ppCAS (T.CompSys_simple pred xs _ a) = do
   y <- ppCAS a
   return $ y {
-    if_begin_end_exprs = (pred,xs) : if_begin_end_exprs y
+    if_begin_end_exprs = trace "CompSys_simple\n" (pred,xs) : if_begin_end_exprs y
   }
 
 ppCAS (T.CompReadReg_simple r k regMap _ cont) = do
@@ -698,35 +698,35 @@ ppCAS (T.CompAsyncRead_simple idxNum num readPort dataArray writePort isWrMask i
   j <- let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, trace ("RME @ CompAsyncRead_simple:\n" ++ show readMap ++ "\n\n") $ queryAsyncReadResp readPort writePort idxNum num k isWrMask $ flatten_RME readMap) : assign_exprs y
+    assign_exprs = (tmp_var j, trace ("CompAsyncRead_simple:\n") $ queryAsyncReadResp readPort writePort idxNum num k isWrMask $ flatten_RME readMap) : assign_exprs y
   }
 
 ppCAS (T.CompSyncReadRes_simple idxNum num readResp readReg dataArray writePort isWrMask k True readMap _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, trace ("RME @ CompSyncReadRes_simple:\n" ++ show readMap ++ "\n\n") $ queryIsAddrReadResp readResp writePort readReg idxNum num k isWrMask $ flatten_RME readMap) : assign_exprs y
+    assign_exprs = (tmp_var j, trace ("CompSyncReadRes_simple:\n") $ queryIsAddrReadResp readResp writePort readReg idxNum num k isWrMask $ flatten_RME readMap) : assign_exprs y
   }
 
 ppCAS (T.CompSyncReadRes_simple idxNum num readResp readReg dataArray writePort isWrMask k False readMap _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, trace ("RME @ CompSyncReadRes_simple:\n" ++ show readMap ++ "\n\n") $ queryNotIsAddrReadResp readResp readReg num k) : assign_exprs y
+    assign_exprs = (tmp_var j, trace ("CompSyncReadRes_simple:\n") $ queryNotIsAddrReadResp readResp readReg num k) : assign_exprs y
   }
 
 ppCAS (T.CompWrite_simple idxNum k writePort dataArray readMap _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, trace ("RME @ CompWrite_simple:\n" ++ show readMap ++ "\n\n") $ T.Const (T.Bit 0) $ T.getDefaultConst (T.Bit 0)) : assign_exprs y
+    assign_exprs = (tmp_var j, trace ("CompWrite_simple:\n") $ T.Const (T.Bit 0) $ T.getDefaultConst (T.Bit 0)) : assign_exprs y
   }
 
 ppCAS (T.CompSyncReadReq_simple idxNum num k readReq readReg dataArray isAddr readMap _ cont) = do
   j <- let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, trace ("RME @ CompSyncReadReq_simple:\n" ++ show readMap ++ "\n\n") $ T.Const (T.Bit 0) $ T.getDefaultConst (T.Bit 0)) : assign_exprs y
+    assign_exprs = (tmp_var j, trace ("CompSyncReadReq_simple:\n") $ T.Const (T.Bit 0) $ T.getDefaultConst (T.Bit 0)) : assign_exprs y
   }
 
 get_final_assigns :: ExprState -> [T.RegFileBase] -> [(T.VarType, T.RtlExpr')]
@@ -774,7 +774,7 @@ get_final_rfmeth_assigns rfbs s = let (asyncs,isAddrs,notIsAddrs) = process_rfbs
     --async reads
     ++ concatMap (\(read,argk) ->
           let c = get_common_from_async_read read asyncs in
-            en_arg_helper read $ queryAsyncReadReq read (commonIdxNum c) True history) (get_async_reads_with_arg asyncs)
+            en_arg_helper read $ snd $ queryAsyncReadReq read (commonIdxNum c) True history) (get_async_reads_with_arg asyncs)
  
     --isAddr readreq
     ++ concatMap (\(readRq,argk) ->
