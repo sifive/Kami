@@ -149,7 +149,7 @@ Section Compile.
                               ))))
       | EAsyncRead idxNum num readPort dataArray writePort isWriteMask idx k cont =>
         CompAsyncRead idxNum readPort dataArray writePort isWriteMask idx pred writeMap (VarRegMap readMap)
-                      (fun array _ => @EcompileAction _ (cont array) pred writeMap)
+                      (fun array writeMap' => @EcompileAction _ (cont array) pred (VarRegMap writeMap'))
       | EWrite idxNum num writePort dataArray idx Data val mask cont =>
         CompWrite idxNum writePort  dataArray idx val mask pred writeMap (VarRegMap readMap)
                   (fun writeMap' => @EcompileAction _ cont pred (VarRegMap writeMap'))
@@ -158,7 +158,7 @@ Section Compile.
                         (fun writeMap' => @EcompileAction _ cont pred (VarRegMap writeMap'))
       | ESyncReadRes idxNum num readResp readReg dataArray writePort isWriteMask Data isAddr cont =>
         CompSyncReadRes idxNum readResp readReg dataArray writePort isWriteMask isAddr writeMap (VarRegMap readMap)
-                        (fun array _ => @EcompileAction _ (cont array) pred writeMap)
+                        (fun array writeMap' => @EcompileAction _ (cont array) pred (VarRegMap writeMap'))
       end.
 
     Fixpoint inlineWriteFile k (rf : RegFileBase) (a : EActionT k) : EActionT k :=

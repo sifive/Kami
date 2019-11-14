@@ -1015,7 +1015,12 @@ Proof.
   - inv H; EqDep_subst.
     inv HRegMapWf.
     rewrite (SemRegExprVals HRegMap H); auto.
-  - inv H0; EqDep_subst; eauto.
+  - inv H0; EqDep_subst; eauto;
+      eapply H with (rexpr := VarRegMap type writeMapTy); eauto;
+        assert (sth: regMap1 = writeMapTy) by
+          (eapply SemRegExprVals; eauto);
+        subst;
+        econstructor.
   - inv H; EqDep_subst; eauto; unfold WfRegMapExpr in *; dest;
       inv H; EqDep_subst; [rewrite HNbexpr in *; discriminate| | rewrite HNbexpr in *; discriminate | ];
         specialize (IHea _ _ _ _ _ _ _ HNbexpr _ (SemVarRegMap _) HSemCompActionT); dest; subst;
@@ -1024,7 +1029,12 @@ Proof.
       inv H; EqDep_subst; [rewrite HNbexpr in *; discriminate| | rewrite HNbexpr in *; discriminate | ];
         specialize (IHea _ _ _ _ _ _ _ HNbexpr _ (SemVarRegMap _) HSemCompActionT); dest; subst;
           rewrite (SemRegExprVals HSemRegMap HRegMap); split; auto.
-  - inv H0; EqDep_subst; eauto; unfold WfRegMapExpr in *; dest; inv H; EqDep_subst.
+  - inv H0; EqDep_subst; eauto;
+      eapply H with (rexpr := VarRegMap type writeMapTy); eauto; unfold WfRegMapExpr in *; dest;
+        assert (sth: regMap1 = writeMapTy) by
+          (eapply SemRegExprVals; eauto);
+        subst;
+        econstructor.
 Qed.
 
 Lemma predFalse_UpdsNil k a:
@@ -1115,14 +1125,23 @@ Proof.
     specialize (SemRegExprVals H HSemRegMap) as TMP; inv TMP.
     reflexivity.
   - inv H0; EqDep_subst.
-    eapply H; eauto.
+    eapply H with (writeMap := VarRegMap type writeMapTy); eauto;
+    assert (sth: writeMapTy = (wOld, wUpds)) by
+        (eapply SemRegExprVals; eauto);
+    subst;
+    econstructor.
   - inv H; EqDep_subst; unfold WfRegMapExpr in *; destruct regMapVal; dest;
       specialize (IHea _ _ _ _ _ _ _ _ _ _ (SemVarRegMap _) HSemCompActionT); subst;
         inv H; EqDep_subst; specialize (SemRegExprVals HSemRegMap HSemRegMap0) as TMP; inv TMP; reflexivity.
   - inv H; EqDep_subst; unfold WfRegMapExpr in *; destruct regMapVal; dest;
       specialize (IHea _ _ _ _ _ _ _ _ _ _ (SemVarRegMap _) HSemCompActionT); subst;
         inv H; EqDep_subst; specialize (SemRegExprVals HSemRegMap HSemRegMap0) as TMP; inv TMP; reflexivity.
-  - inv H0; EqDep_subst; eapply H; eauto.
+  - inv H0; EqDep_subst;
+    eapply H with (writeMap := VarRegMap type writeMapTy); eauto;
+    assert (sth: writeMapTy = (wOld, wUpds)) by
+        (eapply SemRegExprVals; eauto);
+    subst;
+    econstructor.
 Qed.
 
 Lemma EEquivActions k ea:
