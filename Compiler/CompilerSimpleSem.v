@@ -1,7 +1,7 @@
 Require Import Kami.All Kami.Compiler.Compiler.
 Require Import Kami.Notations.
 Require Import Kami.Compiler.CompilerSimple.
-(*
+
 Section SemSimple.
   Local Notation UpdRegT := RegsT.
   Local Notation UpdRegsT := (list UpdRegT).
@@ -67,12 +67,12 @@ Section SemSimple.
                                                                               Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                                              writeMap) (old, upds)):
       Sem_RmeSimple (@ReadReqRME _ _ idxNum num readReq readReg dataArray idx Data isAddr pred writeMap readMap arr) (old, upds)
-  | SemReadRespRME idxNum num readResp readReg dataArray writePort isWriteMask Data isAddr readMap old upds
+  | SemReadRespRME idxNum num readResp readReg dataArray writePort isWriteMask Data isAddr writeMap readMap old upds
                        (HWriteMap : Sem_RmeSimple readMap (old, upds)):
-      Sem_RmeSimple (@ReadRespRME _ _ idxNum num readResp readReg dataArray writePort isWriteMask Data isAddr readMap) (old, upds)
-  | SemAsyncReadRME (idxNum num : nat) (readPort dataArray : string) writePort isWriteMask (idx : Bit (Nat.log2_up idxNum) @# type) (pred : Bool @# type) (k : Kind) (readMap : RmeSimple type RegMapType)
-                 old upds (HNoOp : Sem_RmeSimple readMap (old, upds)):
-      Sem_RmeSimple (@AsyncReadRME _ _ idxNum num readPort dataArray writePort isWriteMask idx pred k readMap) (old, upds)
+      Sem_RmeSimple (@ReadRespRME _ _ idxNum num readResp readReg dataArray writePort isWriteMask Data isAddr writeMap readMap) (old, upds)
+  | SemAsyncReadRME (idxNum num : nat) (readPort dataArray : string) writePort isWriteMask (idx : Bit (Nat.log2_up idxNum) @# type) (pred : Bool @# type) (k : Kind) (writeMap readMap : RmeSimple type RegMapType)
+                 old upds (HNoOp : Sem_RmeSimple writeMap (old, upds)):
+      Sem_RmeSimple (@AsyncReadRME _ _ idxNum num readPort dataArray writePort isWriteMask idx pred k writeMap readMap) (old, upds)
   | SemCompactRME old upds regMap (HSemRegMap: Sem_RmeSimple regMap (old, upds)):
       Sem_RmeSimple (@CompactRME _ _ regMap) (old, nil::upds).
 
@@ -215,4 +215,3 @@ Section SemSimple.
         SemCompActionSimple_Trace o' lupds' lcalls'.
   End Loop.
 End SemSimple.
-*)
