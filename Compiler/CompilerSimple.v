@@ -74,11 +74,6 @@ Section Simple.
                                                                    k (RmeSimple_of_RME writeMap)
                                                                    (RmeSimple_of_RME readMap)))
                               (fun _ x => CompActionSimple_of_CA (cont arr x)))
-(*      CompLetFull_simple (CompRet_simple (($$WO)%kami_expr : Void @# ty)
-                                         (AsyncReadRME idxNum num readPort dataArray writePort
-                                                       isWriteMask idx pred k (RmeSimple_of_RME writeMap) (RmeSimple_of_RME readMap)))
-                         (CompAsyncRead_simple idxNum readPort dataArray writePort isWriteMask idx pred (VarRME y)
-                                                          (fun arr => CompActionSimple_of_CA (cont arr))) *)
     | CompWrite idxNum num writePort dataArray idx Data val mask pred writeMap readMap lret cont =>
       @CompWrite_simple idxNum Data writePort dataArray (RmeSimple_of_RME readMap) lret
                         (fun arr => 
