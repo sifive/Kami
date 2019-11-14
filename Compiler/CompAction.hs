@@ -330,11 +330,24 @@ getPredCallList :: String -> T.Kind -> Int -> [PredCall]
 getPredCallList name k count =
   (map (\i -> (T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (name ++ "#_enable", Just i), T.Var (T.SyntaxKind k) $ T.unsafeCoerce (name ++ "#_argument", Just i))) [0..count])
 
-eval_bool_expr :: T.RtlExpr' -> Maybe Bool --three-value logic, Nothing = not statically known
+--three-valued logic where Nothing = not statically known
+maybe_and :: Maybe Bool -> Maybe Bool -> Maybe Bool
+maybe_and (Just False) _ = Just False
+maybe_and (Just True) x = x
+maybe_and Nothing (Just False) = Just False
+maybe_and Nothing _ = Nothing
+
+maybe_or :: Maybe Bool -> Maybe Bool -> Maybe Bool
+maybe_or (Just True) _ = Just True
+maybe_or (Just False) x = x
+maybe_or Nothing (Just True) = Just True
+maybe_or Nothing _ = Nothing
+
+eval_bool_expr :: T.RtlExpr' -> Maybe Bool
 eval_bool_expr (T.Const T.Bool (T.ConstBool b)) = Just b
 eval_bool_expr (T.UniBool T.Neg e) = liftM not $ eval_bool_expr e
-eval_bool_expr (T.CABool T.And es) = foldr (liftM2 (&&)) (Just True) $ map eval_bool_expr es
-eval_bool_expr (T.CABool T.Or es) = foldr (liftM2 (||)) (Just False) $ map eval_bool_expr es
+eval_bool_expr (T.CABool T.And es) = foldr maybe_and (Just True) $ map eval_bool_expr es
+eval_bool_expr (T.CABool T.Or es) = foldr maybe_or (Just False) $ map eval_bool_expr es
 eval_bool_expr (T.CABool T.Xor es) = foldr (liftM2 (/=)) (Just False) $ map eval_bool_expr es
 eval_bool_expr _ = Nothing
 
