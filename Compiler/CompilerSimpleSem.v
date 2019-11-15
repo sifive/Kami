@@ -68,7 +68,7 @@ Section SemSimple.
                                              writeMap) (old, upds)):
       Sem_RmeSimple (@ReadReqRME _ _ idxNum num readReq readReg dataArray idx Data isAddr pred writeMap readMap arr) (old, upds)
   | SemReadRespRME idxNum num readResp readReg dataArray writePort isWriteMask Data isAddr writeMap readMap old upds
-                       (HWriteMap : Sem_RmeSimple readMap (old, upds)):
+                       (HWriteMap : Sem_RmeSimple writeMap (old, upds)):
       Sem_RmeSimple (@ReadRespRME _ _ idxNum num readResp readReg dataArray writePort isWriteMask Data isAddr writeMap readMap) (old, upds)
   | SemAsyncReadRME (idxNum num : nat) (readPort dataArray : string) writePort isWriteMask (idx : Bit (Nat.log2_up idxNum) @# type) (pred : Bool @# type) (k : Kind) (writeMap readMap : RmeSimple type RegMapType)
                  old upds (HNoOp : Sem_RmeSimple writeMap (old, upds)):
