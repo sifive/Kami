@@ -41,19 +41,19 @@ Section Simple.
   | CompRet_simple lret (e: lret @# ty) (newMap: RmeSimple) : CompActionSimple lret
   | CompLetFull_simple k (a: CompActionSimple k) lret (cont: fullType ty (SyntaxKind k) ->
                                                       regMapTy -> CompActionSimple lret): CompActionSimple lret
-  | CompAsyncRead_simple (idxNum num : nat) (readPort dataArray writePort : string) (isWriteMask: bool) (idx : Bit (Nat.log2_up idxNum) @# ty)
-                         (pred : Bool @# ty)
-                         (k : Kind)
-                         (readMap : RmeSimple) lret
-                         (cont : fullType ty (SyntaxKind (Array num k)) -> CompActionSimple lret) : CompActionSimple lret
-  | CompSyncReadRes_simple (idxNum num : nat) (readResp readReg dataArray writePort : string) (isWriteMask: bool) (Data : Kind) (isAddr : bool)
-                           (readMap : RmeSimple) lret
-                           (cont : fullType ty (SyntaxKind (Array num Data)) -> CompActionSimple lret) : CompActionSimple lret
   | CompWrite_simple (idxNum : nat) (Data : Kind) (writePort dataArray : string) (readMap : RmeSimple) lret
                      (cont : ty (Array idxNum Data) -> CompActionSimple lret) : CompActionSimple lret
   | CompSyncReadReq_simple (idxNum num : nat) (Data : Kind) (readReq readReg dataArray : string) (isAddr : bool)
                            (readMap : RmeSimple) lret
-                           (cont : ty (Array idxNum Data) -> CompActionSimple lret) : CompActionSimple lret.
+                           (cont : ty (Array idxNum Data) -> CompActionSimple lret) : CompActionSimple lret
+  | CompSyncReadRes_simple (idxNum num : nat) (readResp readReg dataArray writePort : string) (isWriteMask: bool) (Data : Kind) (isAddr : bool)
+                           (readMap : RmeSimple) lret
+                           (cont : fullType ty (SyntaxKind (Array num Data)) -> CompActionSimple lret) : CompActionSimple lret
+  | CompAsyncRead_simple (idxNum num : nat) (readPort dataArray writePort : string) (isWriteMask: bool) (idx : Bit (Nat.log2_up idxNum) @# ty)
+                         (pred : Bool @# ty)
+                         (k : Kind)
+                         (readMap : RmeSimple) lret
+                         (cont : fullType ty (SyntaxKind (Array num k)) -> CompActionSimple lret) : CompActionSimple lret.
 
   Fixpoint CompActionSimple_of_CA{k}(a : CompActionT ty regMapTy k) : CompActionSimple k :=
     match a with
@@ -65,15 +65,6 @@ Section Simple.
                                                            (fun x => CompActionSimple_of_CA (cont x))
     | CompRet lret e newMap => CompRet_simple e (RmeSimple_of_RME newMap)
     | CompLetFull k a lret cont => CompLetFull_simple (CompActionSimple_of_CA a) (fun x y => CompActionSimple_of_CA (cont x y))
-    | CompAsyncRead idxNum num readPort dataArray writePort isWriteMask idx pred k writeMap readMap lret cont =>
-      CompAsyncRead_simple idxNum readPort dataArray writePort isWriteMask idx pred (RmeSimple_of_RME readMap)
-                           (fun arr =>
-                              CompLetFull_simple (CompRet_simple (($$ WO)%kami_expr : Void @# ty)
-                                                     (AsyncReadRME idxNum num readPort dataArray
-                                                                   writePort isWriteMask idx pred
-                                                                   k (RmeSimple_of_RME writeMap)
-                                                                   (RmeSimple_of_RME readMap)))
-                              (fun _ x => CompActionSimple_of_CA (cont arr x)))
     | CompWrite idxNum num writePort dataArray idx Data val mask pred writeMap readMap lret cont =>
       @CompWrite_simple idxNum Data writePort dataArray (RmeSimple_of_RME readMap) lret
                         (fun arr => 
@@ -98,6 +89,15 @@ Section Simple.
                                            (RmeSimple_of_RME readMap))
                              (fun x => CompLetFull_simple (CompRet_simple (($$WO)%kami_expr : Void @# ty) (RmeSimple_of_RME writeMap))
                                 (fun _ y => CompActionSimple_of_CA (cont x y)))
+    | CompAsyncRead idxNum num readPort dataArray writePort isWriteMask idx pred k writeMap readMap lret cont =>
+      CompAsyncRead_simple idxNum readPort dataArray writePort isWriteMask idx pred (RmeSimple_of_RME readMap)
+                           (fun arr =>
+                              CompLetFull_simple (CompRet_simple (($$ WO)%kami_expr : Void @# ty)
+                                                     (AsyncReadRME idxNum num readPort dataArray
+                                                                   writePort isWriteMask idx pred
+                                                                   k (RmeSimple_of_RME writeMap)
+                                                                   (RmeSimple_of_RME readMap)))
+                              (fun _ x => CompActionSimple_of_CA (cont arr x)))
     end.
 
   Definition CAS_RulesRf(readMap : regMapTy) (rules : list RuleT) (lrf : list RegFileBase) :=

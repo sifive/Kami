@@ -614,7 +614,7 @@ flatten_RME_state :: RME -> State ExprState ()
 flatten_RME_state regMap = do
   s <- get
   let rmc = regmap_counters s
-  put $ s { regmap_counters = rmc { meth_call_history = {-trace ("RME:\n" ++ (show regMap) ++ "Method Call History:\n" ++ (show $ flatten_RME regMap))-} flatten_RME regMap } } 
+  put $ s { regmap_counters = rmc { meth_call_history = flatten_RME regMap } } 
 
 do_not_isAddr_read_reg :: String -> String -> String -> Int -> Int -> T.Kind -> Bool -> RME2 -> State ExprState [(T.VarType, T.RtlExpr')]
 do_not_isAddr_read_reg regName writeName readReqName idxNum num k isMask regMap = do
@@ -649,10 +649,10 @@ get_all_upds m = let m' = flatten_RME m in do
 ppCAS :: CA_rtl -> State ExprState VerilogExprs
 ppCAS (T.CompCall_simple f (_,k) pred arg _ cont) = do
   i <- meth_count f
-  j <- let_count
+  j <- trace "Call\n" let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = trace "CompCall_simple\n" ((f ++ "#_argument", Just i), arg) :
+    assign_exprs = ((f ++ "#_argument", Just i), arg) :
                    ((f ++ "#_enable", Just i), pred) :
                    (tmp_var j, T.Var (T.SyntaxKind k) $ T.unsafeCoerce (f ++ "#_return", Nothing)) :
                    assign_exprs y 
@@ -660,18 +660,18 @@ ppCAS (T.CompCall_simple f (_,k) pred arg _ cont) = do
 
 ppCAS (T.CompLetExpr_simple (T.NativeKind _) _ _ _) = error "NativeKind encountered."
 ppCAS (T.CompLetExpr_simple (T.SyntaxKind _) expr _ cont) = do
-  j <- let_count
+  j <- trace "LetExpr\n" let_count
   y <- ppCAS (cont $ T.unsafeCoerce $ tmp_var j)
   return $ y {
-    assign_exprs = trace "CompLetExpr_simple\n" (tmp_var j, expr) : assign_exprs y
+    assign_exprs = (tmp_var j, expr) : assign_exprs y
   }
 
 ppCAS (T.CompNondet_simple (T.NativeKind _) _ _) = error "NativeKind encountered."
 ppCAS (T.CompNondet_simple (T.SyntaxKind k) _ cont) = do
-  j <- let_count
+  j <- trace "Nondet\n" let_count
   y <- ppCAS (cont $ T.unsafeCoerce $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, trace "CompNondet_simple\n" T.Const k $ T.getDefaultConst k) : assign_exprs y
+    assign_exprs = (tmp_var j, T.Const k $ T.getDefaultConst k) : assign_exprs y
   }
 
 ppCAS (T.CompSys_simple pred xs _ a) = do
@@ -681,10 +681,10 @@ ppCAS (T.CompSys_simple pred xs _ a) = do
   }
 
 ppCAS (T.CompReadReg_simple r k regMap _ cont) = do
-  j <- let_count
+  j <- trace ("ReadReg\n") let_count
   y <- ppCAS (cont $ T.unsafeCoerce $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, trace ("RME @ CompReadReg_simple:\n" ++ show regMap ++ "\n\n") $ queryReg r k False regMap) : assign_exprs y
+    assign_exprs = (tmp_var j, queryReg r k False regMap) : assign_exprs y
   }
 
 ppCAS (T.CompRet_simple _ retVal regMap) = do
@@ -692,54 +692,53 @@ ppCAS (T.CompRet_simple _ retVal regMap) = do
     assign_exprs = []
     , if_begin_end_exprs = []
     , return_expr = retVal
-    , return_maps = trace ("RME @ CompRet_simple:\n" ++ show regMap ++ "\n\n") $ regMap
+    , return_maps = trace ("RME @ Ret:\n" ++ show regMap ++ "\n\n") $ regMap
   }
 
 ppCAS (T.CompLetFull_simple _  a _ cont) = do
   (VerilogExprs assigns_a if_begin_ends_a ret_a map_a) <- ppCAS a
-  j <- let_count
-  assigns <- trace ("RME returned @ CompLetFull_simple:\n" ++ show map_a ++ "\n\n") $ get_all_upds map_a
+  j <- trace ("LetFull:\n" ++ show map_a ++ "\n\n") let_count
+  assigns <- get_all_upds map_a
   s <- get
-  let regmaps = trace ("RME updated @ CompLetFull_simple:\n" ++ show (meth_call_history $ regmap_counters s) ++ "\n\n") $ regmap_counters s
-  y <- ppCAS (cont (tmp_var j) regmaps)
+  y <- ppCAS (cont (tmp_var j) (regmap_counters s))
   return $ y {
     assign_exprs = assigns_a ++ (tmp_var j, ret_a) : assigns ++ assign_exprs y
     , if_begin_end_exprs = if_begin_ends_a ++ if_begin_end_exprs y
   }
 
 ppCAS (T.CompAsyncRead_simple idxNum num readPort dataArray writePort isWrMask idx pred k readMap _ cont) = do
-  j <- let_count
+  j <- trace "AsyncRead\n" let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, trace ("CompAsyncRead_simple:\n") $ queryAsyncReadResp readPort writePort idxNum num k isWrMask $ flatten_RME readMap) : assign_exprs y
+    assign_exprs = (tmp_var j, queryAsyncReadResp readPort writePort idxNum num k isWrMask $ flatten_RME readMap) : assign_exprs y
   }
 
 ppCAS (T.CompSyncReadRes_simple idxNum num readResp readReg dataArray writePort isWrMask k True readMap _ cont) = do
-  j <- let_count
+  j <- trace "SyncReadResTrue\n" let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, trace ("CompSyncReadRes_simple:\n") $ queryIsAddrReadResp readResp writePort readReg idxNum num k isWrMask $ flatten_RME readMap) : assign_exprs y
+    assign_exprs = (tmp_var j, queryIsAddrReadResp readResp writePort readReg idxNum num k isWrMask $ flatten_RME readMap) : assign_exprs y
   }
 
 ppCAS (T.CompSyncReadRes_simple idxNum num readResp readReg dataArray writePort isWrMask k False readMap _ cont) = do
-  j <- let_count
+  j <- trace "SyncReadResFalse\n" let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, trace ("CompSyncReadRes_simple:\n") $ queryNotIsAddrReadResp readResp readReg num k) : assign_exprs y
+    assign_exprs = (tmp_var j, queryNotIsAddrReadResp readResp readReg num k) : assign_exprs y
   }
 
 ppCAS (T.CompWrite_simple idxNum k writePort dataArray readMap _ cont) = do
-  j <- let_count
+  j <- trace "Write\n" let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, trace ("CompWrite_simple:\n") $ T.Const (T.Bit 0) $ T.getDefaultConst (T.Bit 0)) : assign_exprs y
+    assign_exprs = (tmp_var j, T.Const (T.Bit 0) $ T.getDefaultConst (T.Bit 0)) : assign_exprs y
   }
 
 ppCAS (T.CompSyncReadReq_simple idxNum num k readReq readReg dataArray isAddr readMap _ cont) = do
-  j <- let_count
+  j <- trace "SyncReadReq\n" let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, trace ("CompSyncReadReq_simple:\n") $ T.Const (T.Bit 0) $ T.getDefaultConst (T.Bit 0)) : assign_exprs y
+    assign_exprs = (tmp_var j, T.Const (T.Bit 0) $ T.getDefaultConst (T.Bit 0)) : assign_exprs y
   }
 
 get_final_assigns :: ExprState -> [T.RegFileBase] -> [(T.VarType, T.RtlExpr')]
