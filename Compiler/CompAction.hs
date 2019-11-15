@@ -253,10 +253,6 @@ data RegMapTy =
   , reg_constant :: H.Map String T.ConstT
   , meth_call_history :: RME2 } --deriving (Show)
 
-is_nil_RME2 :: RME2 -> Bool
-is_nil_RME2 NilRME2 = True
-is_nil_RME2 _ = False
-
 empty_rmt :: RegMapTy
 empty_rmt = RegMapTy {
     reg_counters = H.empty
@@ -298,38 +294,6 @@ init_state (_,(rfbs,basemod)) = let (asyncs, isAddrs, notIsAddrs) = process_rfbs
 
 type PredCall = (T.RtlExpr', T.RtlExpr')
 
-queryReg :: String -> T.FullKind -> Bool -> RME -> T.RtlExpr
-queryReg name k isWrite regMap =
-  query regMap
-  where
-    query (T.VarRME v) = T.Var k $ T.unsafeCoerce (name, Just $ reg_counters v !!! name)
-    query (T.UpdRegRME r pred k val regMap') =
-      let restVal = query regMap' in
-        if r == name
-        then
-          case pred of
-            T.Const T.Bool (T.ConstBool True) -> val
-            _ -> T.ITE k pred val restVal
-        else restVal
-    query (T.WriteRME idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) =
-      query (if isWrite then writeMap else readMap)
-    query (T.ReadReqRME idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
-      query (if isWrite then writeMap else readMap)
-    query (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr writeMap readMap) =
-      query (if isWrite then writeMap else readMap)
-    query (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k writeMap readMap) =
-      query (if isWrite then writeMap else readMap)
-    query (T.CompactRME regMap) =
-      query regMap
-
-createPredCall :: String -> T.Kind -> [PredCall] -> PredCall
-createPredCall s k [a@(T.Var _ pred, T.Var _ call)] = a
-createPredCall _ k predCalls = T.predPackOr k predCalls
-
-getPredCallList :: String -> T.Kind -> Int -> [PredCall]
-getPredCallList name k count =
-  (map (\i -> (T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (name ++ "#_enable", Just i), T.Var (T.SyntaxKind k) $ T.unsafeCoerce (name ++ "#_argument", Just i))) [0..count])
-
 --three-valued logic where Nothing = not statically known
 maybe_and :: Maybe Bool -> Maybe Bool -> Maybe Bool
 maybe_and (Just False) _ = Just False
@@ -360,6 +324,44 @@ is_const_false :: T.RtlExpr' -> Bool
 is_const_false e = case eval_bool_expr e of
   Just False -> True
   _ -> False
+
+newRegVal :: T.FullKind -> T.RtlExpr' -> T.RtlExpr' -> T.RtlExpr' -> T.RtlExpr'
+newRegVal k pred newVal oldVal =
+  if is_const_true pred
+  then newVal
+  else if is_const_false pred
+       then oldVal
+       else T.ITE k pred newVal oldVal
+
+queryReg :: String -> T.FullKind -> Bool -> RME -> T.RtlExpr
+queryReg name k isWrite regMap =
+  query regMap
+  where
+    query (T.VarRME v) = T.Var k $ T.unsafeCoerce (name, Just $ reg_counters v !!! name)
+    query (T.UpdRegRME r pred k val regMap') =
+      let restVal = query regMap' in
+        if r == name
+        then
+          newRegVal k pred val restVal
+        else restVal
+    query (T.WriteRME idxNum num writePort dataArray idx dataK val mask pred writeMap readMap arr) =
+      query (if isWrite then writeMap else readMap)
+    query (T.ReadReqRME idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
+      query (if isWrite then writeMap else readMap)
+    query (T.ReadRespRME idxNum num readResp readReg dataArray writePort isWrMask dataK isAddr writeMap readMap) =
+      query (if isWrite then writeMap else readMap)
+    query (T.AsyncReadRME idxNum num readPort dataArray writePort isWrMask idx pred k writeMap readMap) =
+      query (if isWrite then writeMap else readMap)
+    query (T.CompactRME regMap) =
+      query regMap
+
+createPredCall :: String -> T.Kind -> [PredCall] -> PredCall
+createPredCall s k [a@(T.Var _ pred, T.Var _ call)] = a
+createPredCall _ k predCalls = T.predPackOr k predCalls
+
+getPredCallList :: String -> T.Kind -> Int -> [PredCall]
+getPredCallList name k count =
+  (map (\i -> (T.Var (T.SyntaxKind T.Bool) $ T.unsafeCoerce (name ++ "#_enable", Just i), T.Var (T.SyntaxKind k) $ T.unsafeCoerce (name ++ "#_argument", Just i))) [0..count])
 
 flatten_RME :: RME -> RME2
 flatten_RME (T.VarRME v) = meth_call_history v
@@ -392,13 +394,11 @@ queryRfWrite name idxNum num k isMask isWrite regMap =
                       Nothing -> T.createWriteRq idxNum num dataK idx val
                       Just mask' -> T.createWriteRqMask idxNum num dataK idx val mask') in
       let predpair = (pred, T.predPack (T.Bit $ T.size writeType) pred writeRq) in
-      if is_const_false pred
-        then restPredCall
-        else if writePort == name
-          then if is_const_true pred
-            then [predpair]
-            else predpair : restPredCall
-          else restPredCall
+      if is_const_false pred || writePort /= name
+      then restPredCall
+      else if is_const_true pred
+           then [predpair]
+           else predpair : restPredCall
 
 queryAsyncReadReq :: String -> Int -> Bool -> RME2 -> (RME2,PredCall)
 queryAsyncReadReq name idxNum isWrite regMap =
@@ -413,13 +413,11 @@ queryAsyncReadReq name idxNum isWrite regMap =
     query (AsyncReadRME2 idxNum num readPort dataArray writePort isWriteMask idx pred dataK writeMap readMap) =
       let (tail', restPredAddr) = query (if isWrite then writeMap else readMap) in
       let predpair = (pred, T.predPack (T.Bit (log2_up idxNum)) pred idx) in
-      if is_const_false pred
-        then (tail', restPredAddr)
-        else if readPort == name
-          then if is_const_true pred
-            then (if isWrite then writeMap else readMap, [predpair])
-            else (if isWrite then writeMap else readMap, predpair : restPredAddr)
-          else (tail', restPredAddr)
+      if is_const_false pred || readPort /= name
+      then (tail', restPredAddr)
+      else (if isWrite then writeMap else readMap, if is_const_true pred
+                                                   then [predpair]
+                                                   else predpair : restPredAddr)
 
 querySyncReadReqTail :: String -> RME2 -> RME2
 querySyncReadReqTail name' regMap2 = query regMap2
@@ -446,16 +444,14 @@ querySyncReadReq name idxNum isWrite regMap =
     query (ReadReqRME2 idxNum num readReq readReg dataArray idx dataK isAddr pred writeMap readMap arr) =
       let (tail', restPredAddr) = query (if isWrite then writeMap else readMap) in
       let predpair = (pred, T.predPack (T.Bit (log2_up idxNum)) pred idx) in
-      if is_const_false pred
-        then (tail', restPredAddr)
-        else if readReq == name
-          then if is_const_true pred
-            then (if isWrite then writeMap else readMap ,[predpair])
-            else (if isWrite then writeMap else readMap, predpair : restPredAddr)
-          else (tail', restPredAddr)
+      if is_const_false pred || readReq /= name
+      then (tail', restPredAddr)
+      else (if isWrite then writeMap else readMap, if is_const_true pred
+                                                   then [predpair]
+                                                   else predpair : restPredAddr)
 
 queryIsAddrRegWrite :: String -> String -> Int -> RME2 -> T.RtlExpr'
-queryIsAddrRegWrite name readReqName idxNum regMap = T.ITE (T.SyntaxKind (T.Bit (log2_up idxNum))) (fst readCall) (snd readCall) regVal
+queryIsAddrRegWrite name readReqName idxNum regMap = newRegVal (T.SyntaxKind $ T.Bit (log2_up idxNum)) (fst readCall) (snd readCall) regVal
   where
     (_,readCall) = querySyncReadReq readReqName idxNum True regMap
     regVal = T.Var (T.SyntaxKind (T.Bit (log2_up idxNum))) (T.unsafeCoerce (name, Nothing))
@@ -546,9 +542,6 @@ del_reg_constant r = do
   let rc = reg_constant rmc
   put (s { regmap_counters = rmc { reg_constant = H.delete r rc } })
 
-convAny :: T.Any -> T.VarType
-convAny x = T.unsafeCoerce x
-
 do_reg :: String -> T.FullKind -> RME -> State ExprState [(T.VarType, T.RtlExpr')]
 do_reg r k m = case queryReg r k True m of
   e@(T.Const k val) -> do
@@ -556,7 +549,7 @@ do_reg r k m = case queryReg r k True m of
     ins_reg_constant r val
     return [((r, Just i), e)]
   e@(T.Var _ x) -> do
-    let (r', Just _) = convAny x
+    let (r', Just _) = T.unsafeCoerce x
     if r == r'
       then return []
       else do
@@ -576,7 +569,7 @@ do_regs m = do
 do_isAddr_read_reg :: String -> String -> Int -> RME2 -> State ExprState [(T.VarType, T.RtlExpr')]
 do_isAddr_read_reg name readReqName idxNum regMap = case queryIsAddrRegWrite name readReqName idxNum regMap of
   e@(T.Var _ x) ->
-    let (name', Just _) = convAny x in
+    let (name', _) = T.unsafeCoerce x in
       if name == name'
       then return []
       else do
@@ -601,7 +594,7 @@ do_not_isAddr_read_reg :: String -> String -> String -> Int -> Int -> T.Kind -> 
 do_not_isAddr_read_reg regName writeName readReqName idxNum num k isMask regMap = do
   case queryNotIsAddrRegWrite writeName readReqName idxNum num k isMask regMap of
     e@(T.Var _ x) ->
-      let (regName', Just _) = convAny x in
+      let (regName', Just _) = T.unsafeCoerce x in
         if regName == regName'
         then return []
         else do
@@ -743,33 +736,25 @@ get_final_meth_assigns :: T.BaseModule -> [T.RegFileBase] -> ExprState -> [(T.Va
 get_final_meth_assigns basemod rfbs s =
   concatMap (\(f, (argk, _)) -> en_arg_final f argk $ meth_counters s) (get_normal_meth_calls_with_sign basemod rfbs)
 
--- get_common_from_write :: String -> [Async] -> [Sync] -> [Sync] -> CommonInfo
--- get_common_from_write write asyncs isAddrs notIsAddrs =
---   let commons = map asyncCommon asyncs ++ map syncCommon (isAddrs ++ notIsAddrs) in
---   fromJust $ find (\c -> commonWrite c == write) commons
-
--- get_common_from_async_read :: String -> [Async] -> CommonInfo
--- get_common_from_async_read read asyncs = asyncCommon $ fromJust $ find (\async -> read `elem` asyncNames async) asyncs
-
--- get_common_from_sync_readRq :: String -> [Sync] -> CommonInfo
--- get_common_from_sync_readRq readRq syncs = syncCommon $ fromJust $ find
---   (\sync -> readRq `elem` map (\(T.Build_SyncRead r _ _) -> r) (syncNames sync)) syncs
-
 get_final_rfmeth_assigns :: [T.RegFileBase] -> ExprState -> [(T.VarType, T.RtlExpr')]
 get_final_rfmeth_assigns rfbs s = let (asyncs,isAddrs,notIsAddrs) = process_rfbs rfbs in
   let history = meth_call_history $ regmap_counters s in
 
     --writes
-       concatMap (\c -> en_arg_helper (commonWrite c) $ queryRfWrite (commonWrite c) (commonIdxNum c) (commonNum c) (commonData c) (commonIsWrMask c) True history) (map asyncCommon asyncs ++ map syncCommon (isAddrs ++ notIsAddrs))
+       concatMap (\c -> en_arg_helper (commonWrite c) $ queryRfWrite (commonWrite c) (commonIdxNum c) (commonNum c) (commonData c) (commonIsWrMask c) True history)
+       (map asyncCommon asyncs ++ map syncCommon (isAddrs ++ notIsAddrs))
 
     --async reads
-    ++ concatMap (\(Async c reads) -> concatMap (\r -> en_arg_helper r $ snd $ queryAsyncReadReq r (commonIdxNum c) True history) reads) asyncs
+    ++ concatMap (\(Async c reads) -> concatMap (\r -> en_arg_helper r $ snd $ queryAsyncReadReq r (commonIdxNum c) True history) reads)
+       asyncs
  
     --isAddr readreq
-    ++ concatMap (\(Sync c reads) -> concatMap (\(T.Build_SyncRead readRq _ _) -> en_arg_helper readRq $ snd $ querySyncReadReq readRq (commonIdxNum c) True history) reads) isAddrs
+    ++ concatMap (\(Sync c reads) -> concatMap (\(T.Build_SyncRead readRq _ _) -> en_arg_helper readRq $ snd $ querySyncReadReq readRq (commonIdxNum c) True history) reads)
+       isAddrs
  
     --notIsAddr readreq
-    ++ concatMap (\(Sync c reads) -> concatMap (\(T.Build_SyncRead readRq _ _) -> en_arg_helper readRq $ snd $ querySyncReadReq readRq (commonIdxNum c) True history) reads) notIsAddrs
+    ++ concatMap (\(Sync c reads) -> concatMap (\(T.Build_SyncRead readRq _ _) -> en_arg_helper readRq $ snd $ querySyncReadReq readRq (commonIdxNum c) True history) reads)
+       notIsAddrs
  
 all_verilog :: ModInput -> (VerilogExprs, [(T.VarType, T.RtlExpr')], H.Map String T.ConstT)
 all_verilog input@((strs,(rfbs,basemod)),cas) =
