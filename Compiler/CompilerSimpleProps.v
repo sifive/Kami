@@ -61,22 +61,15 @@ Proof.
   - inv HSemCompActionSimple; simpl in *; EqDep_subst; rewrite unifyWO in *.
     inv HSemCompActionSimple_a; simpl in *; EqDep_subst.
     inv HRegMapWf; destruct regMap_a.
-    (*
+    inv H0.
     econstructor 14; eauto using RME_Simple_RME_Equiv.
-    inv HReadMap.
-    apply RME_Simple_RME_Equiv; auto.
-     *)
-    admit.
   - inv HSemCompActionSimple; simpl in *; EqDep_subst; rewrite unifyWO in *.
     inv HSemCompActionSimple_a; simpl in *; EqDep_subst.
     inv HRegMapWf; destruct regMap_a.
-    (*
     econstructor 15; eauto using RME_Simple_RME_Equiv.
-    inv HReadMap.
+    inv H0.
     apply RME_Simple_RME_Equiv; auto.
-     *)
-    admit.
-Admitted.
+Qed.
 
 Lemma CA_Simple_Trace_CA_Trace_Equiv (ca : RegsT -> CompActionT type (RegsT * list RegsT) Void) :
   forall regInits o lupds lcalls,
