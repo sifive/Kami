@@ -743,41 +743,33 @@ get_final_meth_assigns :: T.BaseModule -> [T.RegFileBase] -> ExprState -> [(T.Va
 get_final_meth_assigns basemod rfbs s =
   concatMap (\(f, (argk, _)) -> en_arg_final f argk $ meth_counters s) (get_normal_meth_calls_with_sign basemod rfbs)
 
-get_common_from_write :: String -> [Async] -> [Sync] -> [Sync] -> CommonInfo
-get_common_from_write write asyncs isAddrs notIsAddrs =
-  let commons = map asyncCommon asyncs ++ map syncCommon (isAddrs ++ notIsAddrs) in
-  fromJust $ find (\c -> commonWrite c == write) commons
+-- get_common_from_write :: String -> [Async] -> [Sync] -> [Sync] -> CommonInfo
+-- get_common_from_write write asyncs isAddrs notIsAddrs =
+--   let commons = map asyncCommon asyncs ++ map syncCommon (isAddrs ++ notIsAddrs) in
+--   fromJust $ find (\c -> commonWrite c == write) commons
 
-get_common_from_async_read :: String -> [Async] -> CommonInfo
-get_common_from_async_read read asyncs = asyncCommon $ fromJust $ find (\async -> read `elem` asyncNames async) asyncs
+-- get_common_from_async_read :: String -> [Async] -> CommonInfo
+-- get_common_from_async_read read asyncs = asyncCommon $ fromJust $ find (\async -> read `elem` asyncNames async) asyncs
 
-get_common_from_sync_readRq :: String -> [Sync] -> CommonInfo
-get_common_from_sync_readRq readRq syncs = syncCommon $ fromJust $ find
-  (\sync -> readRq `elem` map (\(T.Build_SyncRead r _ _) -> r) (syncNames sync)) syncs
+-- get_common_from_sync_readRq :: String -> [Sync] -> CommonInfo
+-- get_common_from_sync_readRq readRq syncs = syncCommon $ fromJust $ find
+--   (\sync -> readRq `elem` map (\(T.Build_SyncRead r _ _) -> r) (syncNames sync)) syncs
 
 get_final_rfmeth_assigns :: [T.RegFileBase] -> ExprState -> [(T.VarType, T.RtlExpr')]
 get_final_rfmeth_assigns rfbs s = let (asyncs,isAddrs,notIsAddrs) = process_rfbs rfbs in
   let history = meth_call_history $ regmap_counters s in
 
     --writes
-       concatMap (\(write,argk) ->
-          let c = get_common_from_write write asyncs isAddrs notIsAddrs in
-            en_arg_helper write $ queryRfWrite write (commonIdxNum c) (commonNum c) (commonData c) (commonIsWrMask c) True history) (get_write_meths_with_arg rfbs)
+       concatMap (\c -> en_arg_helper (commonWrite c) $ queryRfWrite (commonWrite c) (commonIdxNum c) (commonNum c) (commonData c) (commonIsWrMask c) True history) (map asyncCommon asyncs ++ map syncCommon (isAddrs ++ notIsAddrs))
 
     --async reads
-    ++ concatMap (\(read,argk) ->
-          let c = get_common_from_async_read read asyncs in
-            en_arg_helper read $ snd $ queryAsyncReadReq read (commonIdxNum c) True history) (get_async_reads_with_arg asyncs)
+    ++ concatMap (\(Async c reads) -> concatMap (\r -> en_arg_helper r $ snd $ queryAsyncReadReq r (commonIdxNum c) True history) reads) asyncs
  
     --isAddr readreq
-    ++ concatMap (\(readRq,argk) ->
-          let c = get_common_from_sync_readRq readRq isAddrs in
-            en_arg_helper readRq $ snd $ querySyncReadReq readRq (commonIdxNum c) True history) (get_sync_readReqs_with_arg isAddrs)
+    ++ concatMap (\(Sync c reads) -> concatMap (\(T.Build_SyncRead readRq _ _) -> en_arg_helper readRq $ snd $ querySyncReadReq readRq (commonIdxNum c) True history) reads) isAddrs
  
     --notIsAddr readreq
-    ++ concatMap (\(readRq,argk) ->
-          let c = get_common_from_sync_readRq readRq notIsAddrs in
-            en_arg_helper readRq $ snd $ querySyncReadReq readRq (commonIdxNum c) True history) (get_sync_readReqs_with_arg notIsAddrs)
+    ++ concatMap (\(Sync c reads) -> concatMap (\(T.Build_SyncRead readRq _ _) -> en_arg_helper readRq $ snd $ querySyncReadReq readRq (commonIdxNum c) True history) reads) notIsAddrs
  
 all_verilog :: ModInput -> (VerilogExprs, [(T.VarType, T.RtlExpr')], H.Map String T.ConstT)
 all_verilog input@((strs,(rfbs,basemod)),cas) =
