@@ -361,24 +361,6 @@ is_const_false e = case eval_bool_expr e of
   Just False -> True
   _ -> False
 
--- is_const_true :: T.RtlExpr' -> Bool
--- is_const_true (T.Const T.Bool (T.ConstBool True)) = True
--- is_const_true (T.UniBool T.Neg e) = is_const_false e
--- is_const_true (T.CABool T.And es) = all is_const_true es
--- is_const_true (T.CABool T.Or es) = any is_const_true es
--- is_const_true (T.CABool T.Xor es) = all (\e -> is_const_true e || is_const_false e) es &&
---   (odd $ length $ filter is_const_true es)
--- is_const_true _ = False
-
--- is_const_false :: T.RtlExpr' -> Bool
--- is_const_false (T.Const T.Bool (T.ConstBool False)) = True
--- is_const_false (T.UniBool T.Neg e) = is_const_true e
--- is_const_false (T.CABool T.And es) = any is_const_false es
--- is_const_false (T.CABool T.Or es) = all is_const_false es
--- is_const_false (T.CABool T.Xor es) = all (\e -> is_const_true e || is_const_false e) es &&
---   (even $ length $ filter is_const_true es)
--- is_const_false _ = False
-
 flatten_RME :: RME -> RME2
 flatten_RME (T.VarRME v) = meth_call_history v
 flatten_RME (T.UpdRegRME r pred k val regMap') = flatten_RME regMap'
@@ -485,14 +467,22 @@ queryNotIsAddrRegWrite writeName readReqName idxNum num k isMask regMap = pointw
     writeCall = queryRfWrite writeName idxNum num k isMask True tail
     pointwise = T.pointwiseIntersection idxNum num k isMask (fst readCall) (snd readCall) (fst writeCall) (T.unsafeCoerce $ snd writeCall)
 
-queryAsyncReadResp :: String -> String -> Int -> Int -> T.Kind -> Bool -> RME2 -> T.RtlExpr'
-queryAsyncReadResp name writeName idxNum num k isMask regMap =
+-- queryAsyncReadResp :: String -> String -> Int -> Int -> T.Kind -> Bool -> RME2 -> T.RtlExpr'
+-- queryAsyncReadResp name writeName idxNum num k isMask regMap =
+--   T.pointwiseBypass num k pointwise respVal
+--   where
+--     respVal = (T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (name ++ "#_return", Nothing)))
+--     (tail,readCall) = queryAsyncReadReq name idxNum True regMap
+--     writeCall = queryRfWrite writeName idxNum num k isMask True tail
+--     pointwise = T.pointwiseIntersection idxNum num k isMask (fst readCall) (snd readCall) (fst writeCall) (T.unsafeCoerce $ snd writeCall)
+
+queryAsyncReadResp :: String -> String -> Int -> Int -> T.Kind -> Bool -> T.RtlExpr' -> T.RtlExpr' -> RME2 -> T.RtlExpr'
+queryAsyncReadResp name writeName idxNum num k isMask pred idx regMap =
   T.pointwiseBypass num k pointwise respVal
   where
     respVal = (T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (name ++ "#_return", Nothing)))
-    (tail,readCall) = queryAsyncReadReq name idxNum True regMap
-    writeCall = queryRfWrite writeName idxNum num k isMask True tail
-    pointwise = T.pointwiseIntersection idxNum num k isMask (fst readCall) (snd readCall) (fst writeCall) (T.unsafeCoerce $ snd writeCall)
+    writeCall = queryRfWrite writeName idxNum num k isMask False regMap
+    pointwise = T.pointwiseIntersection idxNum num k isMask pred idx (fst writeCall) (T.unsafeCoerce $ snd writeCall)
 
 queryIsAddrReadResp :: String -> String -> String -> Int -> Int -> T.Kind -> Bool -> RME2 -> T.RtlExpr'
 queryIsAddrReadResp name writeName regName idxNum num k isMask regMap =
@@ -710,7 +700,7 @@ ppCAS (T.CompAsyncRead_simple idxNum num readPort dataArray writePort isWrMask i
   j <- trace "AsyncRead\n" let_count
   y <- ppCAS (cont $ tmp_var j)
   return $ y {
-    assign_exprs = (tmp_var j, queryAsyncReadResp readPort writePort idxNum num k isWrMask $ flatten_RME readMap) : assign_exprs y
+    assign_exprs = (tmp_var j, queryAsyncReadResp readPort writePort idxNum num k isWrMask pred idx $ flatten_RME readMap) : assign_exprs y
   }
 
 ppCAS (T.CompSyncReadRes_simple idxNum num readResp readReg dataArray writePort isWrMask k True readMap _ cont) = do
