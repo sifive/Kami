@@ -467,15 +467,6 @@ queryNotIsAddrRegWrite writeName readReqName idxNum num k isMask regMap = pointw
     writeCall = queryRfWrite writeName idxNum num k isMask True tail
     pointwise = T.pointwiseIntersection idxNum num k isMask (fst readCall) (snd readCall) (fst writeCall) (T.unsafeCoerce $ snd writeCall)
 
--- queryAsyncReadResp :: String -> String -> Int -> Int -> T.Kind -> Bool -> RME2 -> T.RtlExpr'
--- queryAsyncReadResp name writeName idxNum num k isMask regMap =
---   T.pointwiseBypass num k pointwise respVal
---   where
---     respVal = (T.Var (T.SyntaxKind (T.Array num k)) (T.unsafeCoerce (name ++ "#_return", Nothing)))
---     (tail,readCall) = queryAsyncReadReq name idxNum True regMap
---     writeCall = queryRfWrite writeName idxNum num k isMask True tail
---     pointwise = T.pointwiseIntersection idxNum num k isMask (fst readCall) (snd readCall) (fst writeCall) (T.unsafeCoerce $ snd writeCall)
-
 queryAsyncReadResp :: String -> String -> Int -> Int -> T.Kind -> Bool -> T.RtlExpr' -> T.RtlExpr' -> RME2 -> T.RtlExpr'
 queryAsyncReadResp name writeName idxNum num k isMask pred idx regMap =
   T.pointwiseBypass num k pointwise respVal
