@@ -57,6 +57,8 @@ Section Ty.
 
   Definition orKind k (ls: list (Bit (size k) @# ty)) := unpack k (CABit Bor ls).
 
+  Definition predPackOr k (ls: list ((Bool @# ty) * (k @# ty))) := (CABool Or (map fst ls), orKind k (map (fun '(p, v) => predPack p v) ls)).
+
   Definition createWriteRq ty (idxNum num: nat) (k: Kind) (idx: Bit (Nat.log2_up idxNum) @# ty) (val: Array num k @# ty): WriteRq (Nat.log2_up idxNum) (Array num k) @# ty :=
     STRUCT { "addr" ::= idx ;
              "data" ::= val }.

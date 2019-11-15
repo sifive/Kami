@@ -141,16 +141,10 @@ Section DoubleWritesProof.
       inversion HSemCompActionT_cont; simpl in *; EqDep_subst.
       inversion HSemCompActionT_cont0; simpl in *; EqDep_subst.
       remember (evalExpr e) as P0.
-      (* assert (forall bexpr, (evalExpr (Const type true && bexpr)%kami_expr = evalExpr bexpr)) as P1. *)
-      (* { intro; simpl; auto. } *)
-      (* specialize (SemCompActionEquivBexpr _ _ _ _ _ (P1 e) HSemCompActionT_a) as P2. *)
-      (* specialize (SemCompActionEquivBexpr _ _ _ _ _ (P1 (!e)%kami_expr) HSemCompActionT_a0) as P3. *)
       destruct P0; simpl in *.
       * assert (forall b, (evalExpr (Var type (SyntaxKind Bool) b)) = evalExpr (Const type b)) as P4; auto.
-        (* assert (evalExpr e = evalExpr (Const type true)) as P4. *)
-        (*  simpl in *. rewrite <- HeqP0. reflexivity. *)
          specialize (SemCompActionEquivBexpr _ _ _ _ _ (P4 true) HSemCompActionT_a) as P6.
-         rewrite <- HeqP0 in *; simpl in HSemCompActionT. (*rewrite -> P4 in HSemCompActionT.*)
+         rewrite <- HeqP0 in *; simpl in HSemCompActionT.
          destruct regMap_a0.
          assert (r = old).
          {
@@ -166,8 +160,6 @@ Section DoubleWritesProof.
          rewrite -> H1 in H.
          apply H. assumption.
       * assert (forall b, (evalExpr (Var type (SyntaxKind Bool) b)) = evalExpr (Const type b)) as P4; auto.
-        (*assert (evalExpr (!e)%kami_expr = evalExpr (Const type true)) as P4.
-        { simpl; rewrite <- HeqP0; auto. }*)
         specialize (SemCompActionEquivBexpr _ _ _ _ _ (P4 true) HSemCompActionT_a0) as P6.
         destruct regMap_a0.
         assert (r = old).

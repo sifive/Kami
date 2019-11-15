@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -XStandaloneDeriving #-}
+{-# LANGUAGE Strict #-}
 
 module PrettyPrintVerilog where
 
