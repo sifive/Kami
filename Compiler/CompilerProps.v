@@ -2426,7 +2426,7 @@ Proof.
         rewrite (getKindAttr_map_fst _ _ (prevPrevRegsTrue H2)) in HoInitNoDups.
         specialize (H8 _ (or_introl eq_refl)); dest.
         rewrite (prevPrevRegsTrue H2) in H8.
-        specialize (doUpdRegs_UpdRegs _ (HoInitNoDups) _ H5 H8) as P4.
+        specialize (doUpdRegs_UpdRegs _ (HoInitNoDups) _ H8) as P4.
         unfold UpdRegs in P4; dest.
         specialize (H11 _ _ H3); dest.
         destruct H11; dest.
@@ -2468,10 +2468,8 @@ Proof.
            ++ apply H10.
       * simpl.
         apply doUpdRegs_enuf; auto.
-        -- specialize (H8 _ (or_introl (eq_refl))); dest; auto.
         -- apply getKindAttr_doUpdRegs; auto.
            ++ rewrite <-(getKindAttr_map_fst _ _ (prevPrevRegsTrue H2)); assumption.
-           ++ specialize (H8 _ (or_introl (eq_refl))); dest; assumption.
            ++ intros.
               specialize (H8 _ (or_introl (eq_refl))); dest.
               rewrite <-(prevPrevRegsTrue H2).
@@ -2587,7 +2585,6 @@ Proof.
     rewrite (getKindAttr_map_fst _ _ (prevPrevRegsTrue H)) in HNoDup.
     rewrite (prevPrevRegsTrue H) in HUpdsCorrect.
     specialize (doUpdRegs_UpdRegs _ HNoDup _
-                                  (HNoDupUpds _ (or_introl eq_refl))
                                   (HUpdsCorrect _ (or_introl eq_refl))) as P2.
     unfold UpdRegs in P2; dest.
     econstructor; auto.
