@@ -5414,6 +5414,57 @@ Proof.
   auto.
 Qed.
 
+Lemma getKindAttr_doUpdRegs_app: forall regs upds1 upds2,
+      NoDup (map fst regs) ->
+      (forall (s : string) (v : {x : FullKind & fullType type x}), In (s, v) upds1 -> In (s, projT1 v) (getKindAttr regs)) ->
+      (forall (s : string) (v : {x : FullKind & fullType type x}), In (s, v) upds2 -> In (s, projT1 v) (getKindAttr regs)) ->
+      getKindAttr regs = getKindAttr (doUpdRegs (upds1 ++ upds2) regs).
+Proof.
+  induction upds1; intros; simpl.
+  { eapply getKindAttr_doUpdRegs; auto. }
+  {
+    rewrite getKindAttr_doUpdRegs'.
+    rewrite forall_map; intros.
+    case_eq (findReg (fst x) (a :: upds1 ++ upds2)); intros; auto.
+    epose proof (findRegs_Some' _ _ H3) as inSome.
+    clear H3.
+    destruct x; simpl in *.
+    f_equal.
+    destruct s1, s; simpl in *.
+    destruct inSome.
+    {
+      unshelve epose proof (H0 s0 (existT (fullType type) x0 f0) _) as H0; intuition auto.
+      rewrite in_map_iff in H0; dest.
+      destruct x1; simpl in *.
+      inv H0.
+      pose proof (NoDup_map_fst H H4 H2).
+      subst.
+      auto.
+    }
+    {
+      assert (okApp: forall (s : string) (v : {x : FullKind & fullType type x}), In (s, v) (upds1 ++ upds2) -> In (s, projT1 v) (getKindAttr regs)).
+      intros.
+      edestruct (in_app_or _ _ _ H4).
+      {
+        eapply H0.
+        auto.
+      }
+      {
+        eapply H1.
+        auto.
+      }
+      specialize (okApp s0 (existT (fullType type) x0 f0) H3).
+      rewrite in_map_iff in okApp; dest.
+      simpl in H4.
+      inv H4.
+      destruct x1.
+      epose proof (NoDup_map_fst H H5 H2).
+      subst.
+      auto.
+    }
+  }
+Qed.
+
 Lemma doUpdRegs_UpdRegs' o:
   NoDup (map fst o) ->
   forall u,
