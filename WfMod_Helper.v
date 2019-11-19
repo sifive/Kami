@@ -70,29 +70,6 @@ Proof.
   + elim H1.
 Qed.*)
 
-(*Ltac trivialSolve :=
-    match goal with
-    | |- forall _, In _ (getAllRules (Base (BaseRegFile _))) -> _ => simpl;intros;trivialSolve
-    | H: False |- _ => elim H
-    | |- DisjKey _ List.nil => apply DisjKey_nil2 
-    | |- DisjKey List.nil _ => apply DisjKey_nil1
-    | |- DisjKeyWeak _ List.nil => rewrite <- DisjKeyWeak_same;[apply DisjKey_nil2 | repeat (decide equality)]
-    | |- DisjKeyWeak List.nil _ => rewrite <- DisjKeyWeak_same;[apply DisjKey_nil1 | repeat (decide equality)]
-    | |- ~ (List.In _ _) => simpl;trivialSolve
-    | |- ~ (_ \/ _) => let X := fresh in intro X;inversion X;subst;clear X;trivialSolve
-    | |- _ /\ _ => split;trivialSolve
-    | |- ~False => let X := fresh in intro X;inversion X
-    | |- (_++_)%string <> (_++_)%string => let X := fresh in try (intro X;apply string_equal_prefix in X; inversion X)
-    (*| |- ~((?P++_)%string = _ \/ False) \/ ~((?P++_)%string = _ \/ False) => let X := fresh in try (apply or_diff;intro X;inversion X)*)
-    | |- NoDup (_::_) => econstructor; simpl; trivialSolve
-    | |- NoDup [] => econstructor
-    | H: _ \/ _ |- _ => inversion H;subst;clear H;trivialSolve
-    | H: (?P++_)%string=(?P++_)%string |- _ => apply string_equal_prefix in H;inversion H;subst;clear H;trivialSolve
-    | H: In _ (map fst _) |- _ => simpl in H;trivialSolve
-    | |- (?P = ?P) => reflexivity
-    | _ => idtac
-    end.*)
-
 Theorem ne_disjunction_break1: forall a b c, (~(a \/ False) \/ ~(b \/ False)) /\
                                        (~(a \/ False) \/ ~c) ->
                                         ~(a \/ False) \/ ~(b \/ c).
@@ -106,18 +83,6 @@ Theorem ne_disjunction_break2: forall a b c, (~(a \/ False) \/ ~c) /\
 Proof.
     tauto.
 Qed.
-
-(*Ltac DisjKey_solve :=
-  match goal with
-  (*| |- ~((?P++_)%string = _ \/ False) \/ ~((?P++_)%string = _ \/ False) => let X := fresh in try (apply or_diff;intro X;inversion X)*)
-  | |- ~(_ \/ False) \/ ~(_ \/ _) => apply ne_disjunction_break1;split;DisjKey_solve
-  | |- ~(_ \/ _ \/ _) \/ ~_ => apply ne_disjunction_break2;split;DisjKey_solve
-  (*| |- DisjKey _ _ => unfold DisjKey; simpl; intros;DisjKey_solve*)
-  | |- DisjKey _ _ => rewrite DisjKeyWeak_same;[ DisjKey_solve | repeat (decide equality) ]
-  | |- DisjKeyWeak _ _ => unfold DisjKeyWeak;intros;DisjKey_solve
-  | H: In _ (map fst ((_,_)::_)) |- _ => simpl in H;DisjKey_solve
-  | |- _ => trivialSolve
-  end.*)
 
 Theorem DisjKey_NubBy1: forall T (x: list (string * T)) (y: list (string * T)), DisjKey x y -> DisjKey (nubBy (fun '(a,_) '(b,_) => String.eqb a b) x) y.
 Proof.
@@ -266,25 +231,4 @@ Qed.
 
 Ltac ltac_wfMod_ConcatMod helper_db :=
      repeat (apply ConcatModWf;autorewrite with kami_rewrite_db;repeat split;try (auto with helper_db);trivialSolve;try (apply string_dec)).
-
-(*Ltac WfMod_Solve :=
-    match goal with
-    | |- _ => (progress discharge_wf);WfMod_Solve
-    | |- forall _, _ => intros;WfMod_Solve
-    | |- _ -> _ => intros;WfMod_Solve
-    | |- _ /\ _ => split;WfMod_Solve
-    | |- In _ _ => simpl;WfMod_Solve
-    | |- (_ \/ False) => left;WfMod_Solve
-    | |- _ => trivialSolve
-    end.
-
-Ltac WfConcatAction_Solve :=
-    match goal with
-    | |- _ => progress discharge_wf;WfConcatAction_Solve
-    | |- forall _, _ => intros;simpl;WfConcatAction_Solve
-    | H: In _ (getAllMethods _) |- _ => simpl in H;inversion H;subst;clear H;simpl;WfConcatAction_Solve
-    | H: _ \/ _ |- _ => simpl in H;inversion H;subst;clear H;simpl;WfConcatAction_Solve
-    | H: False |- _ => inversion H
-    | |- _ => idtac
-    end.*)
 
