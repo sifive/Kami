@@ -43,7 +43,7 @@ instance Show T.ConstT where
 
 instance Show T.ConstFullT where
   show (T.SyntaxConst k c) = "SyntaxConst " ++ show k ++ " " ++ show c
-  show (T.NativeConst _) = "NativeConst"
+  show (T.NativeConst _ _) = "NativeConst"
 
 instance Show T.Kind where
   show T.Bool = "Bool"
