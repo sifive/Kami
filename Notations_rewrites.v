@@ -9,6 +9,7 @@ Require Import Vector.
 Import VectorNotations.
 Import ListNotations.
 Require Import Kami.Notations.
+Require Import Kami.Lib.EclecticLib.
 
 Lemma app_rewrite1: forall T (a:T) b c, (a::b)++c=a::(b++c).
 Proof.
@@ -406,102 +407,6 @@ Qed.
       - apply H0.
       - apply H1.
   Qed.*)
-
-  Theorem DisjKey_Cons1:
-    forall T Q (a:(T*Q)) x z (W:forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}),
-           DisjKey (a::x) z <-> ((~(List.In (fst a) (List.map fst z))) /\ DisjKey x z).
-  Proof.
-    intros.
-    rewrite ?DisjKeyWeak_same.
-    split.
-    + intros.
-      split.
-      - unfold DisjKeyWeak in H.
-        assert (List.In (fst a) (List.map fst (a::x)) -> List.In (fst a) (List.map fst z) -> False).
-        apply H.
-        intro X.
-        apply H0.
-        simpl.
-        left.
-        reflexivity.
-        apply X.
-      - simpl.
-        intros.
-        unfold DisjKeyWeak in H.
-        unfold DisjKeyWeak.
-        intros.
-        assert (List.In k (List.map fst (a::x)) -> List.In k (List.map fst z) -> False).
-        apply H.
-        apply H2.
-        simpl.
-        right.
-        apply H0.
-        apply H1.
-    + intros.
-      inversion H; subst; clear H.
-      unfold DisjKeyWeak.
-      unfold DisjKeyWeak in H1.
-      intros.
-      assert (List.In k (List.map fst x) -> List.In k (List.map fst z) -> False).
-      apply H1.
-      simpl in H.
-      inversion H;subst;clear H.
-      - apply H0.
-        apply H2.
-      - apply H3.
-        apply H4.
-        apply H2.
-    + apply W.
-    + apply W.
-Qed.
-
-Theorem DisjKey_Cons2:
-    forall T Q (a:(T*Q)) x z (W:forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}),
-           DisjKey x (a::z) <-> ((~(List.In (fst a) (List.map fst x))) /\ DisjKey x z).
-Proof.
-    intros.
-    rewrite ?DisjKeyWeak_same.
-    split.
-    + intros.
-      split.
-      - intros.
-        unfold DisjKeyWeak in H.
-        assert (List.In (fst a) (List.map fst x) -> List.In (fst a) (List.map fst (a::z)) -> False).
-        apply H.
-        intro X.
-        apply H0.
-        apply X.
-        simpl.
-        left.
-        reflexivity.
-      - simpl.
-        intros.
-        unfold DisjKeyWeak in H.
-        unfold DisjKeyWeak.
-        intros.
-        assert (List.In k (List.map fst x) -> List.In k (List.map fst (a::z)) -> False).
-        apply H.
-        apply H2.
-        apply H0.
-        simpl.
-        right.
-        apply H1.
-    + intros.
-      inversion H; subst; clear H.
-      unfold DisjKeyWeak.
-      unfold DisjKeyWeak in H1.
-      intros.
-      inversion H2;subst;clear H2.
-      - apply H0 in H.
-        inversion H.
-      - assert (List.In k (List.map fst x) -> List.In k (List.map fst z) -> False).
-        apply H1.
-        apply H2.
-        apply H.
-        apply H3.
-    +  apply W.
-    + apply W.
-Qed.
 
 Theorem DisjKey_Append1:
   forall T Q (x:list (T*Q)) y z (W:forall (a1:T) (a2:T), {a1=a2}+{a1<>a2}),
