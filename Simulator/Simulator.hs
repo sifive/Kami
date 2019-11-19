@@ -34,7 +34,7 @@ get_rules (x:xs) rules = case lookup x rules of
         return ((x,a):rest)
 
 initialize :: Modes -> T.RegInitT -> IO (String,Val)
-initialize _ (_, (_, Just (T.NativeConst _ _))) = error "Encountered a NativeConst."
+initialize _ (regName, (_, Just (T.NativeConst _ c))) = return (regName, unsafeCoerce c)
 initialize _ (regName, (_, Just (T.SyntaxConst _ c))) = return (regName, eval c)
 initialize modes (regName, (k, Nothing)) = do
     let debug = debug_mode modes

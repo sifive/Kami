@@ -15,7 +15,7 @@ import Data.Bits
 import qualified Data.BitVector as BV
 import qualified Data.Vector as V
 
-import GHC.Base (unsafeCoerce#)
+import GHC.Base (unsafeCoerce#, Any)
 
 unsafeCoerce :: a -> b
 unsafeCoerce = unsafeCoerce#
@@ -33,6 +33,15 @@ instance Eval T.ConstT Val where
     eval (T.ConstStruct n _ names fields) = StructVal $ map 
         (\i -> (names i, eval $ fields i)) (T.getFins n)
     eval (T.ConstArray n _ vals) = ArrayVal $ V.map (eval . vals) (V.fromList $ T.getFins n)
+
+-- instance Eval (T.ListKind, Any) Val where
+--     eval (T.KindList _, x) = unsafeCoerce x
+--     eval (T.RecurseList l, vs) = ListVal $ unsafeCoerce vs
+
+-- instance Eval (T.SpecificKind, Any) Val where
+--     eval (T.List lk, x) = eval lk x
+--     eval (T.Nat, x) = IntVal $ unsafeCoerce x
+--     eval (T.Anything _ _, _) = error "Not simulatable."
 
 instance Eval (T.UniBoolOp) (Bool -> Bool) where
     eval T.Neg = not
@@ -68,7 +77,7 @@ instance Eval T.CABitOp (Int -> [BV.BV] -> BV.BV) where
 
 instance Eval (T.Expr ty) Val where
     eval (T.Var (T.SyntaxKind _) x) = unsafeCoerce x
-    eval (T.Var (T.NativeKind _) _) = error "Encountered a NativeKind."
+    eval (T.Var (T.NativeKind _) x) = unsafeCoerce x
     eval (T.Const _ c) = eval c
     eval (T.UniBool o e) = BoolVal $ eval o $ boolCoerce $ eval e
     eval (T.CABool o es) = BoolVal $ eval o $ map (boolCoerce . eval) es
