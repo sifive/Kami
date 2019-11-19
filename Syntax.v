@@ -22,9 +22,18 @@ Inductive Kind :=
 | Struct  : forall n, (Fin.t n -> Kind) -> (Fin.t n -> string) -> Kind
 | Array   : nat -> Kind -> Kind.
 
+Inductive ListKind :=
+| KindList (k: Kind)
+| RecurseList (l: ListKind).
+
+Inductive SpecificKind :=
+| List (lk: ListKind)
+| Nat
+| Anything (t: Type) (c: t).
+
 Inductive FullKind: Type :=
 | SyntaxKind: Kind -> FullKind
-| NativeKind (t: Type) (c : t) : FullKind.
+| NativeKind (sk: SpecificKind).
 
 Inductive ConstT: Kind -> Type :=
 | ConstBool: bool -> ConstT Bool
@@ -32,9 +41,25 @@ Inductive ConstT: Kind -> Type :=
 | ConstStruct n fk fs (fv: forall i, ConstT (fk i)): ConstT (@Struct n fk fs)
 | ConstArray n k (fk: Fin.t n -> ConstT k): ConstT (Array n k).
 
+Section Phoas.
+  Variable ty: Kind -> Type.
+  Fixpoint denoteListKind (lk: ListKind) :=
+    match lk with
+    | KindList k => list (ty k)
+    | RecurseList l => list (denoteListKind l)
+    end.
+
+  Definition denoteSpecificKind (sk: SpecificKind) :=
+    match sk with
+    | List lk => denoteListKind lk
+    | Nat => nat
+    | Anything t c => t
+    end.
+End Phoas.
+
 Inductive ConstFullT: FullKind -> Type :=
 | SyntaxConst k: ConstT k -> ConstFullT (SyntaxKind k)
-| NativeConst t (c' : t) : ConstFullT (NativeKind c').
+| NativeConst (sk : SpecificKind) (c: denoteSpecificKind ConstT sk) : ConstFullT (NativeKind sk).
 
 Coercion ConstBool : bool >-> ConstT.
 Coercion ConstBit : word >-> ConstT.
@@ -50,10 +75,20 @@ Fixpoint getDefaultConst (k: Kind): ConstT k :=
 
 Notation Default := (getDefaultConst _).
 
+Definition getDefaultConstSpecificKind (sk: SpecificKind): denoteSpecificKind ConstT sk :=
+  match sk return denoteSpecificKind ConstT sk with
+  | List lk => match lk with
+               | KindList k => nil
+               | RecurseList l => nil
+               end
+  | Nat => 0
+  | Anything t c => c
+  end.
+
 Fixpoint getDefaultConstFullKind (k : FullKind) : ConstFullT k :=
   match k with
   | SyntaxKind k' => SyntaxConst (getDefaultConst k')
-  | NativeKind t c' => NativeConst c'
+  | NativeKind sk => NativeConst sk (getDefaultConstSpecificKind sk)
   end.
 
 Inductive UniBoolOp: Set :=
@@ -95,9 +130,10 @@ Inductive BinBitBoolOp: nat -> nat -> Set :=
 
 Section Phoas.
   Variable ty: Kind -> Type.
+  
   Definition fullType k := match k with
                              | SyntaxKind k' => ty k'
-                             | NativeKind k' c' => k'
+                             | NativeKind sk => denoteSpecificKind ty sk
                            end.
 
   Inductive Expr: FullKind -> Type :=
@@ -1061,10 +1097,23 @@ Fixpoint evalConstT k (e: ConstT k): type k :=
     | ConstArray n k' fv => fun i => evalConstT (fv i)
   end.
 
-Definition evalConstFullT k (e: ConstFullT k) :=
+Fixpoint evalConstListKind (lk: ListKind) {struct lk}: (denoteListKind ConstT lk) -> denoteListKind type lk :=
+  match lk return denoteListKind ConstT lk -> denoteListKind type lk with
+  | KindList k => fun c => map (@evalConstT k) c
+  | RecurseList l => fun c => map (evalConstListKind l) c
+  end.
+
+Definition evalConstSpecificKind (sk: SpecificKind): denoteSpecificKind ConstT sk -> denoteSpecificKind type sk :=
+  match sk return denoteSpecificKind ConstT sk -> denoteSpecificKind type sk with
+  | List k => fun c => evalConstListKind k c
+  | Nat => fun c => c
+  | Anything t c' => fun c => c
+  end.
+
+Definition evalConstFullT k (e: ConstFullT k): fullType type k :=
   match e in ConstFullT k return fullType type k with
-    | SyntaxConst k' c' => evalConstT c'
-    | NativeConst t c' => c'
+    | SyntaxConst k' c => evalConstT c
+    | NativeConst sk c => evalConstSpecificKind sk c
   end.
 
 (* maps register names to the values which they currently hold *)
