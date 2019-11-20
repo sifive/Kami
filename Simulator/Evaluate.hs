@@ -68,7 +68,7 @@ instance Eval T.CABitOp (Int -> [BV.BV] -> BV.BV) where
 
 instance Eval (T.Expr ty) Val where
     eval (T.Var (T.SyntaxKind _) x) = unsafeCoerce x
-    eval (T.Var (T.NativeKind _) _) = error "Encountered a NativeKind."
+    eval (T.Var (T.NativeKind _) x) = unsafeCoerce x
     eval (T.Const _ c) = eval c
     eval (T.UniBool o e) = BoolVal $ eval o $ boolCoerce $ eval e
     eval (T.CABool o es) = BoolVal $ eval o $ map (boolCoerce . eval) es

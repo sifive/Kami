@@ -18,6 +18,46 @@ Instance toString_sigma{X}{Y : X -> Type}`{toString X}`{forall x, toString (Y x)
 Definition cart_prod{X Y}(xs : list X)(ys : list Y) : list (X * Y) :=
   concat (map (fun x => map (pair x) ys) xs).
 
+Inductive FileType :=
+  | AsyncF
+  | SyncIsAddr
+  | SyncNotIsAddr.
+
+Inductive OverlapType :=
+  | Over (* write  -----
+            read     -----
+          *)
+
+  | Under (* write    -----
+             read  -----
+           *)
+
+
+  | Disjoint (* write -----
+                read        -----
+              *)
+  .
+
+Inductive MaskType :=
+  | IsWrMask
+  | NotIsWrMask.
+
+Inductive Schedule :=
+  | WriteFirst
+  | WriteSecond
+  | WriteThird.
+
+Definition FileTuple := (FileType * Schedule * OverlapType * MaskType)%type.
+
+Definition async_file_varieties : list FileTuple :=
+  cart_prod (cart_prod (cart_prod [AsyncF] [WriteFirst; WriteSecond]) [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
+
+Definition syncIsAddr_file_varieties : list FileTuple :=
+  cart_prod (cart_prod (cart_prod [SyncIsAddr] [WriteFirst; WriteSecond; WriteThird]) [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
+
+Definition syncNotIsAddr_file_varieties : list FileTuple :=
+  cart_prod (cart_prod (cart_prod [SyncNotIsAddr] [WriteFirst; WriteSecond; WriteThird]) [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
+
 Definition dep_cart_prod{X}{Y : X -> Type}(xs : list X)(ys : forall x, list (Y x)) : list ({x : X & Y x}) :=
   concat (map (fun x => map (fun y => existT Y x y) (ys x)) xs).
 
@@ -135,35 +175,6 @@ End Params.
 
 Section Files.
 
-Inductive FileType :=
-  | AsyncF
-  | SyncIsAddr
-  | SyncNotIsAddr.
-
-Inductive OverlapType :=
-  | Over (* write  -----
-            read     -----
-          *)
-
-  | Under (* write    -----
-             read  -----
-           *)
-
-
-  | Disjoint (* write -----
-                read        -----
-              *)
-  .
-
-Inductive MaskType :=
-  | IsWrMask
-  | NotIsWrMask.
-
-Inductive Schedule :=
-  | WriteFirst
-  | WriteSecond
-  | WriteThird.
-
 Instance toString_FileType : toString FileType := {|
   to_string := fun x => match x with
                         | AsyncF => "async"
@@ -195,8 +206,6 @@ Instance toString_Schedule : toString Schedule := {|
                         end
   |}.
 
-Definition FileTuple := (FileType * Schedule * OverlapType * MaskType)%type.
-
 Definition dataArray_name : FileTuple -> string :=
   fun tup => ("dataArray_" ++ to_string tup)%string.
 
@@ -214,30 +223,6 @@ Definition readReg_name : FileTuple -> string :=
 
 Definition write_name : FileTuple -> string :=
   fun tup => ("write_" ++ to_string tup)%string.
-
-
-Definition async_schedules : list (FileType * Schedule) :=
-  cart_prod [AsyncF] [WriteFirst; WriteSecond].
-
-Definition syncIsAddr_schedules : list (FileType * Schedule) :=
-  cart_prod [SyncIsAddr] [WriteFirst; WriteSecond; WriteThird].
-
-Definition syncNotIsAddr_schedules : list (FileType * Schedule) :=
-  cart_prod [SyncNotIsAddr] [WriteFirst; WriteSecond; WriteThird].
-
-(*
-Definition file_varieties : list FileTuple :=
-  cart_prod (cart_prod file_schedules [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
-*)
-
-Definition async_file_varieties : list FileTuple :=
-  cart_prod (cart_prod async_schedules [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
-
-Definition syncIsAddr_file_varieties : list FileTuple :=
-  cart_prod (cart_prod syncIsAddr_schedules [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
-
-Definition syncNotIsAddr_file_varieties : list FileTuple :=
-  cart_prod (cart_prod syncNotIsAddr_schedules [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
 
 Definition make_RFB(tup : FileTuple) : RegFileBase :=
   let '(ft,sch,ot,mt) := tup in
@@ -591,12 +576,12 @@ Definition mkTestMod(bm : BaseModule)(rfs : list RegFileBase) :=
   let md := (fold_right ConcatMod bm (map (fun m => Base (BaseRegFile m)) rfs)) in
   createHideMod md (map fst (getAllMethods md)).
 
-Definition testRegMod := mkTestMod testRegBaseMod [].
+Definition testReg := mkTestMod testRegBaseMod [].
 
-Definition testAsyncMod := mkTestMod testAsyncBaseMod testAsyncRFs.
+Definition testAsync := mkTestMod testAsyncBaseMod testAsyncRFs.
 
-Definition testSyncIsAddrMod := mkTestMod testSyncIsAddrBaseMod testSyncIsAddrRFs.
+Definition testSyncIsAddr := mkTestMod testSyncIsAddrBaseMod testSyncIsAddrRFs.
 
-Definition testSyncNotIsAddrMod := mkTestMod testSyncNotIsAddrBaseMod testSyncNotIsAddrRFs.
+Definition testSyncNotIsAddr := mkTestMod testSyncNotIsAddrBaseMod testSyncNotIsAddrRFs.
 
 End TestMod.

@@ -32,10 +32,9 @@ Proof.
   - econstructor 7; eauto.
     destruct regMap; inv HRegMapWf; econstructor; eauto using RME_Simple_RME_Equiv.
   - econstructor 8; eauto.
-  - inv HSemCompActionSimple_a; simpl in *; EqDep_subst.
-    inv HSemCompActionSimple_cont; simpl in *; EqDep_subst.
+  - inv HSemCompActionSimple; simpl in *; EqDep_subst; rewrite unifyWO in *.
+    inv HSemCompActionSimple_a; simpl in *; EqDep_subst.
     inv HRegMapWf; inv H0; EqDep_subst.
-    inv HReadMap.
     econstructor 9; eauto using RME_Simple_RME_Equiv.
   - inv HSemCompActionSimple; simpl in *; EqDep_subst; rewrite unifyWO in *.
     inv HSemCompActionSimple_a; EqDep_subst.
@@ -59,11 +58,16 @@ Proof.
     destruct regMap_a; inv HRegMapWf; inv H0; EqDep_subst;[discriminate|].
     econstructor 13; eauto using RME_Simple_RME_Equiv.
     econstructor; eauto using RME_Simple_RME_Equiv.
-  - econstructor 14; eauto using RME_Simple_RME_Equiv.
-    inv HReadMap.
-    apply RME_Simple_RME_Equiv; auto.
-  - econstructor 15; eauto using RME_Simple_RME_Equiv.
-    inv HReadMap.
+  - inv HSemCompActionSimple; simpl in *; EqDep_subst; rewrite unifyWO in *.
+    inv HSemCompActionSimple_a; simpl in *; EqDep_subst.
+    inv HRegMapWf; destruct regMap_a.
+    inv H0.
+    econstructor 14; eauto using RME_Simple_RME_Equiv.
+  - inv HSemCompActionSimple; simpl in *; EqDep_subst; rewrite unifyWO in *.
+    inv HSemCompActionSimple_a; simpl in *; EqDep_subst.
+    inv HRegMapWf; destruct regMap_a.
+    econstructor 15; eauto using RME_Simple_RME_Equiv.
+    inv H0.
     apply RME_Simple_RME_Equiv; auto.
 Qed.
 

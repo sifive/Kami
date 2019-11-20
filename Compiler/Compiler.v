@@ -26,16 +26,18 @@ Section Compile.
   | CompRead (r: string) (k: FullKind) (readMap: RegMapExpr) lret (cont: fullType ty k -> CompActionT lret): CompActionT lret
   | CompRet lret (e: lret @# ty) (newMap: RegMapExpr) : CompActionT lret
   | CompLetFull k (a: CompActionT k) lret (cont: fullType ty (SyntaxKind k) -> regMapTy -> CompActionT lret): CompActionT lret
-  | CompAsyncRead (idxNum num : nat) (readPort dataArray writePort: string) (isWriteMask: bool) (idx : Bit (Nat.log2_up idxNum) @# ty) (pred : Bool @# ty) (k : Kind) (readMap : RegMapExpr) lret
-                  (cont : fullType ty (SyntaxKind (Array num k)) -> CompActionT lret) : CompActionT lret
+  | CompAsyncRead (idxNum num : nat) (readPort dataArray writePort: string) (isWriteMask: bool)
+                  (idx : Bit (Nat.log2_up idxNum) @# ty) (pred : Bool @# ty) (k : Kind) (writeMap readMap : RegMapExpr) lret
+                  (cont : fullType ty (SyntaxKind (Array num k)) -> regMapTy -> CompActionT lret) : CompActionT lret
   | CompWrite (idxNum num : nat) (writePort dataArray : string) (idx  : Bit (Nat.log2_up idxNum) @# ty) (Data : Kind) (val : Array num Data @# ty)
               (mask : option (Array num Bool @# ty)) (pred : Bool @# ty) (writeMap readMap : RegMapExpr) lret
               (cont : regMapTy -> CompActionT lret) : CompActionT lret
   | CompSyncReadReq (idxNum num : nat) (readReq readReg dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# ty) (Data : Kind)
                     (isAddr : bool) (pred : Bool @# ty) (writeMap readMap : RegMapExpr) lret
                     (cont : regMapTy -> CompActionT lret) : CompActionT lret
-  | CompSyncReadRes (idxNum num : nat) (readResp readReg dataArray writePort : string) (isWriteMask: bool) (Data : Kind) (isAddr : bool) (readMap : RegMapExpr) lret
-                    (cont : fullType ty (SyntaxKind (Array num Data)) -> CompActionT lret) : CompActionT lret.
+  | CompSyncReadRes (idxNum num : nat) (readResp readReg dataArray writePort : string) (isWriteMask: bool)
+                    (Data : Kind) (isAddr : bool) (writeMap readMap : RegMapExpr) lret
+                    (cont : fullType ty (SyntaxKind (Array num Data)) -> regMapTy -> CompActionT lret) : CompActionT lret.
 
   Inductive EActionT (lretT : Kind) : Type :=
   | EMCall (meth : string) s (e : Expr ty (SyntaxKind (fst s)))
@@ -146,8 +148,8 @@ Section Compile.
                                                             (fun val => (@EcompileAction k (cont val) pred (VarRegMap writesF)))
                               ))))
       | EAsyncRead idxNum num readPort dataArray writePort isWriteMask idx k cont =>
-        CompAsyncRead idxNum readPort dataArray writePort isWriteMask idx pred (VarRegMap readMap)
-                      (fun array => @EcompileAction _ (cont array) pred writeMap)
+        CompAsyncRead idxNum readPort dataArray writePort isWriteMask idx pred writeMap (VarRegMap readMap)
+                      (fun array writeMap' => @EcompileAction _ (cont array) pred (VarRegMap writeMap'))
       | EWrite idxNum num writePort dataArray idx Data val mask cont =>
         CompWrite idxNum writePort  dataArray idx val mask pred writeMap (VarRegMap readMap)
                   (fun writeMap' => @EcompileAction _ cont pred (VarRegMap writeMap'))
@@ -155,8 +157,8 @@ Section Compile.
         CompSyncReadReq idxNum num readReq readReg dataArray idx Data isAddr pred writeMap (VarRegMap readMap)
                         (fun writeMap' => @EcompileAction _ cont pred (VarRegMap writeMap'))
       | ESyncReadRes idxNum num readResp readReg dataArray writePort isWriteMask Data isAddr cont =>
-        CompSyncReadRes idxNum readResp readReg dataArray writePort isWriteMask isAddr (VarRegMap readMap)
-                        (fun array => @EcompileAction _ (cont array) pred writeMap)
+        CompSyncReadRes idxNum readResp readReg dataArray writePort isWriteMask isAddr writeMap (VarRegMap readMap)
+                        (fun array writeMap' => @EcompileAction _ (cont array) pred (VarRegMap writeMap'))
       end.
 
     Fixpoint inlineWriteFile k (rf : RegFileBase) (a : EActionT k) : EActionT k :=
@@ -223,9 +225,12 @@ Section Compile.
                 match Signature_dec sign (Bit (Nat.log2_up _idxNum), Array _num _Data) with
                 | left isEq =>
                   let inValue := (match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with | eq_refl => arg end) in
-                  EAsyncRead _idxNum read _dataArray _write _isWrMask inValue (fun array => inlineAsyncReadFile  read rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with
-                                                                                                      | eq_refl => cont
-                                                                                                      end array))
+                  EAsyncRead _idxNum read _dataArray _write _isWrMask inValue
+                             (fun array =>
+                                inlineAsyncReadFile  read rf (match isEq in _ = Y return
+                                                                    fullType ty (SyntaxKind (snd Y)) -> EActionT k with
+                                                              | eq_refl => cont
+                                                              end array))
                 | right _ => EMCall g sign arg (fun ret => inlineAsyncReadFile read rf (cont ret))
                 end
               | false => EMCall g sign arg (fun ret => inlineAsyncReadFile read rf (cont ret))
@@ -583,7 +588,8 @@ Section Semantics.
                    (HSemCompActionT_cont: SemCompActionT (cont val_a regMap_a) regMap_cont calls_cont val_cont):
       SemCompActionT (@CompLetFull _ _ k a lret cont) regMap_cont newCalls val_cont
   | SemCompAsyncRead num (readPort dataArray writePort: string) isWriteMask idxNum (idx : Bit (Nat.log2_up idxNum) @# type) pred Data readMap lret
-                     updatedRegs readMapValOld readMapValUpds regVal regMap
+                     updatedRegs readMapValOld readMapValUpds regVal writeMap writeMapTy regMap
+                     (HWriteMap: SemRegMapExpr writeMap writeMapTy)
                      (HReadMap : SemRegMapExpr readMap (readMapValOld, readMapValUpds))
                      (HUpdatedRegs : PriorityUpds readMapValOld readMapValUpds updatedRegs)
                      (HIn :  In (dataArray, (existT _ (SyntaxKind (Array idxNum Data)) regVal)) updatedRegs)
@@ -594,8 +600,8 @@ Section Semantics.
                                                    (Var type _ regVal)
                                                    (CABit Add (Var type (SyntaxKind _) (evalExpr idx) ::
                                                                    Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
-                     (HSemCompActionT : SemCompActionT (cont (evalExpr contArray)) regMap calls val):
-      SemCompActionT (@CompAsyncRead _ _  idxNum num readPort dataArray writePort isWriteMask idx pred Data readMap lret cont) regMap calls val
+                     (HSemCompActionT : SemCompActionT (cont (evalExpr contArray) writeMapTy) regMap calls val):
+      SemCompActionT (@CompAsyncRead _ _  idxNum num readPort dataArray writePort isWriteMask idx pred Data writeMap readMap lret cont) regMap calls val
   | SemCompWriteSome num (writePort dataArray : string) idxNum (idx  : Bit (Nat.log2_up idxNum) @# type) Data (array : Array num Data @# type)
                      (optMask : option (Array num Bool @# type)) (writeMap readMap : RegMapExpr type RegMapType) lret mask
                      (HMask : optMask = Some mask)
@@ -665,9 +671,11 @@ Section Semantics.
                             regMap_cont calls val
                             (HSemCompActionT : SemCompActionT (cont regMapVal) regMap_cont calls val):
       SemCompActionT (@CompSyncReadReq _ _ idxNum num readReqName readRegName dataArray idx Data isAddr pred writeMap readMap lret cont) regMap_cont calls val
-  | SemCompSyncReadResTrue num idxNum readRespName readRegName dataArray writePort isWriteMask Data isAddr readMap lret cont
+  | SemCompSyncReadResTrue num idxNum readRespName readRegName dataArray writePort isWriteMask Data isAddr writeMap readMap lret cont
                            (HisAddr : isAddr = true)
+                           writeMapTy
                            updatedRegs readMapValOld readMapValUpds regVal idx
+                           (HWriteMap: SemRegMapExpr writeMap writeMapTy)
                            (HReadMap : SemRegMapExpr readMap (readMapValOld, readMapValUpds))
                            (HUpdatedRegs : PriorityUpds readMapValOld readMapValUpds updatedRegs)
                            (HRegVal1 : In (readRegName, existT _ (SyntaxKind (Bit (Nat.log2_up idxNum))) idx) updatedRegs)
@@ -680,17 +688,18 @@ Section Semantics.
                                                          (CABit Add (Var type (SyntaxKind _) idx ::
                                                                          Const type (natToWord _ (proj1_sig (Fin.to_nat i)))::nil))))
                            regMap calls val
-                           (HSemCompActionT : SemCompActionT (cont (evalExpr contArray)) regMap calls val):
-      SemCompActionT (@CompSyncReadRes _ _ idxNum num readRespName readRegName dataArray writePort isWriteMask Data isAddr readMap lret cont) regMap calls val
-  | SemCompSyncReadResFalse num idxNum readRespName readRegName dataArray writePort isWriteMask Data isAddr readMap lret cont
+                           (HSemCompActionT : SemCompActionT (cont (evalExpr contArray) writeMapTy) regMap calls val):
+      SemCompActionT (@CompSyncReadRes _ _ idxNum num readRespName readRegName dataArray writePort isWriteMask Data isAddr writeMap readMap lret cont) regMap calls val
+  | SemCompSyncReadResFalse num idxNum readRespName readRegName dataArray writePort isWriteMask Data isAddr writeMap writeMapTy readMap lret cont
                             (HisAddr : isAddr = false)
                             updatedRegs readMapValOld readMapValUpds regVal
+                            (HWriteMap: SemRegMapExpr writeMap writeMapTy)
                             (HReadMap : SemRegMapExpr readMap (readMapValOld, readMapValUpds))
                             (HUpdatedRegs : PriorityUpds readMapValOld readMapValUpds updatedRegs)
                             (HIn1 : In (readRegName, (existT _ (SyntaxKind (Array num Data)) regVal)) updatedRegs)
                             regMap calls val
-                            (HSemCompActionT : SemCompActionT (cont regVal) regMap calls val):
-      SemCompActionT (@CompSyncReadRes _ _ idxNum num readRespName readRegName dataArray writePort isWriteMask Data isAddr readMap lret cont) regMap calls val.
+                            (HSemCompActionT : SemCompActionT (cont regVal writeMapTy) regMap calls val):
+      SemCompActionT (@CompSyncReadRes _ _ idxNum num readRespName readRegName dataArray writePort isWriteMask Data isAddr writeMap readMap lret cont) regMap calls val.
 
   Variable (k : Kind) (a : CompActionT type RegMapType k) (regInits : list RegInitT).
   

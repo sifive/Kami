@@ -11,7 +11,7 @@ Section ty.
       match e with
       | Var k v => match k return fullType boolTy k -> bool with
                    | SyntaxKind k' => fun v => v
-                   | NativeKind t c => fun _ => true
+                   | _ => fun _ => true
                    end v
       | Const k c => true
       | UniBool op e => @goodDfExpr _ e
@@ -37,19 +37,19 @@ Section ty.
     | LetExpr k e cont =>
       match k return Expr boolTy k -> (fullType boolTy k -> ActionT boolTy lret) -> bool with
       | SyntaxKind k' => fun e cont => goodDfAction (cont (goodDfExpr e))
-      | NativeKind t c => fun e cont => false
+      | _ => fun e cont => false
       end e cont
     | LetAction k a cont => 
       goodDfAction a && (goodDfAction (cont true))
     | ReadNondet k cont =>
       match k return (fullType boolTy k -> ActionT boolTy lret) -> bool with
       | SyntaxKind k' => fun cont => goodDfAction (cont false)
-      | NativeKind t c => fun cont => false
+      | _ => fun cont => false
       end cont
     | ReadReg name k cont =>
       match k return (fullType boolTy k -> ActionT boolTy lret) -> bool with
       | SyntaxKind k' => fun cont => goodDfAction (cont true)
-      | NativeKind t c => fun cont => false
+      | _ => fun cont => false
       end cont
     | WriteReg name k e cont =>
       goodDfAction cont

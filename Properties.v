@@ -5223,7 +5223,20 @@ Proof.
       * right; auto.
 Qed.
 
-Lemma doUpdRegs_enuf o u (noDup: NoDup (map fst u)):
+Lemma findRegs_Some' u:
+  forall s v,
+    findReg s u = Some v ->
+    In (s, v) u.
+Proof.
+  induction u; simpl; auto; intros; auto; try (tauto || discriminate).
+  destruct (String.eqb s (fst a)) eqn:G; [rewrite String.eqb_eq in G|]; subst; simpl in *.
+  - inv H; auto.
+    destruct a; auto. 
+  - specialize (IHu _ _ H).
+    right; auto.
+Qed.
+                           
+Lemma doUpdRegs_enuf o u:
   getKindAttr o = getKindAttr (doUpdRegs u o) ->
   UpdRegs [u] o (doUpdRegs u o).
 Proof.
@@ -5241,7 +5254,7 @@ Proof.
       dest.
       destruct H.
       * case_eq (findReg (fst a) u); intros; rewrite H5 in *; simpl in *.
-        -- rewrite <- findRegs_Some in H5 by auto.
+        -- apply findRegs_Some' in H5.
            inv H; simpl in *.
            left; eexists; eauto.
         -- rewrite <- findRegs_None in H5 by auto; subst; simpl in *.
@@ -5288,19 +5301,6 @@ Proof.
       apply (in_map fst) in H; simpl in *; congruence.
 Qed.
 
-Lemma findRegs_Some' u:
-  forall s v,
-    findReg s u = Some v ->
-    In (s, v) u.
-Proof.
-  induction u; simpl; auto; intros; auto; try (tauto || discriminate).
-  destruct (String.eqb s (fst a)) eqn:G; [rewrite String.eqb_eq in G|]; subst; simpl in *.
-  - inv H; auto.
-    destruct a; auto. 
-  - specialize (IHu _ _ H).
-    right; auto.
-Qed.
-                           
 Lemma getKindAttr_findReg_Some u:
   forall o: RegsT,
     (forall s v, In (s, v) u -> In (s, projT1 v) (getKindAttr o)) ->
@@ -5366,11 +5366,34 @@ Proof.
       apply IHl; auto.
 Qed.
 
+Lemma NoDup_map_fst {A B} {ls: list (A * B)}:
+    NoDup (map fst ls) ->
+    forall {a b c},
+      In (a, b) ls ->
+      In (a, c) ls ->
+      b = c.
+Proof.
+  induction ls; simpl; auto; intros.
+  - tauto.
+  - inv H.
+    specialize (@IHls H5).
+    destruct H0, H1; subst; simpl in *.
+    + inv H0.
+      auto.
+    + rewrite in_map_iff in H4.
+      assert (sth: exists x, fst x = a0 /\ In x ls). {
+        exists (a0, c); split; auto. }
+      tauto.
+    + rewrite in_map_iff in H4.
+      assert (sth: exists x, fst x = a0 /\ In x ls). {
+        exists (a0, b); split; auto. }
+      tauto.
+    + eapply IHls; eauto.
+Qed.
 
 Lemma getKindAttr_doUpdRegs o:
   NoDup (map fst o) ->
   forall u,
-    NoDup (map fst u) ->
     (forall s v, In (s, v) u -> In (s, projT1 v) (getKindAttr o)) ->
     getKindAttr o = getKindAttr (doUpdRegs u o).
 Proof.
@@ -5378,25 +5401,73 @@ Proof.
   setoid_rewrite getKindAttr_doUpdRegs'.
   rewrite forall_map; intros.
   case_eq (findReg (fst x) u); intros; auto.
-  rewrite <- findRegs_Some in H3; auto.
-  specialize (H1 _ _ H3).
-  f_equal.
   destruct x; simpl in *.
-  apply (in_map (fun x => (fst x, projT1 (snd x)))) in H2; simpl in *.
-  assert (sth: map fst o = map fst (getKindAttr o)). {
-    rewrite map_map; simpl.
-    assert (sth2: fst = fun x : RegT => fst x) by (extensionality x; intros; auto).
-    rewrite sth2; auto.
+  f_equal.
+  destruct s1, s; simpl in *.
+  pose proof (findRegs_Some' _ _ H2) as sth.
+  specialize (H0 s0 (existT (fullType type) x0 f0) sth).
+  rewrite in_map_iff in H0; dest.
+  destruct x1; simpl in *.
+  inv H0.
+  pose proof (NoDup_map_fst H H3 H1).
+  subst.
+  auto.
+Qed.
+
+Lemma getKindAttr_doUpdRegs_app: forall regs upds1 upds2,
+      NoDup (map fst regs) ->
+      (forall (s : string) (v : {x : FullKind & fullType type x}), In (s, v) upds1 -> In (s, projT1 v) (getKindAttr regs)) ->
+      (forall (s : string) (v : {x : FullKind & fullType type x}), In (s, v) upds2 -> In (s, projT1 v) (getKindAttr regs)) ->
+      getKindAttr regs = getKindAttr (doUpdRegs (upds1 ++ upds2) regs).
+Proof.
+  induction upds1; intros; simpl.
+  { eapply getKindAttr_doUpdRegs; auto. }
+  {
+    rewrite getKindAttr_doUpdRegs'.
+    rewrite forall_map; intros.
+    case_eq (findReg (fst x) (a :: upds1 ++ upds2)); intros; auto.
+    epose proof (findRegs_Some' _ _ H3) as inSome.
+    clear H3.
+    destruct x; simpl in *.
+    f_equal.
+    destruct s1, s; simpl in *.
+    destruct inSome.
+    {
+      unshelve epose proof (H0 s0 (existT (fullType type) x0 f0) _) as H0; intuition auto.
+      rewrite in_map_iff in H0; dest.
+      destruct x1; simpl in *.
+      inv H0.
+      pose proof (NoDup_map_fst H H4 H2).
+      subst.
+      auto.
+    }
+    {
+      assert (okApp: forall (s : string) (v : {x : FullKind & fullType type x}), In (s, v) (upds1 ++ upds2) -> In (s, projT1 v) (getKindAttr regs)).
+      intros.
+      edestruct (in_app_or _ _ _ H4).
+      {
+        eapply H0.
+        auto.
+      }
+      {
+        eapply H1.
+        auto.
+      }
+      specialize (okApp s0 (existT (fullType type) x0 f0) H3).
+      rewrite in_map_iff in okApp; dest.
+      simpl in H4.
+      inv H4.
+      destruct x1.
+      epose proof (NoDup_map_fst H H5 H2).
+      subst.
+      auto.
+    }
   }
-  rewrite sth in H.
-  pose proof (@KeyMatching_gen _ _ (getKindAttr o) _ _ H H1 H2 eq_refl); simpl in *.
-  inv H4; congruence.
 Qed.
 
 Lemma doUpdRegs_UpdRegs' o:
   NoDup (map fst o) ->
   forall u,
-    NoDup (map fst u) ->
     (forall s v, In (s, v) u -> In (s, projT1 v) (getKindAttr o)) ->
     UpdRegs [u] o (doUpdRegs u o).
 Proof.
@@ -5408,15 +5479,14 @@ Qed.
 Lemma doUpdRegs_UpdRegs o:
   NoDup (map fst o) ->
   forall u,
-    NoDup (map fst u) ->
     SubList (getKindAttr u) (getKindAttr o) ->
     UpdRegs [u] o (doUpdRegs u o).
 Proof.
   intros.
   eapply doUpdRegs_enuf; eauto.
   eapply getKindAttr_doUpdRegs; eauto; intros.
-  apply (in_map (fun x => (fst x, projT1 (snd x)))) in H2; simpl in *.
-  eapply H1; eauto.
+  apply (in_map (fun x => (fst x, projT1 (snd x)))) in H1; simpl in *.
+  eapply H0; eauto.
 Qed.
 
 Section SimulationGeneralEx.
