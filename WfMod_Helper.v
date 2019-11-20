@@ -389,16 +389,16 @@ Proof.
 Qed.
 
 Ltac Solve_WfConcatActionT db :=
-  match goal with
-  | |- forall _, _ => intros;Solve_WfConcatActionT db
-  | |- WfConcatActionT (LETA _ : _ <- _ ; _) _ => apply WfConcatLetAction;Solve_WfConcatActionT db
-  | |- WfConcatActionT (IfElse _ _ _ _) _ => apply  WfConcatIfElse;Solve_WfConcatActionT db
-  | |- WfConcatActionT (Return _) _ => apply  WfConcatReturn;Solve_WfConcatActionT db
-  | |- WfConcatActionT (Sys _ _) _ => apply  WfConcatSys;Solve_WfConcatActionT db
-  | |- WfConcatActionT (LetExpr _ _) _ => apply  WfConcatLetExpr;Solve_WfConcatActionT db
-  | |- WfConcatActionT (ReadReg _ _ _) _ => apply  WfConcatReadReg;Solve_WfConcatActionT db
-  | |- WfConcatActionT (WriteReg _ _ _) _ => apply  WfConcatWriteReg;Solve_WfConcatActionT db
-  | |- WfConcatActionT (MCall _ _ _ _) _ => apply  WfConcatMCall;Solve_WfConcatActionT db
+  repeat match goal with
+  | |- forall _, _ => intros
+  | |- WfConcatActionT (LETA _ : _ <- _ ; _) _ => apply WfConcatLetAction
+  | |- WfConcatActionT (IfElse _ _ _ _) _ => apply  WfConcatIfElse
+  | |- WfConcatActionT (Return _) _ => apply  WfConcatReturn
+  | |- WfConcatActionT (Sys _ _) _ => apply  WfConcatSys
+  | |- WfConcatActionT (LetExpr _ _) _ => apply  WfConcatLetExpr
+  | |- WfConcatActionT (ReadReg _ _ _) _ => apply  WfConcatReadReg
+  | |- WfConcatActionT (WriteReg _ _ _) _ => apply  WfConcatWriteReg
+  | |- WfConcatActionT (MCall _ _ _ _) _ => apply  WfConcatMCall
   | |- WfConcatActionT (convertLetExprSyntax_ActionT _) _ => apply WfConcatActionT_convertLetExprSyntax_ActionT
   | |- WfConcatActionT (gatherActions _ _) _ => solve [
              apply WfConcatActionT_GatherActions1;[
@@ -409,7 +409,6 @@ Ltac Solve_WfConcatActionT db :=
                                (try Solve_WfConcatActionT db)] |
                        (try Solve_WfConcatActionT db)]]
   | |- ~ False => let X := fresh in intro X;inversion X
-  | |- _ => progress (autounfold with db);Solve_WfConcatActionT db
-  | |- _ => idtac
+  | |- _ => progress (autounfold with db)
   end.
 

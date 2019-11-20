@@ -142,7 +142,10 @@ Definition fin_case n x :
   end.
 
 Ltac fin_dep_destruct v :=
-  pattern v; apply fin_case; clear v; intros.
+      pattern v; apply fin_case; clear v; intros.
+
+Ltac fin_dep_destruct_with v n :=
+      pattern v; apply fin_case; clear v;[idtac | intros n].
 
 Lemma Fin_cast_lemma : forall m n i (p q : m = n),
   Fin.cast i p = Fin.cast i q.
