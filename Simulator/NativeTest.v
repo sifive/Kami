@@ -21,7 +21,7 @@ Definition showListFoo xs :=
 Definition int := NativeKind 0.
 Definition listfoo := NativeKind ([] : list Foo).
 
-Definition testNative :=
+Definition testNativeModule :=
   MODULE {
          RegisterN "list" : listfoo <- []
     with RegisterN "count" : int <- 0
@@ -65,7 +65,7 @@ Definition mkMod(bm : BaseModule)(rfs : list RegFileBase) :=
   let md := (fold_right ConcatMod bm (map (fun m => Base (BaseRegFile m)) rfs)) in
   createHideMod md (map fst (getAllMethods md)).
 
-Definition testNativeMod := mkMod testNative [].
+Definition testNative := mkMod testNativeModule [].
 
 Extract Inductive nat => "Prelude.Int" [ "0" "(Prelude.succ :: Prelude.Int -> Prelude.Int)" ]
   "(\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))".
