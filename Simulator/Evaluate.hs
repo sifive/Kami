@@ -7,7 +7,7 @@ module Simulator.Evaluate where
 import Simulator.Util
 import Simulator.Value
 
---import Debug.Trace
+import Debug.Trace
 
 import qualified HaskellTarget as T
 

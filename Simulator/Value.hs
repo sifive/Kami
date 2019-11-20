@@ -12,7 +12,7 @@ import System.Random (randomRIO)
 
 import Debug.Trace
 
-data Val = BoolVal Bool | BVVal BV.BV | StructVal [(String,Val)] | ArrayVal (V.Vector Val) | ListVal [Val] | IntVal Int deriving (Eq,Show)
+data Val = BoolVal Bool | BVVal BV.BV | StructVal [(String,Val)] | ArrayVal (V.Vector Val) deriving (Eq,Show)
 
 boolCoerce :: Val -> Bool
 boolCoerce (BoolVal b) = b
