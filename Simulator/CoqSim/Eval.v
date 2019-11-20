@@ -40,7 +40,7 @@ Fixpoint Kind_eq{k} : eval_Kind k -> eval_Kind k -> bool :=
 Definition eval_FK(k : FullKind) :=
   match k with
   | SyntaxKind k' => eval_Kind k'
-  | NativeKind sk => denoteSpecificKind eval_Kind sk
+  | NativeKind t _ => t
   end.
 
 Fixpoint rand_val(k : Kind) : IO (eval_Kind k) :=
@@ -51,37 +51,10 @@ Fixpoint rand_val(k : Kind) : IO (eval_Kind k) :=
   | Array n k' => rand_vec (rand_val k')
   end.
 
-Fixpoint eval_ConstT{k}(e : ConstT k) : eval_Kind k :=
-  match e with
-  | ConstBool b => b
-  | ConstBit n w => w
-  | ConstStruct n ks ss es => mkTup (fun i => eval_Kind (ks i)) (fun i => eval_ConstT (es i))
-  | ConstArray n k' es => mkVec (fun i => eval_ConstT (es i))
-  end.
-
-Fixpoint eval_ConstListKind (lk: ListKind) {struct lk}: (denoteListKind ConstT lk) -> denoteListKind eval_Kind lk :=
-  match lk return denoteListKind ConstT lk -> denoteListKind eval_Kind lk with
-  | KindList k => fun c => map (@eval_ConstT k) c
-  | RecurseList l => fun c => map (eval_ConstListKind l) c
-  end.
-
-Definition eval_ConstSpecificKind (sk: SpecificKind): denoteSpecificKind ConstT sk -> denoteSpecificKind eval_Kind sk :=
-  match sk return denoteSpecificKind ConstT sk -> denoteSpecificKind eval_Kind sk with
-  | List k => fun c => eval_ConstListKind k c
-  | Nat => fun c => c
-  | Anything t c' => fun c => c
-  end.
-
-Definition eval_ConstFullT{k} (e : ConstFullT k) : eval_FK k :=
-  match e with
-  | SyntaxConst k' c' => eval_ConstT c'
-  | NativeConst sk c' => eval_ConstSpecificKind sk c'
-  end.
-
 Fixpoint rand_val_FK(k : FullKind) : IO (eval_FK k) :=
   match k with
   | SyntaxKind k' => rand_val k'
-  | NativeKind sk => ret (eval_ConstSpecificKind sk (getDefaultConstSpecificKind sk))
+  | NativeKind k' c => ret c
   end.
 
 Definition eval_UniBool(op : UniBoolOp) : bool -> bool :=
@@ -107,6 +80,20 @@ Definition eval_CABit{n}(op : CABitOp) : list (word n) -> word n :=
 
 Definition eval_BinBitBool{m n}(op : BinBitBoolOp m n) : word m -> word n -> bool :=
   evalBinBitBool op.
+
+Fixpoint eval_ConstT{k}(e : ConstT k) : eval_Kind k :=
+  match e with
+  | ConstBool b => b
+  | ConstBit n w => w
+  | ConstStruct n ks ss es => mkTup (fun i => eval_Kind (ks i)) (fun i => eval_ConstT (es i))
+  | ConstArray n k' es => mkVec (fun i => eval_ConstT (es i))
+  end.
+
+Definition eval_ConstFullT{k} (e : ConstFullT k) : eval_FK k :=
+  match e with
+  | SyntaxConst k' c' => eval_ConstT c'
+  | NativeConst t c' => c'
+  end.
 
 Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   match e with

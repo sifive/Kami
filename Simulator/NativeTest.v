@@ -18,43 +18,42 @@ Definition showFoo x :=
 Definition showListFoo xs :=
   ("[" ++ concat ";" (map showFoo xs) ++ "]")%string.
 
-Definition int := Anything 0.
-
-Definition listfoo := Anything ([] : list Foo).
+Definition int := NativeKind 0.
+Definition listfoo := NativeKind ([] : list Foo).
 
 Definition testNative :=
   MODULE {
          RegisterN "list" : listfoo <- []
-    with RegisterN "count" : Nat <- 100
+    with RegisterN "count" : int <- 0
 
     (* increments counter *)
     with Rule "incr" := (
-      ReadN x : NativeKind int <- "count";
-      WriteN "count" : NativeKind int <- Var _ (NativeKind int) (S x);
+      ReadN x : int <- "count";
+      WriteN "count" : int <- Var _ int (S x);
       Retv)
 
     (* prints counter *)
     with Rule "count" := (
-      ReadN x : NativeKind int <- "count";
+      ReadN x : int <- "count";
       System [DispString _ ("Count: " ++ (nat_decimal_string x) ++ "\n")%string];
       Retv)
 
     (* appends A if count is even, else B*)
     with Rule "app_count" := (
-      ReadN x : NativeKind int <- "count";
-      ReadN xs : NativeKind listfoo <- "list";
-      WriteN "list" : NativeKind listfoo <- Var _ (NativeKind listfoo) ((if Nat.even x then A else B)::xs);
+      ReadN x : int <- "count";
+      ReadN xs : listfoo <- "list";
+      WriteN "list" : listfoo <- Var _ listfoo ((if Nat.even x then A else B)::xs);
       Retv)
 
       (* appends C *)
      with Rule "app_c" := (
-      ReadN xs : NativeKind listfoo <- "list";
-      WriteN "list" : NativeKind listfoo <- Var _ (NativeKind listfoo) (C::xs);
+      ReadN xs : listfoo <- "list";
+      WriteN "list" : listfoo <- Var _ listfoo (C::xs);
       Retv)
 
     (* prints list *)
     with Rule "list" := (
-      ReadN xs : NativeKind listfoo <- "list";
+      ReadN xs : listfoo <- "list";
       System [DispString _ ("List: " ++ (showListFoo xs) ++ "\n")%string];
       Retv)
 
