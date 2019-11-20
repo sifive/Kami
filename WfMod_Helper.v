@@ -412,3 +412,91 @@ Ltac Solve_WfConcatActionT db :=
   | |- _ => progress (autounfold with db)
   end.
 
+Theorem WfConcatActionT_getRegFileMethods:
+  forall c meth m, In meth (getRegFileMethods m) ->
+      forall v : type (fst (projT1 (snd meth))),
+          WfConcatActionT (projT2 (snd meth) type v) c.
+Proof. 
+    intros.
+    unfold getRegFileMethods in H.
+    destruct m.
+    simpl in H.
+    inversion H;subst;clear H.
+    + simpl.
+      destruct rfIsWrMask.
+      - simpl.
+        unfold updateNumDataArrayMask.
+        discharge_wf.
+      - unfold updateNumDataArray.
+        discharge_wf.
+    + destruct rfRead.
+      - unfold readRegFile in H0.
+        simpl in H0.
+        induction reads.
+        * simpl in H0.
+          inversion H0.
+        * simpl in H0.
+          destruct H0.
+          ++ destruct meth.
+             inversion H;subst;clear H.
+             simpl.
+             unfold buildNumDataArray.
+             discharge_wf.
+          ++ apply IHreads.
+             apply H.
+      - unfold readSyncRegFile in H0.
+        * destruct isAddr in H0.
+          ++ rewrite in_app in H0.
+             destruct H0.
+             -- induction reads.
+                ** simpl in H.
+                   inversion H.
+                ** simpl in H.
+                   destruct H.
+                   --- simpl in H.
+                       destruct meth.
+                       inversion H;subst;clear H.
+                       simpl.
+                       discharge_wf.
+                   --- apply IHreads.
+                       apply H.
+             -- induction reads.
+                ** simpl in H.
+                   inversion H.
+                ** simpl in H.
+                   destruct H.
+                   --- simpl in H.
+                       destruct meth.
+                       inversion H;subst;clear H.
+                       simpl.
+                       discharge_wf.
+                   --- apply IHreads.
+                       apply H.
+          ++ rewrite in_app in H0.
+             destruct H0.
+             -- induction reads.
+                ** simpl in H.
+                   inversion H.
+                ** simpl in H.
+                   destruct H.
+                   --- simpl in H.
+                       destruct meth.
+                       inversion H;subst;clear H.
+                       simpl.
+                       discharge_wf.
+                   --- apply IHreads.
+                       apply H.
+             -- induction reads.
+                ** simpl in H.
+                   inversion H.
+                ** simpl in H.
+                   destruct H.
+                   --- simpl in H.
+                       destruct meth.
+                       inversion H;subst;clear H.
+                       simpl.
+                       discharge_wf.
+                   --- apply IHreads.
+                       apply H.
+Qed.
+
