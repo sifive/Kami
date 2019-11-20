@@ -165,7 +165,7 @@ Definition addGuardMethWithGuard (f: DefMethGuardT): (DefMethT * DefMethT) :=
 (*                                                | None => None *)
 (*                                                | Some x => Some (Var _ (SyntaxKind k') x) *)
 (*                                                end *)
-(*                    | NativeKind sk => fun v => Some (Var ty (NativeKind sk) v) *)
+(*                    | NativeKind t c => fun v => Some (Var ty (NativeKind c) v) *)
 (*                    end v *)
 (*       | Const k c => Some (Const _ c) *)
 (*       | UniBool op e => liftSome (UniBool op) (@exprForGuard _ e) *)

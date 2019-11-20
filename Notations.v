@@ -193,7 +193,7 @@ Notation "s '@%[' f <- v ]" := ltac:(struct_set_field_ltac s f v)
 
 Notation "'IF' e1 'then' e2 'else' e3" := (ITE e1 e2 e3) : kami_expr_scope.
 
-Notation "nkind <[ def ]>" := (@NativeKind (@Anything nkind def)) (at level 100): kami_expr_scope.
+Notation "nkind <[ def ]>" := (@NativeKind nkind def) (at level 100): kami_expr_scope.
 
 (* One hot switches *)
 Notation "'Switch' val 'Retn' retK 'With' { s1 ; .. ; sN }" :=
@@ -365,14 +365,11 @@ Declare Scope kami_scope.
 Delimit Scope kami_scope with kami.
 
 Notation "'RegisterN' name : type <- init" :=
-  (((MERegister (name%string, existT RegInitValT (@NativeKind type)
-                                     (Some (@NativeConst type (init%kami_init)%word))) :: nil)))
+  (((MERegister (name%string, existT RegInitValT type (Some ((NativeConst init)%kami_init)%word))) :: nil))
     (at level 13, name at level 99) : kami_scope.
 
 Notation "'RegisterNDef' name : type <- init" :=
-  ((MERegister (name%string, existT RegInitValT (@NativeKind (@Anything type init))%kami_init
-                                    (Some ((@NativeConst (@Anything type init)
-                                                         init)%kami_init))) :: nil))
+  ((MERegister (name%string, existT RegInitValT (@NativeKind type init)%kami_init (Some ((NativeConst init)%kami_init))) :: nil))
     (at level 13, name at level 99) : kami_scope.
 
 Notation "'Register' name : type <- init" :=
