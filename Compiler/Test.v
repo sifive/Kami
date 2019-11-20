@@ -576,12 +576,12 @@ Definition mkTestMod(bm : BaseModule)(rfs : list RegFileBase) :=
   let md := (fold_right ConcatMod bm (map (fun m => Base (BaseRegFile m)) rfs)) in
   createHideMod md (map fst (getAllMethods md)).
 
-Definition testRegMod := mkTestMod testRegBaseMod [].
+Definition testReg := mkTestMod testRegBaseMod [].
 
-Definition testAsyncMod := mkTestMod testAsyncBaseMod testAsyncRFs.
+Definition testAsync := mkTestMod testAsyncBaseMod testAsyncRFs.
 
-Definition testSyncIsAddrMod := mkTestMod testSyncIsAddrBaseMod testSyncIsAddrRFs.
+Definition testSyncIsAddr := mkTestMod testSyncIsAddrBaseMod testSyncIsAddrRFs.
 
-Definition testSyncNotIsAddrMod := mkTestMod testSyncNotIsAddrBaseMod testSyncNotIsAddrRFs.
+Definition testSyncNotIsAddr := mkTestMod testSyncNotIsAddrBaseMod testSyncNotIsAddrRFs.
 
 End TestMod.
