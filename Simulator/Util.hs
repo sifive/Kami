@@ -62,11 +62,11 @@ binary_split x xs = go xs [] where
     go (y:ys) acc = if x == y then Just (reverse acc, ys) else go ys (y:acc)
 
 --type of infinite streams
-data Str a = (:+) a (Str a)
+data Str a = (:+) a (Str a) | EndOfCycle (Str a)
 
 unwind_list :: [a] -> Str a
 unwind_list xs = go xs where
-    go [] = go xs
+    go [] = EndOfCycle $ go xs
     go (y:ys) = y :+ go ys
 
 --applies the function to every n+1th elt of the stream
