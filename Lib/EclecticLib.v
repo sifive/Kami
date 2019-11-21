@@ -2204,3 +2204,83 @@ Proof.
         ++ repeat (decide equality).
 Qed.
 
+Theorem DisjKey_app1: forall T (a:list (string * T)) b c, DisjKey (a++b) c<->(DisjKey a c)/\(DisjKey b c).
+Proof.
+    split.
+    * intros.
+      induction a.
+      + simpl in H.
+        split.
+        - apply DisjKey_nil1.
+        - apply H.
+      + rewrite DisjKey_Cons1.
+        simpl in H.
+        rewrite DisjKey_Cons1 in H.
+        inversion H;subst;clear H.
+        rewrite and_assoc.
+        split.
+        - apply H0.
+        - apply IHa.
+          apply H1.
+        - apply string_dec.
+        - apply string_dec.
+    * intros.
+      induction a.
+      + simpl in H.
+        inversion H;subst;clear H.
+        simpl.
+        apply H1.
+      + simpl.
+        rewrite DisjKey_Cons1.
+        simpl in H.
+        rewrite DisjKey_Cons1 in H.
+        rewrite and_assoc in H.
+        inversion H;subst;clear H.
+        split.
+        - apply H0.
+        - apply IHa.
+          apply H1.
+        - apply string_dec.
+        - apply string_dec.
+Qed.
+
+Theorem DisjKey_app2: forall T (a:list (string * T)) b c, DisjKey a (b++c)<->(DisjKey a b)/\(DisjKey a c).
+Proof.
+    split.
+    * intros.
+      induction b.
+      + simpl in H.
+        split.
+        - apply DisjKey_nil2.
+        - apply H.
+      + rewrite DisjKey_Cons2.
+        simpl in H.
+        rewrite DisjKey_Cons2 in H.
+        inversion H;subst;clear H.
+        rewrite and_assoc.
+        split.
+        - apply H0.
+        - apply IHb.
+          apply H1.
+        - apply string_dec.
+        - apply string_dec.
+    * intros.
+      induction b.
+      + simpl in H.
+        inversion H;subst;clear H.
+        simpl.
+        apply H1.
+      + simpl.
+        rewrite DisjKey_Cons2.
+        simpl in H.
+        rewrite DisjKey_Cons2 in H.
+        rewrite and_assoc in H.
+        inversion H;subst;clear H.
+        split.
+        - apply H0.
+        - apply IHb.
+          apply H1.
+        - apply string_dec.
+        - apply string_dec.
+Qed.
+

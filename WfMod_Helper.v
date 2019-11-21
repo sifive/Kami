@@ -31,29 +31,6 @@ Proof.
 Qed.
 
 
-Theorem DisjKey_nil2: forall A B (l: list (A*B)), DisjKey l List.nil.
-Proof.
-  intros.
-  unfold DisjKey.
-  intros.
-  right.
-  simpl.
-  intro X.
-  elim X.
-Qed.
-
-Theorem DisjKey_nil1: forall A B (l: list (A*B)), DisjKey List.nil l.
-Proof.
-  intros.
-  unfold DisjKey.
-  intros.
-  left.
-  simpl.
-  intro X.
-  elim X.
-Qed.
-
-
 (*Theorem or_diff: forall p a b, a<> b -> forall k : string,
     ~ ((p ++ a)%string = k \/ False) \/
     ~ ((p ++ b)%string = k \/ False).
@@ -83,94 +60,6 @@ Theorem ne_disjunction_break2: forall a b c, (~(a \/ False) \/ ~c) /\
                                         ~(a \/ b) \/ ~ c.
 Proof.
     tauto.
-Qed.
-
-Theorem DisjKey_NubBy1: forall T (x: list (string * T)) (y: list (string * T)), DisjKey x y -> DisjKey (nubBy (fun '(a,_) '(b,_) => String.eqb a b) x) y.
-Proof.
-    intros  T x y.
-    generalize y.
-    induction x.
-    + simpl.
-      intros.
-      apply H.
-    + simpl.
-      remember (
-        existsb (let '(a0, _) := a in fun '(b, _) => a0 =? b)
-         (nubBy (fun '(a0, _) '(b, _) => a0 =? b) x)).
-      destruct b.
-      - simpl.
-        intros.
-        apply IHx.
-        unfold DisjKey in H.
-        simpl in H.
-        unfold DisjKey.
-        intros.
-        assert(
-          ~ (fst a = k \/ In k (map fst x)) \/ ~ In k (map fst y0)
-        ).
-        ++ apply H.
-        ++ inversion H0;subst;clear H0.
-           -- left.
-              intro X. 
-              apply H1.
-              right.
-              apply X.
-           -- right.
-              apply H1.
-      - intros.
-        rewrite DisjKey_Cons1.
-        rewrite DisjKey_Cons1 in H.
-        inversion H;subst;clear H.
-        split.
-        ++ apply H0.
-        ++ apply IHx.
-           apply H1.
-        ++ repeat (decide equality).
-        ++ repeat (decide equality).
-Qed.
-
-Theorem DisjKey_NubBy2: forall T (x: list (string * T)) (y: list (string * T)), DisjKey x y -> DisjKey x (nubBy (fun '(a,_) '(b,_) => String.eqb a b) y).
-Proof.
-    intros T x y.
-    generalize x.
-    induction y.
-    + simpl.
-      intros.
-      apply H.
-    + simpl.
-      remember (
-        existsb (let '(a0, _) := a in fun '(b, _) => a0 =? b)
-          (nubBy (fun '(a0, _) '(b, _) => a0 =? b) y)).
-      destruct b.
-      - simpl.
-        intros.
-        apply IHy.
-        unfold DisjKey in H.
-        simpl in H.
-        unfold DisjKey.
-        intros.
-        assert(
-          ~ In k (map fst x0) \/ ~ (fst a = k \/ In k (map fst y))
-        ).
-        ++ apply H.
-        ++ inversion H0; subst; clear H0.
-           -- left.
-              apply H1.
-           -- right.
-              intro X.
-              apply H1.
-              right.
-              apply X.
-      - intros.
-        rewrite DisjKey_Cons2.
-        rewrite DisjKey_Cons2 in H.
-        inversion H;subst;clear H.
-        split.
-        ++ apply H0.
-        ++ apply IHy.
-           apply H1.
-        ++ repeat (decide equality).
-        ++ repeat (decide equality).
 Qed.
 
 Theorem NoDup_NubBy_helper: forall T (a:(string * T)) (l:list (string *T)),
