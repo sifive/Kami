@@ -41,8 +41,6 @@ initialize modes (regName, (k, Nothing)) = do
     v <- (if debug then (pure . defVal_FK) else randVal_FK) k
     return (regName,v)
 
-
---TODO: add methods called to return type
 simulate_action :: AbstractEnvironment a => [String] -> Modes -> IORef a -> FileState -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> T.ActionT Val -> M.Map String Val -> IO ([String], [(String,Val)], [FileUpd] ,Val)
 simulate_action methcalls modes envRef state meths act regs = sim methcalls act [] [] where
 
