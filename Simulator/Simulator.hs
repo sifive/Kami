@@ -41,19 +41,21 @@ initialize modes (regName, (k, Nothing)) = do
     v <- (if debug then (pure . defVal_FK) else randVal_FK) k
     return (regName,v)
 
-simulate_action :: AbstractEnvironment a => [String] -> Modes -> IORef a -> FileState -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> T.ActionT Val -> M.Map String Val -> IO ([String], [(String,Val)], [FileUpd] ,Val)
-simulate_action methcalls modes envRef state meths act regs = sim methcalls act [] [] where
+simulate_action :: AbstractEnvironment a => [T.DefMethT] -> [String] -> Modes -> IORef a -> FileState -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> T.ActionT Val -> M.Map String Val -> IO ([String], [(String,Val)], [FileUpd] ,Val)
+simulate_action defmeths methcalls modes envRef state meths act regs = sim methcalls act [] [] where
 
     sim mcs (T.MCall methName _ arg cont) updates fupdates = if methName `elem` mcs then error ("Method " ++ methName  ++ " called twice in same cycle.") else case rf_methcall state methName (eval arg) of
         Just (Nothing,v) -> sim (methName:mcs) (cont v) updates fupdates
         Just (Just u,v) -> sim (methName:mcs) (cont v) updates (u:fupdates)
-        Nothing -> case lookup methName meths of
-            Nothing -> error ("Method " ++ methName ++ " not found.")
-            Just f -> do
-                currEnv <- readIORef envRef
-                (nextEnv, v) <- f currEnv (eval arg) state regs
-                writeIORef envRef nextEnv
-                sim (methName:mcs) (cont v) updates fupdates
+        Nothing -> case lookup methName defmeths of
+            Just (_,f) -> sim (methName:mcs) (unsafeCoerce $ f () $ unsafeCoerce arg) updates fupdates
+            Nothing -> case lookup methName meths of
+                            Nothing -> error ("Method " ++ methName ++ " not found.")
+                            Just f -> do
+                                currEnv <- readIORef envRef
+                                (nextEnv, v) <- f currEnv (eval arg) state regs
+                                writeIORef envRef nextEnv
+                                sim (methName:mcs) (cont v) updates fupdates
 
     sim mcs (T.LetExpr _ e cont) updates fupdates = sim mcs (cont $ unsafeCoerce $ (eval e :: Val)) updates fupdates
 
@@ -88,7 +90,6 @@ simulate_module _ _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
 simulate_module seed strategy envRef rulenames meths rfbs (T.BaseMod init_regs rules defmeths) = do
     modes <- get_modes
     setStdGen $ mkStdGen seed
-    when (not $ null defmeths) $ putStrLn "Warning: Encountered internal methods."
     case get_rules rulenames rules of
         Left ruleName -> error ("Rule " ++ ruleName ++ " not found.")
         Right rules' -> do
@@ -102,7 +103,7 @@ simulate_module seed strategy envRef rulenames meths rfbs (T.BaseMod init_regs r
                     currEnv <- readIORef envRef
                     preEnv <- envPre currEnv filestate regs ruleName
                     writeIORef envRef preEnv
-                    (mcs',upd,fupd,_) <- simulate_action mcs modes envRef filestate meths (unsafeCoerce $ a ()) regs
+                    (mcs',upd,fupd,_) <- simulate_action defmeths mcs modes envRef filestate meths (unsafeCoerce $ a ()) regs
                     postEnv <- readIORef envRef
                     nextEnv <- envPost postEnv filestate regs ruleName
                     writeIORef envRef nextEnv
