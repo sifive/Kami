@@ -15,6 +15,7 @@ import Simulator.RegisterFile
 import Simulator.Print
 import Simulator.Util
 import Simulator.Value
+import qualified Data.Set as S
 
 import qualified HaskellTarget as T
 
@@ -85,11 +86,12 @@ simulate_action defmeths methcalls modes envRef state meths act regs = sim methc
 
     sim mcs (T.Return e) updates fupdates = return (mcs, updates, fupdates, eval e)
 
-simulate_module :: AbstractEnvironment a => Int -> ([T.RuleT] -> Str (IO T.RuleT)) -> IORef a -> [String] -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> [T.RegFileBase] -> T.BaseModule -> IO (M.Map String Val)
-simulate_module _ _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
-simulate_module seed strategy envRef rulenames meths rfbs (T.BaseMod init_regs rules defmeths) = do
+simulate_module :: AbstractEnvironment a => Int -> ([T.RuleT] -> Str (IO T.RuleT)) -> IORef a -> [String] -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> [T.RegFileBase] -> [String] -> T.BaseModule -> IO (M.Map String Val)
+simulate_module _ _ _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
+simulate_module seed strategy envRef rulenames meths rfbs hiddenMeths (T.BaseMod init_regs rules defmeths) = do
     modes <- get_modes
     setStdGen $ mkStdGen seed
+    when (not (S.fromList (map fst defmeths) `S.isSubsetOf` (S.fromList hiddenMeths))) $ error "Default methods are not a subset of the Hidden methods."
     case get_rules rulenames rules of
         Left ruleName -> error ("Rule " ++ ruleName ++ " not found.")
         Right rules' -> do
