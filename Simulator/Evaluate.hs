@@ -1,6 +1,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE Strict #-}
 
 module Simulator.Evaluate where
 
@@ -11,7 +12,10 @@ import Simulator.Value
 
 import qualified HaskellTarget as T
 
+import Control.Monad
 import Data.Bits
+import qualified Data.Array.IO as A
+import qualified Data.Array.MArray as M
 import qualified Data.BitVector as BV
 import qualified Data.Vector as V
 
@@ -20,19 +24,17 @@ import GHC.Base (unsafeCoerce#)
 unsafeCoerce :: a -> b
 unsafeCoerce = unsafeCoerce#
 
--- list_of_word :: T.Coq_word -> [Bool]
--- list_of_word T.WO = []
--- list_of_word (T.WS b _ w) = b : (list_of_word w)
-
 class Eval a b where
     eval :: a -> b
 
-instance Eval T.ConstT Val where
-    eval (T.ConstBool b) = BoolVal b
-    eval (T.ConstBit _ (n,v)) = BVVal $ BV.bitVec n v
-    eval (T.ConstStruct n _ names fields) = StructVal $ map 
-        (\i -> (names i, eval $ fields i)) (T.getFins n)
-    eval (T.ConstArray n _ vals) = ArrayVal $ V.map (eval . vals) (V.fromList $ T.getFins n)
+instance Eval T.ConstT (IO Val) where
+    eval (T.ConstBool b) = return $ BoolVal b
+    eval (T.ConstBit _ (n,v)) = return $ BVVal $ BV.bitVec n v
+    eval (T.ConstStruct n _ names fields) =
+        liftM StructVal $ pair_sequence $ map (\i -> (names i, eval $ fields i)) $ T.getFins n
+    eval (T.ConstArray n k vals) = do
+        vs <- sequence $ map (eval . vals) $ T.getFins n
+        liftM ArrayVal $ M.newListArray (0,(n-1)) vs
 
 instance Eval (T.UniBoolOp) (Bool -> Bool) where
     eval T.Neg = not
@@ -66,31 +68,57 @@ instance Eval T.CABitOp (Int -> [BV.BV] -> BV.BV) where
     eval T.Bor n = foldr (.|.) $ BV.zeros n
     eval T.Bxor n = foldr xor $ BV.zeros n
 
-instance Eval (T.Expr ty) Val where
-    eval (T.Var (T.SyntaxKind _) x) = unsafeCoerce x
-    eval (T.Var (T.NativeKind _) x) = unsafeCoerce x
+instance Eval (T.Expr ty) (IO Val) where
+    eval (T.Var (T.SyntaxKind _) x) = return $ unsafeCoerce x
+    eval (T.Var (T.NativeKind _) x) = return $ unsafeCoerce x
     eval (T.Const _ c) = eval c
-    eval (T.UniBool o e) = BoolVal $ eval o $ boolCoerce $ eval e
-    eval (T.CABool o es) = BoolVal $ eval o $ map (boolCoerce . eval) es
-    eval (T.UniBit m n o e) = BVVal $ eval o $ bvCoerce $ eval e
-    eval (T.CABit n o es) = BVVal $ eval o n $ map (bvCoerce . eval) es
-    eval (T.BinBit _ _ _ o e1 e2) = BVVal $ eval o (bvCoerce $ eval e1) (bvCoerce $ eval e2)
-    eval (T.BinBitBool _ _ _ e1 e2) = BoolVal $ (bvCoerce $ eval e1) BV.<. (bvCoerce $ eval e2) --only works a.t.m. because there is only one BinBitBoolOp
-    eval (T.ITE _ e1 e2 e3) = if (boolCoerce $ eval e1) then eval e2 else eval e3
-    eval (T.Eq _ e1 e2) = case eval e1 of
-        BoolVal b -> BoolVal $ b == (boolCoerce $ eval e2)
-        BVVal v -> BoolVal $ v == (bvCoerce $ eval e2)
-        StructVal s -> BoolVal $ s == (structCoerce $ eval e2)
-        ArrayVal a -> BoolVal $ a == (arrayCoerce $ eval e2)
-    eval (T.ReadStruct _ _ names e i) = case lookup (names i) (structCoerce $ eval e) of
-        Just v -> v
-        Nothing -> error ("Field " ++ names i ++ " not found.")
-    eval (T.BuildStruct n _ names exprs) = StructVal $ map (\i -> (names i, eval $ exprs i)) (T.getFins n)
-    eval (T.ReadArray n m k a v) = 
-        let i = fromIntegral $ BV.nat $ bvCoerce $ eval v in
-            if i < n then (arrayCoerce $ eval a) V.! i else defVal k
-    eval (T.ReadArrayConst n _ a i) = (arrayCoerce $ eval a) V.! (T.to_nat n i)
-    eval (T.BuildArray n _ exprs) = ArrayVal $ V.map (eval . exprs) (V.fromList $ T.getFins n)
+    eval (T.UniBool o e) = liftM (BoolVal . eval o . boolCoerce) $ eval e
+    eval (T.CABool o es) = liftM (BoolVal . eval o) $ mapM (liftM boolCoerce . eval) es
+    eval (T.UniBit m n o e) = liftM (BVVal . eval o . bvCoerce) $ eval e
+    eval (T.CABit n o es) = liftM (BVVal . eval o n) $ mapM (liftM bvCoerce . eval) es
+    eval (T.BinBit _ _ _ o e1 e2) = liftM BVVal $ (liftM2 $ eval o) (liftM bvCoerce $ eval e1) (liftM bvCoerce $ eval e2)  
+    eval (T.BinBitBool _ _ _ e1 e2) = liftM BoolVal $ liftM2 (BV.<.) (liftM bvCoerce $ eval e1) (liftM bvCoerce $ eval e2) --only works a.t.m. because there is only one BinBitBoolOp
+    eval (T.ITE _ e1 e2 e3) = do
+        b <- eval e1
+        if boolCoerce b then eval e2 else eval e2
+    eval (T.Eq _ e1 e2) = do
+        v1 <- eval e1
+        v2 <- eval e2
+        return $ case v1 of
+                    BoolVal b -> BoolVal $ b == (boolCoerce $ v2)
+                    BVVal v -> BoolVal $ v == (bvCoerce $ v2)
+                    StructVal s -> BoolVal $ s == (structCoerce $ v2)
+                    ArrayVal a -> BoolVal $ a == (arrayCoerce $ v2)
+    eval (T.ReadStruct _ _ names e i) = do
+        v <- eval e
+        return $ case lookup (names i) (structCoerce v) of
+                    Just v' -> v'
+                    Nothing -> error ("Field " ++ names i ++ " not found.")
+    eval (T.BuildStruct n _ names exprs) = 
+        liftM StructVal $ pair_sequence $ map (\i -> (names i, eval $ exprs i)) (T.getFins n)
+    eval (T.ReadArray n m k a v) = do
+        x <- eval v
+        let i = fromIntegral $ BV.nat $ bvCoerce x
+        if i < n 
+            then do
+                y <- eval a
+                let arr = arrayCoerce y
+                M.readArray arr i
+            else defVal k
 
--- defVal :: T.Kind -> Val
--- defVal k = eval (T.getDefaultConst k)
+    eval (T.ReadArrayConst n _ a i) = do
+        let j = T.to_nat n i
+        y <- eval a
+        let arr = arrayCoerce y
+        M.readArray arr j
+
+    eval (T.BuildArray n _ exprs) = do
+        vs <- sequence $ map (eval . exprs) $ T.getFins n
+        liftM ArrayVal $ M.newListArray (0,(n-1)) vs
+
+
+
+
+
+
+
