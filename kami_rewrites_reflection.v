@@ -61,7 +61,6 @@ Ltac KRReifyExp e t :=
                  | KRList ?T => constr:(@KRApp T (ltac:(KRReifyExp F t)) (ltac:(KRReifyExp R t)))
                  | ?T => constr:(@KRVar t e)
                  end
-  | ?X => constr:(@KRVar t X)
   | MERegister ?E => match t with
                      | KRTypModuleElt => constr:(@KRMERegister (ltac:(KRReifyExp E KRTypRegInitT)))
                      | ?T => constr:(@KRVar t e)
@@ -90,6 +89,7 @@ Ltac KRReifyExp e t :=
                           | KRList KRTypDefMethT => constr:(@KRMakeModule_meths (ltac:(KRReifyExp E (KRList KRTypModuleElt))))
                           | ?T => constr:(@KRVar t e)
                           end
+  | ?X => constr:(@KRVar t X)
   end.
 
 Fixpoint KRSimplifyTop {t} (e : KRExp t) :=
@@ -124,6 +124,20 @@ Fixpoint KRSimplify {t} (e: KRExp t) :=
 
 Theorem KRSimplifySound: forall t e, @KRRealizeExp t e = @KRRealizeExp t (@KRSimplify t e).
 Admitted.
+
+Ltac KRSimplifyTac t e :=
+  match goal with
+  | |- ?A = ?B =>
+      let x := (ltac:(KRReifyExp e t)) in
+          replace A with (KRRealizeExp x);[(rewrite KRSimplifySound;compute) | (compute;reflexivity)]
+  end.
+  (*let x := ltac:(KRReifyExp e) in
+      (replace e with (KRRealizeExp x);[compute;reflexivity | replace (KRRealizeExp x) with (KRRealizeExp (KRSimplify x));[rewrite KRSimplifySound;reflexivity | compute]]).
+*)
+
+Goal forall a b c d e, makeModule_regs [MERegister a;MERule b;MEMeth c;MERegister d]=e.
+  intros.
+  KRSimplifyTac (KRList KRTypRegInitT) (makeModule_regs [MERegister a;MERule b;MEMeth c;MERegister d]).
 
 (*Fixpoint KRSimplifyTop {t} (e : KRExp t) :=
   match e in KRExp t return KRExp t with
