@@ -15,7 +15,26 @@ import System.Random (randomRIO)
 
 import Debug.Trace
 
-data Val = BoolVal Bool | BVVal BV.BV | StructVal [(String,Val)] | ArrayVal (A.IOArray Int Val) deriving (Eq)
+data Val = BoolVal Bool | BVVal BV.BV | StructVal [(String,Val)] | ArrayVal (A.IOArray Int Val) --deriving (Eq)
+
+(.==) :: Val -> Val -> IO Bool
+(.==) (BoolVal b1) (BoolVal b2) = return $ b1 == b2
+(.==) (BVVal bv1) (BVVal bv2) = return $ bv1 == bv2
+(.==) (StructVal ps1) (StructVal ps2) = do
+    let names1 = map fst ps1
+    let names2 = map fst ps2
+    let b1 = names1 == names2
+    let vals1 = map snd ps1
+    let vals2 = map snd ps2
+    bs <- sequence $ zipWith (.==) vals1 vals2
+    return $ b1 && foldr (&&) True bs
+(.==) (ArrayVal arr1) (ArrayVal arr2) = do
+    es1 <- M.getElems arr1
+    es2 <- M.getElems arr2
+    bs <- sequence $ zipWith (.==) es1 es2
+    return $ foldr (&&) True bs
+(.==) _ _ = return False
+
 
 boolCoerce :: Val -> Bool
 boolCoerce (BoolVal b) = b

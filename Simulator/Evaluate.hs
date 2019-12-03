@@ -80,15 +80,11 @@ instance Eval (T.Expr ty) (IO Val) where
     eval (T.BinBitBool _ _ _ e1 e2) = liftM BoolVal $ liftM2 (BV.<.) (liftM bvCoerce $ eval e1) (liftM bvCoerce $ eval e2) --only works a.t.m. because there is only one BinBitBoolOp
     eval (T.ITE _ e1 e2 e3) = do
         b <- eval e1
-        if boolCoerce b then eval e2 else eval e2
+        if boolCoerce b then eval e2 else eval e3
     eval (T.Eq _ e1 e2) = do
         v1 <- eval e1
         v2 <- eval e2
-        return $ case v1 of
-                    BoolVal b -> BoolVal $ b == (boolCoerce $ v2)
-                    BVVal v -> BoolVal $ v == (bvCoerce $ v2)
-                    StructVal s -> BoolVal $ s == (structCoerce $ v2)
-                    ArrayVal a -> BoolVal $ a == (arrayCoerce $ v2)
+        liftM BoolVal $ v1 .== v2
     eval (T.ReadStruct _ _ names e i) = do
         v <- eval e
         return $ case lookup (names i) (structCoerce v) of

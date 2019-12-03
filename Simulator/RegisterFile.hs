@@ -13,6 +13,7 @@ import qualified Data.HashMap as M
 import qualified Data.Array.MArray as MA
 import qualified Data.Array.IO as A
 
+import Debug.Trace
 import Control.Monad
 import Data.Foldable (foldrM)
 import Data.Maybe (fromJust, catMaybes)
@@ -66,7 +67,7 @@ file_sync_readreq val state file regName = case readers file of
         then
 
             --isAddr = True
-            return val
+            return $ trace (show $ bvCoerce val) val
 
         else
 
@@ -84,7 +85,7 @@ file_sync_readresp state file regName = case readers file of
 
             --isAddr = True
             case M.lookup regName $ int_regs state of
-                Just v -> liftM ArrayVal $ slice (fromIntegral i) (chunkSize file) (array_of_file state file)
+                Just v -> liftM ArrayVal $ slice (trace ("i = " ++ show i ++ "\n") $ fromIntegral i) (chunkSize file) (array_of_file state file)
 
                     where i = BV.nat $ bvCoerce v
 
@@ -97,9 +98,10 @@ file_sync_readresp state file regName = case readers file of
                 Just v -> return v
                 Nothing -> error $ "Register " ++ regName ++ " not found."
 
-file_writes_mask :: RegFile -> Int -> A.IOArray Int Bool -> A.IOArray Int Val -> IO [(Int,Val)]
+file_writes_mask :: RegFile -> Int -> IO (A.IOArray Int Bool) -> A.IOArray Int Val -> IO [(Int,Val)]
 file_writes_mask file i mask vals = do
-    mask_indices <- filterM (MA.readArray mask) [0..(chunkSize file - 1)] 
+    m <- mask
+    mask_indices <- filterM (MA.readArray m) [0..(chunkSize file - 1)] 
     pair_sequence $ map (\j -> (i+j, MA.readArray vals j)) mask_indices
 
 file_writes_no_mask :: RegFile -> Int -> A.IOArray Int Val -> IO [(Int,Val)]
@@ -132,7 +134,9 @@ rf_methcall state methName val =
 
         arg_data = arrayCoerce $ struct_field_access "data" val
 
-        arg_mask = undefined
+        arg_mask = do
+            let mask = arrayCoerce $ struct_field_access "mask" val
+            MA.mapArray boolCoerce mask
 
         --arg_mask = V.map boolCoerce $ arrayCoerce $ struct_field_access "mask" val
 
@@ -183,8 +187,7 @@ initialize_file modes args rfb@(T.Build_RegFileBase rfIsWrMask rfNum rfDataArray
     newvals <- case rfRead of
                     T.Async _ -> return []
                     T.Sync b rs -> mapM (\r -> do
-                                                let debug = debug_mode modes
-                                                v <- (if debug then defVal else randVal) (if b then T.Bit (log2 $ rfIdxNum) else rfData)
+                                                v <- defVal (if b then T.Bit (log2 $ rfIdxNum) else rfData)
                                                 return (T.readRegName r, v)) rs
 
     return $ state {

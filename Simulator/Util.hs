@@ -105,10 +105,10 @@ slice i_0 size arr = do
     vals <- sequence $ map (\j -> MA.readArray arr (i_0 + j)) [0..(size-1)]
     MA.newListArray (0,size-1) vals
 
-arr_length :: (MA.MArray a e m, MA.Ix i) => a i e -> m Int
+arr_length :: (MA.MArray a e m) => a Int e -> m Int
 arr_length arr = do
-    es <- MA.getElems arr
-    return $ length es
+    (i,j) <- MA.getBounds arr
+    return (j - i)
 
 {-
 debug_mode :: IO Bool
