@@ -1826,8 +1826,9 @@ Definition baseNoSelfCalls (m : Mod) :=
   let '(hides, (rfs, mods)) := separateMod m in
   NoSelfCallBaseModule (inlineAll_All_mod (mergeSeparatedBaseMod mods)).
 
-
-
+Definition separateModHidesNoInline (m : Mod) :=
+  let '(hides, (rfs, mods)) := separateMod m in
+  (hides, (rfs, getFlat (mergeSeparatedBaseMod mods))).
 
 
 
