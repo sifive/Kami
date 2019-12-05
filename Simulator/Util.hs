@@ -11,10 +11,11 @@ import Control.Monad
 import Data.Hashable
 import Data.Text.Read (hexadecimal)
 import System.Environment (getArgs)
+import System.IO.Unsafe (unsafePerformIO)
 
-
-pair_sequence :: Monad m => [(a,m b)] -> m [(a,b)]
-pair_sequence xs = sequence $ map (\(a,m) -> m >>= (\b -> return (a,b))) xs
+pair_sequence ::  [(a,IO b)] ->  IO [(a,b)]
+--pair_sequence xs = sequence $ map (\(a,m) -> m >>= (\b -> return (a,b))) xs
+pair_sequence xs = return $ map (\(a,m) -> (a, unsafePerformIO m)) xs
 
 space_pad :: Int -> String -> String
 space_pad n str = replicate (n - length str) ' ' ++ str
