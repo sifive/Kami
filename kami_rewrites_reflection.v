@@ -138,6 +138,7 @@ Ltac KRSimplifyTac t e :=
 Goal forall a b c d e, makeModule_regs [MERegister a;MERule b;MEMeth c;MERegister d]=e.
   intros.
   KRSimplifyTac (KRList KRTypRegInitT) (makeModule_regs [MERegister a;MERule b;MEMeth c;MERegister d]).
+Abort.
 
 (*Fixpoint KRSimplifyTop {t} (e : KRExp t) :=
   match e in KRExp t return KRExp t with
