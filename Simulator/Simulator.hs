@@ -36,29 +36,40 @@ get_rules (x:xs) rules = case lookup x rules of
 
 initialize :: Modes -> T.RegInitT -> IO (String,Val)
 initialize _ (regName, (_, Just (T.NativeConst c))) = return (regName, unsafeCoerce c)
-initialize _ (regName, (_, Just (T.SyntaxConst _ c))) = return (regName, eval c)
+initialize _ (regName, (_, Just (T.SyntaxConst _ c))) = do
+    v <- eval c
+    return (regName, v)
 initialize modes (regName, (k, Nothing)) = do
     let debug = debug_mode modes
-    v <- (if debug then (pure . defVal_FK) else randVal_FK) k
+    v <- (if debug then defVal_FK else randVal_FK) k
     return (regName,v)
 
 simulate_action :: AbstractEnvironment a => [T.DefMethT] -> [String] -> Modes -> IORef a -> FileState -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> T.ActionT Val -> M.Map String Val -> IO ([String], [(String,Val)], [FileUpd] ,Val)
 simulate_action defmeths methcalls modes envRef state meths act regs = sim methcalls act [] [] where
 
-    sim mcs (T.MCall methName _ arg cont) updates fupdates = if methName `elem` mcs then error ("Method " ++ methName  ++ " called twice in same cycle.") else case rf_methcall state methName (eval arg) of
-        Just (Nothing,v) -> sim (methName:mcs) (cont v) updates fupdates
-        Just (Just u,v) -> sim (methName:mcs) (cont v) updates (u:fupdates)
-        Nothing -> case lookup methName defmeths of
-            Just (_,f) -> sim (methName:mcs) (unsafeCoerce $ f () $ unsafeCoerce arg) updates fupdates
-            Nothing -> case lookup methName meths of
-                            Nothing -> error ("Method " ++ methName ++ " not found.")
-                            Just f -> do
-                                currEnv <- readIORef envRef
-                                (nextEnv, v) <- f currEnv (eval arg) state regs
-                                writeIORef envRef nextEnv
-                                sim (methName:mcs) (cont v) updates fupdates
+    sim mcs (T.MCall methName _ arg cont) updates fupdates = if methName `elem` mcs then error ("Method " ++ methName  ++ " called twice in same cycle.") else do
+        arg' <- eval arg
+        case rf_methcall state methName arg' of
+            Just (Nothing,v) -> do 
+                v' <- v
+                sim (methName:mcs) (cont v') updates fupdates
+            Just (Just u,v) -> do
+                v' <- v
+                u' <- u
+                sim (methName:mcs) (cont v') updates (u':fupdates)
+            Nothing -> case lookup methName defmeths of
+                Just (_,f) -> sim (methName:mcs) (unsafeCoerce $ f () $ unsafeCoerce arg') updates fupdates
+                Nothing -> case lookup methName meths of
+                                Nothing -> error ("Method " ++ methName ++ " not found.")
+                                Just f -> do
+                                    currEnv <- readIORef envRef
+                                    (nextEnv, v) <- f currEnv arg' state regs
+                                    writeIORef envRef nextEnv
+                                    sim (methName:mcs) (cont v) updates fupdates
 
-    sim mcs (T.LetExpr _ e cont) updates fupdates = sim mcs (cont $ unsafeCoerce $ (eval e :: Val)) updates fupdates
+    sim mcs (T.LetExpr _ e cont) updates fupdates = do
+        v <- eval e
+        sim mcs (cont $ unsafeCoerce $ (v :: Val)) updates fupdates
 
     sim mcs (T.LetAction _ a cont) updates fupdates = do
         (mcs', updates', fupdates', v) <- sim mcs a updates fupdates
@@ -73,18 +84,23 @@ simulate_action defmeths methcalls modes envRef state meths act regs = sim methc
 
     sim mcs (T.WriteReg regName _ e a) updates fupdates = case M.lookup regName regs of
         Nothing -> error ("Register " ++ regName ++ " not found.")
-        Just _ -> sim mcs a ((regName, eval e):updates) fupdates
-        
-    sim mcs (T.IfElse e _ a1 a2 cont) updates fupdates = let a = if (boolCoerce $ eval e) then a1 else a2 in
-        do
-            (mcs',updates',fupdates',v) <- sim mcs a updates fupdates
-            sim mcs' (cont v) updates' fupdates'
+        Just _ -> do
+            v <- eval e
+            sim mcs a ((regName, v):updates) fupdates
+
+    sim mcs (T.IfElse e _ a1 a2 cont) updates fupdates = do
+        b <- eval e
+        let a = if boolCoerce b then a1 else a2
+        (mcs',updates',fupdates',v) <- sim mcs a updates fupdates
+        sim mcs' (cont v) updates' fupdates'
 
     sim mcs (T.Sys syss a) updates fupdates = do
         execIOs $ map (sysIO modes) syss
         sim mcs a updates fupdates
 
-    sim mcs (T.Return e) updates fupdates = return (mcs, updates, fupdates, eval e)
+    sim mcs (T.Return e) updates fupdates = do
+        v <- eval e
+        return (mcs, updates, fupdates, v)
 
 simulate_module :: AbstractEnvironment a => Int -> ([T.RuleT] -> Str (IO T.RuleT)) -> IORef a -> [String] -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> [T.RegFileBase] -> [String] -> T.BaseModule -> IO (M.Map String Val)
 simulate_module _ _ _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
@@ -109,5 +125,5 @@ simulate_module seed strategy envRef rulenames meths rfbs hiddenMeths (T.BaseMod
                     postEnv <- readIORef envRef
                     nextEnv <- envPost postEnv filestate regs ruleName
                     writeIORef envRef nextEnv
-                    sim mcs' rs (updates regs upd) (exec_file_updates filestate fupd)
-
+                    s <- exec_file_updates filestate fupd
+                    sim mcs' rs (updates regs upd) s

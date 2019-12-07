@@ -5,9 +5,17 @@ import qualified Data.HashMap as M
 import qualified Data.BitVector as BV
 import qualified Data.Text as T
 
+import qualified Data.Array.MArray as MA
+
+import Control.Monad
 import Data.Hashable
 import Data.Text.Read (hexadecimal)
 import System.Environment (getArgs)
+import System.IO.Unsafe (unsafePerformIO)
+
+pair_sequence ::  [(a,IO b)] ->  IO [(a,b)]
+--pair_sequence xs = sequence $ map (\(a,m) -> m >>= (\b -> return (a,b))) xs
+pair_sequence xs = return $ map (\(a,m) -> (a, unsafePerformIO m)) xs
 
 space_pad :: Int -> String -> String
 space_pad n str = replicate (n - length str) ' ' ++ str
@@ -89,6 +97,19 @@ get_modes = do
         , interactive_mode = "--interactive" `elem` args
         , no_print_mode = "--noprint" `elem` args
     }
+
+do_writes :: (MA.MArray a e m, MA.Ix i) => a i e -> [(i,e)] -> m ()
+do_writes a ps = foldM (\_ (i,e) -> MA.writeArray a i e) () ps
+
+slice :: (MA.MArray a e m) => Int -> Int -> a Int e -> m (a Int e)
+slice i_0 size arr = do
+    vals <- sequence $ map (\j -> MA.readArray arr (i_0 + j)) [0..(size-1)]
+    MA.newListArray (0,size-1) vals
+
+arr_length :: (MA.MArray a e m) => a Int e -> m Int
+arr_length arr = do
+    (i,j) <- MA.getBounds arr
+    return (j - i)
 
 {-
 debug_mode :: IO Bool

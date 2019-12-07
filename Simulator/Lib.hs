@@ -13,7 +13,7 @@ import Simulator.RegisterFile
 import qualified Data.Text as T
 import qualified Data.BitVector as BV
 import qualified Data.HashMap as M
-import qualified Data.Vector as V
+import qualified Data.Array.MArray as MA
 
 import Data.List (find)
 import Data.Maybe (catMaybes)
@@ -35,21 +35,39 @@ getArgVal name n = do
         Just (_,y) -> return $ BVVal $ hex_to_bv n $ T.pack y
         Nothing -> error $ "Argument value " ++ name ++ " not supplied."
 
-ppr_bitformat :: H.BitFormat -> Val -> String
-ppr_bitformat bf (BoolVal b) = if b then "1" else "0"
-ppr_bitformat bf (BVVal v) = printNum bf v
-ppr_bitformat bf (StructVal fields) = "{ " ++ (concat $ 
-    map (\(name,val) -> name ++ ":" ++ (ppr_bitformat bf val) ++ "; ") fields
-    ) ++ "}"
-ppr_bitformat bf (ArrayVal vals) = "[ " ++ (concat (zipWith (\i v -> show i ++ "=" ++ ppr_bitformat bf v ++ "; ") [0..((length vals)-1)] (V.toList vals))) ++ "]"
 
-ppr_bin :: Val -> String
+-- printVal :: T.FullFormat -> Val -> IO String
+-- printVal (T.FBool n bf) (BoolVal b) = return $ space_pad n (if b then "1" else "0")
+-- printVal (T.FBit n m bf) (BVVal bs) = return $ space_pad m $ printNum bf bs
+-- printVal (T.FStruct n _ names ffs) (StructVal fields) = do
+--     ps <- pair_sequence $ zipWith (\(name,val) ff -> (name, printVal ff val)) fields (map ffs $ T.getFins n)
+--     return ("{ " ++ concatMap (\(name,pval) -> name ++ ":" ++ pval ++ "; ") ps ++ "}")
+-- printVal (T.FArray n k ff) (ArrayVal vals) = do
+--     ps <- pair_sequence $ map (\i -> (i, M.readArray vals i)) [0..(n-1)]
+--     qs <- pair_sequence $ map (\(i,v) -> (i, printVal ff v)) ps
+--     return ("[" ++ concatMap (\(i,pval) -> show i ++ "=" ++ pval ++ "; ") qs ++ "]")
+-- printVal ff v = error $ "Cannot print expression with FullFormat " ++ (show ff) ++ "."
+
+
+ppr_bitformat :: H.BitFormat -> Val -> IO String
+ppr_bitformat bf (BoolVal b) = return $ if b then "1" else "0"
+ppr_bitformat bf (BVVal v) = return $ printNum bf v
+ppr_bitformat bf (StructVal fields) = do
+    ps <- pair_sequence $ map (\(name,val) -> (name, ppr_bitformat bf val)) fields
+    return ("{" ++ (concatMap (\(name,pval) -> name ++ ":" ++ pval ++ "; ") ps) ++ "}")
+ppr_bitformat bf (ArrayVal vals) = do
+    len <- arr_length vals
+    ps <- pair_sequence $ map (\i -> (i, MA.readArray vals i)) [0..(len-1)]
+    qs <- pair_sequence $ map (\(i,v) -> (i, ppr_bitformat bf v)) ps
+    return ("[" ++ concatMap (\(i,pval) -> show i ++ "=" ++ pval ++ "; ") qs ++ "]") 
+
+ppr_bin :: Val -> IO String
 ppr_bin = ppr_bitformat H.Binary
 
-ppr_hex :: Val -> String
+ppr_hex :: Val -> IO String
 ppr_hex = ppr_bitformat H.Hex
 
-ppr_dec :: Val -> String
+ppr_dec :: Val -> IO String
 ppr_dec = ppr_bitformat H.Decimal
 
 getRuleNames :: H.BaseModule -> [String]
@@ -58,15 +76,18 @@ getRuleNames mod = map fst $ H.getRules mod
 print_reg :: M.Map String Val -> String -> IO()
 print_reg regs regname =
     case M.lookup regname regs of
-        Just v -> putStrLn $ ppr_hex v
+        Just v -> do 
+            pval <- ppr_hex v
+            putStrLn pval
         Nothing -> putStrLn $ "Register " ++ regname ++ " not found."
 
 print_file_reg :: FileState -> String -> Int -> IO()
 print_file_reg state filename addr =
     case M.lookup filename (arrs state) of
-        Just arr -> case arr V.!? addr of
-                Just v -> putStrLn $ ppr_hex v
-                Nothing -> putStrLn "Index out of bounds."
+        Just arr -> do
+            v <- MA.readArray arr addr
+            pval <- ppr_hex v
+            putStrLn pval
         Nothing -> putStrLn $ "File " ++ filename ++ " not found."
 
 --generates rules randomly from the given list

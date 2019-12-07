@@ -1,18 +1,20 @@
+{-# LANGUAGE Strict #-}
 
 module Simulator.Parse where
 
 import qualified HaskellTarget as H
 
 import qualified Data.BitVector as BV
-import qualified Data.Vector as V
+import qualified Data.Array.MArray as M
+import qualified Data.Array.IO as A
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
+import Control.Monad
 import Data.Text.Read (hexadecimal)
 
 import Simulator.Util
 import Simulator.Value
---import Simulator.Evaluate
 
 import Data.Char (isSpace)
 
@@ -40,27 +42,27 @@ toks_to_addr_vals = go 0 where
     go n ((Addr k):toks) = go k toks
     go n ((Value bs):toks) = (n,bs) : go (n+1) toks
 
--- offset_pairs :: Int -> [(Integer, BV.BV)] -> [(Integer, BV.BV)]
--- offset_pairs offset ps = map (\(i,v) -> (i - fromIntegral offset,v)) ps
-
-val_unpack :: H.Kind -> BV.BV -> Val
-val_unpack H.Bool v = BoolVal $ v BV.@. 0
-val_unpack (H.Bit _) v = BVVal v
-val_unpack (H.Array n k) v = ArrayVal $ V.fromList $ map (val_unpack k) $ BV.split n v
+val_unpack :: H.Kind -> BV.BV -> IO Val
+val_unpack H.Bool v = return $ BoolVal $ v BV.@. 0
+val_unpack (H.Bit _) v = return $ BVVal v
+val_unpack (H.Array n k) v = do
+    vs <- mapM (val_unpack k) $ BV.split n v
+    liftM ArrayVal $ M.newListArray (0,n-1) vs
 val_unpack (H.Struct n kinds names) v =
     let names' = map names $ H.getFins n in
     let kinds' = map kinds $ H.getFins n in
-    let bvs = partition (map H.size kinds') v in
-        StructVal $ zip names' (zipWith val_unpack kinds' bvs) 
+    let bvs = partition (map H.size kinds') v in do
+        ps <- pair_sequence $ zip names' (zipWith val_unpack kinds' bvs)
+        return $ StructVal ps
 
-parseHex :: Bool -> H.Kind -> Int -> FilePath -> IO (V.Vector Val)
+parseHex :: Bool -> H.Kind -> Int -> FilePath -> IO (A.IOArray Int Val)
 parseHex isAscii k arrSize filepath
     | isAscii = do
         text <- T.readFile filepath
         let pairs = getToks (H.size k) text
-        let v_init = V.replicate arrSize (defVal k)
---        let val_pairs = map (\(i,v) -> (fromIntegral i, eval $ H.unpack k $ expr_of_bv v)) pairs
-        let val_pairs = map (\(i,v) -> (fromIntegral i, val_unpack k v)) pairs
-        return $ v_init V.// val_pairs
-
+        v <- defVal k
+        v_init <- M.newArray (0,arrSize-1) v
+        val_pairs <- pair_sequence $ map (\(i,v) -> (fromIntegral i, val_unpack k v)) pairs
+        do_writes v_init val_pairs
+        return v_init
     | otherwise = error "Binary not yet supported."
