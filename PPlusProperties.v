@@ -1835,7 +1835,7 @@ Lemma PPlus_inline_Rule_with_action f m o rn rb upds1 upds2 execs calls1 calls2 
   SubList (getKindAttr reads) (getKindAttr (getRegisters m)) ->
   SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) ->
   DisjKey upds2 upds1 ->
-  PSemAction o (inlineSingle (rb type) f) reads upds1 calls1 WO ->
+  PSemAction o (inlineSingle (rb type) f) reads upds1 calls1 (zToWord 0 0) ->
   PPlusSubsteps m o upds2 execs calls2 ->
   PPlusSubsteps (inlineSingle_Rule_BaseModule f rn m) o (upds1++upds2) ((Rle rn)::execs) (calls1++calls2).
 Proof.
@@ -2754,6 +2754,16 @@ Proof.
   - reflexivity.
   - simpl; destruct String.eqb; simpl;[|rewrite IHl; reflexivity].
     unfold inlineSingle_Meth; destruct a, String.eqb; simpl; rewrite IHl; reflexivity.
+Qed.
+
+Lemma SameKindAttr_inline_Meth f gn l :
+  (getKindAttr (inlineSingle_Meth_in_list f gn l)) = (getKindAttr l).
+Proof.
+  induction l.
+  - reflexivity.
+  - simpl; destruct String.eqb; simpl;[|rewrite IHl; reflexivity].
+    unfold inlineSingle_Meth; destruct a, String.eqb; simpl; rewrite IHl; auto.
+    destruct s0; reflexivity.
 Qed.
 
 Lemma PPlusSubsteps_inline_Meth f m o gn gb upds execs calls :
@@ -5309,7 +5319,7 @@ Lemma PPlus_inlineSingle_BaseModule_with_action f m o rn rb upds execs calls:
     DisjKey upds2 upds1 /\
     SubList (getKindAttr reads) (getKindAttr (getRegisters m)) /\
     SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) /\
-    PSemAction o (inlineSingle (rb type) f) reads upds1 calls1 WO /\
+    PSemAction o (inlineSingle (rb type) f) reads upds1 calls1 (zToWord 0 0) /\
     PPlusSubsteps m o upds2 execs calls2.
 Proof.
   intros.
@@ -8150,11 +8160,11 @@ Proof.
 Qed.
 
 Lemma unifyWO (x : word 0):
-  x = (evalExpr (Const type WO)).
+  x = (evalExpr (Const type (zToWord 0 0))).
 Proof.
   simpl.
-  rewrite (shatter_word_0 x).
-  reflexivity.
+  arithmetizeWord.
+  rewrite Z.mod_0_l; lia.
 Qed.
 
 Local Coercion BaseRegFile : RegFileBase >-> BaseModule.

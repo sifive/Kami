@@ -1,3 +1,4 @@
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv.
 Require Import Kami.Syntax Kami.Notations Kami.Tactics.
 Section mod_test.
   Variable a: string.

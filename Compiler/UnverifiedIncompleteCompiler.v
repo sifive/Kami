@@ -1,3 +1,4 @@
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv.
 Require Import Kami.Syntax Kami.Notations RecordUpdate.RecordSet Kami.Compiler.Rtl Kami.StateMonad.
 
 

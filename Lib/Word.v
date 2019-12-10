@@ -1,4 +1,4 @@
-Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv.
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv Psatz.
 
 
 Definition minimize_eq_proof{A: Type}(eq_dec: forall (x y: A), {x = y} + {x <> y}){x y: A}    (pf: x = y): x = y :=
@@ -10,6 +10,8 @@ Definition minimize_eq_proof{A: Type}(eq_dec: forall (x y: A), {x = y} + {x <> y
 Section Word.
   Section fixedWidth.
     Variable width : nat.
+
+    Declare Scope word_scope.
 
     Local Notation wrap_value n := (Z.modulo n (Z.pow 2 (Z.of_nat width))).
 
@@ -23,7 +25,7 @@ Section Word.
     Open Scope word_scope.
 
     Definition zToWord (n : Z) : word :=
-      mk (wrap_value n) (minimize_eq_proof Z.eq_dec (Zdiv.Zmod_mod n _)).    
+      mk (wrap_value n) (minimize_eq_proof Z.eq_dec (Zdiv.Zmod_mod n _)).
 
     Definition boolToZ b : Z :=
       match b with
@@ -35,6 +37,12 @@ Section Word.
 
     Definition boolToWord b := zToWord (boolToZ b).
 
+    Definition natToWord (n : nat) := zToWord (Z.of_nat n).
+    
+    Definition wordToNat (w : word) := Z.to_nat (wordVal w).
+
+    Definition wones := zToWord ((2 ^ (Z.of_nat width))%Z - 1).
+      
     Definition wadd x y := zToWord (Z.add (wordVal x) (wordVal y)).
 
     Definition wsub x y := zToWord (Z.sub (wordVal x) (wordVal y)).
@@ -139,6 +147,8 @@ End Word.
 
 Module Notations.
 
+  Declare Scope word_scope.
+  
   Notation "^~" := wneg : word_scope.
   Notation "l ^* r" := (@wmul _ l r) (at level 40, left associativity) : word_scope.
   Notation "l ^/ r" := (@wdiv _ l r) (at level 50, left associativity) : word_scope.

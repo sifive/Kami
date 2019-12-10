@@ -1965,3 +1965,32 @@ Section Forall.
 End Forall.
 
 
+Section Silly.
+
+(*used to avoid ill-typed term error messages*)
+	
+Lemma silly_lemma_true : forall {Y} (b : bool) f g pf, b = true ->
+  match b as b' return b = b' -> Y with
+  | true => f
+  | false => g
+  end eq_refl = f pf.
+Proof.
+  intros.
+  destruct b.
+  rewrite (hedberg bool_dec eq_refl pf); reflexivity.
+  discriminate.
+Qed.
+
+Lemma silly_lemma_false : forall {Y} (b : bool) f g pf, b = false ->
+  match b as b' return b = b' -> Y with
+  | true => f
+  | false => g
+  end eq_refl = g pf.
+Proof.
+  intros.
+  destruct b.
+  discriminate.
+  rewrite (hedberg bool_dec eq_refl pf); reflexivity.
+Qed.
+
+End Silly.

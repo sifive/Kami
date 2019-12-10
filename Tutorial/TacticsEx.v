@@ -1,4 +1,5 @@
 Require Import Kami.AllNotations.
+Require Import ZArith.
 
 Section Named.
   Variable sz: nat.

@@ -93,7 +93,7 @@ Section Compile.
       | ReadReg r k' cont =>
         @CompRead r k' (VarRegMap readMap) _ (fun v => @compileAction _ (cont v) pred writeMap)
       | WriteReg r k' expr cont =>
-        CompLetFull (CompRet ($$ WO)%kami_expr
+        CompLetFull (CompRet ($$ (zToWord 0 0))%kami_expr
                              (UpdRegMap r pred expr writeMap)) (fun _ v => @compileAction _ cont pred (VarRegMap v))
       | LetAction k' a' cont =>
         CompLetFull (@compileAction k' a' pred writeMap)
@@ -128,7 +128,7 @@ Section Compile.
       | EReadReg r k' cont =>
         @CompRead r k' (VarRegMap readMap) _ (fun v => @EcompileAction _ (cont v) pred writeMap)
       | EWriteReg r k' expr cont =>
-        CompLetFull (CompRet ($$ WO)%kami_expr
+        CompLetFull (CompRet ($$ (zToWord 0 0))%kami_expr
                              (UpdRegMap r pred expr writeMap)) (fun _ v => @EcompileAction _ cont pred (VarRegMap v))
       | ELetAction k' a' cont =>
         CompLetFull (@EcompileAction k' a' pred writeMap)
@@ -172,7 +172,7 @@ Section Compile.
               match Signature_dec sign (WriteRqMask (Nat.log2_up _idxNum) _num _Data, Void) with
               | left isEq =>
                 let inValue := (match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with | eq_refl => arg end) in
-                ELetExpr ($$ WO)%kami_expr
+                ELetExpr ($$ (zToWord 0 0))%kami_expr
                          (fun v => EWrite _idxNum _write _dataArray (inValue @% "addr")%kami_expr (inValue @% "data")%kami_expr
                                           (Some (inValue @% "mask")%kami_expr) (inlineWriteFile rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with
                                                                                                     | eq_refl => cont
@@ -183,7 +183,7 @@ Section Compile.
               match Signature_dec sign (WriteRq (Nat.log2_up _idxNum) (Array _num _Data), Void) with
               | left isEq =>
                 let inValue := (match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with | eq_refl => arg end) in
-                ELetExpr ($$ WO)%kami_expr
+                ELetExpr ($$ (zToWord 0 0))%kami_expr
                          (fun v => EWrite _idxNum _write _dataArray (inValue @% "addr")%kami_expr (inValue @% "data")%kami_expr
                                           None (inlineWriteFile rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with
                                                                     | eq_refl => cont
@@ -344,7 +344,7 @@ Section Compile.
                 match Signature_dec sign (Bit (Nat.log2_up _idxNum), Void) with
                 | left isEq =>
                   let inValue := (match isEq in _ = Y return Expr ty (SyntaxKind (fst Y)) with | eq_refl => arg end) in
-                  ELetExpr ($$ WO)%kami_expr
+                  ELetExpr ($$ (zToWord 0 0))%kami_expr
                            (fun v => ESyncReadReq _idxNum _num _readReqName _readRegName _dataArray inValue _Data isAddr (inlineSyncReqFile read rf (match isEq in _ = Y return fullType ty (SyntaxKind (snd Y)) -> EActionT k with
                                                                                                        | eq_refl => cont
                                                                                                        end v)))
@@ -397,14 +397,14 @@ Section Compile.
                 (fun (ty : Kind -> Type) (idx : fullType ty (SyntaxKind (fst (Bit (Nat.log2_up (rfIdxNum rf)), Void)))) =>
                    (Write readRegName read : fst (Bit (Nat.log2_up (rfIdxNum rf)), Void) <-
                                                  Var ty (SyntaxKind (fst (Bit (Nat.log2_up (rfIdxNum rf)), Void))) idx; Ret 
-                                                                                                                          Const ty WO)%kami_action))
+                                                                                                                          Const ty (zToWord 0 0))%kami_action))
       else
         (readReqName read,
          existT MethodT (Bit (Nat.log2_up (rfIdxNum rf)), Void)
                 (fun (ty : Kind -> Type) (idx : fullType ty (SyntaxKind (fst (Bit (Nat.log2_up (rfIdxNum rf)), Void)))) =>
                    (LETA vals : Array (rfNum rf) (rfData rf) <- buildNumDataArray (rfNum rf) (rfDataArray rf) (rfIdxNum rf) (rfData rf) ty idx;
                       Write readRegName read : Array (rfNum rf) (rfData rf) <- Var ty (SyntaxKind (Array (rfNum rf) (rfData rf))) vals;
-                      Ret Const ty WO)%kami_action)).
+                      Ret Const ty (zToWord 0 0))%kami_action)).
 
     Definition getSyncRes (rf : RegFileBase) (isAddr : bool) (read : SyncRead) : DefMethT :=
       if isAddr
@@ -465,18 +465,18 @@ Section Compile.
     Definition compileActions (readMap : regMapTy) (acts: list (ActionT ty Void)) :=
       fold_left (fun acc a =>
                    CompLetFull acc (fun _ writeMap =>
-                                      (CompLetFull (CompRet ($$ WO)%kami_expr
+                                      (CompLetFull (CompRet ($$ (zToWord 0 0))%kami_expr
                                                             (CompactRegMap (VarRegMap writeMap)))
                                       (fun _ v => @compileAction v _ a ($$ true)%kami_expr (VarRegMap v))))) acts
-                (CompRet ($$ WO)%kami_expr (VarRegMap readMap)).
+                (CompRet ($$ (zToWord 0 0))%kami_expr (VarRegMap readMap)).
 
     Definition compileActionsRf (readMap : regMapTy) (acts : list (ActionT ty Void)) (lrf : list RegFileBase) :=
       fold_left (fun acc a =>
                    CompLetFull acc (fun _ writeMap =>
-                                      (CompLetFull (CompRet ($$ WO)%kami_expr
+                                      (CompLetFull (CompRet ($$ (zToWord 0 0))%kami_expr
                                                             (CompactRegMap (VarRegMap writeMap)))
                                                    (fun _ v => @EcompileAction v _ (preCompileRegFiles (Action_EAction a) lrf) ($$ true)%kami_expr (VarRegMap v))))) acts
-                (CompRet ($$ WO)%kami_expr (VarRegMap readMap)).
+                (CompRet ($$ (zToWord 0 0))%kami_expr (VarRegMap readMap)).
 
     Definition compileRules (readMap : regMapTy) (rules: list RuleT) :=
       compileActions readMap (map (fun a => snd a ty) rules).

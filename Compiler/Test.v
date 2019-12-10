@@ -16,7 +16,7 @@ Instance toString_sigma{X}{Y : X -> Type}`{toString X}`{forall x, toString (Y x)
   |}.
 
 Definition cart_prod{X Y}(xs : list X)(ys : list Y) : list (X * Y) :=
-  concat (map (fun x => map (pair x) ys) xs).
+  List.concat (map (fun x => map (pair x) ys) xs).
 
 Inductive FileType :=
   | AsyncF
@@ -59,7 +59,7 @@ Definition syncNotIsAddr_file_varieties : list FileTuple :=
   cart_prod (cart_prod (cart_prod [SyncNotIsAddr] [WriteFirst; WriteSecond; WriteThird]) [Over; Under; Disjoint]) [IsWrMask; NotIsWrMask].
 
 Definition dep_cart_prod{X}{Y : X -> Type}(xs : list X)(ys : forall x, list (Y x)) : list ({x : X & Y x}) :=
-  concat (map (fun x => map (fun y => existT Y x y) (ys x)) xs).
+  List.concat (map (fun x => map (fun y => existT Y x y) (ys x)) xs).
 
 Section Params.
 
@@ -156,17 +156,17 @@ Qed.
 
 (* good values *)
 
-Lemma init_write1_neq : weqb init_val write_val_1 = false.
+Lemma init_write1_neq : weqb _ init_val write_val_1 = false.
 Proof.
   auto.
 Qed.
 
-Lemma init_write2_neq : weqb init_val write_val_2 = false.
+Lemma init_write2_neq : weqb _ init_val write_val_2 = false.
 Proof.
   auto.
 Qed.
 
-Lemma write1_write2_neq : weqb write_val_1 write_val_2 = false.
+Lemma write1_write2_neq : weqb _ write_val_1 write_val_2 = false.
 Proof.
   auto.
 Qed.
@@ -393,7 +393,7 @@ Definition make_read : RuleT :=
     Call val : Array num Data <- (read_name tup)($read_index : Bit (Nat.log2_up idxNum));
     Read c : Counter <- "counter";
     LET exp_val : Array num Data <- ITE (#c == $1) $$expected_read_val_second_cycle $$expected_read_val_first_cycle;
-    System ([DispString _  ("rule_" ++ read_name tup ++ ":\n")%string] ++ print_read ($read_index));
+    System ([DispString _  ("rule_" ++ read_name tup ++ ":\n")%string] ++ print_read ($read_index))%list;
     LETA _ : _ <- (print_comparison #val #exp_val);
     Retv
   ).
@@ -408,7 +408,7 @@ Definition make_readReq : RuleT :=
   (("rule_" ++ readReq_name tup)%string,
   fun ty => 
       Call (readReq_name tup)($read_index : Bit (Nat.log2_up idxNum));
-      System ([DispString _  ("rule_" ++ readReq_name tup ++ ":\n")%string] ++ print_read ($read_index));
+      System ([DispString _  ("rule_" ++ readReq_name tup ++ ":\n")%string] ++ print_read ($read_index))%list;
       Retv
   ).
 
@@ -444,13 +444,13 @@ Local Open Scope kami_expr.
 Local Open Scope kami_action.
 
 Definition all_async_rules : list RuleT :=
-  concat (map make_rules async_file_varieties).
+  List.concat (map make_rules async_file_varieties).
 
 Definition all_syncIsAddr_rules : list RuleT :=
-  concat (map make_rules syncIsAddr_file_varieties).
+  List.concat (map make_rules syncIsAddr_file_varieties).
 
 Definition all_syncNotIsAddr_rules : list RuleT :=
-  concat (map make_rules syncNotIsAddr_file_varieties).
+  List.concat (map make_rules syncNotIsAddr_file_varieties).
 
 (* registers *)
 (* write then read *)

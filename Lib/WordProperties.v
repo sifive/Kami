@@ -1,5 +1,5 @@
 Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv Eqdep.
-Require Import Lib.Word.
+Require Import Kami.Lib.Word.
 Require Import Lia.
 Require Import Omega.
 Require Import Coq.Arith.Even.
@@ -437,6 +437,29 @@ Proof.
   auto.
 Qed.
 
+Lemma pow2_of_nat (n : nat) : (2 ^ Z.of_nat n)%Z = Z.of_nat (2 ^ n)%nat.
+Proof.
+  induction n.
+  + simpl. auto.
+  + rewrite Nat2Z.inj_succ.
+    simpl.
+    rewrite Z.pow_succ_r; try lia.
+Qed.
+
+Lemma wordToNat_natToWord : forall (sz : nat) (w : nat),
+    (w < 2 ^ sz)%nat -> wordToNat _ (natToWord sz w) = w.
+Proof.
+  intros.
+  unfold wordToNat. unfold natToWord.
+  arithmetizeWord.
+  simpl.
+  rewrite Z.mod_small.
+  rewrite Nat2Z.id. auto.
+  split; try lia.
+  rewrite pow2_of_nat.
+  apply Nat2Z.inj_lt. auto.
+Qed.
+  
 Lemma Zpow_of_nat : forall n, Z.of_nat (2 ^ n) = (2 ^ Z.of_nat n)%Z.
 Proof.
   induction n; auto.
@@ -1576,7 +1599,6 @@ Lemma ws_zero_trivial (w : word 0) : w = zToWord 0 1.
 Proof.
   arithmetizeWord.
   cbn in *.
-  Search Z.modulo.
   rewrite Z.mod_1_r in wordBound.
   auto.
 Qed.

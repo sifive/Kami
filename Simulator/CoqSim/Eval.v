@@ -6,7 +6,7 @@ Require Import Kami.Simulator.CoqSim.Misc.
 Require Import Kami.Simulator.CoqSim.IO.
 Require Import Kami.Simulator.CoqSim.TransparentProofs.
 
-Fixpoint eval_Kind(k : Kind) : Type :=
+Fixpoint eval_Kind (k : Kind) : Type :=
   match k with
   | Bool => bool
   | Bit n => word n
@@ -20,11 +20,11 @@ Definition print_BF(bf : BitFormat) : nat -> string :=
   | Decimal => nat_decimal_string
   | Hex => nat_hex_string
   end.
-
-Fixpoint print_Kind(k : Kind)(ff : FullFormat k) : eval_Kind k -> string :=
+    
+Fixpoint print_Kind (k : Kind) (ff : FullFormat k) : eval_Kind k -> string :=
   match ff with
   | FBool n _ => fun x => space_pad n (if x then "1" else "0")
-  | FBit n m bf => fun x => zero_pad m (print_BF bf (wordToNat x))
+  | FBit n m bf => fun x => zero_pad m (print_BF bf (wordToNat _ x))
   | FStruct n fk fs ffs => fun x => ("{" ++ String.concat "; " (vec_to_list (vec_map (fun '(str1,str2) => str1 ++ ":" ++ str2) (add_strings fs (tup_to_vec _ (fun i => print_Kind (ffs i)) x)))) ++ "}")%string
   | FArray n k' ff' => fun x => ("[" ++ String.concat "; " (vec_to_list (vec_map (fun '(n,y) => nat_decimal_string n ++ "=" ++ print_Kind ff' y) (add_indices x))) ++ "]")%string (*fix*)
   end.
@@ -109,7 +109,7 @@ Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   | Eq _ e1 e2 => Kind_eq (eval_Expr e1) (eval_Expr e2)
   | ReadStruct n ks ss e i => tup_index i _ (eval_Expr e)
   | BuildStruct n ks ss es => mkTup _ (fun i => eval_Expr (es i))
-  | ReadArray n m k v i => match lt_dec (wordToNat (eval_Expr i)) n with
+  | ReadArray n m k v i => match lt_dec (wordToNat _ (eval_Expr i)) n with
                            | left pf => vec_index (Fin.of_nat_lt pf) (eval_Expr v)
                            | right _ => eval_ConstT (getDefaultConst k)
                            end

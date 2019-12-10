@@ -1,8 +1,9 @@
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv Eqdep.
 Require Import Kami.Syntax Kami.Lib.EclecticLib Kami.Tactics.
 Require Import RecordUpdate.RecordSet.
 Require Import Wf.
 Require Import Wf_nat.
-Require Import BinNums.
+(* Require Import BinNums. *)
 
 Definition natToHexStr (n : nat) : string :=
   match (BinNat.N.of_nat n) with
@@ -99,8 +100,8 @@ Delimit Scope kami_struct_scope with kami_struct.
 (** Notations for expressions *)
 
 Notation "k @# ty" := (Expr ty (SyntaxKind k)) (no associativity, at level 98, only parsing).
-Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (only parsing) : kami_expr_scope.
-Notation "$ n" := (Const _ (natToWord _ n)): kami_expr_scope.
+Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (at level 0, only parsing) : kami_expr_scope.
+Notation "$ n" := (Const _ (natToWord _ n)) (at level 9): kami_expr_scope.
 Notation "$$ e" := (Const ltac:(assumption) e) (at level 8, only parsing) : kami_expr_scope.
 
 Notation "! v" := (UniBool Neg v) (at level 35): kami_expr_scope.
@@ -149,18 +150,18 @@ Infix "<<" := (BinBit (Sll _ _)) (at level 100) : kami_expr_scope.
 Infix ">>" := (BinBit (Srl _ _)) (at level 100) : kami_expr_scope.
 Infix ">>>" := (BinBit (Sra _ _)) (at level 100) : kami_expr_scope.
 Notation "{< a , .. , b >}" :=
-  ((BinBit (Concat _ _)) a .. (BinBit (Concat _ _) b (@Const _ (Bit 0) WO)) ..)
+  ((BinBit (Concat _ _)) a .. (BinBit (Concat _ _) b (@Const _ (Bit 0) (zToWord 0 0))) ..)
     (at level 100, a at level 99): kami_expr_scope.
 Notation "{< a , .. , b >}" :=
-  (Word.combine b .. (Word.combine a WO) ..)
+  (wconcat b .. (wconcat a (zToWord 0 0)) ..)
     (at level 100, a at level 99): word_scope.
 
 Infix "<" := (BinBitBool (LessThan _)) : kami_expr_scope.
 Notation "x > y" := (BinBitBool (LessThan _) y x) : kami_expr_scope.
 Notation "x >= y" := (UniBool Neg (BinBitBool (LessThan _) x y)) : kami_expr_scope.
 Notation "x <= y" := (UniBool Neg (BinBitBool (LessThan _) y x)) : kami_expr_scope.
-Infix "<s" := (Slt _) : kami_expr_scope.
-Notation "x >s y" := (Slt _ y x) : kami_expr_scope.
+Infix "<s" := (Slt _) (at level 70) : kami_expr_scope.
+Notation "x >s y" := (Slt _ y x) (at level 70, y at next level) : kami_expr_scope.
 Notation "x >=s y" := (UniBool Neg (Slt _ x y)) (at level 100) : kami_expr_scope.
 Notation "x <=s y" := (UniBool Neg (Slt _ y x)) (at level 100): kami_expr_scope.
 Infix "==" := Eq (at level 39, no associativity) : kami_expr_scope.
@@ -330,7 +331,7 @@ Definition callNames (ty: Kind -> Type) k names := map (fun r =>
 Definition writeNames (ty: Kind -> Type) k namesVals :=
   map (fun r => 
          (@WriteReg _ _ (fst r) (SyntaxKind k) (snd r)
-                    (Return (Const ty WO)))) namesVals.
+                    (Return (Const ty (zToWord 0 0))))) namesVals.
 
 (* Complex list action notations *)
 Notation "'GatherActions' actionList 'as' val ; cont" :=
@@ -365,7 +366,7 @@ Declare Scope kami_scope.
 Delimit Scope kami_scope with kami.
 
 Notation "'RegisterN' name : type <- init" :=
-  (((MERegister (name%string, existT RegInitValT type (Some ((NativeConst init)%kami_init)%word))) :: nil))
+  ((MERegister (name%string, existT RegInitValT type (Some ((NativeConst init)%kami_init))) :: nil))
     (at level 13, name at level 99) : kami_scope.
 
 Notation "'RegisterNDef' name : type <- init" :=
@@ -373,7 +374,7 @@ Notation "'RegisterNDef' name : type <- init" :=
     (at level 13, name at level 99) : kami_scope.
 
 Notation "'Register' name : type <- init" :=
-  (((MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst ((init)%kami_init)%word)))) :: nil))
+  (((MERegister (name%string, existT RegInitValT (SyntaxKind type) (Some (makeConst ((init)%kami_init))))) :: nil))
     (at level 13, name at level 99) : kami_scope.
 
 Notation "'RegisterU' name : type" :=
@@ -432,11 +433,11 @@ Notation "'STRUCT_TYPE' { s1 ; .. ; sN }" :=
   (getStruct (cons s1%kami_struct .. (cons sN%kami_struct nil) ..)).
 
 Notation "'ARRAY_CONST' { x1 ; .. ; xn }" :=
-  (ConstArray (nth_Fin' (cons (x1%kami_init)%word .. (cons (xn%kami_init)%word nil) ..) eq_refl)).
+  (ConstArray (nth_Fin' (cons (x1%kami_init) .. (cons (xn%kami_init) nil) ..) eq_refl)).
 
 Notation "'STRUCT_CONST' { s1 ; .. ; sN }" :=
-  (getStructConst (cons (s1%struct_initial)%word ..
-                        (cons (sN%struct_initial)%word nil) ..)).
+  (getStructConst (cons (s1%struct_initial) ..
+                        (cons (sN%struct_initial) nil) ..)).
 
 Notation "i #: n" := (@Fin.of_nat_lt (i)%nat (n)%nat ltac:(lia)) (at level 10, only parsing).
 
@@ -459,7 +460,7 @@ Section mod_test.
 
   Local Example test1 := MODULE_WF{
                              (concat [Register (^"x") : Bool <- true; Register (^"w"): Bool <- true;
-                                        Register (^"t"): Bit 0 <- WO])
+                                        Register (^"t"): Bit 0 <- (zToWord 0 Z0)])
                                with Register (^"y") : Bool <- false
                                with Rule (^"r1") := ( Read y: Bool <- ^"y";
                                                         Write (^"x"): Bool <- #y;

@@ -506,23 +506,17 @@ Qed.
     induction x; cbn; try lia.
     destruct (Fin.to_nat x); cbn in *; lia.
   Qed.
-
-  Lemma fin_to_nat_bound : forall n (x: Fin.t n), proj1_sig (Fin.to_nat x) < n.
-  Proof.
-    induction x; cbn; try lia.
-    destruct (Fin.to_nat x); cbn in *; lia.
-  Qed.
-
+  
   Lemma fin_to_word_id : forall n (i : Fin.t n),
-    wordToNat (natToWord (Nat.log2_up n) (proj1_sig (Fin.to_nat i))) = proj1_sig (Fin.to_nat i).
+    wordToNat _ (natToWord (Nat.log2_up n) (proj1_sig (Fin.to_nat i))) = proj1_sig (Fin.to_nat i).
   Proof.
     intros.
     pose proof (log2_up_pow2 n); pose proof (fin_to_nat_bound i).
-    rewrite wordToNat_natToWord_2; lia.
+    rewrite wordToNat_natToWord; lia.
   Qed.
 
   Lemma eval_ReadArray_in_bounds : forall A n (arr : Expr type (SyntaxKind (Array n A))) i m,
-    n <= pow2 m ->
+    (n <= 2 ^ m)%nat ->
     evalExpr
       (ReadArray arr
         (Var type (SyntaxKind (Bit m))
@@ -530,11 +524,15 @@ Qed.
     evalExpr arr i.
   Proof.
     intros.
+    simpl.
     pose proof (fin_to_nat_bound i).
+    rewrite Z.mod_small.
+    rewrite Nat2Z.id.
+    destruct (lt_dec (proj1_sig (to_nat i)) n); try lia.
     unfold evalExpr at 1.
-    rewrite wordToNat_natToWord_2 by lia.
-    destruct (Compare_dec.lt_dec _ _) as [? | ?]; [| exfalso; auto].
     erewrite Fin.of_nat_ext, Fin.of_nat_to_nat_inv; eauto.
+    split; try lia. rewrite pow2_of_nat.
+    apply Nat2Z.inj_lt. lia.
   Qed.
 
   Corollary eval_ReadArray_in_bounds_log : forall A n (arr : Expr type (SyntaxKind (Array n A))) i,
@@ -545,7 +543,7 @@ Qed.
     evalExpr arr i.
   Proof. intros; apply eval_ReadArray_in_bounds, log2_up_pow2. Qed.
 
-  Corollary eval_ReadArray_in_bounds_pow : forall A n (arr : Expr type (SyntaxKind (Array (pow2 n) A))) i,
+  Corollary eval_ReadArray_in_bounds_pow : forall A n (arr : Expr type (SyntaxKind (Array (2 ^ n) A))) i,
     evalExpr
       (ReadArray arr
         (Var type (SyntaxKind (Bit n))
@@ -2911,9 +2909,6 @@ Proof.
       { intros; apply H1; auto; left; reflexivity. }
       constructor; auto.
       rewrite createHide_Meths; auto.
-      intros. apply H1.
-      auto. simpl.
-      left. reflexivity.
 Qed.
     
 Lemma Step_substitute m o l (HWfMod: WfMod m):
@@ -5053,7 +5048,7 @@ Section SimulationGen.
     (exists r a reads upds calls,
         l = (upds, (Rle r, calls)) :: nil /\
         In (r, a) (getRules imp) /\
-        SemAction o (a type) reads upds calls WO) \/
+        SemAction o (a type) reads upds calls (zToWord 0 0)) \/
     (exists f sign arg ret a reads upds calls,
         l = (upds, (Meth (f, existT SignT sign (arg, ret)), calls)) :: nil /\
         In (f, existT MethodT sign a) (getMethods imp) /\

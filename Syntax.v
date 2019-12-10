@@ -1,5 +1,5 @@
 Require Export Bool Ascii String Fin List FunctionalExtensionality Psatz PeanoNat.
-Require Export Lib.Word Lib.WordProperties Kami.Lib.VectorFacts Kami.Lib.EclecticLib.
+Require Export Kami.Lib.Word Kami.Lib.WordProperties Kami.Lib.VectorFacts Kami.Lib.EclecticLib.
 
 Export ListNotations.
 
@@ -992,13 +992,13 @@ Definition evalUniBit n1 n2 (op: UniBitOp n1 n2): word n1 -> word n2 :=
 Definition evalBinBit n1 n2 n3 (op: BinBitOp n1 n2 n3)
   : word n1 -> word n2 -> word n3 :=
   match op with
-    | Sub n => @wminus_simple n
-    | Div n => @wdivN n
-    | Rem n => @wremN n
-    | Sll n m => (fun x y => wlshift' x (wordToNat y))
-    | Srl n m => (fun x y => wrshift' x (wordToNat y))
-    | Sra n m => (fun x y => wrshifta' x (wordToNat y))
-    | Concat n1 n2 => fun x y => (Word.combine y x)
+    | Sub n => @wsub n
+    | Div n => @wdiv n
+    | Rem n => @wmod n
+    | Sll n m => (fun x y => wslu _ x (zToWord _ (wordVal _ y)))
+    | Srl n m => (fun x y => wsru _ x (zToWord _ (wordVal _ y)))
+    | Sra n m => wsra
+    | Concat n1 n2 => wconcat
   end.
 
 Definition evalCABit n (op: CABitOp) (ls: list (word n)): word n :=
@@ -1060,7 +1060,7 @@ Section Semantics.
       | ReadStruct n fk fs e i => (@evalExpr _ e) i
       | BuildStruct n fk fs fv => fun i => @evalExpr _ (fv i)
       | ReadArray n m k fv i =>
-        match lt_dec (wordToNat (@evalExpr _ i)) n with
+        match lt_dec (Z.to_nat (wordVal _ (@evalExpr _ i))) n with
         | left pf => fun fv => fv (Fin.of_nat_lt pf)
         | right _ => fun _ => evalConstT (getDefaultConst k)
         end (@evalExpr _ fv)

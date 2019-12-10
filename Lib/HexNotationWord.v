@@ -1,7 +1,5 @@
-Require Export Lib.Word.
-Require Export Lib.HexNotation.
-Require Export Lib.Word.
-Export Word.Notations.
+Require Export Kami.Lib.Word.
+Require Export Kami.Lib.HexNotation.
 Open Scope word_scope.
 Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv.
 

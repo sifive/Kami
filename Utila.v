@@ -2,6 +2,7 @@
   This library contains useful functions for generating Kami
   expressions.
  *)
+Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv.
 Require Import Kami.Syntax Kami.Notations Kami.LibStruct.
 Require Import List.
 Import Word.Notations.
@@ -901,9 +902,8 @@ Section utila.
       simpl.
       repeat (rewrite wor_wzero).
       reflexivity.
-      Qed.
-
     Qed.
+
 
   End monad_ver.
 
@@ -1271,7 +1271,7 @@ Open Scope word_scope.
         replace
           (fun (x0 : Expr type (SyntaxKind k))
                (acc : Expr type (SyntaxKind (Bit (size k))))
-           => (CABit (Bor) ((IF f x0 then pack x0 else (Const type (zToWord _ (Z.of_nat 0)))) :: acc :: nil)))
+           => (CABit (Bor) ((IF f x0 then pack x0 else (Const type (natToWord _ 0))) :: acc :: nil)))
           with (case f).
         (rewrite (utila_expr_find_lm2 f xs H)).
         (apply unpack_pack).
