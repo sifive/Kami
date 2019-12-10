@@ -5,6 +5,65 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+Section NubBy.
+  Variable A : Type.
+  Variable f: A -> A -> bool.
+
+  Definition nubBy (ls: list A) :=
+    fold_right (fun x acc => if existsb (f x) acc
+                             then acc
+                             else x :: acc) nil ls.
+End NubBy.
+
+Section Tree.
+  Inductive Tree (A: Type): Type :=
+  | Leaf (_: list A)
+  | Node (_: list (Tree A)).
+
+  Fixpoint flattenTree A (t: Tree A): list A :=
+    match t with
+    | Leaf xs => xs
+    | Node xs =>
+      (fix fold xs :=
+         match xs with
+         | nil => nil
+         | x :: xs => flattenTree x ++ fold xs
+         end) xs
+    end.
+End Tree.
+
+Fixpoint string_rev (ls: string) :=
+  match ls with
+  | EmptyString => EmptyString
+  | String x xs => append (string_rev xs) (String x EmptyString)
+  end.
+
+(* Definition in_decb{X}(eqb : X -> X -> bool) : X -> list X -> bool :=
+  fun x => existsb (eqb x).
+
+Lemma in_decb_In{X} : forall eqb : X -> X -> bool,
+  (forall x y, eqb x y = true <-> x = y) -> forall x xs, in_decb eqb x xs = true <-> In x xs.
+Proof.
+  intros; unfold in_decb;
+  rewrite existsb_exists.
+  split.
+  intros [y [Hy1 Hy2]].
+  rewrite H in Hy2; congruence.
+  intro.
+  exists x; split; [auto | rewrite H; auto].
+Qed. *)
+
+Fixpoint Fin_t_foldr
+         (A : Type)
+         (n : nat)
+         (init : A)
+  := match n return
+           forall (f : Fin.t n -> A -> A), A
+     with
+     | 0 => fun _ => init
+     | S m => fun f => f Fin.F1 (Fin_t_foldr m init (fun i => f (Fin.FS i)))
+     end.
+
 Section nth_Fin.
   Variable A: Type.
   Fixpoint nth_Fin (ls: list A): Fin.t (length ls) -> A :=
@@ -172,6 +231,42 @@ Section nth_Fin_map2.
       exact val.
   Defined.
 End nth_Fin_map2.
+
+Section Fin.
+
+Fixpoint Fin_forallb{n} : (Fin.t n -> bool) -> bool :=
+  match n return (Fin.t n -> bool) -> bool with
+  | 0 => fun _ => true
+  | S m => fun p => p Fin.F1 && Fin_forallb (fun i => p (Fin.FS i))
+  end.
+
+Lemma Fin_forallb_correct{n} : forall p : Fin.t n -> bool,
+  Fin_forallb p = true <-> forall i, p i = true.
+Proof.
+  induction n; intros; split; intros.
+  apply (Fin.case0 (fun i => p i = true)).
+  reflexivity.
+  simpl in H.
+  fin_dep_destruct i.
+  destruct (p F1); [auto|discriminate].
+  apply (IHn (fun j => p (FS j))).
+  destruct (p F1); [auto|discriminate].
+  simpl.
+  apply andb_true_intro; split.
+  apply H.
+  apply IHn.
+  intro; apply H.
+Qed.
+
+Definition Fin_cast : forall {m n}, Fin.t m -> m = n -> Fin.t n :=
+  fun m n i pf => match pf in _ = y return Fin.t y with
+                  | eq_refl => i
+                  end.
+
+End Fin.
+
+
+
 
 Lemma inversionPair A B (a1 a2: A) (b1 b2: B):
   (a1, b1) = (a2, b2) ->
@@ -1713,6 +1808,12 @@ Proof.
     auto.
 Qed.
 
+Lemma string_rev_append : forall s1 s2,
+  (string_rev (s1 ++ s2) = string_rev s2 ++ string_rev s1)%string.
+Proof.
+  induction s1; intros *; cbn; auto using append_nil.
+  rewrite IHs1; auto using append_assoc.
+Qed.
 
 Lemma key_not_In_fst A B (ls: list (A*B)):
   forall k,

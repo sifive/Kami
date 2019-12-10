@@ -1,13 +1,116 @@
-Require Import Lib.EclecticLib Syntax Properties KamiNotations.
+Require Import Kami.Lib.EclecticLib Kami.Syntax Kami.Properties.
+
+Ltac struct_get_field_ltac packet name :=
+  let val := eval cbv in (struct_get_field_index packet name) in
+      match val with
+      | Some ?x => exact (ReadStruct packet x)
+      | None =>
+        let newstr := constr:(("get field not found in struct" ++ name)%string) in
+        fail 0 newstr
+      | _ =>
+        let newstr := constr:(("major error - struct_get_field_index not reducing " ++ name)%string) in
+        fail 0 newstr
+      end.
+
+Ltac struct_set_field_ltac packet name newval :=
+  let val := eval cbv in (struct_get_field_index packet name) in
+      match val with
+      | Some ?x => exact (UpdateStruct packet x newval)
+      | None =>
+        let newstr := constr:(("set field not found in struct " ++ name)%string) in
+        fail 0 newstr
+      | _ =>
+        let newstr := constr:(("major error - struct_set_field_index not reducing " ++ name)%string) in
+        fail 0 newstr
+      end.
+
+
+Local Ltac constructor_simpl :=
+  econstructor; eauto; simpl; unfold not; intros.
+
+Ltac destruct_string_dec :=
+  repeat match goal with
+         | H: context[string_dec ?P%string ?Q%string] |- _ =>
+           destruct (string_dec P Q)
+         | |- context[string_dec ?P%string ?Q%string] =>
+           destruct (string_dec P Q)
+         end.
+
+Local Ltac process_append :=
+  repeat match goal with
+         | H: (_ ++ _)%string = (_ ++ _)%string |- _ =>
+           rewrite <- ?append_assoc in H; cbn [append] in H
+         | |- (_ ++ _)%string = (_ ++ _)%string =>
+           rewrite <- ?append_assoc; cbn [append]
+         end;
+  repeat match goal with
+         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
+           apply append_remove_prefix in H; subst
+         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
+           apply append_remove_suffix in H; subst
+         | |- (?a ++ ?b)%string = (?a ++ ?c)%string =>
+           apply append_remove_prefix
+         | |- (?a ++ ?b)%string = (?c ++ ?b)%string =>
+           apply append_remove_suffix
+         | H: (?a ++ (String ?x ?b))%string = (?c ++ (String ?y ?d))%string |- _ =>
+           apply (f_equal string_rev) in H;
+           rewrite (string_rev_append a (String x b)), (string_rev_append c (String y d)) in H;
+           cbn [string_rev] in H;
+           rewrite <- ?append_assoc in H; cbn [append] in H
+         end.
+
+Local Ltac finish_append :=
+  auto; try (apply InSingleton || discriminate || tauto || congruence).
+
+Ltac discharge_append :=
+  simpl; unfold getBool in *; process_append; finish_append.
+
+Goal forall (a b c: string),
+  (a ++ "a" <> a ++ "b"
+  /\ a ++ "a" ++ b <> c ++ "b" ++ b
+  /\ a ++ "a" ++ "b" <> a ++ "a" ++ "c"
+  /\ "a" ++ a <> "b" ++ b
+  /\ (a ++ "a") ++ b <> a ++ "b" ++ a
+  /\ (a ++ (b ++ "b")) ++ "c" <> (a ++ b) ++ "d")%string.
+Proof. intuition idtac; discharge_append. Qed.
+
+Ltac discharge_DisjKey :=
+  repeat match goal with
+         | |- DisjKey _ _ =>
+           rewrite (DisjKeyWeak_same string_dec); unfold DisjKeyWeak; simpl; intros
+         | H: _ \/ _ |- _ => destruct H; subst
+         end; discharge_append.
+
+Ltac discharge_wf :=
+  repeat match goal with
+         | |- @WfMod _ => constructor_simpl
+         | |- @WfConcat _ _ => constructor_simpl
+         | |- _ /\ _ => constructor_simpl
+         | |- @WfConcatActionT _ _ _ => constructor_simpl
+         | |- @WfBaseModule _ => constructor_simpl
+         | |- @WfActionT _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
+         | |- @WfActionT _ _ _ => constructor_simpl
+         | |- NoDup _ => constructor_simpl
+         | H: _ \/ _ |- _ => destruct H; subst; simpl
+         | |- forall _, _ => intros
+         | |- _ -> _ => intros 
+         | H: In _ (getAllMethods _) |- _ => simpl in H;inversion H;subst;clear H;simpl
+         end;
+  discharge_DisjKey.
 
 Lemma string_dec_refl {A} : forall (s: string) (T E: A),
-  (if string_dec s s then T else E) = T.
-Proof. intros; destruct (string_dec _ _); easy. Qed.
+  (if String.eqb s s then T else E) = T.
+Proof.
+  intros; rewrite String.eqb_refl; auto.
+Qed.
 
 Lemma string_dec_neq {A} : forall (s1 s2: string) (T E: A),
   s1 <> s2 ->
-  (if string_dec s1 s2 then T else E) = E.
-Proof. intros; destruct (string_dec _ _); easy. Qed.
+  (if String.eqb s1 s2 then T else E) = E.
+Proof.
+  intros.
+  rewrite <- String.eqb_neq in H; rewrite H; auto.
+Qed.
 
 Ltac discharge_string_dec :=
   repeat (rewrite string_dec_refl || rewrite string_dec_neq by (intros ?; discharge_append)).
@@ -21,13 +124,34 @@ Ltac discharge_NoSelfCall :=
          | _ => constructor; auto; simpl; try intro; discharge_DisjKey
          end.
 
-  Ltac discharge_SemAction :=
+Ltac unfold_beta_head a :=
+  let new :=
+      lazymatch a with
+      | ?h _ _ _ _ _ _ _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ _ _ _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ _ _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ _ => eval cbv beta delta [h] in a
+      | ?h _ _ => eval cbv beta delta [h] in a
+      | ?h _ => eval cbv beta delta [h] in a
+      end in
+    exact new.
+
+Ltac discharge_SemAction :=
   match goal with
   | |- SemAction _ _ _ _ ?meths _ =>
     repeat match goal with
-           | |- SemAction _ (If ?p then _ else _ as _; _)%kami_action _ _ _ _ => eapply SemAction_if_split
+           | |- SemAction ?o ?act ?reads ?news ?calls ?retv =>
+             let act' := constr:(ltac:(unfold_beta_head act)) in
+             change (SemAction o act' reads news calls retv)
+           | |- SemAction _ (@IfElse _ _ ?p _ _ _ _) _ _ _ _ => eapply SemAction_if_split
            | |- if ?P then SemAction _ _ _ _ _ _ else SemAction _ _ _ _ _ _ =>
-             case_eq P; let H := fresh in intros H; rewrite ?H in *; cbn [evalExpr] in *; try discriminate
+             case_eq P;
+             let H := fresh in
+             intros H; rewrite ?H in *; cbn [evalExpr] in *; try discriminate
            | |- SemAction _ (convertLetExprSyntax_ActionT _) _ _ _ _ => eapply convertLetExprSyntax_ActionT_same
            | |- SemAction _ _ _ _ _ _ => econstructor
            end;
@@ -36,7 +160,8 @@ Ltac discharge_NoSelfCall :=
            | |- In _ _ => simpl; auto
            | |- ?a = ?a => reflexivity
            | |- meths = _ => eauto
-           end; simpl in *; try (discriminate || congruence); eauto; simpl in *; discharge_DisjKey
+           end;
+    simpl in *; try (discriminate || congruence); eauto; simpl in *; discharge_DisjKey
   end.
 
 Ltac simplify_simulatingRule name :=
@@ -47,14 +172,6 @@ Ltac simplify_simulatingRule name :=
 Ltac simplify_nilStep :=
   left; split; auto; simpl in *;
   discharge_string_dec.
-
-
-
-
-
-
-
-
 
 Local Ltac discharge_init :=
   repeat econstructor;

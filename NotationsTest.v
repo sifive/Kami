@@ -1,6 +1,4 @@
-Require Import Syntax KamiNotations.
-Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt.
-
+Require Import Kami.Syntax Kami.Notations Kami.Tactics.
 Section mod_test.
   Variable a: string.
   Local Notation "^ x" := (a ++ "." ++ x)%string (at level 0).

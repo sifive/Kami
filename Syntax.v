@@ -1,5 +1,5 @@
 Require Export Bool Ascii String Fin List FunctionalExtensionality Psatz PeanoNat.
-Require Export Lib.Word Lib.WordProperties Lib.VectorFacts Lib.EclecticLib.
+Require Export Lib.Word Lib.WordProperties Kami.Lib.VectorFacts Kami.Lib.EclecticLib.
 
 Export ListNotations.
 
@@ -52,7 +52,7 @@ Fixpoint getDefaultConstFullKind (k : FullKind) : ConstFullT k :=
   match k with
   | SyntaxKind k' => SyntaxConst (getDefaultConst k')
   | NativeKind t c' => NativeConst c'
-                         end.
+  end.
 
 Inductive UniBoolOp: Set :=
 | Neg: UniBoolOp.
@@ -214,7 +214,7 @@ Section Phoas.
         | right isGe => UniBit (TruncLsb no (ni - no)) (castBits _ e)
         end; abstract Omega.omega.
     Defined.
-
+    
     Definition ZeroExtendTruncMsb ni no (e: Expr (SyntaxKind (Bit ni))):
       Expr (SyntaxKind (Bit no)).
       refine
@@ -223,7 +223,7 @@ Section Phoas.
         | right isGe => UniBit (TruncMsb (ni - no) no) (castBits _ e)
         end; abstract lia.
     Defined.
-
+    
     Definition SignExtendTruncMsb ni no (e: Expr (SyntaxKind (Bit ni))):
       Expr (SyntaxKind (Bit no)).
       refine
@@ -232,7 +232,7 @@ Section Phoas.
         | right isGe => UniBit (TruncMsb (ni - no) no) (castBits _ e)
         end; abstract Omega.omega.
     Defined.
-
+    
     Fixpoint countLeadingZeros ni no: Expr (SyntaxKind (Bit ni)) -> Expr (SyntaxKind (Bit no)).
     refine
       match ni return Expr (SyntaxKind (Bit ni)) -> Expr (SyntaxKind (Bit no)) with
@@ -259,7 +259,6 @@ Section Phoas.
         sumSizes (fun i => size (fk i))
       | Array n k => n * size k
       end.
-
     (* ConstExtract: LSB, MIDDLE, MSB *)
     (* Concat: MSB, LSB *)
 
@@ -277,7 +276,7 @@ Section Phoas.
                    (Concat _ _) (f Fin.F1)
                    (@concatStructExpr m (fun x => (sizes (Fin.FS x))) (fun x => f (Fin.FS x)))
       end.
-
+    
     Fixpoint pack (k: Kind): Expr (SyntaxKind k) -> Expr (SyntaxKind (Bit (size k))).
       refine
       match k return Expr (SyntaxKind k) -> Expr (SyntaxKind (Bit (size k))) with
@@ -300,7 +299,7 @@ Section Phoas.
              end) n
       end; abstract lia.
     Defined.
-
+    
     Fixpoint sumSizesMsbs n (i: Fin.t n) {struct i}: (Fin.t n -> nat) -> nat :=
       match i in Fin.t n return (Fin.t n -> nat) -> nat with
       | Fin.F1 _ => fun _ => 0
@@ -523,18 +522,21 @@ Fixpoint getRules m :=
 
 Definition getStruct ls :=
   (Struct (fun i => snd (nth_Fin ls i)) (fun j => fst (nth_Fin ls j))).
+Arguments getStruct : simpl never.
 
 Definition getStructVal ty ls :=
   (BuildStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i))
                (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j))
                (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => Expr ty (SyntaxKind (snd x)))
                                       ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))).
+Arguments getStructVal : simpl never.
 
 Definition getStructConst ls :=
   (ConstStruct (fun i => snd (nth_Fin (map (@projT1 _ _) ls) i))
                (fun j => fst (nth_Fin (map (@projT1 _ _) ls) j))
                (fun k => nth_Fin_map2 (@projT1 _ _) (fun x => ConstT (snd x))
                                       ls k (projT2 (nth_Fin ls (Fin.cast k (map_length_red (@projT1 _ _) ls)))))).
+Arguments getStructConst : simpl never. 
 
 Definition WriteRq lgIdxNum Data := (getStruct (cons ("addr", Bit lgIdxNum)
                                                      (cons ("data", Data) nil))).
@@ -558,8 +560,8 @@ Definition buildNumDataArray num dataArray IdxNum Data ty (idx: ty (Bit (Nat.log
                                    ReadArray
                                      (Var ty _ val)
                                      (CABit Add (Var ty (SyntaxKind _) idx ::
-                                                     Const ty (zToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) :: nil))))).
-                                                                                                                   
+                                                     Const ty (natToWord _ (proj1_sig (Fin.to_nat i))) :: nil))))).
+
 Definition updateNumDataArray num dataArray IdxNum Data ty (idxData: ty (WriteRq (Nat.log2_up IdxNum)
                                                                                  (Array num Data))):
   ActionT ty Void :=
@@ -804,16 +806,17 @@ Coercion getModWf: BaseModuleWf >-> ModWf.
 Coercion getModWfOrd: BaseModuleWfOrd >-> ModWfOrd.
 
 Section NoCallActionT.
-  Variable ls: list string.
+  Variable ls: list DefMethT.
+  Variable ty : Kind -> Type.
   
-  Inductive NoCallActionT: forall k, ActionT type k -> Prop :=
-  | NoCallMCall meth s e lretT c: ~ In meth ls -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (MCall meth s e c)
-  | NoCallLetExpr k (e: Expr type k) lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetExpr e c)
-  | NoCallLetAction k (a: ActionT type k) lretT c: NoCallActionT a -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetAction a c)
+  Inductive NoCallActionT: forall k , ActionT ty k -> Prop :=
+  | NoCallMCall meth s e lretT c: ~ In (meth, s) (getKindAttr ls) -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (MCall meth s e c)
+  | NoCallLetExpr k (e: Expr ty k) lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetExpr e c)
+  | NoCallLetAction k (a: ActionT ty k) lretT c: NoCallActionT a -> (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (LetAction a c)
   | NoCallReadNondet k lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (ReadNondet k c)
   | NoCallReadReg r k lretT c: (forall v, NoCallActionT (c v)) -> @NoCallActionT lretT (ReadReg r k c)
-  | NoCallWriteReg r k (e: Expr type k) lretT c: NoCallActionT c  -> @NoCallActionT lretT (WriteReg r e c)
-  | NoCallIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, NoCallActionT (c v)) -> NoCallActionT atrue -> NoCallActionT afalse -> @NoCallActionT lretT (IfElse p atrue afalse c)
+  | NoCallWriteReg r k (e: Expr ty k) lretT c: NoCallActionT c  -> @NoCallActionT lretT (WriteReg r e c)
+  | NoCallIfElse p k (atrue: ActionT ty k) afalse lretT c: (forall v, NoCallActionT (c v)) -> NoCallActionT atrue -> NoCallActionT afalse -> @NoCallActionT lretT (IfElse p atrue afalse c)
   | NoCallSys ls lretT c: NoCallActionT c -> @NoCallActionT lretT (Sys ls c)
   | NoCallReturn lretT e: @NoCallActionT lretT (Return e).
 End NoCallActionT.
@@ -822,15 +825,15 @@ Section NoSelfCallBaseModule.
   Variable m: BaseModule.
   
   Definition NoSelfCallRuleBaseModule (rule : Attribute (Action Void)) :=
-    NoCallActionT (map fst (getMethods m)) (snd rule type).
+    forall ty, NoCallActionT (getMethods m) (snd rule ty).
   
   Definition NoSelfCallRulesBaseModule :=
-    forall rule, In rule (getRules m) ->
-                 NoCallActionT (map fst (getMethods m)) (snd rule type).
+    forall rule ty, In rule (getRules m) ->
+                    NoCallActionT (getMethods m) (snd rule ty).
   
   Definition NoSelfCallMethsBaseModule :=
-    forall meth, In meth (getMethods m) ->
-                 forall (arg: type (fst (projT1 (snd meth)))), NoCallActionT (map fst (getMethods m)) (projT2 (snd meth) type arg).
+    forall meth ty, In meth (getMethods m) ->
+                 forall (arg: ty (fst (projT1 (snd meth)))), NoCallActionT (getMethods m) (projT2 (snd meth) ty arg).
 
   Definition NoSelfCallBaseModule :=
     NoSelfCallRulesBaseModule /\ NoSelfCallMethsBaseModule.
@@ -843,79 +846,85 @@ End NoSelfCallBaseModule.
 
 
 (* Semantics *)
-
-Local Ltac Struct_neq :=
-  match goal with
-  | |- Struct _ _ <> Struct _ _ =>
-    let H := fresh in intro H;
-                      injection H;
-                      intros;
-                      repeat (existT_destruct Nat.eq_dec)
-  end.
-
-Definition Kind_dec (k1: Kind): forall k2, {k1 = k2} + {k1 <> k2}.
+Fixpoint Kind_decb(k1 k2 : Kind) : bool.
 Proof.
-  induction k1; destruct k2; try (right; (intros; abstract congruence)).
-  - left; abstract (reflexivity).
-  - destruct (Nat.eq_dec n n0); [left; abstract (subst; reflexivity) | right; abstract congruence].
-  - destruct (Nat.eq_dec n n0).
-    + subst.
-      induction n0.
-      * left.
-        abstract (f_equal; extensionality x; apply Fin.case0; exact x).
-      * destruct  (IHn0 (fun i => s (Fin.FS i)) (fun i => k (Fin.FS i))
-                         (fun i => H (Fin.FS i)) (fun i => k0 (Fin.FS i))
-                         (fun i => s0 (Fin.FS i))).
-        -- destruct (string_dec (s Fin.F1) (s0 Fin.F1)).
-           ++ destruct (H Fin.F1 (k0 Fin.F1)).
-              ** left.
-                 abstract (
-                 injection e;
-                 intros;
-                 repeat (existT_destruct Nat.eq_dec);
-                 f_equal; extensionality x; apply (Fin.caseS' x); try assumption;
-                 apply equal_f; assumption).
-              ** right.
-                 abstract (Struct_neq;
-                           apply (n eq_refl)).
-           ++ right.
-              abstract (Struct_neq;
-                        apply (n eq_refl)).
-        -- right.
-           abstract (Struct_neq;
-                     apply (n eq_refl)).
-    + right.
-      abstract (intro;
-                injection H0 as H0;
-                intros;
-                apply (n1 H0)).
-  - destruct (Nat.eq_dec n n0).
-    + destruct (IHk1 k2).
-      * left.
-        abstract (subst; reflexivity).
-      * right.
-        abstract (subst; intro;
-                  injection H as H;
-                  apply (n1 H)).
-    + right.
-      abstract (subst; intro;
-                injection H as H;
-                apply (n1 H)).
+  refine (
+    match k1,k2 with
+    | Bool, Bool => true
+    | Bit n, Bit m => Nat.eqb n m
+    | Array n k, Array m k' => Nat.eqb n m && Kind_decb k k'
+    | Struct n ks fs, Struct m ks' fs' => _
+    | _,_ => false
+    end).
+  destruct (Nat.eqb n m) eqn:G.
+  exact (Fin_forallb (fun i => Kind_decb (ks i) (ks' (Fin_cast i (proj1 (Nat.eqb_eq n m) G)))) && Fin_forallb (fun i => String.eqb (fs i) (fs' (Fin_cast i (proj1 (Nat.eqb_eq n m) G))))).
+  exact false.
 Defined.
 
-Definition Signature_dec (s1 s2: Signature): {s1 = s2} + {s1 <> s2}.
-  refine match s1, s2 with
-         | (k11, k12), (k21, k22) => match Kind_dec k11 k21, Kind_dec k12 k22 with
-                                     | left pf1, left pf2 => left _
-                                     | left pf1, right pf2 => right (fun x => pf2 _)
-                                     | right pf1, left pf2 => right (fun x => pf1 _)
-                                     | right pf1, right pf2 => right (fun x => pf1 _)
-                                     end
-         end.
-  - subst; auto.
-  - exact (f_equal snd x).
-  - exact (f_equal fst x).
-  - exact (f_equal fst x).
+
+Lemma Kind_decb_refl : forall k, Kind_decb k k = true.
+Proof.
+  induction k; simpl; auto.
+  - apply Nat.eqb_refl.
+  -
+    rewrite silly_lemma_true with (pf := (Nat.eqb_refl _)) by apply Nat.eqb_refl.
+    rewrite andb_true_iff; split; rewrite Fin_forallb_correct; intros.
+    + rewrite (hedberg Nat.eq_dec _ eq_refl); simpl; apply H.
+    + rewrite (hedberg Nat.eq_dec _ eq_refl); simpl; apply String.eqb_refl.
+  - rewrite andb_true_iff; split; auto.
+    apply Nat.eqb_refl.
+Qed.
+
+Lemma Kind_decb_eq : forall k1 k2, Kind_decb k1 k2 = true <-> k1 = k2.
+Proof.
+  induction k1; intros; destruct k2; split; intro; try (reflexivity || discriminate).
+  - simpl in H; rewrite Nat.eqb_eq in H; congruence.
+  - inversion H; simpl; apply Nat.eqb_refl.
+  - destruct (n =? n0)%nat eqn:G.
+    + simpl in H0.
+      rewrite (@silly_lemma_true bool (n =? n0)%nat _ _ G) in H0 by auto.
+      pose proof G.
+      rewrite Nat.eqb_eq in H1 by auto.
+      rewrite andb_true_iff in H0; destruct H0 as [G1 G2]; rewrite Fin_forallb_correct in G1,G2; subst.
+      rewrite (hedberg Nat.eq_dec _ eq_refl) in G1,G2; simpl in *.
+      setoid_rewrite H in G1.
+      setoid_rewrite String.eqb_eq in G2.
+      f_equal; extensionality i; auto.
+    + simpl in H0.
+      rewrite silly_lemma_false in H0; try discriminate; auto.
+  - rewrite H0; apply Kind_decb_refl.
+  - simpl in H; rewrite andb_true_iff in H.
+    destruct H as [H1 H2]; rewrite Nat.eqb_eq in H1; rewrite IHk1 in H2; congruence.
+  - simpl.
+    rewrite andb_true_iff; inversion H; split.
+    + apply Nat.eqb_refl.
+    + rewrite <- H2, IHk1; reflexivity.
+Qed.
+
+Lemma Kind_dec (k1 k2 : Kind): {k1 = k2} + {k1 <> k2}.
+Proof.
+  destruct (Kind_decb k1 k2) eqn:G.
+  left; abstract (rewrite Kind_decb_eq in G; auto).
+  right; abstract (intro;
+                   rewrite <- Kind_decb_eq in H;
+                   rewrite H in G; discriminate).
+Defined.
+
+Definition Signature_decb : Signature -> Signature -> bool :=
+  fun '(k,l) '(k',l') => Kind_decb k k' && Kind_decb l l'.
+
+Lemma Signature_decb_eq : forall s1 s2, Signature_decb s1 s2 = true <-> s1 = s2.
+Proof.
+  intros [] []; simpl; rewrite andb_true_iff; repeat rewrite Kind_decb_eq; firstorder congruence.
+Qed.
+
+Definition Signature_dec (s1 s2 : Signature) : {s1 = s2} + {s1 <> s2}.
+Proof.
+  destruct (Signature_decb s1 s2) eqn:G.
+  left; abstract (rewrite <- Signature_decb_eq; auto).
+  right; (intro;
+          rewrite <- Signature_decb_eq in H;
+          rewrite H in G; discriminate).
 Defined.
  
 Lemma isEq k: forall (e1: type k) (e2: type k),
@@ -983,14 +992,14 @@ Definition evalUniBit n1 n2 (op: UniBitOp n1 n2): word n1 -> word n2 :=
 Definition evalBinBit n1 n2 n3 (op: BinBitOp n1 n2 n3)
   : word n1 -> word n2 -> word n3 :=
   match op with
-    | Sub n => wsub n
-    | Div n => wdiv n
-    | Rem n => wmod n
-    | Sll n m => fun x y => wslu _ x (zToWord _ (wordVal _ y))
-    | Srl n m =>  fun x y => wsru _ x (zToWord _ (wordVal _ y))
-    | Sra n m =>  wsra
-    | Concat n1 n2 => wconcat
- end.
+    | Sub n => @wminus_simple n
+    | Div n => @wdivN n
+    | Rem n => @wremN n
+    | Sll n m => (fun x y => wlshift' x (wordToNat y))
+    | Srl n m => (fun x y => wrshift' x (wordToNat y))
+    | Sra n m => (fun x y => wrshifta' x (wordToNat y))
+    | Concat n1 n2 => fun x y => (Word.combine y x)
+  end.
 
 Definition evalCABit n (op: CABitOp) (ls: list (word n)): word n :=
   match op with
@@ -1051,14 +1060,15 @@ Section Semantics.
       | ReadStruct n fk fs e i => (@evalExpr _ e) i
       | BuildStruct n fk fs fv => fun i => @evalExpr _ (fv i)
       | ReadArray n m k fv i =>
-        match lt_dec (Z.to_nat (wordVal _ (@evalExpr _ i))) n with
-       | left pf => fun fv => fv (Fin.of_nat_lt pf)
+        match lt_dec (wordToNat (@evalExpr _ i)) n with
+        | left pf => fun fv => fv (Fin.of_nat_lt pf)
         | right _ => fun _ => evalConstT (getDefaultConst k)
         end (@evalExpr _ fv)
       | ReadArrayConst n k fv i =>
         (@evalExpr _ fv) i
       | BuildArray n k fv => fun i => @evalExpr _ (fv i)
     end.
+  Arguments evalExpr : simpl nomatch.
   
   Fixpoint evalLetExpr k (e: LetExprSyntax type k) :=
     match e in LetExprSyntax _ _ return type k with
@@ -1069,7 +1079,7 @@ Section Semantics.
                                                     then evalLetExpr t
                                                     else evalLetExpr f))
     end.
-
+  
   Variable o: RegsT.
 
   Inductive SemAction:
@@ -1198,10 +1208,10 @@ Section MethT_dec.
   Lemma method_values_eq
   :  forall (s : Signature) (x y : SignT s), existT SignT s x = existT SignT s y -> x = y.
   Proof.
-    intros. inv H. apply (Eqdep_dec.inj_pair2_eq_dec Signature Signature_dec SignT) in H1. auto.
+    intros. inv H.
+    apply (Eqdep_dec.inj_pair2_eq_dec Signature Signature_dec SignT) in H1. auto.
   Qed.
-     
-  
+
   (*
   Asserts that the values passed to and returned
   by two method calls differ if their signatures
@@ -1247,7 +1257,6 @@ Section MethT_dec.
                   (fun H0 : existT SignT s x = existT SignT s y
                    => H (method_values_eq H0)))
             (method_denotation_values_dec x y).
-
   
   (*
   Determines whether or not the values passed to,
@@ -1277,6 +1286,7 @@ Section MethT_dec.
     - apply string_dec.
     - apply sigT_SignT_dec.
   Defined.
+  
 End MethT_dec.
   
 Fixpoint getNumFromCalls (f : MethT) (l : MethsT) : Z :=
@@ -1311,13 +1321,13 @@ Definition getListFullLabel_diff (f : MethT) (l : list FullLabel) :=
 
 Definition MatchingExecCalls_Base (l : list FullLabel) m :=
   forall f,
-    In (fst f) (map fst (getMethods m)) ->
+    In (fst f, projT1 (snd f)) (getKindAttr (getMethods m)) ->
     (getNumCalls f l <= getNumExecs f l)%Z.
 
 Definition MatchingExecCalls_Concat (lcall lexec : list FullLabel) mexec :=
   forall f,
     (getNumCalls f lcall <> 0%Z) ->
-    In (fst f) (map fst (getAllMethods mexec)) ->
+    In (fst f, projT1 (snd f)) (getKindAttr (getAllMethods mexec)) ->
     ~In (fst f) (getHidden mexec) /\
     (getNumCalls f lcall + getNumCalls f lexec <= getNumExecs f lexec)%Z.
 
@@ -1364,7 +1374,7 @@ Inductive Step: Mod -> RegsT -> list FullLabel -> Prop :=
 | BaseStep m o l (HSubsteps: Substeps m o l) (HMatching: MatchingExecCalls_Base l  m):
     Step (Base m) o l
 | HideMethStep m s o l (HStep: Step m o l)
-               (HHidden : In s (map fst (getAllMethods m)) -> (forall v, (getListFullLabel_diff (s, v) l = 0%Z))):
+               (HHidden : forall v, In (s, projT1 v) (getKindAttr (getAllMethods m)) -> getListFullLabel_diff (s, v) l = 0%Z):
     Step (HideMeth m s) o l
 | ConcatModStep m1 m2 o1 o2 l1 l2
                 (HStep1: Step m1 o1 l1)
@@ -1397,7 +1407,7 @@ Notation regInit := (fun (o': RegT) (r: RegInitT)  => fst o' = fst r /\
 
 Fixpoint findReg (s: string) (u: RegsT) :=
   match u with
-  | x :: xs => if string_dec s (fst x)
+  | x :: xs => if String.eqb s (fst x)
                then Some (snd x)
                else findReg s xs
   | nil => None
@@ -1486,12 +1496,14 @@ Definition getCallsWithSignPerRule (rule: Attribute (Action Void)) :=
 Definition getCallsWithSignPerMeth (meth: DefMethT) :=
   getCallsWithSign (projT2 (snd meth) _ tt).
 
-Definition getCallsWithSignPerMod (m: Mod) :=
-  List.concat (map getCallsWithSignPerRule (getAllRules m)) ++ List.concat (map getCallsWithSignPerMeth (getAllMethods m)).
+Fixpoint getCallsWithSignPerMod (mm: Mod) :=
+  match mm with
+  | Base m => concat (map getCallsWithSignPerRule (getRules m))++ concat (map getCallsWithSignPerMeth (getMethods m))
+  | HideMeth m _ => getCallsWithSignPerMod m
+  | ConcatMod m1 m2 => getCallsWithSignPerMod m1 ++ getCallsWithSignPerMod m2
+  end.
 
 Definition getCallsPerMod (m: Mod) := map fst (getCallsWithSignPerMod m).
-
-
 
 Fixpoint getRegWrites k (a: ActionT (fun _ => unit) k) :=
   match a in ActionT _ _ with
@@ -1550,7 +1562,7 @@ Definition getFlat m := BaseMod (getAllRegisters m) (getAllRules m) (getAllMetho
 
 Definition flatten m := createHide (getFlat m) (getHidden m).
 
-Definition autoHide (m: Mod) := createHideMod m (filter (fun i => getBool (in_dec string_dec i (getCallsPerMod m)))
+Definition autoHide (m: Mod) := createHideMod m (filter (fun i => existsb (String.eqb i) (getCallsPerMod m))
                                                         (map fst (getAllMethods m))).
 
 Fixpoint separateBaseMod (m: Mod): (list RegFileBase * list BaseModule) :=
@@ -1599,9 +1611,8 @@ Definition concatFlat m1 m2 := BaseMod (getRegisters m1 ++ getRegisters m2)
 
 Section inlineSingle.
   Variable ty: Kind -> Type.
-  Variable f: DefMethT.
 
-  Fixpoint inlineSingle k (a: ActionT ty k): ActionT ty k :=
+  Fixpoint inlineSingle k (a: ActionT ty k) (f: DefMethT): ActionT ty k :=
     match a with
     | MCall g sign arg cont =>
       match String.eqb (fst f) g with
@@ -1613,25 +1624,25 @@ Section inlineSingle.
                              end (projT2 (snd f) ty))
                     (fun ret => inlineSingle (match isEq in _ = Y return ty (snd Y) -> ActionT ty k with
                                               | eq_refl => cont
-                                              end ret))
-        | right _ => MCall g sign arg (fun ret => inlineSingle (cont ret))
+                                              end ret) f)
+        | right _ => MCall g sign arg (fun ret => inlineSingle (cont ret) f)
         end
-      | false => MCall g sign arg (fun ret => inlineSingle (cont ret))
+      | false => MCall g sign arg (fun ret => inlineSingle (cont ret) f)
       end
     | LetExpr _ e cont =>
-      LetExpr e (fun ret => inlineSingle (cont ret))
+      LetExpr e (fun ret => inlineSingle (cont ret) f)
     | LetAction _ a cont =>
-      LetAction (inlineSingle a) (fun ret => inlineSingle (cont ret))
+      LetAction (inlineSingle a f) (fun ret => inlineSingle (cont ret) f)
     | ReadNondet k c =>
-      ReadNondet k (fun ret => inlineSingle (c ret))
+      ReadNondet k (fun ret => inlineSingle (c ret) f)
     | ReadReg r k c =>
-      ReadReg r k (fun ret => inlineSingle (c ret))
+      ReadReg r k (fun ret => inlineSingle (c ret) f)
     | WriteReg r k e a =>
-      WriteReg r e (inlineSingle a)
+      WriteReg r e (inlineSingle a f)
     | IfElse p _ aT aF c =>
-      IfElse p (inlineSingle aT) (inlineSingle aF) (fun ret => inlineSingle (c ret))
+      IfElse p (inlineSingle aT f) (inlineSingle aF f) (fun ret => inlineSingle (c ret) f)
     | Sys ls c =>
-      Sys ls (inlineSingle c)
+      Sys ls (inlineSingle c f)
     | Return e =>
       Return e
     end.
@@ -1640,7 +1651,7 @@ End inlineSingle.
 
 Definition inlineSingle_Rule  (f : DefMethT) (rle : RuleT): RuleT :=
   let (s, a) := rle in
-  (s, fun ty => inlineSingle f (a ty)).
+  (s, fun ty => inlineSingle (a ty) f).
 
 Definition inlineSingle_Rule_map_BaseModule (f : DefMethT) (m : BaseModule) :=
   BaseMod (getRegisters m) (map (inlineSingle_Rule f) (getRules m)) (getMethods m).
@@ -1664,7 +1675,7 @@ Definition inlineSingle_Meth (f : DefMethT) (meth : DefMethT): DefMethT :=
    then sig_body
    else
      let (sig, body) := sig_body in
-     existT _ sig (fun ty arg => inlineSingle f (body ty arg))).
+     existT _ sig (fun ty arg => inlineSingle (body ty arg) f)).
 
 Definition inlineSingle_Meth_map_BaseModule (f : DefMethT) (m : BaseModule) :=
   BaseMod (getRegisters m) (getRules m) (map (inlineSingle_Meth f) (getMethods m)).
@@ -1728,17 +1739,15 @@ Definition flatten_inline_everything m :=
 
 Definition removeHides (m: BaseModule) s :=
   BaseMod (getRegisters m) (getRules m)
-          (filter (fun df => negb (getBool (in_dec string_dec (fst df) s))) (getMethods m)).
+          (filter (fun df => negb (existsb (String.eqb (fst df)) s)) (getMethods m)).
 
 Definition flatten_inline_remove m :=
   removeHides (inlineAll_All_mod m) (getHidden m).
-  
-
 
 (* Last Set of Utility Functions *)
 
 Definition hiddenBy (meths : list DefMethT) (h : string) : bool :=
-  (getBool (in_dec string_dec h (map fst meths))).
+  (existsb (String.eqb h) (map fst meths)).
 
 Definition getAllBaseMethods (lb : list BaseModule) : (list DefMethT) :=
   (List.concat (map getMethods lb)).
@@ -1767,136 +1776,16 @@ Definition baseNoSelfCalls (m : Mod) :=
   let '(hides, (rfs, mods)) := separateMod m in
   NoSelfCallBaseModule (inlineAll_All_mod (mergeSeparatedBaseMod mods)).
 
-Definition struct_foldr
-  (T : Type)
-  (ty : Kind -> Type)
-  (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
-  (f : Fin.t (S n) -> string -> Kind -> T -> T)
-  (init : T)
-  :  T
-  := nat_rect
-       (fun m : nat => m < (S n) -> T)
-       (fun H : 0 < (S n)
-         => let index : Fin.t (S n)
-              := Fin.of_nat_lt H in
-            f index (get_name index) (get_kind index) init)
-       (fun (m : nat)
-         (F : m < (S n) -> T)
-         (H : S m < (S n))
-         => let H0
-              :  m < (S n)
-              := PeanoNat.Nat.lt_lt_succ_r m n
-                   (Lt.lt_S_n m n H) in
-            let index
-              :  Fin.t (S n)
-              := Fin.of_nat_lt H in
-            (f index (get_name index) (get_kind index) (F H0)))
-       n
-       (PeanoNat.Nat.lt_succ_diag_r n).
-
-Definition struct_get_names
-  (ty : Kind -> Type)
-  (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
-  (_ : ConstT (Struct get_kind get_name))
-  :  list string
-  := struct_foldr ty get_kind get_name (fun _ name _ acc => name :: acc) nil.
-
-Definition struct_get_field_index
-  (ty: Kind -> Type)
-  (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
-  (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
-  (name : string)
-  :  option (Fin.t (S n))
-  := struct_foldr ty get_kind get_name
-       (fun index field_name _ acc
-         => if string_dec name field_name
-              then Some index
-              else acc)
-       None.
-
-Ltac struct_get_field_ltac packet name :=
-  let val := eval cbv in (struct_get_field_index packet name) in
-      match val with
-      | Some ?x => exact (ReadStruct packet x)
-      | None =>
-        let newstr := constr:(("get field not found in struct" ++ name)%string) in
-        fail 0 newstr
-      | _ =>
-        let newstr := constr:(("major error - struct_get_field_index not reducing " ++ name)%string) in
-        fail 0 newstr
-      end.
-
-Ltac struct_set_field_ltac packet name newval :=
-  let val := eval cbv in (struct_get_field_index packet name) in
-      match val with
-      | Some ?x => exact (UpdateStruct packet x newval)
-      | None =>
-        let newstr := constr:(("set field not found in struct " ++ name)%string) in
-        fail 0 newstr
-      | _ =>
-        let newstr := constr:(("major error - struct_set_field_index not reducing " ++ name)%string) in
-        fail 0 newstr
-      end.
+Definition separateModHidesNoInline (m : Mod) :=
+  let '(hides, (rfs, mods)) := separateMod m in
+  (hides, (rfs, getFlat (mergeSeparatedBaseMod mods))).
 
 
-Local Ltac constructor_simpl :=
-  econstructor; eauto; simpl; unfold not; intros.
-
-Ltac destruct_string_dec :=
-  repeat match goal with
-         | H: context[string_dec ?P%string ?Q%string] |- _ =>
-           destruct (string_dec P Q)
-         | |- context[string_dec ?P%string ?Q%string] =>
-           destruct (string_dec P Q)
-         end.
-
-Local Ltac process_append :=
-  repeat match goal with
-         | H: (?a ++ ?b)%string = (?a ++ ?c)%string |- _ =>
-           apply append_remove_prefix in H; subst
-         | H: (?a ++ ?b)%string = (?c ++ ?b)%string |- _ =>
-           apply append_remove_suffix in H; subst
-         | |- (?a ++ ?b)%string = (?a ++ ?c)%string =>
-           apply append_remove_prefix
-         | |- (?a ++ ?b)%string = (?c ++ ?b)%string =>
-           apply append_remove_suffix
-         end.
-
-Local Ltac finish_append :=
-  auto; try (apply InSingleton || discriminate || tauto || congruence).
-
-Ltac discharge_append :=
-  simpl; unfold getBool in *; process_append; finish_append.
-
-Ltac discharge_DisjKey :=
-  repeat match goal with
-         | |- DisjKey _ _ =>
-           rewrite (DisjKeyWeak_same string_dec); unfold DisjKeyWeak; simpl; intros
-         | H: _ \/ _ |- _ => destruct H; subst
-         end; discharge_append.
-
-Ltac discharge_wf :=
-  repeat match goal with
-         | |- @WfMod _ => constructor_simpl
-         | |- @WfConcat _ _ => constructor_simpl
-         | |- _ /\ _ => constructor_simpl
-         | |- @WfConcatActionT _ _ _ => constructor_simpl
-         | |- @WfBaseModule _ => constructor_simpl
-         | |- @WfActionT _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
-         | |- @WfActionT _ _ _ => constructor_simpl
-         | |- NoDup _ => constructor_simpl
-         | H: _ \/ _ |- _ => destruct H; subst; simpl
-         end;
-  discharge_DisjKey.
 
 
-(* NOTATIONS WERE HERE *)
+
+
+
 
 Section Positive.
   Local Open Scope positive_scope.
@@ -1967,11 +1856,30 @@ Local Definition option_bind
 
 Local Notation "X >>- F" := (option_bind X F) (at level 85, only parsing).
 
+Fixpoint struct_get_field_index'
+         (name: string) n
+  := match n return
+         forall (get_name : Fin.t n -> string),
+                option (Fin.t n)
+     with
+     | 0 => fun _ => None
+     | S m => fun get_name =>
+       if String.eqb (get_name Fin.F1) name
+       then Some Fin.F1
+       else match struct_get_field_index' name _ (fun i => get_name (Fin.FS i)) with
+            | Some i => Some (Fin.FS i)
+            | None => None
+            end
+     end.
+
+Definition struct_get_field_index n (kinds: Fin.t n -> Kind) (names: Fin.t n -> string) ty (e: Expr ty (SyntaxKind (Struct kinds names))) name
+  := struct_get_field_index' name names.
+
 Local Definition struct_get_field_aux
   (ty: Kind -> Type)
   (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
+  (get_kind : Fin.t n -> Kind)
+  (get_name : Fin.t n -> string)
   (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
   (name : string)
   :  option ({kind : Kind & Expr ty (SyntaxKind kind)})
@@ -1986,69 +1894,122 @@ Local Definition struct_get_field_aux
 Definition struct_get_field
   (ty: Kind -> Type)
   (n : nat)
-  (get_value : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
+  (get_value : Fin.t n -> Kind)
+  (get_name : Fin.t n -> string)
   (packet : Expr ty (SyntaxKind (Struct get_value get_name)))
   (name : string)
-  (kind : Kind)
-  :  option (Expr ty (SyntaxKind kind))
-  := struct_get_field_aux packet name >>-
-       sigT_rect
-         (fun _ => option (Expr ty (SyntaxKind kind)))
-         (fun field_kind field_value
-           => sumbool_rect
-                (fun _ => option (Expr ty (SyntaxKind kind)))
-                (fun H : field_kind = kind
-                  => Some (
-                       eq_rect
-                         field_kind
-                         (fun k => Expr ty (SyntaxKind k))
-                         field_value
-                         kind
-                         H))
-                (fun _ : field_kind <> kind
-                  => None)
-                (Kind_dec field_kind kind)).
+  (k : Kind)
+  :  option (Expr ty (SyntaxKind k)).
+Proof.
+refine (let y := @struct_get_field_aux ty n get_value get_name packet name in
+        match y with
+        | None => None
+        | Some (existT x y) => _
+        end).
+destruct (Kind_decb x k) eqn:G.
+- apply Kind_decb_eq in G.
+  subst.
+  exact (Some y).
+- exact None.
+Defined.
 
 Definition struct_get_field_default
   (ty: Kind -> Type)
   (n : nat)
-  (get_value : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
+  (get_value : Fin.t n -> Kind)
+  (get_name : Fin.t n -> string)
   (packet : Expr ty (SyntaxKind (Struct get_value get_name)))
   (name : string)
   (kind : Kind)
   (default : Expr ty (SyntaxKind kind))
   :  Expr ty (SyntaxKind kind)
   := match struct_get_field packet name kind with
-       | Some field_value
-         => field_value
-       | None
-         => default
+       | Some field_value => field_value
+       | None => default
      end.
 
 Definition struct_set_field
   (ty: Kind -> Type)
   (n : nat)
-  (get_kind : Fin.t (S n) -> Kind)
-  (get_name : Fin.t (S n) -> string)
+  (get_kind : Fin.t n -> Kind)
+  (get_name : Fin.t n -> string)
   (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
   (name : string)
   (kind : Kind)
   (value : Expr ty (SyntaxKind kind))
-  :  option (Expr ty (SyntaxKind (Struct get_kind get_name)))
-  := struct_get_field_index packet name >>-
-       fun index
-         => sumbool_rect
-              (fun _ => option (Expr ty (SyntaxKind (Struct get_kind get_name))))
-              (fun H : get_kind index = kind
-                => Some
-                     (UpdateStruct packet index
-                       (eq_rect_r (fun k => Expr ty (SyntaxKind k)) value H)))
-             (fun _ => None)
-             (Kind_dec (get_kind index) kind).
+  :  option (Expr ty (SyntaxKind (Struct get_kind get_name))).
+Proof.
+  refine (let y := struct_get_field_index packet name in
+          match y with
+          | None => None
+          | Some i => _
+          end).
+  destruct (Kind_dec (get_kind i) kind).
+  - subst.
+    exact (Some (UpdateStruct packet i value)).
+  - exact None.
+Defined.
+
+Definition struct_set_field_default
+           (ty: Kind -> Type)
+           (n : nat)
+           (get_kind : Fin.t n -> Kind)
+           (get_name : Fin.t n -> string)
+           (packet : Expr ty (SyntaxKind (Struct get_kind get_name)))
+           (name : string)
+           (kind : Kind)
+           (value : Expr ty (SyntaxKind kind))
+  : Expr ty (SyntaxKind (Struct get_kind get_name)).
+Proof.
+  refine (let y := struct_get_field_index packet name in
+          match y with
+          | None => packet
+          | Some i => _
+          end).
+  destruct (Kind_dec (get_kind i) kind).
+  - subst.
+    exact (UpdateStruct packet i value).
+  - exact packet.
+Defined.
+
+Create HintDb KamiDb.
+Hint Unfold 
+     inlineSingle_Meths_pos
+     flatten_inline_remove 
+     getHidden
+     getAllRegisters
+     getAllMethods
+     getAllRules
+     inlineAll_All_mod
+     inlineAll_All
+     writeRegFileFn
+     readRegFile
+     createHideMod
+     List.find
+     List.fold_right
+     List.fold_left
+     List.filter
+     List.length
+     List.app
+     List.seq
+     List.nth_error
+     List.map
+     List.concat
+     List.existsb
+     List.nth
+     Datatypes.length
+     Ascii.eqb
+     String.eqb
+     Bool.eqb
+     Datatypes.negb
+     Datatypes.andb
+     Datatypes.orb
+     Datatypes.fst
+     Datatypes.snd
+     String.append
+     EclecticLib.nth_Fin
+  : KamiDb.
 (* TODO
-   + Compiler verification (difficult)
    + PUAR: Linux/Certikos
  *)
 

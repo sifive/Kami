@@ -11,7 +11,8 @@ Target.hs
 ../Target.hs
 *.hi
 *.o
-PrettyPrintVerilog
+Compiler/PrettyPrintVerilog
+Compiler/CompAction
 obj_dir
 top.sv
 *.vcd

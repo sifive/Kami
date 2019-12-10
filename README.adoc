@@ -9,7 +9,7 @@ Kami is an umbrella term used to denote the following:
 . A simulator for said hardware designs, by generating an executable
 in Haskell, using user-defined functions to drive inputs and examine
 outputs for the hardware design
-. A formal definition of the smeantics of the DSL in Coq, including a
+. A formal definition of the semantics of the DSL in Coq, including a
 definition of whether one design _implements_ another simpler design,
 i.e. whether an _implementation adheres to its specification_
 . A set of theorems or properties about said semantics, formally
@@ -18,7 +18,7 @@ proven in Coq
 to its specification
 
 In Kami, one can write generators, i.e. functions that
-generatehardware when its parameters are specified, and can prove that
+generate hardware when its parameters are specified, and can prove that
 the generators are correct with respect to their specification. Unlike
 traditional model-checking based approaches, the ability to prove
 theorems involving higher-order logic in Coq enables one to easily

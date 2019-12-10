@@ -1,26 +1,21 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-mkdir -p Haskell
+mkdir -p $1
 
-includes=""
-
-[[ -z $1 ]] || includes="-i$1"
-
-cmd="ghc -j -O1 --make $includes $1/FixLits.hs"
+cmd="ghc $GHCFLAGS -j -O1 --make ./FixLits.hs"
 
 echo $cmd
 
 $cmd
 
 echo "Fixing Literals"
-for file in $(find . -maxdepth 1 -name "*.hs")
+for file in $(find $2 -maxdepth 1 -name "*.hs")
 do
+  baseval=`basename $file`
   ./FixLits $file
-  mv $file Haskell
+  mv $file $1
   echo "$file fixed."
 done
-
-
 
 echo "Adding missing imports"
 
@@ -30,7 +25,7 @@ case "${unameOut}" in
   *)       SED=sed
 esac
 
-for file in $(grep -l "CustomExtract" Haskell/*.hs)
+for file in $(grep -l "CustomExtract" $1/*.hs)
 do
   grep -q "import qualified CustomExtract" $file
   if [ $? -ne 0 ]
@@ -39,7 +34,7 @@ do
   fi
 done
 
-for file in $(grep -l "Data\.Char" Haskell/*.hs)
+for file in $(grep -l "Data\.Char" $1/*.hs)
 do
   grep -q "import qualified Data\.Char" $file
   if [ $? -ne 0 ]
@@ -48,7 +43,7 @@ do
   fi
 done
 
-for file in $(grep -l "Data\.Bits" Haskell/*.hs)
+for file in $(grep -l "Data\.Bits" $1/*.hs)
 do
   grep -q "import qualified Data\.Bits" $file
   if [ $? -ne 0 ]
@@ -57,7 +52,7 @@ do
   fi
 done
 
-for file in $(grep -l "Data\.List" Haskell/*.hs)
+for file in $(grep -l "Data\.List" $1/*.hs)
 do
   grep -q "import qualified Data\.List" $file
   if [ $? -ne 0 ]

@@ -1,8 +1,4 @@
-Require Import Kami.All.
-Import Word.Notations.
-Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt.
-
-Open Scope word_scope.
+Require Import Kami.AllNotations.
 
 Section Named.
   Variable sz: nat.

@@ -1,4 +1,3 @@
-Require Export AllNoNotations.
+Require Export Kami.AllNotations.
 (* N.b.: this module exports notations or things dependent on them *)
-Require Export KamiNotations LibStruct.
-Export ListNotations.
+Require Export Kami.Extraction.

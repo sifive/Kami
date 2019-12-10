@@ -1,5 +1,5 @@
 Require Export Bool Ascii String List FunctionalExtensionality Psatz PeanoNat.
-Require Export Lib.Word Lib.VectorFacts Lib.EclecticLib All.
+Require Export Lib.Word Kami.Lib.VectorFacts Kami.Lib.EclecticLib Kami.AllNotations.
 
 Export Word.Notations.
 

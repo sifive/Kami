@@ -1,4 +1,5 @@
-Require Import Kami.Syntax KamiNotations Lib.Fold.
+Require Import Kami.Syntax Kami.Lib.Fold.
+Import Word.Notations.
 Import ListNotations.
 Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
@@ -211,7 +212,7 @@ Inductive PStep: Mod -> RegsT -> list FullLabel -> Prop :=
 | PBaseStep m o l (HPSubsteps: PSubsteps m o l) (HMatching: MatchingExecCalls_Base l m):
     PStep (Base m) o l
 | PHideMethStep m s o l (HPStep: PStep m o l)
-               (HHidden : In s (map fst (getAllMethods m)) -> (forall v, (getListFullLabel_diff (s, v) l = 0%Z))):
+               (HHidden : forall v, In (s, projT1 v) (getKindAttr (getAllMethods m)) -> getListFullLabel_diff (s, v) l = 0%Z):
     PStep (HideMeth m s) o l
 | PConcatModStep m1 m2 o1 o2 l1 l2
                  (HPStep1: PStep m1 o1 l1)
@@ -233,7 +234,7 @@ Section PPlusStep.
   
   Definition MatchingExecCalls_flat (calls : MethsT) (execs : list RuleOrMeth) (m : BaseModule) :=
     forall (f : MethT),
-      In (fst f) (map fst (getMethods m)) ->
+      In (fst f, projT1 (snd f)) (getKindAttr (getMethods m)) ->
       (getNumFromCalls f calls <= getNumFromExecs f execs)%Z.
   
   Inductive PPlusStep :  RegsT -> list RuleOrMeth -> MethsT -> Prop :=
@@ -300,14 +301,14 @@ Definition PTraceInclusion (m m' : Mod) :=
 Definition PStepSubstitute m o l :=
   PSubsteps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
   MatchingExecCalls_Base l (getFlat m) /\
-  (forall s v, In s (map fst (getAllMethods m)) ->
+  (forall s v, In (s, projT1 v) (getKindAttr (getAllMethods m)) ->
                In s (getHidden m) ->
                (getListFullLabel_diff (s, v) l = 0%Z)).
 
 Definition StepSubstitute m o l :=
   Substeps (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) o l /\
   MatchingExecCalls_Base l (getFlat m) /\
-  (forall s v, In s (map fst (getAllMethods m)) ->
+  (forall s v, In (s, projT1 v) (getKindAttr (getAllMethods m)) ->
                In s (getHidden m) ->
                (getListFullLabel_diff (s, v) l = 0%Z)).
 
@@ -326,6 +327,7 @@ Proof.
   - apply (match n eq_refl with end).
 Qed.
 
+(*
 Lemma Signature_eq: forall sig, Signature_dec sig sig = left eq_refl.
 Proof.
   intros; destruct (Signature_dec sig sig).
@@ -334,6 +336,7 @@ Proof.
     apply Signature_dec.
   - apply (match n eq_refl with end).
 Qed.
+*)
 
 Section InverseSemAction.
   Variable o: RegsT.
@@ -429,8 +432,8 @@ Section evalExpr.
     auto.
   Qed.
 
-  Lemma evalExpr_castBits: forall ni no (pf: ni = no) (e: Bit ni @# type), evalExpr (castBits pf e) =
-                                                                           nat_cast (fun n => word n) pf (evalExpr e).
+  Lemma evalExpr_castBits: forall ni no (pf: ni = no) (e: Expr type (SyntaxKind (Bit ni))), evalExpr (castBits pf e) =
+                                                                                            nat_cast (fun n => word n) pf (evalExpr e).
   Proof.
     intros.
     unfold castBits.
@@ -440,8 +443,8 @@ Section evalExpr.
   Qed.
 
   Lemma evalExpr_BinBit: forall kl kr k (op: BinBitOp kl kr k)
-                                (l1 l2: Bit kl @# type)
-                                (r1 r2: Bit kr @# type),
+                                (l1 l2: Expr type (SyntaxKind (Bit kl)))
+                                (r1 r2: Expr type (SyntaxKind (Bit kr))),
     evalExpr l1 = evalExpr l2 ->
     evalExpr r1 = evalExpr r2 ->
     evalExpr (BinBit op l1 r1) = evalExpr (BinBit op l2 r2).
@@ -450,15 +453,15 @@ Section evalExpr.
     induction op; simpl; try congruence.
   Qed.
 
-  Lemma evalExpr_ZeroExtend: forall lsb msb (e1 e2: Bit lsb @# type), evalExpr e1 = evalExpr e2 ->
-                                                                      evalExpr (ZeroExtend msb e1) = evalExpr (ZeroExtend msb e2).
+  Lemma evalExpr_ZeroExtend: forall lsb msb (e1 e2: Expr type (SyntaxKind (Bit lsb))), evalExpr e1 = evalExpr e2 ->
+                                                                                       evalExpr (ZeroExtend msb e1) = evalExpr (ZeroExtend msb e2).
   Proof.
     intros.
     unfold ZeroExtend.
     erewrite evalExpr_BinBit; eauto.
   Qed.
 
-  Lemma evalExpr_pack_Bool: forall (e1 e2: Bool @# type),
+  Lemma evalExpr_pack_Bool: forall (e1 e2: Expr type (SyntaxKind Bool)),
       evalExpr e1 = evalExpr e2 ->
       evalExpr (pack e1) = evalExpr (pack e2).
   Proof.
@@ -504,53 +507,282 @@ Qed.
     destruct (Fin.to_nat x); cbn in *; lia.
   Qed.
 
-  Lemma fin_to_word_id : forall n (i : Fin.t n),
-    wordVal _ (zToWord (Nat.log2_up n) (Z.of_nat (proj1_sig (Fin.to_nat i)))) = (Z.of_nat (proj1_sig (Fin.to_nat i))).
+  Lemma fin_to_nat_bound : forall n (x: Fin.t n), proj1_sig (Fin.to_nat x) < n.
   Proof.
-    intros.
-    rewrite wordToZ_zToWord. reflexivity.
-    pose proof (log2_up_pow2 n); pose proof (fin_to_nat_bound i).
-    split.
-    lia.
-    rewrite <- Zpow_of_nat.
-    rewrite <- Nat2Z.inj_lt; omega.
+    induction x; cbn; try lia.
+    destruct (Fin.to_nat x); cbn in *; lia.
   Qed.
 
-  
-  Lemma eval_ReadArray_in_bounds : forall A n (arr : Array n A @# type) i m,
-    n <= Nat.pow 2 m ->
+  Lemma fin_to_word_id : forall n (i : Fin.t n),
+    wordToNat (natToWord (Nat.log2_up n) (proj1_sig (Fin.to_nat i))) = proj1_sig (Fin.to_nat i).
+  Proof.
+    intros.
+    pose proof (log2_up_pow2 n); pose proof (fin_to_nat_bound i).
+    rewrite wordToNat_natToWord_2; lia.
+  Qed.
+
+  Lemma eval_ReadArray_in_bounds : forall A n (arr : Expr type (SyntaxKind (Array n A))) i m,
+    n <= pow2 m ->
     evalExpr
       (ReadArray arr
         (Var type (SyntaxKind (Bit m))
-          (zToWord m (Z.of_nat (proj1_sig (Fin.to_nat i)))))) =
+          (natToWord m (proj1_sig (Fin.to_nat i))))) =
     evalExpr arr i.
   Proof.
     intros.
     pose proof (fin_to_nat_bound i).
-    simpl.
-    rewrite Z.mod_small; [| split; try lia; rewrite <- Zpow_of_nat, <- Nat2Z.inj_lt; lia].
-    rewrite Nat2Z.id.
-    destruct lt_dec;[|exfalso; lia].
-    erewrite Fin.of_nat_ext, Fin.of_nat_to_nat_inv; auto.
-  Qed.       
+    unfold evalExpr at 1.
+    rewrite wordToNat_natToWord_2 by lia.
+    destruct (Compare_dec.lt_dec _ _) as [? | ?]; [| exfalso; auto].
+    erewrite Fin.of_nat_ext, Fin.of_nat_to_nat_inv; eauto.
+  Qed.
 
-  Corollary eval_ReadArray_in_bounds_log : forall A n (arr : Array n A @# type) i,
+  Corollary eval_ReadArray_in_bounds_log : forall A n (arr : Expr type (SyntaxKind (Array n A))) i,
     evalExpr
       (ReadArray arr
         (Var type (SyntaxKind (Bit (Nat.log2_up n)))
-          (zToWord (Nat.log2_up n) (Z.of_nat (proj1_sig (Fin.to_nat i)))))) =
+          (natToWord (Nat.log2_up n) (proj1_sig (Fin.to_nat i))))) =
     evalExpr arr i.
   Proof. intros; apply eval_ReadArray_in_bounds, log2_up_pow2. Qed.
 
-  Corollary eval_ReadArray_in_bounds_pow : forall A n (arr : Array (Nat.pow 2 n) A @# type) i,
+  Corollary eval_ReadArray_in_bounds_pow : forall A n (arr : Expr type (SyntaxKind (Array (pow2 n) A))) i,
     evalExpr
       (ReadArray arr
         (Var type (SyntaxKind (Bit n))
-          (zToWord n (Z.of_nat (proj1_sig (Fin.to_nat i)))))) =
+          (natToWord n (proj1_sig (Fin.to_nat i))))) =
     evalExpr arr i.
   Proof. intros; apply eval_ReadArray_in_bounds; auto. Qed.
 End evalExpr.
 
+
+Lemma seq_nil n m :
+  seq n m = nil ->
+  m = 0.
+Proof.
+  induction m; auto; intro; exfalso.
+  rewrite seq_eq in H.
+  apply app_eq_nil in H; dest.
+  inv H0.
+Qed.
+
+Lemma Reduce_seq :
+  forall m n k,
+    k <= n ->
+    (map (fun x => x - k) (seq n m)) = (seq (n - k) m).
+Proof.
+  induction m; intros; simpl; auto.
+  apply f_equal2; auto.
+  rewrite IHm, Nat.sub_succ_l; auto.
+Qed.
+
+Lemma getKindAttr_fst {A B : Type} {P : B -> Type}  {Q : B -> Type} (l1 : list (A * {x : B & P x})):
+  forall  (l2 : list (A * {x : B & Q x})),
+    getKindAttr l1 = getKindAttr l2 ->
+    (map fst l1) = (map fst l2).
+Proof.
+  induction l1, l2; intros; auto; simpl in *; inv H.
+  erewrite IHl1; eauto.
+Qed.
+
+Lemma NoDup_app_split {A : Type} (l l' : list A) :
+  NoDup (l++l') ->
+  forall a,
+    In a l ->
+    ~ In a l'.
+Proof.
+  induction l'; repeat intro;[inv H1|].
+  specialize (NoDup_remove _ _ _ H) as P0; dest.
+  inv H1; apply H3; rewrite in_app_iff; auto.
+  exfalso; eapply IHl'; eauto.
+Qed.
+
+Lemma KeyMatch (l1 : RegsT) :
+  NoDup (map fst l1) ->
+  forall l2,
+    map fst l1 = map fst l2 ->
+    (forall s v, In (s, v) l1 -> In (s, v) l2) ->
+    l1 = l2.
+Proof.
+  induction l1; intros.
+  - destruct l2; inv H0; auto.
+  - destruct a; simpl in *.
+    destruct l2; inv H0.
+    destruct p; simpl in *.
+    inv H.
+    specialize (H1 _ _ (or_introl (eq_refl))) as TMP; destruct TMP.
+    + rewrite H in *.
+      assert (forall s v, In (s, v) l1 -> In (s, v) l2).
+      { intros.
+        destruct (H1 _ _ (or_intror H0)); auto.
+        exfalso.
+        inv H2.
+        apply H3.
+        rewrite in_map_iff.
+        exists (s2, v); auto.
+      }
+      rewrite (IHl1 H5 _ H4 H0).
+      reflexivity.
+    + exfalso.
+      apply H3.
+      rewrite H4, in_map_iff.
+      exists (s, s0); auto.
+Qed.
+
+Lemma seq_app' s e :
+  forall m (Hm_lte_e : m <= e),
+    seq s e = seq s m ++ seq (s + m) (e - m).
+Proof.
+  induction e; intros.
+  - rewrite Nat.le_0_r in *; subst; simpl; reflexivity.
+  - destruct (le_lt_or_eq _ _ Hm_lte_e).
+    + rewrite Nat.sub_succ_l; [|lia].
+      repeat rewrite seq_eq.
+      assert (s + m + (e - m) = s + e) as P0.
+      { lia. }
+      rewrite (IHe m), app_assoc, P0; auto.
+      lia.
+    + rewrite <- H.
+      rewrite Nat.sub_diag, app_nil_r; reflexivity.
+Qed.
+
+Lemma fst_getKindAttr {A B : Type} {P : B -> Type} (l : list (A * {x : B & P x})) :
+  map fst (getKindAttr l) = map fst l.
+Proof.
+  induction l; simpl; auto.
+  rewrite IHl; reflexivity.
+Qed.
+
+Lemma key_not_In_app {A B : Type} (key : A) (ls1 ls2 : list (A * B)):
+  key_not_In key (ls1 ++ ls2) ->
+  key_not_In key ls1 /\ key_not_In key ls2.
+Proof.
+  induction ls1; simpl; intros; split;
+    repeat intro; auto; eapply H; eauto; simpl; rewrite in_app_iff; eauto.
+  inv H0; eauto.
+Qed.
+
+Lemma key_not_In_app_iff {A B : Type} (key : A) (ls1 ls2 : list (A * B)):
+  key_not_In key (ls1 ++ ls2) <-> key_not_In key ls1 /\ key_not_In key ls2.
+Proof.
+  split; eauto using key_not_In_app.
+  repeat intro; dest.
+  rewrite in_app_iff in H0.
+  destruct H0.
+  - eapply H; eauto.
+  - eapply H1; eauto.
+Qed.
+
+Lemma existsb_nexists_str str l :
+  existsb (String.eqb str) l = false <->
+  ~ In str l.
+Proof.
+  split; repeat intro.
+  - assert (exists x, In x l /\ (String.eqb str) x = true) as P0.
+    { exists str; split; auto. apply String.eqb_refl. }
+    rewrite <- existsb_exists in P0; rewrite P0 in *; discriminate.
+  - remember (existsb _ _) as exb; symmetry in Heqexb; destruct exb; auto.
+    exfalso; rewrite existsb_exists in Heqexb; dest.
+    rewrite String.eqb_eq in *; subst; auto.
+Qed.
+
+Lemma nth_error_map_None_iff :
+  forall {A B : Type} (f : A -> B) (l : list A) (n : nat),
+    nth_error l n = None <-> nth_error (map f l) n = None.
+Proof.
+  intros; split; intros; rewrite nth_error_None, map_length in *; assumption.
+Qed.
+
+Lemma nth_error_map_Some1 :
+  forall {A B : Type} (f : A -> B) (l : list A) (b : B) (n : nat),
+    nth_error (map f l) n = Some b -> exists a, nth_error l n = Some a /\ (f a = b).
+Proof.
+  intros.
+  specialize (nth_error_map f (fun b => nth_error (map f l) n = Some b) n l) as P0.
+  rewrite H in P0.
+  remember (nth_error l _) as err0; symmetry in Heqerr0; destruct err0.
+  - exists a; split; auto.
+    destruct P0 as [P0 P1].
+    specialize (P0 eq_refl); inv P0; reflexivity.
+  - exfalso.
+    rewrite nth_error_None in Heqerr0.
+    enough (Some b <> None).
+    { eapply H0; rewrite <- H.
+      rewrite nth_error_None, map_length; assumption. }
+    intro; discriminate.
+Qed.
+
+Lemma nth_error_map_Some2 :
+  forall {A B : Type} (f : A -> B) (l : list A) (b : B) (n : nat),
+    (exists a, nth_error l n = Some a /\ (f a = b)) -> nth_error (map f l) n = Some b.
+Proof.
+  intros; dest.
+  rewrite <- H0; eapply map_nth_error; eauto.
+Qed.
+
+Lemma nth_error_map_iff :
+  forall {A B : Type} (f : A -> B) (l : list A) (b : B) (n : nat),
+    nth_error (map f l) n = Some b <-> (exists a, nth_error l n = Some a /\ (f a = b)).
+Proof.
+  repeat red; intros; dest; eauto using nth_error_map_Some1, nth_error_map_Some2.
+Qed.
+
+Lemma nth_error_nil_None :
+  forall {A : Type} (n : nat),
+    nth_error (nil : list A) n = None.
+Proof.
+  intros; rewrite nth_error_None; simpl; lia.
+Qed.
+
+Lemma SubList_map_iff  {A B : Type} (f : A -> B) (l' : list B) :
+  forall (l : list A),
+    SubList l' (map f l) <->
+    exists l'',
+      SubList l'' l /\
+      (map f l'' = l').
+Proof.
+  intros; split.
+  - induction l'; simpl; intros.
+    + exists nil; simpl; split; repeat intro; auto.
+      destruct l; auto.
+      exfalso; inv H0.
+    + unfold SubList in *; simpl in *.
+      specialize (IHl' (ltac : (eauto))); dest.
+      specialize (H _ (or_introl eq_refl)); rewrite in_map_iff in H; dest.
+      exists (x0 :: x); split; intros; [inv H3; auto|].
+      simpl; apply f_equal2; assumption.
+  - repeat intro; dest.
+    rewrite <- H1 in H0.
+    rewrite in_map_iff in *; dest.
+    specialize (H _ H2).
+    exists x1; split; assumption.
+Qed.
+
+Lemma KeyPair_Equiv {A B : Type} (l : list (A * B)) :
+  NoDup (map fst l) ->
+  forall l',
+    SubList l l' ->
+    map fst l = map fst l' ->
+    l = l'.
+Proof.
+  induction l; simpl; intros.
+  - rewrite (map_eq_nil _ _ (eq_sym H1)); reflexivity.
+  - destruct l'; [discriminate|].
+    apply f_equal2; simpl in *.
+    + assert (In a (p :: l')).
+      { apply H0; left; reflexivity. }
+      inv H2; eauto.
+      exfalso.
+      apply (in_map fst) in H3; rewrite H1 in H; inv H1.
+      rewrite <- H4 in H; inv H; contradiction.
+    + enough (SubList l l').
+      { inv H; inv H1; eapply IHl; eauto. }
+      repeat intro.
+      specialize (H0 _ (in_cons _ _ _ H2)).
+      inv H0; eauto.
+      exfalso.
+      apply (in_map fst) in H2.
+      inv H1; rewrite H3 in H; inv H; contradiction.
+Qed.
 
 Lemma getNumCalls_nil f :
   getNumCalls f nil = 0%Z.
@@ -1831,6 +2063,24 @@ Proof.
     Transparent getNumFromExecs.
 Qed.
 
+Lemma NotInDef_ZeroExecs_Substeps' m o ls f :
+  ~In (fst f, projT1 (snd f)) (getKindAttr (getMethods m)) ->
+  Substeps m o ls ->
+  (getNumExecs f ls = 0%Z).
+Proof.
+  induction 2.
+  - reflexivity.
+  - rewrite HLabel.
+    unfold getNumExecs in *; simpl; assumption.
+  - rewrite HLabel.
+    unfold getNumExecs.
+    Opaque getNumFromExecs.
+    simpl; destruct (MethT_dec f (fn, existT _ (projT1 fb) (argV, retV))); subst.
+    + apply (in_map (fun x => (fst x, projT1 (snd x)))) in HInMeths; contradiction.
+    + rewrite getNumFromExecs_neq_cons; auto.
+    Transparent getNumFromExecs.
+Qed.  
+
 Lemma NotInDef_ZeroExecs_Step m o ls f:
   ~In (fst f) (map fst (getAllMethods m)) ->
   Step m o ls ->
@@ -1842,6 +2092,19 @@ Proof.
     rewrite getNumExecs_app.
     rewrite map_app, in_app_iff in H.
     assert (~In (fst f) (map fst (getAllMethods m1)) /\ ~In (fst f) (map fst (getAllMethods m2)));[tauto|]; dest.
+    rewrite IHStep1, IHStep2; auto.
+Qed.  
+
+Lemma NotInDef_ZeroExecs_Step' m o ls f:
+  ~In (fst f, projT1 (snd f)) (getKindAttr (getAllMethods m)) ->
+  Step m o ls ->
+  (getNumExecs f ls = 0%Z).
+Proof.
+  induction 2; simpl in *; auto.
+  - apply (NotInDef_ZeroExecs_Substeps' _ H HSubsteps).
+  - rewrite HLabels.
+    rewrite getNumExecs_app.
+    rewrite map_app, in_app_iff in H.
     rewrite IHStep1, IHStep2; auto.
 Qed.
 
@@ -1862,13 +2125,10 @@ Qed.
 Lemma Step_meth_InCall_InDef_InExec m o ls:
   Step m o ls ->
   forall (f : MethT),
-    In (fst f) (map fst (getAllMethods m)) ->
+    In (fst f, projT1 (snd f)) (getKindAttr (getAllMethods m)) ->
     (getNumCalls f ls <= getNumExecs f ls)%Z.
 Proof.
-  induction 1.
-  - unfold MatchingExecCalls_Base in *.
-    auto.
-  - assumption.
+  induction 1; eauto.
   - subst.
     simpl.
     rewrite map_app.
@@ -1890,7 +2150,8 @@ Qed.
 Lemma Trace_meth_InCall_InDef_InExec m o ls:
   Trace m o ls ->
   forall (f : MethT) (i : nat) (l : list (RegsT * (RuleOrMeth * MethsT))),
-    nth_error ls i = Some l -> In (fst f) (map fst (getAllMethods m)) ->
+    nth_error ls i = Some l ->
+    In (fst f, projT1 (snd f)) (getKindAttr (getAllMethods m)) ->
     (getNumCalls f l <= getNumExecs f l)%Z.
 Proof.
   induction 1; subst; auto; simpl; intros.
@@ -1906,10 +2167,9 @@ Lemma Trace_meth_InCall_not_InExec_not_InDef m o ls:
   forall (f : MethT) (i : nat) (l : list (RegsT * (RuleOrMeth * MethsT))),
     nth_error ls i = Some l ->
     ~(getNumCalls f l <= getNumExecs f l)%Z ->
-    ~ In (fst f) (map fst (getAllMethods m)).
+    ~ In (fst f, projT1 (snd f)) (getKindAttr (getAllMethods m)).
 Proof.
-  intros.
-  intro.
+  repeat intro.
   eapply Trace_meth_InCall_InDef_InExec in H2; eauto.
 Qed.
 
@@ -2590,9 +2850,10 @@ Proof.
            specialize (getNumExecs_nonneg f l2); intros.
            Omega.omega.
         -- destruct  (HMatching2 f n H7).
-           assert (getNumExecs f l2 = 0%Z) as P1;
-             [destruct (HDisjMeths (fst f));[contradiction|];
-              eapply NotInDef_ZeroExecs_Substeps; eauto; simpl; assumption|].
+           assert (getNumExecs f l2 = 0%Z) as P1.
+           { destruct (HDisjMeths (fst f)).
+             - apply (in_map fst) in H7; simpl in *; rewrite fst_getKindAttr in H7; contradiction.
+             - eapply NotInDef_ZeroExecs_Substeps; eauto; simpl; assumption. }
            Omega.omega.
       * destruct (Z.eq_dec (getNumCalls f l1) 0%Z).
         -- rewrite e.
@@ -2600,25 +2861,26 @@ Proof.
            specialize (getNumExecs_nonneg f l1); intros.
            Omega.omega.
         -- destruct  (HMatching1 f n H7).
-           assert (getNumExecs f l1 = 0%Z) as P1;
-             [destruct (HDisjMeths (fst f));[|contradiction];
-              eapply NotInDef_ZeroExecs_Substeps; eauto; simpl; assumption|].
+           assert (getNumExecs f l1 = 0%Z) as P1.
+           { destruct (HDisjMeths (fst f)).
+             - eapply NotInDef_ZeroExecs_Substeps; eauto; simpl; assumption.
+             - apply (in_map fst) in H7; simpl in *; rewrite fst_getKindAttr in H7; contradiction. }
            Omega.omega.
     + intros s v.
       rewrite map_app;repeat rewrite in_app_iff.
       unfold getListFullLabel_diff in *.
       rewrite getNumExecs_app, getNumCalls_app.
       intros.
-      destruct H7, H8, (HDisjMeths s); try tauto.
-      * assert (getNumExecs (s, v) l2 = 0%Z) as P1;
-          [eapply NotInDef_ZeroExecs_Substeps; eauto; simpl; assumption|].
-        destruct (Z.eq_dec (getNumCalls (s, v) l2) 0%Z);
-          [specialize (H6 _ v H7 H8);Omega.omega|].
+      destruct H7, H8, (HDisjMeths s); try (apply (in_map fst) in H7; rewrite fst_getKindAttr in H7; contradiction).
+      * assert (getNumExecs (s, v) l2 = 0%Z) as P1.
+        { eapply NotInDef_ZeroExecs_Substeps; eauto; simpl; assumption. }
+        destruct (Z.eq_dec (getNumCalls (s, v) l2) 0%Z).
+        { specialize (H6 _ v H7 H8); Omega.omega. }
         destruct (HMatching2 _ n H7); contradiction.
       * pose proof (WfMod_Hidden HWf2 _ H8); contradiction.
       * pose proof (WfMod_Hidden HWf1 _ H8); contradiction.
-      * assert (getNumExecs (s, v) l1 = 0%Z) as P1;
-          [eapply NotInDef_ZeroExecs_Substeps; eauto; simpl; assumption|].
+      * assert (getNumExecs (s, v) l1 = 0%Z) as P1.
+        { eapply NotInDef_ZeroExecs_Substeps; eauto; simpl; assumption. }
         destruct (Z.eq_dec (getNumCalls (s, v) l1) 0%Z);
           [specialize (H3 _ v H7 H8);Omega.omega|].
         destruct (HMatching1 _ n H7); contradiction.
@@ -2638,21 +2900,15 @@ Proof.
       specialize (IHl0 HStep); dest.
       split; [auto| split; [auto| intros]].
       rewrite createHide_Meths in *; simpl in *.
-      destruct H3.
-      subst.
-      specialize (HHidden H2 v); auto.
-      clear - H1 H2 H3.
-      specialize (H1 s v H2 H3); auto.
+      destruct H3; [subst |clear - H1 H2 H3; firstorder fail].
+      eapply HHidden; eauto.
   - induction (getHidden m); simpl; auto; dest.
     + constructor; auto.
     + assert (sth: Step (createHide (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) l0) o l).
-      apply IHl0.
-      split; eauto. split; eauto.
-      intros. apply H1. auto.
-      assert (sth2: forall v, In a (map fst (getAllMethods m)) -> (getListFullLabel_diff (a, v) l = 0%Z)).
-      intros. apply H1; auto.
-      simpl. left. reflexivity.
-      simpl. right; auto.
+      { eapply IHl0; repeat split; auto.
+        intros; apply H1; auto; right; assumption. }
+      assert (sth2: forall v, In (a, projT1 v) (getKindAttr (getAllMethods m)) -> (getListFullLabel_diff (a, v) l = 0%Z)).
+      { intros; apply H1; auto; left; reflexivity. }
       constructor; auto.
       rewrite createHide_Meths; auto.
       intros. apply H1.
@@ -2921,8 +3177,8 @@ Proof.
   unfold ModuleFilterLabels.
   specialize (filter_reduces_calls f (BaseModuleFilter m1) l) as P1.
   fold ((ModuleFilterLabels m1) l).
-  rewrite <-InExec_ModuleFilterLabels; auto.
-  eauto using Z.le_trans.
+  rewrite <-InExec_ModuleFilterLabels; eauto using Z.le_trans.
+  apply (in_map fst) in HDef; rewrite fst_getKindAttr in HDef; assumption.
 Qed.
 
 Lemma MatchingExecCalls_Split2 (l : list FullLabel) (m1 m2 : BaseModule) :
@@ -2936,8 +3192,8 @@ Proof.
   unfold ModuleFilterLabels.
   specialize (filter_reduces_calls f (BaseModuleFilter m2) l) as P1.
   fold ((ModuleFilterLabels m2) l).
-  rewrite <-InExec_ModuleFilterLabels; auto.
-  eauto using Z.le_trans.
+  rewrite <-InExec_ModuleFilterLabels; eauto using Z.le_trans.
+  apply (in_map fst) in HDef; rewrite fst_getKindAttr in HDef; assumption.
 Qed.
 
 Lemma MatchingExecCalls_Concat_comm : forall (l l' : list FullLabel) (m1 m2 : BaseModule),
@@ -2960,12 +3216,6 @@ Proof.
   rewrite map_app, in_app_iff in *.
   destruct H0. right; auto.
   left; auto.
-Qed.
-
-Lemma Kind_Kind_dec: forall k1 k2: Kind * Kind, {k1 = k2} + {k1 <> k2}.
-Proof.
-  decide equality; subst;
-    apply Kind_dec.
 Qed.
 
 Lemma WfActionT_ReadsWellDefined : forall (k : Kind)(a : ActionT type k)(retl : type k)
@@ -3172,6 +3422,7 @@ Section SplitSubsteps.
     specialize (H0 f); simpl in *;rewrite map_app, in_app_iff in H0.
     specialize (H0 (or_intror _ H2)).
     rewrite <-InExec_ModuleFilterLabels; auto.
+    apply (in_map fst) in H2; rewrite fst_getKindAttr in H2; assumption.
   Qed.
 
 
@@ -3187,6 +3438,7 @@ Section SplitSubsteps.
     specialize (H0 f); simpl in *;rewrite map_app, in_app_iff in H0.
     specialize (H0 (or_introl _ H2)).
     rewrite <-InExec_ModuleFilterLabels; auto.
+    apply (in_map fst) in H2; rewrite fst_getKindAttr in H2; assumption.
   Qed.
   
   Lemma split_Substeps1 o l:
@@ -3314,18 +3566,12 @@ Definition PWeakInclusion (l1 l2 : list FullLabel) : Prop :=
 
 Lemma InExec_app_comm : forall l1 l2 e, InExec e (l1++l2) -> InExec e (l2++l1).
 Proof.
-  intros.
-  apply InExec_app_iff.
-  apply InExec_app_iff in H.
-  firstorder.
+  intros; rewrite InExec_app_iff in *; firstorder.
 Qed.
 
 Lemma InCall_app_comm : forall l1 l2 e, InCall e (l1++l2) -> InCall e (l2++l1).
 Proof.
-  intros.
-  apply InCall_app_iff.
-  apply InCall_app_iff in H.
-  firstorder.
+  intros; rewrite InCall_app_iff in *; firstorder.
 Qed.
 
 Lemma WeakInclusion_app_comm : forall l1 l2, WeakInclusion (l1++l2)(l2++l1).
@@ -3634,10 +3880,10 @@ Proof.
     pose proof (@split_Substeps1 (getFlat m1) (getFlat m2) HDisjRegs HDisjRules HDisjMeths WfBaseMod1 WfBaseMod2 _ _  ND_Regs1 ND_Regs2 H);dest.
     assert (Substeps (BaseMod (getAllRegisters m1) (getAllRules m1) (getAllMethods m1)) x (ModuleFilterLabels (getFlat m1) l) /\
             MatchingExecCalls_Base (ModuleFilterLabels (getFlat m1) l) (getFlat m1) /\
-            (forall (s : string) (v : {x : Kind * Kind & SignT x}), In s (map fst (getAllMethods m1)) ->
+            (forall (s : string) (v : {x : Kind * Kind & SignT x}), In (s, projT1 v) (getKindAttr (getAllMethods m1)) ->
                                                                     In s (getHidden m1) ->
                                                                     (getListFullLabel_diff (s, v) (ModuleFilterLabels (getFlat m1) l) = 0%Z))).
-    + split;unfold getFlat at 1 in H5. assumption.
+    + split; unfold getFlat at 1 in H5. assumption.
       split.
       * unfold getFlat in H0. simpl in H0.
         unfold getFlat; simpl.
@@ -3645,20 +3891,20 @@ Proof.
         apply (MatchingExecCalls_Split H7).
       * intros; specialize (WfConcats WfConcat2 H6 _ v H8) as P1.
         rewrite map_app in H1.
-        specialize (H1 s v (in_or_app _ _ s (or_introl H7)) (in_or_app _ _ s (or_introl H8))); unfold getListFullLabel_diff in *.
+        specialize (H1 s v (in_or_app _ _ _ (or_introl H7)) (in_or_app _ _ _ (or_introl H8))); unfold getListFullLabel_diff in *.
         assert (DisjKey (getRules (getFlat m1)) (getRules (getFlat m2))) as P2;[repeat intro; apply HDisjRules|].
         assert (DisjKey (getMethods (getFlat m1))(getMethods (getFlat m2))) as P3;[repeat intro;apply HDisjMeths|].
         specialize (filter_perm P2 P3 H) as P4.
         rewrite P4, getNumExecs_app, getNumCalls_app in H1.
         setoid_rewrite P1 in H1.
-        destruct (P3 s) as [P5|P5];[simpl in P5;contradiction|].
+        destruct (P3 s) as [P5|P5];[simpl in P5; apply (in_map fst) in H7; rewrite fst_getKindAttr in H7; contradiction|].
         assert (~In (fst (s,v)) (map fst (getMethods (getFlat m2)))) as P6;auto.
         setoid_rewrite (NotInDef_ZeroExecs_Substeps _ P6 H6) in H1; rewrite <-H1.
         repeat rewrite Z.add_0_r.
         reflexivity.
     + assert (Substeps (BaseMod (getAllRegisters m2) (getAllRules m2) (getAllMethods m2)) x0 (ModuleFilterLabels (getFlat m2) l) /\
               MatchingExecCalls_Base (ModuleFilterLabels (getFlat m2) l) (getFlat m2) /\
-              (forall (s : string) (v : {x : Kind * Kind & SignT x}), In s (map fst (getAllMethods m2)) ->
+              (forall (s : string) (v : {x : Kind * Kind & SignT x}), In (s, projT1 v) (getKindAttr (getAllMethods m2)) ->
                                                                       In s (getHidden m2) ->
                                                                       (getListFullLabel_diff (s, v) (ModuleFilterLabels (getFlat m2) l) = 0%Z))).
       * split;unfold getFlat at 1 in H6. assumption.
@@ -3670,19 +3916,19 @@ Proof.
            eapply (MatchingExecCalls_Split H8).
         -- intros; specialize (WfConcats WfConcat1 H5 _ v H9) as P1.
            rewrite map_app in H1.
-           specialize (H1 s v (in_or_app _ _ s (or_intror H8)) (in_or_app _ _ s (or_intror H9))); unfold getListFullLabel_diff in *.
+           specialize (H1 s v (in_or_app _ _ _ (or_intror H8)) (in_or_app _ _ _ (or_intror H9))); unfold getListFullLabel_diff in *.
            assert (DisjKey (getRules (getFlat m1)) (getRules (getFlat m2))) as P2;[repeat intro; apply HDisjRules|].
            assert (DisjKey (getMethods (getFlat m1))(getMethods (getFlat m2))) as P3;[repeat intro;apply HDisjMeths|].
            specialize (filter_perm P2 P3 H) as P4.
            rewrite P4, getNumExecs_app, getNumCalls_app in H1.
            setoid_rewrite P1 in H1.
-           destruct (P3 s) as [P5|P5];[|simpl in P5;contradiction].
+           destruct (P3 s) as [P5|P5];[|simpl in P5; apply (in_map fst) in H8; rewrite fst_getKindAttr in H8; contradiction].
            assert (~In (fst (s,v)) (map fst (getMethods (getFlat m1)))) as P6;auto.
            setoid_rewrite (NotInDef_ZeroExecs_Substeps _ P6 H5) in H1; rewrite <-H1.
            repeat rewrite Z.add_0_r.
            reflexivity.
       * specialize (IHm1 x (ModuleFilterLabels (getFlat m1) l) H7).
-        specialize (IHm2 x0 (ModuleFilterLabels (getFlat m2) l) H8). dest.
+        specialize (IHm2 x0 (ModuleFilterLabels (getFlat m2) l) H8); dest.
         exists (x2++x1).
         split.
         -- specialize (filter_perm (m1:=(getFlat m1)) (m2:=(getFlat m2)) HDisjRules HDisjMeths H).
@@ -4260,17 +4506,36 @@ Proof.
     + eauto.
 Qed.
 
+Lemma NotInDef_ZeroExecs_Trace' :
+  forall (m : Mod) (o : RegsT) lss (ls : list FullLabel) (f : string * {x : Kind * Kind & SignT x}),
+    Trace m o lss ->
+    ~ In (fst f, projT1 (snd f)) (getKindAttr (getAllMethods m)) ->
+    forall i,
+      nth_error lss i = Some ls ->
+      getNumExecs f ls = 0%Z.
+Proof.
+  induction 1; subst; simpl; auto; intros; simpl in *.
+  - destruct i; simpl in *; discriminate.
+  - specialize (IHTrace H0).
+    destruct i; simpl in *.
+    + inv H1.
+      eapply NotInDef_ZeroExecs_Step'; eauto.
+    + eauto.
+Qed.
+
 
 Section ModularSubstitution.
   Variable a b a' b': Mod.
-  Variable SameList_a: forall x, (In x (map fst (getAllMethods a)) /\
-                                  ~ In x (getHidden a)) <->
-                                 (In x (map fst (getAllMethods a')) /\
-                                  ~ In x (getHidden a')).
-  Variable SameList_b: forall x, (In x (map fst (getAllMethods b)) /\
-                                  ~ In x (getHidden b)) <->
-                                 (In x (map fst (getAllMethods b')) /\
-                                  ~ In x (getHidden b')).
+  Variable SameList_a: forall (x : MethT),
+      (In (fst x, projT1 (snd x)) (getKindAttr (getAllMethods a)) /\
+       ~ In (fst x) (getHidden a)) <->
+      (In (fst x, projT1 (snd x)) (getKindAttr (getAllMethods a')) /\
+       ~ In (fst x) (getHidden a')).
+  Variable SameList_b: forall (x : MethT),
+      (In (fst x, projT1 (snd x)) (getKindAttr (getAllMethods b)) /\
+       ~ In (fst x) (getHidden b)) <->
+      (In (fst x, projT1 (snd x)) (getKindAttr (getAllMethods b')) /\
+       ~ In (fst x) (getHidden b')).
 
   Variable wfAConcatB: WfMod (ConcatMod a b).
   Variable wfA'ConcatB': WfMod (ConcatMod a' b').
@@ -4324,7 +4589,7 @@ Section ModularSubstitution.
           try specialize (Subset_b (fst f)).
         specialize (getNumExecs_nonneg f l1) as P1;
           rewrite Z.lt_eq_cases in P1; destruct P1;
-            [specialize (Trace_meth_InExec' H _ _ H13 H21) as P2; clear - HDisjMeths0 P2 H20; tauto|].
+            [specialize (Trace_meth_InExec' H _ _ H13 H21) as P2; clear - HDisjMeths0 P2 H20; apply (in_map fst) in H20; rewrite fst_getKindAttr in H20; tauto|].
         specialize (getNumCalls_nonneg f l1) as P1; rewrite Z.lt_eq_cases in P1; destruct P1;[|symmetry in H22; contradiction].
         rewrite <- H21 in H10; simpl in H10.
         specialize (getNumExecs_nonneg f (filterExecs id a l)) as P1.
@@ -4335,20 +4600,21 @@ Section ModularSubstitution.
         pose proof (Trace_meth_InCall_InDef_InExec H2 f i) as sth10.
         pose proof (map_nth_error (filterExecs id a) _ _ H11) as sth11.
         specialize (sth10 _ sth11).
-        pose proof (in_dec string_dec (fst f) (map fst (getAllMethods a))) as [th1 | th2].
+        pose proof (in_dec (prod_dec string_dec Signature_dec) (fst f, projT1 (snd f)) (getKindAttr (getAllMethods a))) as [th1 | th2].
         * clear - H11 H2 helper th1 sth10 sth11.
           specialize (sth10 th1).
           pose proof (Trace_meth_InCall_InDef_InExec H2 f i) as sth0.
           Omega.omega.
-        * pose proof (NotInDef_ZeroExecs_Trace f H2 th2 _ sth11) as sth12.
+        * pose proof (NotInDef_ZeroExecs_Trace' f H2 th2 _ sth11) as sth12.
           assert (sth13: (getNumCalls f (filterExecs id a l) > 0)%Z) by (Omega.omega).
           rewrite sth12 in *.
           assert (sth14: getNumCalls f (filterExecs id a l) = getNumCalls f l1) by Omega.omega.
-          destruct (in_dec string_dec (fst f) (map fst (getAllMethods b))) as [ez|hard].
+          destruct (in_dec (prod_dec string_dec Signature_dec) (fst f, projT1 (snd f)) (getKindAttr (getAllMethods b))) as [ez|hard].
           -- specialize (H5 ez); dest.
              rewrite sth14 in *.
-             split; [tauto|Omega.omega].
-          -- destruct (in_dec string_dec (fst f) (getHidden b')) as [lhs | rhs]; [ | tauto].
+             split; [tauto |Omega.omega].
+          -- destruct (in_dec string_dec (fst f) (getHidden b')) as [lhs | rhs]; [ |tauto ].
+             apply (in_map fst) in H20; rewrite fst_getKindAttr in H20.
              pose proof (WfConcats_Trace H WfConcat0 _ H13 f lhs).
              Omega.omega.
       + unfold MatchingExecCalls_Concat in *; intros.
@@ -4362,7 +4628,7 @@ Section ModularSubstitution.
           try specialize (Subset_b (fst f)).
         specialize (getNumExecs_nonneg f l0) as P1;
           rewrite Z.lt_eq_cases in P1; destruct P1;
-            [specialize (Trace_meth_InExec' H0 _ _ H12 H21) as P2; clear - HDisjMeths0 P2 H20; tauto|].
+            [specialize (Trace_meth_InExec' H0 _ _ H12 H21) as P2; clear - HDisjMeths0 P2 H20; apply (in_map fst) in H20; rewrite fst_getKindAttr in H20; tauto|].
         specialize (getNumCalls_nonneg f l0) as P1; rewrite Z.lt_eq_cases in P1; destruct P1;[|symmetry in H22; contradiction].
         rewrite <- H21 in H8; simpl in H8.
         specialize (getNumExecs_nonneg f (filterExecs id b l)) as P1.
@@ -4373,16 +4639,16 @@ Section ModularSubstitution.
         pose proof (Trace_meth_InCall_InDef_InExec H3 f i) as sth10.
         pose proof (map_nth_error (filterExecs id b) _ _ H11) as sth11.
         specialize (sth10 _ sth11).
-        pose proof (in_dec string_dec (fst f) (map fst (getAllMethods b))) as [th1 | th2].
+        pose proof (in_dec (prod_dec string_dec Signature_dec) (fst f, projT1 (snd f)) (getKindAttr (getAllMethods b))) as [th1 | th2].
         * clear - H11 H3 helper th1 sth10 sth11.
           specialize (sth10 th1).
           pose proof (Trace_meth_InCall_InDef_InExec H3 f i) as sth0.
           Omega.omega.
-        * pose proof (NotInDef_ZeroExecs_Trace f H3 th2 _ sth11) as sth12.
+        * pose proof (NotInDef_ZeroExecs_Trace' f H3 th2 _ sth11) as sth12.
           assert (sth13: (getNumCalls f (filterExecs id b l) > 0)%Z) by (Omega.omega).
           rewrite sth12 in *.
           assert (sth14: getNumCalls f (filterExecs id b l) = getNumCalls f l0) by Omega.omega.
-          destruct (in_dec string_dec (fst f) (map fst (getAllMethods a))) as [ez|hard].
+          destruct (in_dec (prod_dec string_dec Signature_dec) (fst f, projT1 (snd f)) (getKindAttr (getAllMethods a))) as [ez|hard].
           -- specialize (H14 ez); dest.
              rewrite sth14 in *.
              split; [tauto|Omega.omega].
@@ -4435,6 +4701,7 @@ Section ModularSubstitution.
         exists x3; auto.
         exists x. right; auto.
   Qed.
+  
 End ModularSubstitution.
 
 Section Fold.
@@ -4596,6 +4863,7 @@ Section SimulationZeroAct.
         repeat econstructor; eauto.
       + split; assumption.
   Qed.
+
 End SimulationZeroAct.
 
 Section LemmaNoSelfCall.
@@ -4604,7 +4872,7 @@ Section LemmaNoSelfCall.
     NoCallActionT ls a ->
     forall o reads u cs ret,
       SemAction o a reads u cs ret ->
-      forall f, In (fst f) ls ->
+      forall f, In (fst f, projT1 (snd f)) (getKindAttr ls) ->
                 getNumFromCalls f cs = 0%Z.
   Proof.
     intro.
@@ -4656,13 +4924,13 @@ Section LemmaNoSelfCall.
     In r (getRules m) ->
     forall o reads u cs ret,
       SemAction o (snd r type) reads u cs ret ->
-      forall f, In (fst f) (map fst (getMethods m)) ->
+      forall f, In (fst f, projT1 (snd f)) (getKindAttr (getMethods m)) ->
                 getNumFromCalls  f cs = 0%Z.
   Proof.
     intros.
     destruct H.
     unfold NoSelfCallRulesBaseModule, NoSelfCallMethsBaseModule in *.
-    specialize (H _ H0); simpl in *.
+    specialize (H _ type H0); simpl in *.
     eapply NoSelfCallAction; eauto.
   Qed.
 
@@ -4671,15 +4939,16 @@ Section LemmaNoSelfCall.
     In f (getMethods m) ->
     forall o reads u cs arg ret,
       SemAction o (projT2 (snd f) type arg) reads u cs ret ->
-      forall g, In (fst g) (map fst (getMethods m)) ->
+      forall g, In (fst g, projT1 (snd g)) (getKindAttr (getMethods m)) ->
                 getNumFromCalls  g cs = 0%Z.
   Proof.
     intros.
     destruct H.
     unfold NoSelfCallRulesBaseModule, NoSelfCallMethsBaseModule in *.
-    specialize (H3 _ H0 arg); simpl in *.
+    specialize (H3 _ type H0 arg); simpl in *.
     eapply NoSelfCallAction; eauto.
   Qed.
+  
 End LemmaNoSelfCall.
 
 Section SimulationGen.
@@ -4784,7 +5053,7 @@ Section SimulationGen.
     (exists r a reads upds calls,
         l = (upds, (Rle r, calls)) :: nil /\
         In (r, a) (getRules imp) /\
-        SemAction o (a type) reads upds calls (zToWord 0 0)) \/
+        SemAction o (a type) reads upds calls WO) \/
     (exists f sign arg ret a reads upds calls,
         l = (upds, (Meth (f, existT SignT sign (arg, ret)), calls)) :: nil /\
         In (f, existT MethodT sign a) (getMethods imp) /\
@@ -4901,15 +5170,15 @@ Lemma findRegs_Some u:
 Proof.
   induction u; simpl; split; auto; intros; auto; try (tauto || discriminate).
   - destruct H0; subst; simpl.
-    + destruct (string_dec s s); simpl; tauto.
+    + rewrite String.eqb_refl; simpl; tauto.
     + destruct a; simpl in *.
       inv H.
       specialize (IHu H4).
-      destruct (string_dec s s0); subst; simpl; auto; subst.
+      destruct (String.eqb s s0) eqn:G; [rewrite String.eqb_eq in G|]; subst; simpl; auto; subst.
       * apply (in_map fst) in H0; simpl in *; tauto.
       * rewrite <- IHu; auto.
   - destruct a; simpl in *.
-    destruct (string_dec s s0); simpl in *.
+    destruct (String.eqb s s0) eqn:G; [rewrite String.eqb_eq in G|] ; simpl in *.
     inv H0; auto.
     inv H.
     specialize (IHu H4).
@@ -4932,13 +5201,14 @@ Proof.
   induction u; simpl; split; auto; destruct a; simpl; intros.
   - destruct (string_dec s s0); subst.
     + firstorder fail.
-    + rewrite <- IHu.
+    + rewrite <- String.eqb_neq in n; rewrite n.
+      rewrite <- IHu.
       firstorder fail.
-  - destruct (string_dec s s0); subst.
+  - destruct (String.eqb s s0) eqn:G; [rewrite String.eqb_eq in G|]; subst.
     + discriminate.
     + rewrite <- IHu in H.
       intro.
-      destruct H0; subst; firstorder fail.
+      rewrite String.eqb_neq in G; firstorder.
 Qed.
 
 Lemma NoDup_app A (l1: list (string * A)):
@@ -5030,7 +5300,20 @@ Proof.
       * right; auto.
 Qed.
 
-Lemma doUpdRegs_enuf o u (noDup: NoDup (map fst u)):
+Lemma findRegs_Some' u:
+  forall s v,
+    findReg s u = Some v ->
+    In (s, v) u.
+Proof.
+  induction u; simpl; auto; intros; auto; try (tauto || discriminate).
+  destruct (String.eqb s (fst a)) eqn:G; [rewrite String.eqb_eq in G|]; subst; simpl in *.
+  - inv H; auto.
+    destruct a; auto. 
+  - specialize (IHu _ _ H).
+    right; auto.
+Qed.
+                           
+Lemma doUpdRegs_enuf o u:
   getKindAttr o = getKindAttr (doUpdRegs u o) ->
   UpdRegs [u] o (doUpdRegs u o).
 Proof.
@@ -5048,7 +5331,7 @@ Proof.
       dest.
       destruct H.
       * case_eq (findReg (fst a) u); intros; rewrite H5 in *; simpl in *.
-        -- rewrite <- findRegs_Some in H5 by auto.
+        -- apply findRegs_Some' in H5.
            inv H; simpl in *.
            left; eexists; eauto.
         -- rewrite <- findRegs_None in H5 by auto; subst; simpl in *.
@@ -5095,19 +5378,6 @@ Proof.
       apply (in_map fst) in H; simpl in *; congruence.
 Qed.
 
-Lemma findRegs_Some' u:
-  forall s v,
-    findReg s u = Some v ->
-    In (s, v) u.
-Proof.
-  induction u; simpl; auto; intros; auto; try (tauto || discriminate).
-  destruct (string_dec s (fst a)); subst; simpl in *.
-  - inv H; auto.
-    destruct a; auto.
-  - specialize (IHu _ _ H).
-    right; auto.
-Qed.
-                           
 Lemma getKindAttr_findReg_Some u:
   forall o: RegsT,
     (forall s v, In (s, v) u -> In (s, projT1 v) (getKindAttr o)) ->
@@ -5173,11 +5443,34 @@ Proof.
       apply IHl; auto.
 Qed.
 
+Lemma NoDup_map_fst {A B} {ls: list (A * B)}:
+    NoDup (map fst ls) ->
+    forall {a b c},
+      In (a, b) ls ->
+      In (a, c) ls ->
+      b = c.
+Proof.
+  induction ls; simpl; auto; intros.
+  - tauto.
+  - inv H.
+    specialize (@IHls H5).
+    destruct H0, H1; subst; simpl in *.
+    + inv H0.
+      auto.
+    + rewrite in_map_iff in H4.
+      assert (sth: exists x, fst x = a0 /\ In x ls). {
+        exists (a0, c); split; auto. }
+      tauto.
+    + rewrite in_map_iff in H4.
+      assert (sth: exists x, fst x = a0 /\ In x ls). {
+        exists (a0, b); split; auto. }
+      tauto.
+    + eapply IHls; eauto.
+Qed.
 
 Lemma getKindAttr_doUpdRegs o:
   NoDup (map fst o) ->
   forall u,
-    NoDup (map fst u) ->
     (forall s v, In (s, v) u -> In (s, projT1 v) (getKindAttr o)) ->
     getKindAttr o = getKindAttr (doUpdRegs u o).
 Proof.
@@ -5185,25 +5478,73 @@ Proof.
   setoid_rewrite getKindAttr_doUpdRegs'.
   rewrite forall_map; intros.
   case_eq (findReg (fst x) u); intros; auto.
-  rewrite <- findRegs_Some in H3; auto.
-  specialize (H1 _ _ H3).
-  f_equal.
   destruct x; simpl in *.
-  apply (in_map (fun x => (fst x, projT1 (snd x)))) in H2; simpl in *.
-  assert (sth: map fst o = map fst (getKindAttr o)). {
-    rewrite map_map; simpl.
-    assert (sth2: fst = fun x : RegT => fst x) by (extensionality x; intros; auto).
-    rewrite sth2; auto.
+  f_equal.
+  destruct s1, s; simpl in *.
+  pose proof (findRegs_Some' _ _ H2) as sth.
+  specialize (H0 s0 (existT (fullType type) x0 f0) sth).
+  rewrite in_map_iff in H0; dest.
+  destruct x1; simpl in *.
+  inv H0.
+  pose proof (NoDup_map_fst H H3 H1).
+  subst.
+  auto.
+Qed.
+
+Lemma getKindAttr_doUpdRegs_app: forall regs upds1 upds2,
+      NoDup (map fst regs) ->
+      (forall (s : string) (v : {x : FullKind & fullType type x}), In (s, v) upds1 -> In (s, projT1 v) (getKindAttr regs)) ->
+      (forall (s : string) (v : {x : FullKind & fullType type x}), In (s, v) upds2 -> In (s, projT1 v) (getKindAttr regs)) ->
+      getKindAttr regs = getKindAttr (doUpdRegs (upds1 ++ upds2) regs).
+Proof.
+  induction upds1; intros; simpl.
+  { eapply getKindAttr_doUpdRegs; auto. }
+  {
+    rewrite getKindAttr_doUpdRegs'.
+    rewrite forall_map; intros.
+    case_eq (findReg (fst x) (a :: upds1 ++ upds2)); intros; auto.
+    epose proof (findRegs_Some' _ _ H3) as inSome.
+    clear H3.
+    destruct x; simpl in *.
+    f_equal.
+    destruct s1, s; simpl in *.
+    destruct inSome.
+    {
+      unshelve epose proof (H0 s0 (existT (fullType type) x0 f0) _) as H0; intuition auto.
+      rewrite in_map_iff in H0; dest.
+      destruct x1; simpl in *.
+      inv H0.
+      pose proof (NoDup_map_fst H H4 H2).
+      subst.
+      auto.
+    }
+    {
+      assert (okApp: forall (s : string) (v : {x : FullKind & fullType type x}), In (s, v) (upds1 ++ upds2) -> In (s, projT1 v) (getKindAttr regs)).
+      intros.
+      edestruct (in_app_or _ _ _ H4).
+      {
+        eapply H0.
+        auto.
+      }
+      {
+        eapply H1.
+        auto.
+      }
+      specialize (okApp s0 (existT (fullType type) x0 f0) H3).
+      rewrite in_map_iff in okApp; dest.
+      simpl in H4.
+      inv H4.
+      destruct x1.
+      epose proof (NoDup_map_fst H H5 H2).
+      subst.
+      auto.
+    }
   }
-  rewrite sth in H.
-  pose proof (@KeyMatching_gen _ _ (getKindAttr o) _ _ H H1 H2 eq_refl); simpl in *.
-  inv H4; congruence.
 Qed.
 
 Lemma doUpdRegs_UpdRegs' o:
   NoDup (map fst o) ->
   forall u,
-    NoDup (map fst u) ->
     (forall s v, In (s, v) u -> In (s, projT1 v) (getKindAttr o)) ->
     UpdRegs [u] o (doUpdRegs u o).
 Proof.
@@ -5215,15 +5556,14 @@ Qed.
 Lemma doUpdRegs_UpdRegs o:
   NoDup (map fst o) ->
   forall u,
-    NoDup (map fst u) ->
     SubList (getKindAttr u) (getKindAttr o) ->
     UpdRegs [u] o (doUpdRegs u o).
 Proof.
   intros.
   eapply doUpdRegs_enuf; eauto.
   eapply getKindAttr_doUpdRegs; eauto; intros.
-  apply (in_map (fun x => (fst x, projT1 (snd x)))) in H2; simpl in *.
-  eapply H1; eauto.
+  apply (in_map (fun x => (fst x, projT1 (snd x)))) in H1; simpl in *.
+  eapply H0; eauto.
 Qed.
 
 Section SimulationGeneralEx.
@@ -5510,7 +5850,7 @@ Section SimulationZeroAction.
   Qed.
 End SimulationZeroAction.
 
-Lemma SemAction_if k1 k (e: Bool @# type) (a1 a2: ActionT type k1) (a: type k1 -> ActionT type k) o reads u cs v:
+Lemma SemAction_if k1 k (e: Expr type (SyntaxKind Bool)) (a1 a2: ActionT type k1) (a: type k1 -> ActionT type k) o reads u cs v:
   (if evalExpr e
    then SemAction o (LetAction a1 a) reads u cs v
    else SemAction o (LetAction a2 a) reads u cs v) ->
@@ -5521,7 +5861,7 @@ Proof.
   - econstructor 8; eauto.
 Qed.
 
-Lemma SemAction_if_split k1 k (e: Bool @# type) (a1 a2: ActionT type k1) (a: type k1 -> ActionT type k) o reads1 reads2 u1 u2 cs1 cs2 v1 v2 reads u cs v:
+Lemma SemAction_if_split k1 k (e: Expr type (SyntaxKind Bool)) (a1 a2: ActionT type k1) (a: type k1 -> ActionT type k) o reads1 reads2 u1 u2 cs1 cs2 v1 v2 reads u cs v:
   (if evalExpr e
    then SemAction o (LetAction a1 a) reads1 u1 cs1 v1
    else SemAction o (LetAction a2 a) reads2 u2 cs2 v2) ->
