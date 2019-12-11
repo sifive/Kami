@@ -249,7 +249,7 @@ getRegFileNames (rf@(T.Build_RegFileBase isWrMask num name reads write idxNum da
                      (False, T.Array num dataType, readRs ++ "#_return")]) readLs) ++
   [(True, T.Bool, write ++ "#_enable"),
    (True, writeType, write ++ "#_argument")]
-  where writeType = if isWrMask then T.coq_WriteRqMask idxNum num dataType else T.coq_WriteRq idxNum (T.Array num dataType)
+  where writeType = if isWrMask then T.coq_WriteRqMask (log2_up idxNum) num dataType else T.coq_WriteRq (log2_up idxNum) (T.Array num dataType)
   
 
 ppRfInstance :: T.RegFileBase -> String
