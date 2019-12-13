@@ -143,6 +143,12 @@ Section Word.
 
   Definition wtail sz (w : word (S sz)) := @truncLsb sz _ w.
 
+  Definition wsplitl (sz1 sz2 : nat) (w : @word (sz1 + sz2)) : @word sz1 :=
+    zToWord _ (wordVal _ w / (Z.pow 2 (Z.of_nat sz2)))%Z.
+
+  Definition wsplitr (sz1 sz2 : nat) (w : @word (sz1 + sz2)) : @word sz2 :=
+    zToWord _ ((wordVal _ w) mod (Z.pow 2 (Z.of_nat sz2)))%Z.
+  
 End Word.
 
 Module Notations.

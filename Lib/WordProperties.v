@@ -6,7 +6,7 @@ Require Import Coq.Arith.Even.
 Require Import Coq.Arith.Div2.
 Require Import Coq.NArith.NArith.
 Require Import Arith_base.
-Require Import Coq.ZArith.Znat.
+Require Import Arith Coq.ZArith.Znat Psatz.
 
 Lemma eq_wordVal {sz} {x y : word sz} : wordVal _ x = wordVal _ y -> x = y.
 Proof.
@@ -1632,11 +1632,28 @@ Proof.
   f_equal.
   lia.
 Qed.
-
-
-
-
-
-
+  
+Lemma split_concat : forall sz1 sz2 (w : word (sz1 + sz2)),
+    wconcat (wsplitl sz1 sz2 w) (wsplitr sz1 sz2 w) = w.
+Proof.
+  intros.
+  unfold wconcat. unfold wsplitl. unfold wsplitr.
+  specialize Z_of_nat_pow_2_gt_0 with sz2 as Hp.
+  simpl.
+  arithmetizeWord.
+  rewrite Zmod_mod.
+  specialize Z.mod_small with (wordVal / 2 ^ Z.of_nat sz2)%Z (2 ^ Z.of_nat sz1)%Z as Hs.
+  rewrite Hs.
+  specialize Z_div_mod_eq with wordVal (2 ^ Z.of_nat sz2)%Z as Hmod.
+  rewrite Z.mul_comm in Hmod.
+  rewrite <- Hmod.
+  rewrite Z.mod_small; try lia.
+  auto.
+  split; try apply Z.div_pos; intuition.
+  apply Z.div_lt_upper_bound; intuition.
+  rewrite <- Z.pow_add_r; try lia.
+  rewrite <- Nat2Z.inj_add. rewrite Nat.add_comm.
+  lia.
+Qed.
 
 
