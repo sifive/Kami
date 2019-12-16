@@ -265,6 +265,7 @@ Goal forall a b c d e, Registers ([a;b]++[c;d])=e.
       let x := (ltac:(KRReifyExp A (KRList KRTypModuleElt))) in
           change A with (@KRDenote (KRList KRTypModuleElt) x nil);rewrite KRSimplifySound
   end.
+  compute.
   cbv [KRSimplify KRSimplifyTop KRDenote KRRealizeExp].
 Abort.
 
