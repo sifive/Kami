@@ -30,8 +30,8 @@ readTok n txt = let txt' = T.filter (/= '_') txt in
 getToks :: Int -> T.Text -> [(Integer, BV.BV)]
 getToks n text = toks_to_addr_vals $ concat $ map ((map $ readTok n) . (filter (not . T.null)) . (T.split isSpace)) $ T.lines text
 
-word_of_bv :: BV.BV -> (Int,Integer)
-word_of_bv v = (BV.size v, BV.nat v)
+word_of_bv :: BV.BV -> Integer
+word_of_bv = BV.nat
 
 expr_of_bv :: BV.BV -> H.Expr Val
 expr_of_bv v = H.Const (H.Bit $ BV.size v) $ H.ConstBit (BV.size v) $ word_of_bv v

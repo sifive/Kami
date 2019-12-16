@@ -5,22 +5,16 @@ Require Import Kami.Notations.
 
 Require Coq.extraction.Extraction.
 
-Require Export ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString.
+Require Export ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString ExtrHaskellZInteger.
 
 Extraction Language Haskell.
 
 Set Extraction Optimize.
 Set Extraction KeepSingleton.
 Unset Extraction AutoInline.
-
 Extract Inductive sigT => "(,)" ["(,)"].
-(* Extract Inductive word => "(Prelude.Int,Prelude.Int)" ["(,)"] "(\fmk (x,y) -> fmk x y)" *) (* <- use this one *)
 
-(* Extract Inductive word => "CustomExtract.EWord" ["CustomExtract.wordNil" "CustomExtract.wordCons"] "CustomExtract.wordRec". *)
 Extract Inductive Fin.t => "CustomExtract.EFin" ["CustomExtract.fin0" "CustomExtract.finS"] "CustomExtract.finRec".
-(* Extract Inductive Vector.t => "[]" ["[]" "(\x xs -> x : xs)"] "(\fnil fcons xs -> case xs of { [] -> fnil (); (x:xs) -> fcons x xs })".
-Extract Inductive Vector.t => "[]" ["[]" "(:)"].
- *)
 
 Extract Inlined Constant fst => "Prelude.fst".
 Extract Inlined Constant snd => "Prelude.snd".
@@ -37,8 +31,8 @@ Extract Constant Nat.div2 => "(`Prelude.div` 2)".
 Extract Constant Nat.log2 => "(\x -> Prelude.floor (Prelude.logBase 2 (Prelude.fromIntegral x)))".
 Extract Constant Nat.log2_up => "(\x -> Prelude.ceiling (Prelude.logBase 2 (Prelude.fromIntegral x)))".
 Extract Constant List.fold_left => "(\f bs a -> Data.List.foldl' f a bs)".
-Extract Constant natToWord => "(\sz n -> (sz, Prelude.toInteger n))".
-Extract Constant wordToNat => "(\_ (_,v) -> Prelude.fromIntegral v)".
+Extract Constant natToWord => "(\sz n -> Prelude.toInteger n)".
+Extract Constant wordToNat => "(\_ -> Prelude.fromIntegral)".
 Extract Constant sumSizes => "(\n f -> Prelude.sum (Prelude.map (\i -> f (n Prelude.-1,i)) [0..(n Prelude.-1)]))".
 Extract Constant nth_Fin => "(\xs (_,i) -> xs Prelude.!! i)".
 Extract Constant nth_Fin_map2 => "(\_ _ _ x -> x)".
