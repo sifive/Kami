@@ -1361,7 +1361,7 @@ Proof.
       rewrite ?in_app_iff in *.
   - rewrite HUNewRegs in *.
     rewrite map_app, in_app_iff in *.
-    destruct H1; firstorder fail.
+    destruct H1; intuition.
   - rewrite HANewRegs in *; inv H0;[simpl in *|subst; auto]; assumption.
   - rewrite HUNewRegs in *.
     rewrite map_app, in_app_iff in *.
@@ -1567,7 +1567,7 @@ Proof.
       apply H1; auto.
   - induction (getHidden m); simpl; auto; dest.
     + constructor; auto.
-    + assert (sth: PStep (createHide (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) l0) o l) by firstorder fail.
+    + assert (sth: PStep (createHide (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) l0) o l) by intuition.
       assert (sth2: forall v, In (a, projT1 v) (getKindAttr (getAllMethods m)) -> (getListFullLabel_diff (a, v) l = 0%Z)).
       {intros; apply H1; auto; left; reflexivity. }
       constructor; auto.

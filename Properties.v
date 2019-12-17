@@ -408,7 +408,7 @@ Section InverseSemAction.
     induction 1; auto; subst;
       unfold SubList in *; intros;
         rewrite ?in_app_iff in *.
-    - subst; firstorder.
+    - subst; intuition. 
     - repeat (subst; firstorder).
     - subst.
       rewrite ?in_app_iff in H1.
@@ -1081,7 +1081,7 @@ Proof.
   - rewrite app_nil_r; auto.
   - unfold DisjKey in *; intros.
     specialize (H k).
-    firstorder congruence.
+    intuition congruence.
 Qed.
   
 Lemma DisjRegs_1_negb (l1: list RegInitT):
@@ -1099,7 +1099,7 @@ Proof.
   - auto.
   - unfold DisjKey in *; intros.
     specialize (H k).
-    firstorder congruence.
+    intuition congruence.
 Qed.
   
 Lemma DisjRegs_2_id (l1: list RegInitT):
@@ -1117,7 +1117,7 @@ Proof.
   - rewrite ?app_nil_r; auto.
   - unfold DisjKey in *; intros.
     specialize (H k).
-    firstorder congruence.
+    intuition congruence.
 Qed.
   
 Lemma DisjRegs_2_negb (l1: list RegInitT):
@@ -1135,7 +1135,7 @@ Proof.
   - rewrite ?app_nil_r; auto.
   - unfold DisjKey in *; intros.
     specialize (H k).
-    firstorder congruence.
+    intuition congruence.
 Qed.
 
 Lemma Substeps_rm_In m o l:
@@ -1240,14 +1240,14 @@ Proof.
     assert (sth1: DisjKey (getAllRules m1) (getAllRules m0)).
         {clear - DisjRules; unfold DisjKey in *; simpl in *.
          rewrite ?map_app in *; setoid_rewrite in_app_iff in DisjRules.
-         firstorder fail. }
+         firstorder. }
     assert (sth2: DisjKey (getAllMethods m1) (getAllMethods m0)).
         {clear - DisjMeths; unfold DisjKey in *; simpl in *.
          rewrite ?map_app in *; setoid_rewrite in_app_iff in DisjMeths.
          intro k; destruct (DisjMeths k); [left| right]; auto. }
     assert (sth3: DisjKey (getAllRules m1) (getAllRules m2)) by
         (clear - DisjRules; unfold DisjKey in *; simpl in *;
-         rewrite ?map_app in *; setoid_rewrite in_app_iff in DisjRules; firstorder fail).
+         rewrite ?map_app in *; setoid_rewrite in_app_iff in DisjRules; firstorder).
     assert (sth4: DisjKey (getAllMethods m1) (getAllMethods m2)).
         {clear - DisjMeths; unfold DisjKey in *; simpl in *.
          rewrite ?map_app in *; setoid_rewrite in_app_iff in DisjMeths.
@@ -1295,7 +1295,7 @@ Proof.
     + rewrite ?app_nil_r; auto.
     + eapply Step_rm_In; eauto.
   - eapply Step_rm_not_In; eauto.
-    + clear - DisjRules; firstorder fail.
+    + clear - DisjRules; firstorder.
     + clear - DisjMeths. unfold DisjKey in *.
       intros.
       specialize (DisjMeths k).
@@ -1340,7 +1340,7 @@ Proof.
       eapply Step_rm_In; eauto.
   - setoid_rewrite negb_true_iff.
     eapply Step_rm_not_In; eauto.
-    + clear - DisjRules; firstorder fail.
+    + clear - DisjRules; firstorder.
     + clear - DisjMeths. unfold DisjKey in *.
       intros.
       specialize (DisjMeths k).
@@ -2755,7 +2755,7 @@ Proof.
       rewrite ?(functional_extensionality (fun x => fst x) fst) in HUpdGood by tauto.
       setoid_rewrite (functional_extensionality (fun x => fst x) fst) in HUpdGood; [|tauto].
       specialize (HUpdGood _ H3).
-      clear - H2 DisjRegs HUpdGood; firstorder fail.
+      clear - H2 DisjRegs HUpdGood; firstorder.
     + intros.
       rewrite in_app_iff in *.
       destruct H1; [eapply HNoRle; eauto| ].
@@ -3561,12 +3561,12 @@ Definition PWeakInclusion (l1 l2 : list FullLabel) : Prop :=
 
 Lemma InExec_app_comm : forall l1 l2 e, InExec e (l1++l2) -> InExec e (l2++l1).
 Proof.
-  intros; rewrite InExec_app_iff in *; firstorder.
+  intros; rewrite InExec_app_iff in *; intuition.
 Qed.
 
 Lemma InCall_app_comm : forall l1 l2 e, InCall e (l1++l2) -> InCall e (l2++l1).
 Proof.
-  intros; rewrite InCall_app_iff in *; firstorder.
+  intros; rewrite InCall_app_iff in *; intuition.
 Qed.
 
 Lemma WeakInclusion_app_comm : forall l1 l2, WeakInclusion (l1++l2)(l2++l1).
@@ -3574,7 +3574,7 @@ Proof.
   intros.
   unfold WeakInclusion;split;intros.
   - unfold getListFullLabel_diff; repeat rewrite getNumExecs_app, getNumCalls_app; ring.
-  - dest; exists x; rewrite map_app,in_app_iff in *; firstorder fail.
+  - dest; exists x; rewrite map_app,in_app_iff in *; intuition.
 Qed.
 
 Definition WeakEquality (l1 l2 : list FullLabel) : Prop :=
@@ -4032,7 +4032,7 @@ Qed.
 Lemma PermutationInCall : forall (l l' : list FullLabel), Permutation l l' -> (forall (f : MethT), InCall f l <-> InCall f l').
 Proof.
   induction 1.
-  - firstorder.
+  - intuition. 
   - intro; split; intros; try assumption.
     + apply (InCall_app_iff f (x::nil) l'); apply (InCall_app_iff f (x::nil) l) in H0.
       destruct H0;[left|right;apply IHPermutation];assumption.
@@ -4040,8 +4040,8 @@ Proof.
       destruct H0;[left|right;apply IHPermutation];assumption.
   - split; intros.
     + apply (InCall_app_iff f (x::y::nil) l); apply (InCall_app_iff f (y::x::nil) l) in H.
-      destruct H;[left;simpl|right];firstorder.
-    +  apply (InCall_app_iff f (y::x::nil) l); apply (InCall_app_iff f (x::y::nil) l) in H;firstorder.
+      destruct H;[left;simpl|right]; firstorder.
+    +  apply (InCall_app_iff f (y::x::nil) l); apply (InCall_app_iff f (x::y::nil) l) in H; firstorder.
   - intros; split;intros.
     + apply IHPermutation2; apply IHPermutation1; assumption.
     + apply IHPermutation1; apply IHPermutation2; assumption.
@@ -5195,15 +5195,15 @@ Lemma findRegs_None u:
 Proof.
   induction u; simpl; split; auto; destruct a; simpl; intros.
   - destruct (string_dec s s0); subst.
-    + firstorder fail.
+    + intuition. 
     + rewrite <- String.eqb_neq in n; rewrite n.
       rewrite <- IHu.
-      firstorder fail.
+      intuition.
   - destruct (String.eqb s s0) eqn:G; [rewrite String.eqb_eq in G|]; subst.
     + discriminate.
     + rewrite <- IHu in H.
       intro.
-      rewrite String.eqb_neq in G; firstorder.
+      rewrite String.eqb_neq in G; intuition.
 Qed.
 
 Lemma NoDup_app A (l1: list (string * A)):
@@ -5334,7 +5334,7 @@ Proof.
            split; try intro; auto; dest.
            destruct H; subst; auto.
       * specialize (H4 _ _ H).
-        clear - H4; firstorder fail.
+        clear - H4; intuition.
 Qed.
 
 Lemma UpdRegs_nil_nil_upd: forall o, NoDup (map fst o) -> forall o', UpdRegs [[]] o o' -> o = o'.
@@ -5408,10 +5408,10 @@ Proof.
     + inv H.
       rewrite IHls in H3.
       eapply H3; eauto.
-  - assert (sth1: f a = g a) by firstorder fail.
-    assert (sth2: forall x, In x ls -> f x = g x) by firstorder fail.
+  - assert (sth1: f a = g a) by intuition.
+    assert (sth2: forall x, In x ls -> f x = g x) by intuition. 
     f_equal; auto.
-    firstorder.
+    intuition.
 Qed.
 
 
