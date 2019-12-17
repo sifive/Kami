@@ -46,16 +46,11 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma weq : forall sz (x y : word sz), {x = y} + {x <> y}.
-Proof.
-  intros.
-  destruct (weqb _ x y) eqn:H.
-  apply weqb_true in H.
-  left. assumption.
-  right.
-  apply weqb_false in H.
-  assumption.
-Qed.
+Definition weq sz (x y: word sz): {x = y} + {x <> y} :=
+  match weqb _ x y as sth return weqb _ x y = sth -> {x = y} + {x <> y} with
+  | true => fun s => left (weqb_true _ _ _ s)
+  | false => fun s => right (weqb_false _ _ _ s)
+  end eq_refl.
 
 Fixpoint nat_cast (P : nat -> Type) {n m} : n = m -> P n -> P m.
   refine match n, m return n = m -> P n -> P m with
