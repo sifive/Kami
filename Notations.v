@@ -20,18 +20,6 @@ Inductive ModuleElt: Type :=
 | MERule (_ : Attribute (Action Void))
 | MEMeth (_ : DefMethT).
 
-Fixpoint makeModule'  (xs: list ModuleElt) :=
-  match xs with
-  | e :: es =>
-    let '(iregs, irules, imeths) := makeModule' es in
-    match e with
-    | MERegister mreg => (mreg :: iregs, irules, imeths)
-    | MERule mrule => (iregs, mrule :: irules, imeths)
-    | MEMeth mmeth => (iregs, irules, mmeth :: imeths)
-    end
-  | nil => (nil, nil, nil)
-  end.
-
 Fixpoint makeModule_regs  (xs: list ModuleElt) :=
   match xs with
   | e :: es =>
