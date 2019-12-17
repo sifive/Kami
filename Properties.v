@@ -4280,12 +4280,7 @@ Proof.
   - rewrite e.
     destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e2)) (zToWord 1 0)); simpl; auto.
     + rewrite e0.
-      destruct (wltu _ (evalExpr e1) (evalExpr e2)).
-      simpl. destruct weq.
-      * simpl. reflexivity.
-      * simpl. contradiction.
-      * simpl. destruct weq. simpl. reflexivity.
-        simpl. contradiction.
+      destruct (wltu _ (evalExpr e1) (evalExpr e2)); simpl; auto.
     + case_eq (wltu _ (evalExpr e1) (evalExpr e2)); intros; simpl; auto.
       * destruct (weq _ (zToWord 1 0) (@truncMsb 1 (n+1) (evalExpr e2))); simpl; auto.
       * destruct (weq _ (zToWord 1 0) (@truncMsb 1 (n+1) (evalExpr e2))); simpl; auto.
@@ -4304,32 +4299,22 @@ Proof.
       case_eq (wltu _ (evalExpr e1) (evalExpr e2)); intros; simpl; auto.
       * destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e1)) (zToWord 1 0)); simpl; auto.
         apply word0_neq in n1.
-        simpl in n1.
-        destruct weq.
-        ** simpl. inversion e0.
-        ** simpl. apply word0_neq in n0.
-           simpl in n0.
-           assert ((wordVal 1 (truncMsb (evalExpr e2))) < (wordVal 1 (truncMsb (evalExpr e1))))%Z.
-           rewrite e. rewrite n0.
-           simpl. rewrite Zmod_0_l.
-        rewrite Zmod_1_l. lia.
-        rewrite Z.pow_pos_fold. lia.
-        specialize truncMsbLtFalse. intros.
-        specialize (H1 (n+1) 1 (evalExpr e2) (evalExpr e1) H0).
-        rewrite H in H1. auto.
+        
+        assert (sth:
+                  (wordVal 1 (truncMsb (evalExpr e2)) < wordVal 1 (truncMsb (evalExpr e1)))%Z).
+        {
+          rewrite e, n1.
+          reflexivity.
+        }
+        pose proof (@truncMsbLtFalse (n+1) 1 (evalExpr e2) (evalExpr e1) sth) as sth2.
+        congruence.
       * destruct (weq _ (@truncMsb 1 (n+1) (evalExpr e1)) (zToWord 1 0)); simpl; auto.
-        tauto. destruct weq.
-        ** simpl. inversion e0.
-        ** simpl. reflexivity.
+        tauto.
     + apply word0_neq in n0.
       apply word0_neq in n1.
       rewrite ?n0, ?n1.
       simpl.
       case_eq (wltu _ (evalExpr e1) (evalExpr e2)); intros; simpl; auto.
-      ** destruct weq. simpl. reflexivity.
-         simpl. exfalso. apply n2. reflexivity.
-      ** destruct weq. simpl. reflexivity.
-         simpl. reflexivity.
 Qed.
 
 Lemma mergeSeparatedBaseFile_noHides (rfl : list RegFileBase) :
