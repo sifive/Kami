@@ -66,6 +66,3 @@ Definition mkMod(bm : BaseModule)(rfs : list RegFileBase) :=
   createHideMod md (map fst (getAllMethods md)).
 
 Definition testNative := mkMod testNativeModule [].
-
-Extract Inductive nat => "Prelude.Int" [ "0" "(Prelude.succ :: Prelude.Int -> Prelude.Int)" ]
-  "(\fO fS n -> if n Prelude.== 0 then fO () else fS (n Prelude.- 1))".
