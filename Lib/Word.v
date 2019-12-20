@@ -154,7 +154,7 @@ End Word.
 Module Notations.
 
   Declare Scope word_scope.
-  
+
   Notation "^~" := wneg : word_scope.
   Notation "l ^* r" := (@wmul _ l r) (at level 40, left associativity) : word_scope.
   Notation "l ^/ r" := (@wdiv _ l r) (at level 50, left associativity) : word_scope.
@@ -163,6 +163,10 @@ Module Notations.
   Notation "l ^% r" := (@wmod _ l r) (at level 50, left associativity) : word_scope.
   Notation "l ^| r" := (@wor _ l r) (at level 50, left associativity) : word_scope.
   Notation "l ^& r" := (@wand _ l r) (at level 40, left associativity) : word_scope.
+
+  Notation "WO~0" := (ZToWord 1 0) : word_scope.
+  Notation "WO~1" := (ZToWord 1 1) : word_scope.
+  
 End Notations.
 
 Export Notations.
