@@ -1,5 +1,4 @@
 Require Import Kami.AllNotations.
-Require Import ZArith.
 
 (* In order to write a Kami module, one first opens a section using the same name as the module,
   and writes the following five lines of boiler plate code. *)
@@ -42,7 +41,7 @@ Section exampleModule.
         "field1" :: Bit 4 ;
         "someOtherField" :: Bool } <-
       STRUCT_CONST {
-        "field1" ::= zToWord _ 13 ;
+        "field1" ::= ZToWord _ 13 ;
         "someOtherField" ::= true }
       (* reg4 is initialized to a "structure" containing fields "field1" and "someOtherField".
         "field1" is initialized to (natToWord _ 13), which is converting a nat 13 into a bit-vector (i.e. [word]) of length 4
@@ -72,7 +71,7 @@ Section exampleModule.
         (* x3 is set to a 2-element array with boolean values. Notice
           agian that we use $$ for creating a non-not constant *)
         
-        LET x4 : Array 2 (Bit 4) <- $$ ARRAY_CONST { (zToWord 4 5) ; (zToWord 4 12)} ;
+        LET x4 : Array 2 (Bit 4) <- $$ ARRAY_CONST { (ZToWord 4 5) ; (ZToWord 4 12)} ;
         (* yet another example of a constant array built using bit-vectors.
           The Coq's type checker fails to infer the width of the bit-vector this time, forcing us
           to specify the size as 4 *)
@@ -82,13 +81,13 @@ Section exampleModule.
           "sth2" :: Bit 20 } <-
         $$ STRUCT_CONST {
           "sth1" ::= false ;
-          "sth2" ::= zToWord 20 4 };
+          "sth2" ::= ZToWord 20 4 };
         (* One can also have constant structures assigned to a local variable *)
         
         LET x6 <- 
         $$ STRUCT_CONST {
           "sth1" ::= false ;
-          "sth2" ::= zToWord 20 4
+          "sth2" ::= ZToWord 20 4
           };
         (* One can omit the type of the expression if it is easy for Coq to infer it *)
         
@@ -213,7 +212,7 @@ Section exampleModule.
           nil);
         
         
-        LET x100: Void <- $$ (zToWord 0 0);
+        LET x100: Void <- $$ (ZToWord 0 0);
         (* Void is literally Bit 0, and WO is the only way to create a value of type Bit 0 *)       
                
         (* Finally, we end any action by a return statement *)
@@ -283,13 +282,13 @@ Section exampleModule.
         LET x20 <- #x7 * #x8;
                 
         (* Bitwise And *)
-        LET x11 <- #x7 & #x8;
+        LET x11 <- #x7 .& #x8;
         
         (* Bitwise Or *)
-        LET x12 <- #x7 | #x8;
+        LET x12 <- #x7 .| #x8;
         
         (* Bitwise Xor *)
-        LET x13 <- #x7 ^ #x8;
+        LET x13 <- #x7 .^ #x8;
         
         (* Extract a bit-range *)
         LET x141 <- #x13$[3:4];
@@ -369,7 +368,7 @@ Section exampleModule.
           Actions, however, are non-deterministic. So, if we want to write a simple expression using let-blocks, we use a
           "LetExprSyntax" and convert it to actions using "convertLetExprSyntax_ActionT" as follows: *)
         LETA r2: Bit 10 <- convertLetExprSyntax_ActionT (
-          LETC k1: Bit 10 <- #x13 | #x7;
+          LETC k1: Bit 10 <- #x13 .| #x7;
           LETC k2 <- CABit (Bor) (#x8 :: #k1 :: nil);
 
           (* We can have if-then-else inside let-expressions.
@@ -396,7 +395,7 @@ Section exampleModule.
               DispString _ "Bye\n" ::
               nil             
               );
-            RetE ($$ (zToWord 0 0)));
+            RetE ($$ (ZToWord 0 0)));
           
           IfE (#k2 == (#k3 + $1))
           then (
@@ -404,13 +403,13 @@ Section exampleModule.
               DispString _ "Bye\n" ::
               nil             
               ) ;
-            RetE ($$ (zToWord 0 0)))
+            RetE ($$ (ZToWord 0 0)))
           else (
             SystemE (
               DispString _ "Good Bye\n" ::
               nil             
               ) ;
-              RetE ($$ (zToWord 0 0)));
+              RetE ($$ (ZToWord 0 0)));
             
           RetE (#k2 + #k3)
           ) ;
@@ -433,8 +432,8 @@ Section exampleModule.
   Definition exampleModule2: Mod.
     refine (
       MODULE {
-        Register @^"reg10": Bit (n + m) <- (zToWord _ 0)
-        with Register @^"reg11": Bit (m + n) <- (zToWord _ 1)
+        Register @^"reg10": Bit (n + m) <- (ZToWord _ 0)
+        with Register @^"reg11": Bit (m + n) <- (ZToWord _ 1)
         
         with Rule @^"test" := (
           Read x : Bit (n + m) <- @^"reg10";

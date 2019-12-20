@@ -24,7 +24,7 @@ Section Word.
 
     Open Scope word_scope.
 
-    Definition zToWord (n : Z) : word :=
+    Definition ZToWord (n : Z) : word :=
       mk (wrap_value n) (minimize_eq_proof Z.eq_dec (Zdiv.Zmod_mod n _)).
 
     Definition boolToZ b : Z :=
@@ -33,35 +33,35 @@ Section Word.
       | true => 1
       end.
 
-    Definition NToWord (n : N) := zToWord (Z.of_N n).
+    Definition NToWord (n : N) := ZToWord (Z.of_N n).
 
-    Definition boolToWord b := zToWord (boolToZ b).
+    Definition boolToWord b := ZToWord (boolToZ b).
 
-    Definition natToWord (n : nat) := zToWord (Z.of_nat n).
+    Definition natToWord (n : nat) := ZToWord (Z.of_nat n).
     
     Definition wordToNat (w : word) := Z.to_nat (wordVal w).
 
-    Definition wones := zToWord ((2 ^ (Z.of_nat width))%Z - 1).
+    Definition wones := ZToWord ((2 ^ (Z.of_nat width))%Z - 1).
       
-    Definition wadd x y := zToWord (Z.add (wordVal x) (wordVal y)).
+    Definition wadd x y := ZToWord (Z.add (wordVal x) (wordVal y)).
 
-    Definition wsub x y := zToWord (Z.sub (wordVal x) (wordVal y)).
+    Definition wsub x y := ZToWord (Z.sub (wordVal x) (wordVal y)).
 
-    Definition wor x y := zToWord (Z.lor (wordVal x) (wordVal y)).
+    Definition wor x y := ZToWord (Z.lor (wordVal x) (wordVal y)).
 
-    Definition wand x y := zToWord (Z.land (wordVal x) (wordVal y)).
+    Definition wand x y := ZToWord (Z.land (wordVal x) (wordVal y)).
 
-    Definition wxor x y := zToWord (Z.lxor (wordVal x) (wordVal y)).
+    Definition wxor x y := ZToWord (Z.lxor (wordVal x) (wordVal y)).
 
-    Definition wneg x := zToWord (Z.sub (Z.pow 2 (Z.of_nat width)) (wordVal x)).
+    Definition wneg x := ZToWord (Z.sub (Z.pow 2 (Z.of_nat width)) (wordVal x)).
 
-    Definition wnot x := zToWord (Z.sub (wordVal (wneg x)) 1).
+    Definition wnot x := ZToWord (Z.sub (wordVal (wneg x)) 1).
 
-    Definition wmax := zToWord (Z.pow 2 (Z.of_nat width) - 1).
+    Definition wmax := ZToWord (Z.pow 2 (Z.of_nat width) - 1).
 
     Definition wuand x := Z.eqb (wordVal wmax) (wordVal x).
 
-    Definition wuor x := negb (Z.eqb (wordVal (zToWord 0)) (wordVal x)).
+    Definition wuor x := negb (Z.eqb (wordVal (ZToWord 0)) (wordVal x)).
 
     Fixpoint pos_uxor (p : positive) : bool :=
       match p with
@@ -79,15 +79,15 @@ Section Word.
 
     Definition wuxor x := un_xor (wordVal x).
 
-    Definition wmul x y := zToWord (Z.mul (wordVal x) (wordVal y)).
+    Definition wmul x y := ZToWord (Z.mul (wordVal x) (wordVal y)).
 
-    Definition wdiv x y := zToWord (Z.div (wordVal x) (wordVal y)).
+    Definition wdiv x y := ZToWord (Z.div (wordVal x) (wordVal y)).
 
-    Definition wmod x y := zToWord (Z.modulo (wordVal x) (wordVal y)).
+    Definition wmod x y := ZToWord (Z.modulo (wordVal x) (wordVal y)).
 
-    Definition wslu x y := zToWord (Z.mul (wordVal x) (Z.pow 2 (wordVal y))).
+    Definition wslu x y := ZToWord (Z.mul (wordVal x) (Z.pow 2 (wordVal y))).
 
-    Definition wsru x y := zToWord (Z.div (wordVal x) (Z.pow 2 (wordVal y))).
+    Definition wsru x y := ZToWord (Z.div (wordVal x) (Z.pow 2 (wordVal y))).
 
     Definition weqb x y := Z.eqb (wordVal x) (wordVal y).
 
@@ -96,14 +96,14 @@ Section Word.
   End fixedWidth.
 
   Definition truncLsb {lsb outSz} (w : @word outSz) : @word lsb := 
-    zToWord lsb (wordVal outSz w).
+    ZToWord lsb (wordVal outSz w).
 
   Definition truncMsb {msb outSz} (w : @word outSz) : @word msb :=
-    zToWord msb (Z.div (wordVal outSz w) (Z.pow 2 (Z.of_nat (Nat.sub outSz msb)))).
+    ZToWord msb (Z.div (wordVal outSz w) (Z.pow 2 (Z.of_nat (Nat.sub outSz msb)))).
 
 
   Definition wconcat {msb lsb outSz} (w1 : @word msb) (w2 : @word lsb) :  @word outSz :=
-    zToWord outSz (Z.add (Z.mul (wordVal msb w1) (Z.pow 2 (Z.of_nat lsb))) (wordVal lsb w2)).
+    ZToWord outSz (Z.add (Z.mul (wordVal msb w1) (Z.pow 2 (Z.of_nat lsb))) (wordVal lsb w2)).
 
   Definition get_msb {sz} (w : @word sz) : @word 1 :=
     (@truncMsb 1 sz w).
@@ -115,7 +115,7 @@ Section Word.
     (Z.ltb (wordVal _ w) (Z.pow 2 (Z.of_nat (sz - 1)))).
   
   Definition twosComplement {sz} (w: @word sz) : @word sz :=
-    zToWord _ (Z.sub (Z.pow 2 (Z.of_nat sz)) (wordVal _ w)).
+    ZToWord _ (Z.sub (Z.pow 2 (Z.of_nat sz)) (wordVal _ w)).
 
   Definition wordToSignedZ {sz} (w: @word sz) : Z :=
     if Z.ltb (wordVal _ w) (Z.pow 2 (Z.of_nat (sz - 1)))
@@ -131,8 +131,8 @@ Section Word.
   
   Definition signedZToWord {sz} (n: Z) : @word sz :=
     if signZ n
-    then twosComplement (zToWord _ (Z.opp n))
-    else zToWord _ n.
+    then twosComplement (ZToWord _ (Z.opp n))
+    else ZToWord _ n.
 
   Definition wsra {sz1 sz2: nat} (w1: @word sz1) (w2 : @word sz2) : @word sz1 :=
     @signedZToWord sz1 (Z.div (if wnon_neg w1
@@ -144,10 +144,10 @@ Section Word.
   Definition wtail sz (w : word (S sz)) := @truncLsb sz _ w.
 
   Definition wsplitl (sz1 sz2 : nat) (w : @word (sz1 + sz2)) : @word sz1 :=
-    zToWord _ (wordVal _ w / (Z.pow 2 (Z.of_nat sz2)))%Z.
+    ZToWord _ (wordVal _ w / (Z.pow 2 (Z.of_nat sz2)))%Z.
 
   Definition wsplitr (sz1 sz2 : nat) (w : @word (sz1 + sz2)) : @word sz2 :=
-    zToWord _ ((wordVal _ w) mod (Z.pow 2 (Z.of_nat sz2)))%Z.
+    ZToWord _ ((wordVal _ w) mod (Z.pow 2 (Z.of_nat sz2)))%Z.
   
 End Word.
 
@@ -163,23 +163,22 @@ Module Notations.
   Notation "l ^% r" := (@wmod _ l r) (at level 50, left associativity) : word_scope.
   Notation "l ^| r" := (@wor _ l r) (at level 50, left associativity) : word_scope.
   Notation "l ^& r" := (@wand _ l r) (at level 40, left associativity) : word_scope.
-
 End Notations.
 
-(* Compute (@wnot 2 (zToWord 2 2)). *)
+Export Notations.
+Export ZArith.
+(* Compute (@wnot 2 (ZToWord 2 2)). *)
 
-(* Compute (@wneg 2 (zToWord 2 3)). *)
+(* Compute (@wneg 2 (ZToWord 2 3)). *)
 
-(* Compute (wsra (zToWord 4 15) (zToWord 1 1)). *)
+(* Compute (wsra (ZToWord 4 15) (ZToWord 1 1)). *)
 
-(* Compute (wsra (zToWord 4 12) (zToWord 3 3)). *)
+(* Compute (wsra (ZToWord 4 12) (ZToWord 3 3)). *)
 
-(* Compute (wsra (zToWord 2 1) (zToWord 3 5)). *)
+(* Compute (wsra (ZToWord 2 1) (ZToWord 3 5)). *)
 
-(* Compute (wsra (zToWord 5 9) (zToWord 4 3)). *)
+(* Compute (wsra (ZToWord 5 9) (ZToWord 4 3)). *)
 
-(* Compute (NToWord 2 6). *)
+(* Compute (@wconcat 2 2 4 (ZToWord 2 2) (ZToWord 2 3)). *)
 
-(* Compute (@wconcat 2 2 4 (zToWord 2 2) (zToWord 2 3)). *)
-
-(* Compute (@truncLsb 2 4 (@wconcat 2 2 4 (zToWord 2 2) (zToWord 2 3))).*)
+(* Compute (@truncLsb 2 4 (@wconcat 2 2 4 (ZToWord 2 2) (ZToWord 2 3))).*)

@@ -80,11 +80,11 @@ Qed.
 
 Fixpoint countLeadingZerosWord ni no: word ni -> word no :=
   match ni return word ni -> word no with
-  | 0 => fun _ => (zToWord _ 0)
+  | 0 => fun _ => (ZToWord _ 0)
   | S m => fun e =>
-             if (weq _ (@truncMsb 1 (m+1) (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e)) (zToWord 1 0))
-             then (wadd _ (zToWord _ 1) (@countLeadingZerosWord m no (@truncLsb m (m+1) (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e))))
-             else (zToWord _ 0)
+             if (weq _ (@truncMsb 1 (m+1) (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e)) (ZToWord 1 0))
+             then (wadd _ (ZToWord _ 1) (@countLeadingZerosWord m no (@truncLsb m (m+1) (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e))))
+             else (ZToWord _ 0)
   end.
 
 
@@ -175,7 +175,7 @@ Ltac arithmetizeWord :=
          end.
 
 
-Lemma word0_neq: forall w : word 1, w <> (zToWord 1 0) -> w = (zToWord 1 1).
+Lemma word0_neq: forall w : word 1, w <> (ZToWord 1 0) -> w = (ZToWord 1 1).
 Proof.
   intros.
   arithmetizeWord.
@@ -185,14 +185,14 @@ Proof.
 Qed.
 
 
-Lemma wor_wzero : forall sz w, wor _ (zToWord sz 0) w = w.
+Lemma wor_wzero : forall sz w, wor _ (ZToWord sz 0) w = w.
 Proof.
   intros.
   arithmetizeWord.
   assumption.
 Qed.
 
-Lemma wzero_wor: forall sz w, wor _  w (zToWord sz 0) = w.
+Lemma wzero_wor: forall sz w, wor _  w (ZToWord sz 0) = w.
 Proof.
   intros.
   arithmetizeWord.
@@ -201,7 +201,7 @@ Proof.
 Qed.
 
 Lemma unique_word_0 : forall a : word 0,
-    a = zToWord 0 0.
+    a = ZToWord 0 0.
 Proof.
   intros.
   arithmetizeWord.
@@ -210,14 +210,14 @@ Proof.
   lia.
 Qed.
 
-Lemma wzero_wplus: forall sz w, wadd _ (zToWord sz 0) w = w.
+Lemma wzero_wplus: forall sz w, wadd _ (ZToWord sz 0) w = w.
 Proof.
   intros.
   arithmetizeWord.
   assumption.
 Qed.
 
-Lemma wplus_wzero : forall sz w, wadd _ w (zToWord sz 0) = w.
+Lemma wplus_wzero : forall sz w, wadd _ w (ZToWord sz 0) = w.
 Proof.
   intros.
   arithmetizeWord.
@@ -383,7 +383,7 @@ Proof.
   lia.
 Qed.
 
-Theorem wplus_unit : forall sz (x : word sz), wadd _ (zToWord sz 0) x = x.
+Theorem wplus_unit : forall sz (x : word sz), wadd _ (ZToWord sz 0) x = x.
 Proof.
   intros.
   arithmetizeWord.
@@ -408,7 +408,7 @@ Proof.
 Qed.
 
 
-Lemma wmax_wzero : forall sz, (sz > 0) -> wmax sz <> zToWord sz 0.
+Lemma wmax_wzero : forall sz, (sz > 0) -> wmax sz <> ZToWord sz 0.
 Proof.
   repeat intro.
   eapply (f_equal (wordVal _)) in H0.
@@ -422,8 +422,8 @@ Proof.
 Qed.
 
 
-Lemma wordToZ_zToWord: forall (sz : nat) (w : Z),
-    (0 <= w < Z.pow 2 (Z.of_nat sz))%Z -> wordVal _ (zToWord sz w) = w.
+Lemma wordToZ_ZToWord: forall (sz : nat) (w : Z),
+    (0 <= w < Z.pow 2 (Z.of_nat sz))%Z -> wordVal _ (ZToWord sz w) = w.
 Proof.
   intros.
   arithmetizeWord.
@@ -613,11 +613,11 @@ Proof.
 Qed.
 
 Lemma combine_wones_WO sz:
-  forall w, w <> zToWord sz 0 ->
+  forall w, w <> ZToWord sz 0 ->
             @truncMsb 1 (sz+1)
-                      (@wadd _ (@wconcat sz 1 (sz+1) (wmax sz) (zToWord 1 0))
-                             (@wconcat _ 1 _ w (@zToWord 1 0)))
-            = @wconcat 1 0 1 (wmax 1) (zToWord 0 0).
+                      (@wadd _ (@wconcat sz 1 (sz+1) (wmax sz) (ZToWord 1 0))
+                             (@wconcat _ 1 _ w (@ZToWord 1 0)))
+            = @wconcat 1 0 1 (wmax 1) (ZToWord 0 0).
 Proof.
   intros.
   arithmetizeWord.
@@ -637,8 +637,8 @@ Proof.
 Admitted.
 
 Lemma word1_neq (w: word 1):
-  w <> (zToWord 1 0) ->
-  w <> (zToWord 1 1) ->
+  w <> (ZToWord 1 0) ->
+  w <> (ZToWord 1 1) ->
   False.
 Proof.
   intros.
@@ -685,9 +685,9 @@ Proof.
   auto.
 Qed.
 
-Lemma truncLsb_fits_zToWord n sz:
+Lemma truncLsb_fits_ZToWord n sz:
   (0 <= n < Z.pow 2 (Z.of_nat sz))%Z -> 
-  (@truncLsb sz (sz+1) (zToWord (sz + 1) n) = zToWord sz n).
+  (@truncLsb sz (sz+1) (ZToWord (sz + 1) n) = ZToWord sz n).
 Proof.
   intro.
   unfold truncLsb.
@@ -1323,7 +1323,7 @@ Proof.
 Qed.
 
 Lemma wneg_wnot:
-  forall sz (w : word sz), wnot _ w = wneg _ w ^- (zToWord _ 1).
+  forall sz (w : word sz), wnot _ w = wneg _ w ^- (ZToWord _ 1).
 Proof.
   intros.
   arithmetizeWord.
@@ -1347,7 +1347,7 @@ Proof.
   lia.
 Qed.
 
-Lemma wminus_diag : (forall sz (x : word sz), x ^- x = zToWord sz 0).
+Lemma wminus_diag : (forall sz (x : word sz), x ^- x = ZToWord sz 0).
 Proof.
   intros.
   arithmetizeWord; f_equal; lia.
@@ -1405,14 +1405,14 @@ Qed.
 
 
 Lemma wconcat_1_0 :
-  (@wconcat 1 0 1 (zToWord 1 1) (zToWord 0 0)) = (zToWord 1 1).
+  (@wconcat 1 0 1 (ZToWord 1 1) (ZToWord 0 0)) = (ZToWord 1 1).
 Proof.
   arithmetizeWord.
   lia.
 Qed.
 
 Lemma wconcat_w_0 : forall sz (w : word sz),
-    (@wconcat sz 0 sz w (zToWord 0 0)) = w.
+    (@wconcat sz 0 sz w (ZToWord 0 0)) = w.
 Proof.
   intros.
   arithmetizeWord.
@@ -1423,7 +1423,7 @@ Proof.
 Qed.
 
 Lemma wconcat_0_sz1_w : forall sz (w : word sz),
-    (@wconcat 1 sz (sz+1) (zToWord 1 0) w) = (zToWord (sz+1) (wordVal _ w)).
+    (@wconcat 1 sz (sz+1) (ZToWord 1 0) w) = (ZToWord (sz+1) (wordVal _ w)).
 Proof.
   intros.
   arithmetizeWord.
@@ -1441,7 +1441,7 @@ Qed.
 
 Lemma getWordVal : forall n x,
     (0 <= x < (2 ^ (Z.of_nat n)))%Z ->
-    wordVal n (zToWord n x) = x.
+    wordVal n (ZToWord n x) = x.
 Proof.
   intros.
   arithmetizeWord. simpl.
@@ -1481,7 +1481,7 @@ Qed.
 
 Lemma concat_shiftl_plus_n n x:
   (0 <= x < 2 ^ (Z.of_nat n))%Z ->
-  (@wconcat 1 n (n+1) (zToWord 1 1) (zToWord n x)) = (zToWord (n + 1) (2 ^ (Z.of_nat n))) ^+ zToWord (n + 1) x.
+  (@wconcat 1 n (n+1) (ZToWord 1 1) (ZToWord n x)) = (ZToWord (n + 1) (2 ^ (Z.of_nat n))) ^+ ZToWord (n + 1) x.
 Proof.
   intros.
   apply eq_wordVal.
@@ -1489,7 +1489,7 @@ Proof.
   unfold wconcat.
   unfold wadd.
   f_equal.
-  assert (wordVal 1 (zToWord 1 1) = 1)%Z. {
+  assert (wordVal 1 (ZToWord 1 1) = 1)%Z. {
     simpl. apply Z.mod_1_l.
     rewrite Z.pow_pos_fold. rewrite Z.pow_1_r. lia. }
   rewrite H0.
@@ -1503,7 +1503,7 @@ Qed.
 Lemma concat_wplus sz (w1 w2: word sz):
   forall sz' (w': word sz'),
     (0 <= (wordVal _ w1) + (wordVal _ w2) < 2 ^ Z.of_nat sz)%Z ->
-    wconcat w' (w1 ^+ w2) = @wconcat sz' sz (sz'+sz) w' w1 ^+ wconcat (zToWord sz' 0) w2.
+    wconcat w' (w1 ^+ w2) = @wconcat sz' sz (sz'+sz) w' w1 ^+ wconcat (ZToWord sz' 0) w2.
 Proof.
   intros.
   arithmetizeWord.
@@ -1514,7 +1514,7 @@ Proof.
   auto.
 Qed.
 
-Lemma wminus_inv : forall sz (x : word sz), x ^+ ^~ _ x = zToWord sz 0.
+Lemma wminus_inv : forall sz (x : word sz), x ^+ ^~ _ x = ZToWord sz 0.
 Proof.
   intros.
   arithmetizeWord; autorewrite with distributeMod.
@@ -1538,7 +1538,7 @@ Proof.
 Qed.
   
 Lemma wadd_wzero_1:
-  forall sz (w: word sz), w ^+ (zToWord _ 0) = w.
+  forall sz (w: word sz), w ^+ (ZToWord _ 0) = w.
 Proof.
   intros.
   arithmetizeWord; autorewrite with distributeMod.
@@ -1581,8 +1581,8 @@ Proof.
   auto.
 Qed.
 
-Lemma zToWord_plus : forall sz n m,
-    zToWord sz (n + m) = zToWord _ n ^+ zToWord _ m.
+Lemma ZToWord_plus : forall sz n m,
+    ZToWord sz (n + m) = ZToWord _ n ^+ ZToWord _ m.
 Proof.
   intros.
   arithmetizeWord; autorewrite with distributeMod.
@@ -1590,7 +1590,7 @@ Proof.
 Qed.
 
 (* The ring of size-0 words is the trivial ring, with 0 = 1 *)
-Lemma ws_zero_trivial (w : word 0) : w = zToWord 0 1.
+Lemma ws_zero_trivial (w : word 0) : w = ZToWord 0 1.
 Proof.
   arithmetizeWord.
   cbn in *.
@@ -1606,7 +1606,7 @@ Proof.
     apply one_lt_pow2.
 Qed.
 
-Lemma wone_wmul : forall sz w, wmul _ (zToWord sz 1) w = w.
+Lemma wone_wmul : forall sz w, wmul _ (ZToWord sz 1) w = w.
 Proof.
   intros.
   case (zerop sz) as [H_wz | H_wpos].

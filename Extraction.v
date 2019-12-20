@@ -43,7 +43,7 @@ Extract Constant Fin.cast => "(\_ x _ -> x)".
 Extract Constant Fin.of_nat_lt => "(\i n -> (n Prelude.- 1,i))".
 Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)".
 Extract Inlined Constant getBool => "Prelude.id".
-Extract Constant zToWord => "(\n x -> Prelude.mod x (2 Prelude.^ n))".
+Extract Constant ZToWord => "(\n x -> Prelude.mod x (2 Prelude.^ n))".
 Extract Inlined Constant NToWord => "(\_ x -> x)".
 Extract Constant wones => "(\n -> 2 Prelude.^ n Prelude.- 1)".
 Extract Constant wadd => "(\_ x y -> x Prelude.+ y)".

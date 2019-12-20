@@ -1805,7 +1805,7 @@ Proof.
     inv H1.
     specialize (KeyMatching3 _ _ _ H H0 HInRules (eq_refl)) as P1.
     destruct rle; simpl in *; inv P1; subst.
-    exists reads, oldExecs, u, oldUpds, cs, oldCalls, (zToWord 0 0).
+    exists reads, oldExecs, u, oldUpds, cs, oldCalls, (ZToWord 0 0).
     repeat split; auto.
     repeat intro; apply (HNoRle _ H1).
   - rewrite HExecs in H1.
@@ -1835,7 +1835,7 @@ Lemma PPlus_inline_Rule_with_action f m o rn rb upds1 upds2 execs calls1 calls2 
   SubList (getKindAttr reads) (getKindAttr (getRegisters m)) ->
   SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) ->
   DisjKey upds2 upds1 ->
-  PSemAction o (inlineSingle (rb type) f) reads upds1 calls1 (zToWord 0 0) ->
+  PSemAction o (inlineSingle (rb type) f) reads upds1 calls1 (ZToWord 0 0) ->
   PPlusSubsteps m o upds2 execs calls2 ->
   PPlusSubsteps (inlineSingle_Rule_BaseModule f rn m) o (upds1++upds2) ((Rle rn)::execs) (calls1++calls2).
 Proof.
@@ -5319,7 +5319,7 @@ Lemma PPlus_inlineSingle_BaseModule_with_action f m o rn rb upds execs calls:
     DisjKey upds2 upds1 /\
     SubList (getKindAttr reads) (getKindAttr (getRegisters m)) /\
     SubList (getKindAttr upds1) (getKindAttr (getRegisters m)) /\
-    PSemAction o (inlineSingle (rb type) f) reads upds1 calls1 (zToWord 0 0) /\
+    PSemAction o (inlineSingle (rb type) f) reads upds1 calls1 (ZToWord 0 0) /\
     PPlusSubsteps m o upds2 execs calls2.
 Proof.
   intros.
@@ -8160,7 +8160,7 @@ Proof.
 Qed.
 
 Lemma unifyWO (x : word 0):
-  x = (evalExpr (Const type (zToWord 0 0))).
+  x = (evalExpr (Const type (ZToWord 0 0))).
 Proof.
   simpl.
   arithmetizeWord.

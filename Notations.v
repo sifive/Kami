@@ -1,4 +1,4 @@
-Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv Eqdep.
+Require Import Eqdep.
 Require Import Kami.Syntax Kami.Lib.EclecticLib Kami.Tactics.
 Require Import RecordUpdate.RecordSet.
 Require Import Wf.
@@ -138,11 +138,11 @@ Notation "a $#[ i : j ]":=
 
 Notation "e1 + e2" := (CABit (Add) (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 * e2" := (CABit (Mul) (e1 :: e2 :: nil)) : kami_expr_scope.
-Notation "e1 & e2" := (CABit (Band) (e1 :: e2 :: nil)) (at level 201)
+Notation "e1 .& e2" := (CABit (Band) (e1 :: e2 :: nil)) (at level 201)
                       : kami_expr_scope.
-Notation "e1 | e2" := (CABit (Bor) (e1 :: e2 :: nil)) (at level 201)
+Notation "e1 .| e2" := (CABit (Bor) (e1 :: e2 :: nil)) (at level 201)
                       : kami_expr_scope.
-Notation "e1 ^ e2" := (CABit (Bxor) (e1 :: e2 :: nil)) : kami_expr_scope.
+Notation "e1 .^ e2" := (CABit (Bxor) (e1 :: e2 :: nil)) (at level 201): kami_expr_scope.
 Infix "-" := (BinBit (Sub _)) : kami_expr_scope.
 Infix "/" := (BinBit (Div _)) : kami_expr_scope.
 Infix "%%" := (BinBit (Rem _)) (at level 100): kami_expr_scope.
@@ -150,10 +150,10 @@ Infix "<<" := (BinBit (Sll _ _)) (at level 100) : kami_expr_scope.
 Infix ">>" := (BinBit (Srl _ _)) (at level 100) : kami_expr_scope.
 Infix ">>>" := (BinBit (Sra _ _)) (at level 100) : kami_expr_scope.
 Notation "{< a , .. , b >}" :=
-  ((BinBit (Concat _ _)) a .. (BinBit (Concat _ _) b (@Const _ (Bit 0) (zToWord 0 0))) ..)
+  ((BinBit (Concat _ _)) a .. (BinBit (Concat _ _) b (@Const _ (Bit 0) (ZToWord 0 0))) ..)
     (at level 100, a at level 99): kami_expr_scope.
 Notation "{< a , .. , b >}" :=
-  (wconcat b .. (wconcat a (zToWord 0 0)) ..)
+  (wconcat b .. (wconcat a (ZToWord 0 0)) ..)
     (at level 100, a at level 99): word_scope.
 
 Infix "<" := (BinBitBool (LessThan _)) : kami_expr_scope.
@@ -331,7 +331,7 @@ Definition callNames (ty: Kind -> Type) k names := map (fun r =>
 Definition writeNames (ty: Kind -> Type) k namesVals :=
   map (fun r => 
          (@WriteReg _ _ (fst r) (SyntaxKind k) (snd r)
-                    (Return (Const ty (zToWord 0 0))))) namesVals.
+                    (Return (Const ty (ZToWord 0 0))))) namesVals.
 
 (* Complex list action notations *)
 Notation "'GatherActions' actionList 'as' val ; cont" :=
@@ -460,7 +460,7 @@ Section mod_test.
 
   Local Example test1 := MODULE_WF{
                              (concat [Register (^"x") : Bool <- true; Register (^"w"): Bool <- true;
-                                        Register (^"t"): Bit 0 <- (zToWord 0 Z0)])
+                                        Register (^"t"): Bit 0 <- (ZToWord 0 Z0)])
                                with Register (^"y") : Bool <- false
                                with Rule (^"r1") := ( Read y: Bool <- ^"y";
                                                         Write (^"x"): Bool <- #y;

@@ -1,5 +1,4 @@
 Require Import Kami.AllNotations.
-Require Import ZArith.
 
 Section Named.
   Variable sz: nat.
@@ -48,11 +47,11 @@ Section Named.
     { counterImpl: word sz ;
       isSending: bool ;
       implEq : impl = (@^"counter", existT _ (SyntaxKind (Bit sz)) counterImpl)
-                        :: (@^"counter1", existT _ (SyntaxKind (Bit sz)) (zToWord _ 0))
+                        :: (@^"counter1", existT _ (SyntaxKind (Bit sz)) (ZToWord _ 0))
                         :: (@^"isSending", existT _ (SyntaxKind Bool) isSending) :: nil ;
       specEq : spec = (@^"counter", existT _ (SyntaxKind (Bit sz))
-                                           (if isSending then counterImpl else counterImpl ^+ (zToWord _ 1)))
-                        :: (@^"counter1", existT  _ (SyntaxKind (Bit sz)) (zToWord _ 0))
+                                           (if isSending then counterImpl else counterImpl ^+ (ZToWord _ 1)))
+                        :: (@^"counter1", existT  _ (SyntaxKind (Bit sz)) (ZToWord _ 0))
                         :: nil
     }.
 

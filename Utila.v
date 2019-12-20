@@ -48,7 +48,7 @@ Section utila.
       (width : Bit n @# ty)
       (x : Bit m @# ty)
       :  Bit m @# ty
-      := (x & ~($$(wones m) << width)).
+      := (x .& ~($$(wones m) << width)).
 
     Definition slice
       (n m k : nat)
@@ -56,7 +56,7 @@ Section utila.
       (width : Bit m @# ty)
       (x : Bit k @# ty)
       :  Bit k @# ty
-      := ((x >> offset) & ~($$(wones k) << width)).
+      := ((x >> offset) .& ~($$(wones k) << width)).
 
     Definition utila_opt_pkt
       (k : Kind)
@@ -861,7 +861,7 @@ Section utila.
 
     Definition utila_null (k : Kind)
       :  k @# type
-      := unpack k (Var type (SyntaxKind (Bit (size k))) (zToWord (size k) 0)).
+      := unpack k (Var type (SyntaxKind (Bit (size k))) (ZToWord (size k) 0)).
 
     Lemma utila_mfind_nil
       :  forall (k : Kind)
@@ -872,7 +872,7 @@ Section utila.
       (fun k f
         => eq_refl {{utila_null k}}
            || X = {{utila_null k}}
-              @X by utila_sem_unit_correct (unpack k (Var type (SyntaxKind (Bit (size k))) (zToWord (size k) 0)))
+              @X by utila_sem_unit_correct (unpack k (Var type (SyntaxKind (Bit (size k))) (ZToWord (size k) 0)))
            || [[munit (unpack k (Var type (SyntaxKind (Bit (size k))) X))]] = {{utila_null k}}
               @X by utila_sem_foldr_nil_correct
                       (fun x acc => (CABit (Bor) ((ITE (f x) (pack x) ($0)) :: acc :: nil)))
@@ -1192,7 +1192,7 @@ Open Scope word_scope.
                                   @a by <- wor_wzero _
                                              (if {{f #[[x0]]}}
                                                then {{pack #[[x0]]}}
-                                               else (zToWord _ 0))
+                                               else (ZToWord _ 0))
                                || _ = (if a : bool then _ else _) ^| _
                                   @a by <- fx0_true 
                                || _ = {{pack #[[a]]}} ^| _
@@ -1396,7 +1396,7 @@ Open Scope word_scope.
     Qed.
 
     Definition fin_to_bit {ty n} (i: Fin.t n) : Bit (Nat.log2_up n) @# ty :=
-      Const _ (zToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))).
+      Const _ (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))).
 
     Definition array_forall_except {ty n}
         (f: A @# ty -> Bool @# ty)

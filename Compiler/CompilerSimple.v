@@ -1,6 +1,5 @@
 Require Import Kami.Syntax Kami.Compiler.Compiler.
 Require Import Kami.Notations.
-Require Import ZArith.
 
 Section Simple.
 
@@ -69,14 +68,14 @@ Section Simple.
     | CompWrite idxNum num writePort dataArray idx Data val mask pred writeMap readMap lret cont =>
       @CompWrite_simple idxNum Data writePort dataArray (RmeSimple_of_RME readMap) lret
                         (fun arr => 
-                           CompLetFull_simple (CompRet_simple (($$ (zToWord 0 0))%kami_expr : Void @# ty)
+                           CompLetFull_simple (CompRet_simple (($$ (ZToWord 0 0))%kami_expr : Void @# ty)
                                                               (@WriteRME idxNum num writePort dataArray idx Data val mask pred
                                                                          (RmeSimple_of_RME writeMap)
                                                                          (RmeSimple_of_RME readMap) (#arr)%kami_expr))
                                               (fun _ y => CompActionSimple_of_CA (cont y)))
     | CompSyncReadReq idxNum num readReq readReg dataArray idx Data isAddr pred writeMap readMap lret cont =>
       @CompSyncReadReq_simple idxNum num Data readReq readReg dataArray isAddr (RmeSimple_of_RME readMap) lret
-                              (fun x => CompLetFull_simple (CompRet_simple (($$ (zToWord 0 0))%kami_expr : Void @# ty)
+                              (fun x => CompLetFull_simple (CompRet_simple (($$ (ZToWord 0 0))%kami_expr : Void @# ty)
                                                                            (@ReadReqRME idxNum num readReq readReg dataArray
                                                                                         idx Data isAddr pred
                                                                                         (RmeSimple_of_RME writeMap)
@@ -86,7 +85,7 @@ Section Simple.
     | CompSyncReadRes idxNum num readResp readReg dataArray writePort isWriteMask Data isAddr writeMap readMap lret cont =>
       CompSyncReadRes_simple idxNum readResp readReg dataArray writePort isWriteMask isAddr (RmeSimple_of_RME readMap)
                              (fun x => CompLetFull_simple
-                                         (CompRet_simple (($$(zToWord 0 0))%kami_expr)
+                                         (CompRet_simple (($$(ZToWord 0 0))%kami_expr)
                                                          (@ReadRespRME idxNum num readResp readReg dataArray writePort
                                                                        isWriteMask Data isAddr (RmeSimple_of_RME writeMap)
                                                                        (RmeSimple_of_RME readMap)))
@@ -94,7 +93,7 @@ Section Simple.
     | CompAsyncRead idxNum num readPort dataArray writePort isWriteMask idx pred k writeMap readMap lret cont =>
       CompAsyncRead_simple idxNum readPort dataArray writePort isWriteMask idx pred (RmeSimple_of_RME readMap)
                            (fun x =>
-                              CompLetFull_simple (CompRet_simple (($$(zToWord 0 0))%kami_expr : Void @# ty)
+                              CompLetFull_simple (CompRet_simple (($$(ZToWord 0 0))%kami_expr : Void @# ty)
                                                      (AsyncReadRME idxNum num readPort dataArray
                                                                    writePort isWriteMask idx pred
                                                                    k (RmeSimple_of_RME writeMap)

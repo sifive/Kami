@@ -1,4 +1,4 @@
-Require Import Kami.SyntaxDoubleWrites Kami.Compiler.Compiler Kami.Compiler.CompilerProps Kami.Syntax Kami.Properties Kami.PProperties Kami.PPlusProperties Kami.Lib.EclecticLib Kami.Notations ZArith.
+Require Import Kami.SyntaxDoubleWrites Kami.Compiler.Compiler Kami.Compiler.CompilerProps Kami.Syntax Kami.Properties Kami.PProperties Kami.PPlusProperties Kami.Lib.EclecticLib Kami.Notations.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
@@ -112,7 +112,7 @@ Section DoubleWritesProof.
       eapply H. apply H0. apply HSemCompActionT. apply H2.
     (* Write *)
     - inv H0; simpl in *; EqDep_subst.
-      assert (val_a = evalExpr (Const type (zToWord 0 0))) as P0.
+      assert (val_a = evalExpr (Const type (ZToWord 0 0))) as P0.
       {specialize (unique_word_0 val_a). intros. auto. }
       subst.
       inversion HSemCompActionT_a; EqDep_subst.
