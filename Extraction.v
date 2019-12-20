@@ -1,4 +1,4 @@
-Require Export List String Ascii BinNums.
+Require Export List String Ascii BinInt BinNat.
 Require Export Kami.Syntax Kami.Compiler.CompilerSimple Kami.Compiler.Compiler Kami.Compiler.Rtl Kami.LibStruct Kami.Compiler.UnverifiedIncompleteCompiler.
 
 Require Import Kami.Notations.
@@ -60,6 +60,23 @@ Extract Constant wmod => "(\_ -> Prelude.mod)".
 Extract Constant wslu => "(\_ x n -> Data.Bits.shiftL x (Prelude.fromIntegral n))".
 Extract Constant wsru => "(\_ x n -> Data.Bits.shiftR x (Prelude.fromIntegral n))".
 Extract Constant weqb => "(\_ -> (Prelude.==))".
+Extract Constant wuand => "(\n x -> x Prelude.== 2 Prelude.^ n)".
+Extract Constant wuor => "(\_ x -> Prelude.not (x Prelude.== 0))".
+Extract Constant wltu => "(\_ -> (Prelude.<))".
+Extract Constant truncMsb => "(\msb _ x -> Data.Bits.shiftR x msb)".
+Extract Inlined Constant Z.pow => "(Prelude.^)".
+Extract Inlined Constant Z.of_nat => "Prelude.toInteger".
+Extract Inlined Constant Z.ltb => "(Prelude.<)".
+Extract Inlined Constant Z.opp => "Prelude.negate".
+Extract Inlined Constant Z.div => "Prelude.div".
+Extract Inlined Constant Z.modulo => "Prelude.mod".
+Extract Inlined Constant N.succ_pos => "(\x -> x Prelude.+ 1)".
+Extract Inlined Constant N.add => "(Prelude.+)".
+Extract Inlined Constant N.sub => "(Prelude.-)".
+Extract Inlined Constant N.mul => "(Prelude.*)".
+Extract Inlined Constant N.eqb => "(Prelude.==)".
+Extract Inlined Constant N.ltb => "(Prelude.<)".
+Extract Inlined Constant N.of_nat => "Prelude.toInteger".
 
 Section Ty.
   Variable ty: Kind -> Type.
