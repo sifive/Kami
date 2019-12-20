@@ -397,7 +397,7 @@ Proof.
   - apply Z.mod_small; auto.
 Qed.
 
-Lemma Zpow_1_0 : forall b, (Z.pow 2 b = 1)%Z -> b = 0%Z.
+Lemma Zpow_1_0 : forall b, (pow2 b = 1)%Z -> b = 0%Z.
 Proof.
   repeat intro.
   destruct (Z_lt_le_dec 0 b).
@@ -423,7 +423,7 @@ Qed.
 
 
 Lemma wordToZ_ZToWord: forall (sz : nat) (w : Z),
-    (0 <= w < Z.pow 2 (Z.of_nat sz))%Z -> wordVal _ (ZToWord sz w) = w.
+    (0 <= w < pow2 (Z.of_nat sz))%Z -> wordVal _ (ZToWord sz w) = w.
 Proof.
   intros.
   arithmetizeWord.
@@ -612,7 +612,7 @@ Proof.
   lia.
 Qed.
 
-Lemma combine_wones_WO sz:
+Lemma combine_wmax_WO sz:
   forall w, w <> ZToWord sz 0 ->
             @truncMsb 1 (sz+1)
                       (@wadd _ (@wconcat sz 1 (sz+1) (wmax sz) (ZToWord 1 0))
@@ -686,7 +686,7 @@ Proof.
 Qed.
 
 Lemma truncLsb_fits_ZToWord n sz:
-  (0 <= n < Z.pow 2 (Z.of_nat sz))%Z -> 
+  (0 <= n < pow2 (Z.of_nat sz))%Z -> 
   (@truncLsb sz (sz+1) (ZToWord (sz + 1) n) = ZToWord sz n).
 Proof.
   intro.

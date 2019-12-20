@@ -45,14 +45,13 @@ Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)".
 Extract Inlined Constant getBool => "Prelude.id".
 Extract Constant ZToWord => "(\n x -> Prelude.mod x (2 Prelude.^ n))".
 Extract Inlined Constant NToWord => "(\_ x -> x)".
-Extract Constant wones => "(\n -> 2 Prelude.^ n Prelude.- 1)".
+Extract Constant wmax => "(\n -> 2 Prelude.^ n Prelude.- 1)".
 Extract Constant wadd => "(\_ x y -> x Prelude.+ y)".
 Extract Constant wsub => "(\_ x y -> x Prelude.- y)".
 Extract Constant wor => "(\_ x y -> x Data.Bits..|. y)".
 Extract Constant wand => "(\_ x y -> x Data.Bits..&. y)".
 Extract Constant wxor => "(\_ -> Data.Bits.xor)".
 Extract Constant wnot => "(\_ -> Data.Bits.complement)".
-Extract Constant wmax => "(\n -> 2 Prelude.^ n Prelude.- 1)".
 Extract Constant wuxor => "(\_ x -> Prelude.odd (Data.Bits.popCount x))".
 Extract Constant wmul => "(\_ x y -> x Prelude.* y)".
 Extract Constant wdiv => "(\_ -> Prelude.div)".
