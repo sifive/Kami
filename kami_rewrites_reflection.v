@@ -265,9 +265,42 @@ refine
     + apply (KRMakeModule_meths x).
 Defined.
 
-Definition KRSimplifyTop t e := ltac:(let x := eval cbv in (@KRSimplifyTop' t e) in exact x).
+Definition KRSimplifyTop {t} e := ltac:(let x := eval cbv in (@KRSimplifyTop' t e) in exact x).
 
-Fixpoint KRSimplify {t} (e: KRExpr t) :=
+Fixpoint KRSimplify' {tp} (e: KRExpr tp) : KRExpr tp.
+  inversion e.
+  - apply KRNil.
+  - subst.
+    apply e.
+  - subst.
+    apply (@KRSimplifyTop (KRTypeList t) (@KRCons t (@KRSimplify' t X) (@KRSimplify' (KRTypeList t) X0))).
+  - subst.
+    apply (@KRSimplifyTop (KRTypeList t) (@KRApp t (@KRSimplify' (KRTypeList t) X) (@KRSimplify' (KRTypeList t) X0))).
+  - apply (KRSimplifyTop (KRMERegister (KRSimplify' (KRTypeElem KRElemRegInitT) X))).
+  - apply (KRSimplifyTop (KRRegisters (KRSimplify' (KRTypeList (KRTypeElem KRElemRegInitT)) X))).
+  - apply (KRSimplifyTop (KRMERule (KRSimplify' (KRTypeElem KRElemRule) X))).
+  - apply (KRSimplifyTop (KRMEMeth (KRSimplify' (KRTypeElem KRElemDefMethT) X))).
+  - apply (KRSimplifyTop (KRMakeModule_regs (KRSimplify' (KRTypeList (KRTypeElem KRElemModuleElt)) X))).
+  - apply (KRSimplifyTop (KRMakeModule_rules (KRSimplify' (KRTypeList (KRTypeElem KRElemModuleElt)) X))).
+  - apply (KRSimplifyTop (KRMakeModule_meths (KRSimplify' (KRTypeList (KRTypeElem KRElemModuleElt)) X))).
+Defined.
+
+Definition KRSimplify t e := ltac:(let x := eval cbv in (@KRSimplify' t e) in exact x).
+
+  (*refine (
+      match e in KRExpr t return KRExpr t with
+      | @KRCons tp2 a b => _
+      | @KRApp t a b => _
+      | @KRRegisters a => _
+      | @KRMEMeth a => _
+      | @KRMERule a => _
+      | @KRMakeModule_rules a => _
+      | @KRMakeModule_regs a => _
+      | @KRMakeModule_meths a => _
+      | e => e
+      end).*)
+  
+(*Fixpoint KRSimplify {t} (e: KRExpr t) :=
   match e in KRExpr t return KRExpr t with
   | @KRCons t a b => KRSimplifyTop (@KRCons t (KRSimplify a) (KRSimplify b))
   | @KRApp t a b => KRSimplifyTop (@KRApp t (KRSimplify a) (KRSimplify b))
@@ -279,7 +312,7 @@ Fixpoint KRSimplify {t} (e: KRExpr t) :=
   | @KRMakeModule_regs a => KRSimplifyTop (@KRMakeModule_regs (KRSimplify a))
   | @KRMakeModule_meths a => KRSimplifyTop (@KRMakeModule_meths (KRSimplify a))
   | e => e
-  end.
+  end.*)
 
 Theorem KRSimplifyTopSound: forall t e,
     @KRExprDenote t e = @KRExprDenote t (@KRSimplifyTop t e).
@@ -307,10 +340,70 @@ Proof.
       reflexivity.
 Qed.
 
+Opaque KRSimplifyTop.
+
 Theorem KRSimplifySound: forall t e, @KRExprDenote t e = @KRExprDenote t (@KRSimplify t e).
 Proof.
-  (*intros.
-  induction e; simpl; auto.
+  intros.
+  induction e.
+  - reflexivity.
+  - reflexivity.
+  - simpl.
+    rewrite IHe1.
+    rewrite IHe2.
+    reflexivity.
+  - simpl.
+    remember (KRSimplify e1).
+    dependent destruction k;try (subst;simpl;simpl in IHe1;rewrite IHe1;simpl;rewrite <- IHe2;reflexivity).
+  - simpl.
+    rewrite <- IHe.
+    reflexivity.
+  - simpl.
+    remember (KRSimplify e).
+    dependent destruction k;try(simpl in IHe;rewrite IHe;reflexivity).
+    + rewrite IHe.
+      simpl.
+      rewrite Registers_dist_append.
+      reflexivity.
+  - simpl.
+    rewrite <- IHe.
+    reflexivity.
+  - simpl.
+    rewrite <- IHe.
+    reflexivity.
+  - simpl.
+    remember (KRSimplify e).
+    dependent destruction k;try (simpl in IHe;rewrite IHe;reflexivity).
+    + dependent destruction k1;try (rewrite IHe;simpl;reflexivity).
+    + rewrite IHe.
+      simpl.
+      rewrite makeModule_regs_append.
+      reflexivity.
+    + rewrite IHe.
+      simpl.
+      rewrite makeModule_regs_Registers.
+      reflexivity.
+  - simpl.
+    remember (KRSimplify e).
+    dependent destruction k;try (simpl in IHe;rewrite IHe;reflexivity).
+    + dependent destruction k1;try (rewrite IHe;simpl;reflexivity).
+    + rewrite IHe.
+      simpl.
+      rewrite makeModule_rules_append.
+      reflexivity.
+  - simpl.
+    remember (KRSimplify e).
+    dependent destruction k;try (simpl in IHe;rewrite IHe;reflexivity).
+    + dependent destruction k1;try (rewrite IHe;simpl;reflexivity).
+    + rewrite IHe.
+      simpl.
+      rewrite makeModule_meths_append.
+      reflexivity.
+Qed.
+
+Transparent KRSimplifyTop.
+
+  (*induction e; simpl; auto.
   - rewrite <- IHe1.
     rewrite <- IHe2.
     reflexivity.
@@ -336,9 +429,9 @@ Proof.
       reflexivity.
     + remember (KRSimplify e).
       dependent destruction k; simpl; auto.
-      * simpl in IHe.*)
+      * simpl in IHe.
       
-Admitted.
+Admitted.*)
 
 
 Ltac KRSimplifyTac e :=
