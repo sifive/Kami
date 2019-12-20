@@ -24,3 +24,9 @@ Makefile.coq
 *.md
 *.hs
 FixLits
+.*.swk
+.*.swl
+.*.swm
+.*.swn
+.*.swo
+.*.swp
