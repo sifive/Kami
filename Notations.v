@@ -139,10 +139,10 @@ Notation "a $#[ i : j ]":=
 Notation "e1 + e2" := (CABit (Add) (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 * e2" := (CABit (Mul) (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 .& e2" := (CABit (Band) (e1 :: e2 :: nil)) (at level 201)
-                      : kami_expr_scope.
+                       : kami_expr_scope.
 Notation "e1 .| e2" := (CABit (Bor) (e1 :: e2 :: nil)) (at level 201)
-                      : kami_expr_scope.
-Notation "e1 .^ e2" := (CABit (Bxor) (e1 :: e2 :: nil)) (at level 201): kami_expr_scope.
+                       : kami_expr_scope.
+Notation "e1 .^ e2" := (CABit (Bxor) (e1 :: e2 :: nil)) (at level 201) : kami_expr_scope.
 Infix "-" := (BinBit (Sub _)) : kami_expr_scope.
 Infix "/" := (BinBit (Div _)) : kami_expr_scope.
 Infix "%%" := (BinBit (Rem _)) (at level 100): kami_expr_scope.
