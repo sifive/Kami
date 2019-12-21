@@ -612,27 +612,27 @@ Proof.
   lia.
 Qed.
 
-Lemma combine_wones_WO sz:
-  forall w, w <> ZToWord sz 0 ->
-            truncMsb (outSz := sz+1)
-                     (wadd _ (wconcat (wones sz) (ZToWord 1 0))
-                           (wconcat w (@ZToWord 1 0)))
-            = (WO~1)%word.
-Proof.
-  intros.
-  arithmetizeWord.
-  rewrite Z.mod_1_l by reflexivity.
-  + rewrite Z.pow_pos_fold.
-    simpl in *.
-    rewrite Z.mod_0_l by (let H := fresh in intro H; discriminate).
-    rewrite Nat.add_sub.
-    rewrite Z.pow_pos_fold.
-    rewrite Z.pow_1_r.
-    repeat (rewrite Z.add_0_r).
+(* Lemma combine_wones_WO sz: *)
+(*   forall w, w <> ZToWord sz 0 -> *)
+(*             truncMsb (outSz := sz+1) *)
+(*                      (wadd _ (wconcat (wones sz) (ZToWord 1 0)) *)
+(*                            (wconcat w (@ZToWord 1 0))) *)
+(*             = (WO~1)%word. *)
+(* Proof. *)
+(*   intros. *)
+(*   arithmetizeWord. *)
+(*   rewrite Z.mod_1_l by reflexivity. *)
+(*   + rewrite Z.pow_pos_fold. *)
+(*     simpl in *. *)
+(*     rewrite Z.mod_0_l by (let H := fresh in intro H; discriminate). *)
+(*     rewrite Nat.add_sub. *)
+(*     rewrite Z.pow_pos_fold. *)
+(*     rewrite Z.pow_1_r. *)
+(*     repeat (rewrite Z.add_0_r). *)
     
-    simpl.
-    admit.
-Admitted.
+(*     simpl. *)
+(*     admit. *)
+(* Admitted. *)
 
 Lemma word1_neq (w: word 1):
   w <> (ZToWord 1 0) ->
