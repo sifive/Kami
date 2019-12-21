@@ -5,9 +5,11 @@ Require Import Kami.Notations.
 
 Require Coq.extraction.Extraction.
 
-Require Export ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString.
+Require Export ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString ExtrHaskellZInteger.
 
 Extraction Language Haskell.
+
+Require Import Kami.Lib.Word.
 
 Set Extraction Optimize.
 Set Extraction KeepSingleton.

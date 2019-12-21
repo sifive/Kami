@@ -282,13 +282,13 @@ Section exampleModule.
         LET x20 <- #x7 * #x8;
                 
         (* Bitwise And *)
-        LET x11 <- #x7 & #x8;
+        LET x11 <- #x7 .& #x8;
         
         (* Bitwise Or *)
-        LET x12 <- #x7 | #x8;
+        LET x12 <- #x7 .| #x8;
         
         (* Bitwise Xor *)
-        LET x13 <- #x7 ^ #x8;
+        LET x13 <- #x7 .^ #x8;
         
         (* Extract a bit-range *)
         LET x141 <- #x13$[3:4];
@@ -368,8 +368,8 @@ Section exampleModule.
           Actions, however, are non-deterministic. So, if we want to write a simple expression using let-blocks, we use a
           "LetExprSyntax" and convert it to actions using "convertLetExprSyntax_ActionT" as follows: *)
         LETA r2: Bit 10 <- convertLetExprSyntax_ActionT (
-          LETC k1: Bit 10 <- #x13 | #x7;
-          LETC k2 <- (#x8 | #k1);
+          LETC k1: Bit 10 <- #x13 .| #x7;
+          LETC k2 <- (#x8 .| #k1);
 
           (* We can have if-then-else inside let-expressions.
             The predicate is a simple expression, *not* a let-expression *)
