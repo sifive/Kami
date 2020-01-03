@@ -9,8 +9,6 @@ Require Export ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString ExtrHaskellZ
 
 Extraction Language Haskell.
 
-Require Import Kami.Lib.Word.
-
 Set Extraction Optimize.
 Set Extraction KeepSingleton.
 Unset Extraction AutoInline.
