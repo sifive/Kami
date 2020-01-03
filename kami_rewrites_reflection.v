@@ -65,7 +65,7 @@ Inductive KRExpr: KRType -> Type :=
   | KRMakeModule_meths : @KRExpr (KRTypeList (KRTypeElem KRElemModuleElt)) ->
                          @KRExpr (KRTypeList (KRTypeElem KRElemDefMethT))
   | KRMakeModule : @KRExpr (KRTypeList (KRTypeElem KRElemModuleElt)) ->
-                   @KRExpr (KRTypeElem (KRElemMod))
+                   @KRExpr (KRTypeElem (KRElemBaseModule))
   | KRBaseMod : @KRExpr (KRTypeList (KRTypeElem KRElemRegInitT)) ->
                 @KRExpr (KRTypeList (KRTypeElem KRElemRule)) ->
                 @KRExpr (KRTypeList (KRTypeElem KRElemDefMethT)) ->
@@ -123,23 +123,29 @@ Ltac KRExprReify e t :=
                        constr:(@KRRegisters x)
   | getRegisters ?E => let x := ltac:(KRExprReify E (KRTypeList (KRTypeElem KRElemBaseModule))) in
                        constr:(@KRgetRegisters x)
-  | getAllRegisters ?E => let x := ltac:(KRExprReify E (KRTypeList (KRTypeElem KRElemMod))) in
+  | getAllRegisters ?E => let x := ltac:(KRExprReify E (KRTypeElem KRElemMod)) in
                           constr:(@KRgetAllRegisters x)
+  | getAllRegisters ?E => let x := ltac:(KRExprReify E (KRTypeElem KRElemMod)) in
+                          constr:(@KRgetAllRegisters (@KRBase x))
+  | getAllRegisters ?E => let x := ltac:(KRExprReify E (KRTypeElem KRElemBaseModule)) in
+                          constr:(@KRgetAllRegisters x)
+  | getAllRegisters ?E => let x := ltac:(KRExprReify E (KRTypeElem KRElemBaseModule)) in
+                          constr:(@KRgetAllRegisters (@KRBase x))
   | MERule ?E => let  x := ltac:(KRExprReify E (KRTypeElem KRElemRule)) in
                      constr:(@KRMERule x)
   | Rules ?E => let x := ltac:(KRExprReify E (KRTypeList (KRTypeElem KRElemRule))) in
                          constr:(@KRRules x)
-  | getRules ?E => let x := ltac:(KRExprReify E (KRTypeList (KRTypeElem KRElemBaseModule))) in
+  | getRules ?E => let x := ltac:(KRExprReify E (KRTypeElem KRElemBaseModule)) in
                    constr:(@KRgetRules x)
-  | getAllRules ?E => let x := ltac:(KRExprReify E (KRTypeList (KRTypeElem KRElemMod))) in
+  | getAllRules ?E => let x := ltac:(KRExprReify E (KRTypeElem KRElemMod)) in
                       constr:(@KRgetAllRules x)
   | MEMeth ?E => let x := ltac:(KRExprReify E (KRTypeElem KRElemDefMethT)) in
                      constr:(@KRMEMeth x)
   | Methods ?E => let x := ltac:(KRExprReify E (KRTypeList (KRTypeElem KRElemDefMethT))) in
                            constr:(@KRMethods x)
-  | getMethods ?E => let x := ltac:(KRExprReify E (KRTypeList (KRTypeElem KRElemBaseModule))) in
+  | getMethods ?E => let x := ltac:(KRExprReify E (KRTypeElem KRElemBaseModule)) in
                      constr:(@KRgetMethods x)
-  | getAllMethods ?E => let x := ltac:(KRExprReify E (KRTypeList (KRTypeElem KRElemMod))) in
+  | getAllMethods ?E => let x := ltac:(KRExprReify E (KRTypeElem KRElemMod)) in
                         constr:(@KRgetAllMethods x)
   | makeModule_regs ?X => let x := ltac:(KRExprReify X (KRTypeList (KRTypeElem KRElemModuleElt))) in
                               constr:(@KRMakeModule_regs x)
@@ -287,24 +293,35 @@ refine
     + apply (KRMethods x).
   - inversion x.
     + apply (KRgetRegisters x).
+    + inversion X.
+      * apply KRNil.
+      * apply (KRgetRegisters x).
+      * inversion X0.
+        -- apply (KRgetRegisters x).
+        -- apply (@KRCons (KRTypeElem KRElemRegInitT) X2 (KRgetRegisters (KRMakeModule X1))).
+        -- apply (KRgetRegisters (KRMakeModule X1)).
+        -- apply (KRgetRegisters (KRMakeModule X1)).
+      * apply (@KRApp (KRTypeElem KRElemRegInitT) (KRgetRegisters (KRMakeModule X0)) (KRgetRegisters (KRMakeModule X1))).
+      * apply (KRgetRegisters x).
+      * apply (KRgetRegisters x).
+      * apply (KRgetRegisters x).
     + apply X.
   - inversion x.
     + apply (KRgetAllRegisters x).
-    + apply (KRMakeModule_regs X).
     + apply (KRgetRegisters X).
   - inversion x.
+    + apply (KRgetRules x).
     + apply (KRgetRules x).
     + apply X0.
   - inversion x.
     + apply (KRgetAllRules x).
-    + apply (KRMakeModule_rules X).
     + apply (KRgetRules X).
   - inversion x.
+    + apply (KRgetMethods x).
     + apply (KRgetMethods x).
     + apply X1.
   - inversion x.
     + apply (KRgetAllMethods x).
-    + apply (KRMakeModule_meths X).
     + apply (KRgetMethods X).
   - inversion x.
     + apply KRNil.
