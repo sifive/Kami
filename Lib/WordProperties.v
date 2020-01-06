@@ -705,10 +705,13 @@ Theorem concat_split : forall sz1 sz2 (w : word (sz1 + sz2)),
 Proof.
   intros. 
   arithmetizeWord.
-  rewrite minus_plus.
-  admit.
-Admitted.
-
+  erewrite minus_plus, Z.add_comm, Z.mul_comm, <- Z.rem_mul_r.
+  - erewrite <- Z.pow_add_r, <- Nat2Z.inj_add,  Nat.add_comm; try apply Nat2Z.is_nonneg.
+    repeat rewrite wordBound; auto.
+  - intro.
+    specialize (Z_of_nat_pow_2_gt_0 sz2) as P0; lia.
+  - specialize (Z_of_nat_pow_2_gt_0 sz1) as P0; lia.
+Qed.
 
 Fixpoint mod2 (n : nat) : bool :=
   match n with
