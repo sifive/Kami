@@ -4269,7 +4269,7 @@ Section test.
   Definition Slt2 n (e1 e2: Expr ty (SyntaxKind (Bit (n + 1)))) :=
     ITE (Eq (UniBit (TruncMsb n 1) e1) (Const ty (ZToWord 1 0)))
         (ITE (Eq (UniBit (TruncMsb n 1) e2) (Const ty (ZToWord 1 0))) (BinBitBool (LessThan _) e1 e2) (Const ty false))
-        (ITE (Eq (UniBit (TruncMsb n 1) e2) (Const ty (ZToWord 1 ((pow2 1) - 1)))) (BinBitBool (LessThan _) e1 e2) (Const ty true)).
+        (ITE (Eq (UniBit (TruncMsb n 1) e2) (Const ty (ZToWord 1 ((2 ^ 1) - 1)))) (BinBitBool (LessThan _) e1 e2) (Const ty true)).
 End test.
 
 Lemma Slt_same n e1 e2: evalExpr (Slt2 n e1 e2) = evalExpr (Slt n e1 e2).

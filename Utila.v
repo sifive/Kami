@@ -48,7 +48,7 @@ Section utila.
       (width : Bit n @# ty)
       (x : Bit m @# ty)
       :  Bit m @# ty
-      := (x .& ~($$(wmax m) << width)).
+      := (x .& ~($$(wones m) << width)).
 
     Definition slice
       (n m k : nat)
@@ -56,7 +56,7 @@ Section utila.
       (width : Bit m @# ty)
       (x : Bit k @# ty)
       :  Bit k @# ty
-      := ((x >> offset) .& ~($$(wmax k) << width)).
+      := ((x >> offset) .& ~($$(wones k) << width)).
 
     Definition utila_opt_pkt
       (k : Kind)

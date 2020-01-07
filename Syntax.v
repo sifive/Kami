@@ -165,7 +165,7 @@ Section Phoas.
       UniBit (TruncMsb lsb n) (UniBit (TruncLsb (lsb + n) msb) e).
 
     Definition OneExtend msb lsb (e: Expr (SyntaxKind (Bit lsb))): Expr (SyntaxKind (Bit (lsb + msb))) :=
-      (BinBit (Concat msb lsb) (Const (ZToWord msb ((pow2 (Z.of_nat msb)) - 1)))) e.
+      (BinBit (Concat msb lsb) (Const (ZToWord msb ((2 ^ (Z.of_nat msb)) - 1)))) e.
 
     Definition ZeroExtend msb lsb (e: Expr (SyntaxKind (Bit lsb))): Expr (SyntaxKind (Bit (lsb + msb))) :=
       (BinBit (Concat msb lsb) (Const (ZToWord msb 0))) e.
@@ -178,7 +178,7 @@ Section Phoas.
                                                                      (castBits _ e))
                                                              (Const (ZToWord 1 0)))
                                                          (Const (ZToWord msb 0))
-                                                         (Const (ZToWord msb ((pow2 (Z.of_nat msb)) - 1)))) e
+                                                         (Const (ZToWord msb ((2 ^ (Z.of_nat msb)) - 1)))) e
         end; abstract lia.
     Defined.
 
@@ -280,7 +280,7 @@ Section Phoas.
     Fixpoint pack (k: Kind): Expr (SyntaxKind k) -> Expr (SyntaxKind (Bit (size k))).
       refine
       match k return Expr (SyntaxKind k) -> Expr (SyntaxKind (Bit (size k))) with
-      | Bool => fun e => (ITE e (Const  (ZToWord 1 ((pow2 1) - 1))) (Const (ZToWord 1 0)))
+      | Bool => fun e => (ITE e (Const  (ZToWord 1 ((2 ^ 1) - 1))) (Const (ZToWord 1 0)))
       | Bit n => fun e => e
       | Struct n fk fs =>
         fun e =>
@@ -329,7 +329,7 @@ Section Phoas.
 
     Fixpoint unpack (k: Kind): Expr (SyntaxKind (Bit (size k))) -> Expr (SyntaxKind k) :=
       match k return Expr (SyntaxKind (Bit (size k))) -> Expr (SyntaxKind k) with
-      | Bool => fun e => Eq e (Const  (ZToWord 1 ((pow2 1) - 1)))
+      | Bool => fun e => Eq e (Const  (ZToWord 1 ((2 ^ 1) - 1)))
       | Bit _ => fun e => e
       | Struct n fk fs =>
         fun e => BuildStruct
@@ -1005,7 +1005,7 @@ Definition evalCABit n (op: CABitOp) (ls: list (word n)): word n :=
   match op with
     | Add => fold_left (wadd n) ls (ZToWord n 0)
     | Mul => fold_left (wmul n) ls (ZToWord n 1)
-    | Band => fold_left (wand n) ls  (ZToWord n ((pow2 (Z.of_nat n)) - 1))
+    | Band => fold_left (wand n) ls  (ZToWord n ((2 ^ (Z.of_nat n)) - 1))
     | Bor => fold_left (wor n) ls (ZToWord n 0)
     | Bxor => fold_left (wxor n) ls (ZToWord n 0)
   end.

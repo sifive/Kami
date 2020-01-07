@@ -45,7 +45,7 @@ Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)".
 Extract Inlined Constant getBool => "Prelude.id".
 Extract Constant ZToWord => "(\n x -> Prelude.mod x (2 Prelude.^ n))".
 Extract Inlined Constant NToWord => "(\_ x -> x)".
-Extract Constant wmax => "(\n -> 2 Prelude.^ n Prelude.- 1)".
+Extract Constant wones => "(\n -> 2 Prelude.^ n Prelude.- 1)".
 Extract Constant wadd => "(\_ x y -> x Prelude.+ y)".
 Extract Constant wsub => "(\_ x y -> x Prelude.- y)".
 Extract Constant wor => "(\_ x y -> x Data.Bits..|. y)".
