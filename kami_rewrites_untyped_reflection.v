@@ -83,10 +83,10 @@ Definition KRExprType (e: KRExpr) :=
   end.
 
 
-Fixpoint KRExprDenote' (e: KRExpr) : option (KRTypeDenote (KRExprType e)).
-  refine (match e return option (KRTypeDenote (KRExprType e)) with
-  | KRNil t => Some (@nil (KRTypeDenote t))
-  | KRVar t e => Some e
+Fixpoint KRExprDenote' (tp:KRType) (e: KRExpr) : option (KRTypeDenote tp).
+  refine (match e return option (KRTypeDenote tp) with
+  | KRNil t => _
+  | KRVar t e => _
   | KRCons t a b => _
   | KRApp t a b => _
   | KRMERegister e => _
@@ -108,280 +108,307 @@ Fixpoint KRExprDenote' (e: KRExpr) : option (KRTypeDenote (KRExprType e)).
   | KRBaseMod regs rules meths => _
   | KRBase b => _
   end).
-  - assert ({KRExprType a=t}+{KRExprType a<>t}).
-        repeat (decide equality).
-      destruct H.
-    + subst.
-      assert ({KRTypeList (KRExprType a)=KRExprType b}+{KRTypeList (KRExprType a)<>KRExprType b}).
-        repeat (decide equality).
-      destruct H.
-      * refine (match KRExprDenote' a,KRExprDenote' b with
-               | Some a',Some b' => Some (_)
-               | _,_ => None
-               end).
-        rewrite <- e0 in b'.
-        apply (cons a' b').
-      * apply None.
-    + apply None.
-  - assert ({KRExprType a=KRTypeList t}+{KRExprType a<>KRTypeList t}).
-        repeat (decide equality).
-      destruct H.
-    + subst.
-      assert ({KRExprType a=KRExprType b}+{KRExprType a<>KRExprType b}).
-        repeat (decide equality).
-      destruct H.
-      * refine (match KRExprDenote' a,KRExprDenote' b with
-               | Some a',Some b' => Some (_)
-               | _,_ => None
-                end).
-        simpl.
-        rewrite <- e1 in b'.
-        rewrite e0 in a'.
-        rewrite e0 in b'.
-        apply (app a' b').
-      * apply None.
-    + apply None.
-  - assert ({KRTypeElem KRElemRegInitT=KRExprType e}+{KRTypeElem KRElemRegInitT<>KRExprType e}).
-      repeat (decide equality).
+  - assert ({KRTypeList t=tp}+{KRTypeList t<>tp}).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' e with
-                | Some e' => _
-                | None => None
-                end).
-        rewrite <- e1 in e'.
-        simpl.
-        simpl in e'.
-        apply (Some (MERegister e')).
+      * subst.
+        apply (Some (@nil (KRTypeDenote t))).
+      * apply None.
+  - assert ({t=tp}+{t<>tp}).
+    + repeat (decide equality).
+    + destruct H.
+      * subst.
+        apply (Some e).
+      * apply None.
+  - assert ({KRTypeList (KRExprType a)=tp}+{KRTypeList (KRExprType a)<>tp}).
+    + repeat (decide equality).
+    + destruct H.
+      * subst.
+        assert ({KRExprType a=t}+{KRExprType a<>t}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ subst.
+              assert ({KRExprType b=KRTypeList (KRExprType a)}+{KRExprType b<>KRTypeList (KRExprType a)}).
+              ** repeat (decide equality).
+              ** destruct H.
+                 --- apply (match (KRExprDenote' (KRExprType a) a),(KRExprDenote' (KRTypeList (KRExprType a)) b) with
+                             | Some a',Some b' => Some (cons a' b')
+                             | _,_ => None
+                            end).
+                 --- apply None.
+           ++ apply None.
+      * apply None.
+  - assert ({KRExprType a=tp}+{KRExprType a<>tp}).
+    + repeat (decide equality).
+    + destruct H.
+      * subst.
+        assert ({KRExprType b=KRExprType a}+{KRExprType b<>KRExprType a}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ assert ({KRExprType a=KRTypeList t}+{KRExprType a<>KRTypeList t}).
+              ** repeat (decide equality).
+              ** destruct H.
+                 --- refine (match (KRExprDenote' (KRExprType a) a),(KRExprDenote' (KRExprType a) b) with
+                             | Some a',Some b' => Some (_)
+                             | _,_ => None
+                             end).
+                     rewrite e1 in a'.
+                     rewrite e1 in b'.
+                     rewrite e1.
+                     apply (app a' b').
+                 --- apply None.
+           ++ apply None.
+      * apply None.
+  - assert ({KRTypeElem KRElemRegInitT=KRExprType e}+{KRTypeElem KRElemRegInitT<>KRExprType e}).
+    + repeat (decide equality).
+    + destruct H.
+      * assert ({tp=KRTypeElem KRElemModuleElt}+{tp<>KRTypeElem KRElemModuleElt}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ subst.
+              apply (match KRExprDenote' (KRTypeElem KRElemRegInitT) e with
+                     | Some e' => Some (MERegister e')
+                     | None => None
+                     end).
+           ++ apply None.
       * apply None.
   - assert ({KRTypeList (KRTypeElem KRElemRegInitT)=KRExprType l}+{KRTypeList (KRTypeElem KRElemRegInitT)<>KRExprType l}).
-      repeat (decide equality).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' l with
-                | Some l' => _
-                | None => None
-                end).
-        rewrite <- e0 in l'.
-        simpl.
-        simpl in l'.
-        apply (Some (Registers l')).
+      * assert ({tp=KRTypeList (KRTypeElem KRElemModuleElt)}+{tp<>KRTypeList (KRTypeElem KRElemModuleElt)}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ subst.
+              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemRegInitT)) l with
+                     | Some e' => Some (Registers e')
+                     | None => None
+                     end).
+           ++ apply None.
       * apply None.
   - assert ({KRTypeList (KRTypeElem KRElemRule)=KRExprType l}+{KRTypeList (KRTypeElem KRElemRule)<>KRExprType l}).
-      repeat (decide equality).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' l with
-                | Some l' => _
-                | None => None
-                end).
-        rewrite <- e0 in l'.
-        simpl.
-        simpl in l'.
-        apply (Some (Rules l')).
+      * assert ({tp=KRTypeList (KRTypeElem KRElemModuleElt)}+{tp<>KRTypeList (KRTypeElem KRElemModuleElt)}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ subst.
+              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemRule)) l with
+                     | Some l' => Some (Rules l')
+                     | None => None
+                     end).
+           ++ apply None.
       * apply None.
   - assert ({KRTypeList (KRTypeElem KRElemDefMethT)=KRExprType l}+{KRTypeList (KRTypeElem KRElemDefMethT)<>KRExprType l}).
-      repeat (decide equality).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' l with
-                | Some l' => _
-                | None => None
-                end).
-        rewrite <- e0 in l'.
-        simpl.
-        simpl in l'.
-        apply (Some (Methods l')).
+      * assert ({tp=KRTypeList (KRTypeElem KRElemModuleElt)}+{tp<>KRTypeList (KRTypeElem KRElemModuleElt)}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ subst.
+              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemDefMethT)) l with
+                     | Some e' => Some (Methods e')
+                     | None => None
+                     end).
+           ++ apply None.
       * apply None.
   - assert ({KRTypeElem KRElemRule=KRExprType r}+{KRTypeElem KRElemRule<>KRExprType r}).
-      repeat (decide equality).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' r with
-                | Some r' => _
-                | None => None
-                end).
-        rewrite <- e0 in r'.
-        simpl.
-        simpl in r'.
-        apply (Some (MERule r')).
+      * assert ({tp=KRTypeElem KRElemModuleElt}+{tp<>KRTypeElem KRElemModuleElt}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ subst.
+              apply (match KRExprDenote' (KRTypeElem KRElemRule) r with
+                     | Some r' => Some (MERule r')
+                     | None => None
+                     end).
+           ++ apply None.
       * apply None.
   - assert ({KRTypeElem KRElemDefMethT=KRExprType m}+{KRTypeElem KRElemDefMethT<>KRExprType m}).
-      repeat (decide equality).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' m with
-                | Some m' => _
-                | None => None
-                end).
-        rewrite <- e0 in m'.
-        simpl.
-        simpl in m'.
-        apply (Some (MEMeth m')).
+      * assert ({tp=KRTypeElem KRElemModuleElt}+{tp<>KRTypeElem KRElemModuleElt}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ subst.
+              apply (match KRExprDenote' (KRTypeElem KRElemDefMethT) m with
+                     | Some m' => Some (MEMeth m')
+                     | None => None
+                     end).
+           ++ apply None.
       * apply None.
-  - assert ({KRTypeElem KRElemBaseModule=KRExprType l}+{KRTypeElem KRElemBaseModule<>KRExprType l}).
-      repeat (decide equality).
+  - assert ({tp=KRTypeList (KRTypeElem KRElemRegInitT)}+{tp<>KRTypeList (KRTypeElem KRElemRegInitT)}).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' l with
-                | Some l' => _
-                | None => None
-                end).
-        rewrite <- e0 in l'.
-        simpl.
-        simpl in l'.
-        apply (Some (getRegisters l')).
+      * subst.
+        assert ({KRTypeElem KRElemBaseModule=KRExprType l}+{KRTypeElem KRElemBaseModule<>KRExprType l}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ** refine (match KRExprDenote' (KRTypeElem KRElemBaseModule) l with
+                      | Some l' => Some (getRegisters l')
+                      | None => None
+                      end).
+           ** apply None.
       * apply None.
-  - assert ({KRTypeElem KRElemMod=KRExprType l}+{KRTypeElem KRElemMod<>KRExprType l}).
-      repeat (decide equality).
+  - assert ({tp=KRTypeList (KRTypeElem KRElemRegInitT)}+{tp<>KRTypeList (KRTypeElem KRElemRegInitT)}).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' l with
-                | Some l' => _
-                | None => None
-                end).
-        rewrite <- e0 in l'.
-        simpl.
-        simpl in l'.
-        apply (Some (getAllRegisters l')).
+      * subst.
+        assert ({KRTypeElem KRElemMod=KRExprType l}+{KRTypeElem KRElemMod<>KRExprType l}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ** refine (match KRExprDenote' (KRTypeElem KRElemMod) l with
+                      | Some l' => Some (getAllRegisters l')
+                      | None => None
+                      end).
+           ** apply None.
       * apply None.
-  - assert ({KRTypeElem KRElemBaseModule=KRExprType l}+{KRTypeElem KRElemBaseModule<>KRExprType l}).
-      repeat (decide equality).
+  - assert ({tp=KRTypeList (KRTypeElem KRElemRule)}+{tp<>KRTypeList (KRTypeElem KRElemRule)}).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' l with
-                | Some l' => _
-                | None => None
-                end).
-        rewrite <- e0 in l'.
-        simpl.
-        simpl in l'.
-        apply (Some (getRules l')).
+      * subst.
+        assert ({KRTypeElem KRElemBaseModule=KRExprType l}+{KRTypeElem KRElemBaseModule<>KRExprType l}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ** refine (match KRExprDenote' (KRTypeElem KRElemBaseModule) l with
+                      | Some l' => Some (getRules l')
+                      | None => None
+                      end).
+           ** apply None.
       * apply None.
-  - assert ({KRTypeElem KRElemMod=KRExprType l}+{KRTypeElem KRElemMod<>KRExprType l}).
-      repeat (decide equality).
+  - assert ({tp=KRTypeList (KRTypeElem KRElemRule)}+{tp<>KRTypeList (KRTypeElem KRElemRule)}).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' l with
-                | Some l' => _
-                | None => None
-                end).
-        rewrite <- e0 in l'.
-        simpl.
-        simpl in l'.
-        apply (Some (getAllRules l')).
+      * subst.
+        assert ({KRTypeElem KRElemMod=KRExprType l}+{KRTypeElem KRElemMod<>KRExprType l}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ** refine (match KRExprDenote' (KRTypeElem KRElemMod) l with
+                      | Some l' => Some (getAllRules l')
+                      | None => None
+                      end).
+           ** apply None.
       * apply None.
-  - assert ({KRTypeElem KRElemBaseModule=KRExprType l}+{KRTypeElem KRElemBaseModule<>KRExprType l}).
-      repeat (decide equality).
+  - assert ({tp=KRTypeList (KRTypeElem KRElemDefMethT)}+{tp<>KRTypeList (KRTypeElem KRElemDefMethT)}).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' l with
-                | Some l' => _
-                | None => None
-                end).
-        rewrite <- e0 in l'.
-        simpl.
-        simpl in l'.
-        apply (Some (getMethods l')).
+      * subst.
+        assert ({KRTypeElem KRElemBaseModule=KRExprType l}+{KRTypeElem KRElemBaseModule<>KRExprType l}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ** refine (match KRExprDenote' (KRTypeElem KRElemBaseModule) l with
+                      | Some l' => Some (getMethods l')
+                      | None => None
+                      end).
+           ** apply None.
       * apply None.
-  - assert ({KRTypeElem KRElemMod=KRExprType l}+{KRTypeElem KRElemMod<>KRExprType l}).
-      repeat (decide equality).
+  - assert ({tp=KRTypeList (KRTypeElem KRElemDefMethT)}+{tp<>KRTypeList (KRTypeElem KRElemDefMethT)}).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' l with
-                | Some l' => _
-                | None => None
-                end).
-        rewrite <- e0 in l'.
-        simpl.
-        simpl in l'.
-        apply (Some (getAllMethods l')).
+      * subst.
+        assert ({KRTypeElem KRElemMod=KRExprType l}+{KRTypeElem KRElemMod<>KRExprType l}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ** refine (match KRExprDenote' (KRTypeElem KRElemMod) l with
+                      | Some l' => Some (getAllMethods l')
+                      | None => None
+                      end).
+           ** apply None.
       * apply None.
-  - assert ({KRTypeList (KRTypeElem KRElemModuleElt)=KRExprType r}+{KRTypeList (KRTypeElem KRElemModuleElt)<>KRExprType r}).
-      repeat (decide equality).
+  - assert ({tp=KRTypeList (KRTypeElem KRElemRegInitT)}+{tp<>KRTypeList (KRTypeElem KRElemRegInitT)}).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' r with
-                | Some r' => _
-                | None => None
-                end).
-        rewrite <- e0 in r'.
-        simpl.
-        simpl in r'.
-        apply (Some (makeModule_regs r')).
+      * assert ({KRTypeList (KRTypeElem KRElemModuleElt)=KRExprType r}+{KRTypeList (KRTypeElem KRElemModuleElt)<>KRExprType r}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ subst.
+              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemModuleElt)) r with
+                     | Some r' => Some (makeModule_regs r')
+                     | None => None
+                     end).
+           ++ apply None.
       * apply None.
-  - assert ({KRTypeList (KRTypeElem KRElemModuleElt)=KRExprType r}+{KRTypeList (KRTypeElem KRElemModuleElt)<>KRExprType r}).
-      repeat (decide equality).
+  - assert ({tp=KRTypeList (KRTypeElem KRElemRule)}+{tp<>KRTypeList (KRTypeElem KRElemRule)}).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' r with
-                | Some r' => _
-                | None => None
-                end).
-        rewrite <- e0 in r'.
-        simpl.
-        simpl in r'.
-        apply (Some (makeModule_rules r')).
+      * assert ({KRTypeList (KRTypeElem KRElemModuleElt)=KRExprType r}+{KRTypeList (KRTypeElem KRElemModuleElt)<>KRExprType r}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ subst.
+              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemModuleElt)) r with
+                     | Some r' => Some (makeModule_rules r')
+                     | None => None
+                     end).
+           ++ apply None.
       * apply None.
-  - assert ({KRTypeList (KRTypeElem KRElemModuleElt)=KRExprType m}+{KRTypeList (KRTypeElem KRElemModuleElt)<>KRExprType m}).
-      repeat (decide equality).
+  - assert ({tp=KRTypeList (KRTypeElem KRElemDefMethT)}+{tp<>KRTypeList (KRTypeElem KRElemDefMethT)}).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' m with
-                | Some m' => _
-                | None => None
-                end).
-        rewrite <- e0 in m'.
-        simpl.
-        simpl in m'.
-        apply (Some (makeModule_meths m')).
+      * assert ({KRTypeList (KRTypeElem KRElemModuleElt)=KRExprType m}+{KRTypeList (KRTypeElem KRElemModuleElt)<>KRExprType m}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ subst.
+              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemModuleElt)) m with
+                     | Some m' => Some (makeModule_meths m')
+                     | None => None
+                     end).
+           ++ apply None.
       * apply None.
   - assert ({KRTypeList (KRTypeElem KRElemModuleElt)=KRExprType l}+{KRTypeList (KRTypeElem KRElemModuleElt)<>KRExprType l}).
-      repeat (decide equality).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' l with
-                | Some l' => _
-                | None => None
-                end).
-        rewrite <- e0 in l'.
-        simpl.
-        simpl in l'.
-        apply (Some (makeModule l')).
+      * assert ({KRTypeElem KRElemBaseModule=tp}+{KRTypeElem KRElemBaseModule<>tp}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ subst.
+              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemModuleElt)) l with
+                     | Some l' => Some (makeModule l')
+                     | None => None
+                     end).
+           ++ apply None.
       * apply None.
-  - assert ({KRTypeList (KRTypeElem KRElemRegInitT)=KRExprType regs}+{KRTypeList (KRTypeElem KRElemRegInitT)<>KRExprType regs}).
-      repeat (decide equality).
+  - assert ({KRTypeElem KRElemBaseModule=tp}+{KRTypeElem KRElemBaseModule<>tp}).
+    + repeat (decide equality).
     + destruct H.
-      * assert ({KRTypeList (KRTypeElem KRElemRule)=KRExprType rules}+{KRTypeList (KRTypeElem KRElemRule)<>KRExprType rules}).
-          repeat (decide equality).
-      -- destruct H.
-         ++ assert ({KRTypeList (KRTypeElem KRElemDefMethT)=KRExprType meths}+{KRTypeList (KRTypeElem KRElemDefMethT)<>KRExprType meths}).
-            repeat (decide equality).
-         ** destruct H.
-            --- refine (match KRExprDenote' regs,KRExprDenote' rules,KRExprDenote' meths with
-                | Some regs',Some rules',Some meths' => _
-                | _,_,_ => None
-                end).
-                rewrite <- e0 in regs'.
-                rewrite <- e1 in rules'.
-                rewrite <- e2 in meths'.
-                simpl.
-                simpl in regs'.
-                simpl in rules'.
-                simpl in meths'.
-                apply (Some (BaseMod regs' rules' meths')).
-            --- apply None.
-         ++ apply None.
+      * assert ({KRTypeList (KRTypeElem KRElemRegInitT)=KRExprType regs}+{KRTypeList (KRTypeElem KRElemRegInitT)<>KRExprType regs}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ assert ({KRTypeList (KRTypeElem KRElemRule)=KRExprType rules}+{KRTypeList (KRTypeElem KRElemRule)<>KRExprType rules}).
+              ** repeat (decide equality).
+              ** destruct H.
+                 --- assert ({KRTypeList (KRTypeElem KRElemDefMethT)=KRExprType meths}+{KRTypeList (KRTypeElem KRElemDefMethT)<>KRExprType meths}).
+                     +++ repeat (decide equality).
+                     +++ destruct H.
+                         *** subst.
+                             apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemRegInitT)) regs,KRExprDenote' (KRTypeList (KRTypeElem KRElemRule)) rules,KRExprDenote' (KRTypeList (KRTypeElem KRElemDefMethT)) meths with
+                                     | Some regs',Some rules',Some meths' => Some (BaseMod regs' rules' meths')
+                                     | _,_,_ => None
+                                     end).
+                         *** apply None.
+                --- apply None.
+           ++ apply None.
       * apply None.
-  - assert ({KRTypeElem KRElemBaseModule=KRExprType b}+{KRTypeElem KRElemBaseModule<>KRExprType b}).
-      repeat (decide equality).
+  - assert ({KRTypeElem KRElemMod=tp}+{KRTypeElem KRElemMod<>tp}).
+    + repeat (decide equality).
     + destruct H.
-      * refine (match KRExprDenote' b with
-                | Some b' => _
-                | None => None
-                end).
-        rewrite <- e0 in b'.
-        simpl.
-        simpl in b'.
-        apply (Some (Base b')).
+      * assert ({KRTypeElem KRElemBaseModule=KRExprType b}+{KRTypeElem KRElemBaseModule<>KRExprType b}).
+        -- repeat (decide equality).
+        -- destruct H.
+           ++ subst.
+              apply (match KRExprDenote' (KRTypeElem KRElemBaseModule) b with
+                     | Some b' => Some (Base b')
+                     | None => None
+                     end).
+           ++ apply None.
       * apply None.
 Defined.
 
-Definition KRExprDenote'' e := ltac:(let x := eval cbv in (@KRExprDenote' e) in exact x).
+Opaque app.
 
-Fixpoint KRExprDenote (tp:KRType) (e:KRExpr) : option (KRTypeDenote tp).
-  assert({tp=KRExprType e}+{tp<>KRExprType e}).
-    repeat (decide equality).
-  - destruct H.
-    + subst.
-      apply (KRExprDenote'' e).
-    + apply None.
-Defined.
-    
+Definition KRExprDenote tp e := ltac:(let x := eval cbv in (@KRExprDenote' tp e) in exact x).
+
+Transparent app.
+
 Ltac KRExprReify e t :=
   match e with
   | nil => match t with
@@ -579,9 +606,9 @@ Admitted. (*Proof.
       reflexivity.
 Qed.*)
 
-(*Opaque KRSimplifyTop.
+Opaque KRSimplifyTop.
 
-Theorem KRSimplifySound: forall t e, @KRExprDenote t e = @KRExprDenote t (@KRSimplify t e).
+Theorem KRSimplifySound: forall e tp,  tp=(KRExprType e) -> (exists q, Some q=KRExprDenote (KRExprType e) e) -> @KRExprDenote tp e = @KRExprDenote tp (@KRSimplify e).
 Admitted. (*Proof.
   intros.
   induction e.
@@ -642,6 +669,34 @@ Qed.*)
 
 Transparent KRSimplifyTop.
 
+Goal forall (a:ModuleElt) (b:list ModuleElt) c, app (cons a b) c=cons a (app b c).
+  intros.
+  match goal with
+  | |- ?A = ?B => let x := (ltac:(KRExprReify A (KRTypeList (KRTypeElem KRElemModuleElt)))) in assert (Some A = (KRExprDenote (KRTypeList (KRTypeElem KRElemModuleElt)) (KRSimplify x)))
+  end.
+  rewrite <- KRSimplifySound.
+  compute [KRExprDenote KRExprDenote']. reflexivity.
+  simpl. reflexivity.
+  compute [KRExprDenote KRExprDenote' KRTypeDenote KRExprType].
+  eapply ex_intro.
+  reflexivity.
+  cbv [KRSimplify KRSimplifyTop KRExprDenote KRExprDenote'] in H.
+Abort.
+
+(*  destruct H.
+  constructor H.
+  rewrite H.
+  cbv [KRExprDenote] in H.
+  simpl [KRSimplify KRSimplifyTop] in H.
+  simpl in H.
+  match goal with
+
+  end.
+
+
+  
+  compute in H.
+  destruct H.
 Ltac KRSimplifyTac e :=
   let x := (ltac:(KRExprReify e t)) in
   let t := eval compute in (KRTypeDenote x) in
