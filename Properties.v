@@ -395,7 +395,8 @@ Section InverseSemAction.
     | Return e =>
       retC = evalExpr e /\
       news = nil /\
-      calls = nil
+      calls = nil /\
+      reads = nil
     end.
   Proof.
     destruct evalA; eauto; repeat eexists; try destruct (evalExpr p); eauto; try discriminate.
