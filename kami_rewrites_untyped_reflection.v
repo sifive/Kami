@@ -57,40 +57,66 @@ Inductive KRType : Type :=
   | KRTypeList: KRType -> KRType.
 
 
-(*Fixpoint beq_KRType (a:KRType) (b:KRType) :=
+Fixpoint KRType_decb (a:KRType) (b:KRType) :=
   match a,b with
-  | KRTypeElem a',KRTypeElem b' => beq_KRElem a' b'
-  | KRTypeList a',KRTypeList b' => beq_KRType a' b'
+  | KRTypeElem a',KRTypeElem b' => KRElem_decb a' b'
+  | KRTypeList a',KRTypeList b' => KRType_decb a' b'
   | _,_ => false
   end.
 
-Theorem beq_KRType_eq: forall a b, true=beq_KRType a b -> a=b.
+Theorem KRType_decb_eq: forall a b, true=KRType_decb a b <-> a=b.
 Proof.
   intro a.
   induction a.
   - intros.
-    destruct b;inversion H.
-    destruct k;destruct k0;inversion H;reflexivity.
+    destruct b.
+    * simpl.
+      split.
+      ++ intros.
+         rewrite KRElem_decb_eq in H.
+         subst.
+         reflexivity.
+      ++ intros.
+         inversion H.
+         subst.
+         rewrite KRElem_decb_eq.
+         reflexivity.
+    * simpl.
+      split; intros; inversion H.
   - intros.
-    destruct b;inversion H.
-    apply IHa in H1.
-    subst.
-    reflexivity.
+    destruct b.
+    * simpl.
+      split; intros; inversion H.
+    * simpl.
+      rewrite IHa.
+      split.
+      ++ intros.
+         subst.
+         reflexivity.
+      ++ intros.
+         inversion H.
+         subst.
+         reflexivity.
 Qed.
 
-Theorem beq_KRType_refl: forall x y, x=y -> beq_KRType x y=true.
+Theorem KRType_decb_refl: forall x, KRType_decb x x=true.
 Proof.
-  intros x.
+  intros.
   induction x.
-  - intros.
-    destruct y;inversion H;subst;clear H.
-    destruct k0;reflexivity.
-  - intros.
-    destruct y;inversion H;subst;clear H.
-    simpl.
-    apply IHx.
+  - simpl.
+    rewrite KRElem_decb_refl.
     reflexivity.
-Qed.*)
+  - apply IHx.
+Qed.
+
+Theorem KRType_dec (k1 k2 : KRType): {k1 = k2} + {k1 <> k2}.
+Proof.
+  destruct (KRType_decb k1 k2) eqn:G.
+  left; abstract (apply eq_sym in G;rewrite KRType_decb_eq in G; auto).
+  right; abstract (intro;
+                   rewrite <- KRType_decb_eq in H;
+                   rewrite <- H in G; discriminate).
+Defined.
 
 Fixpoint KRTypeDenote (t: KRType) :=
   match t with
@@ -148,341 +174,6 @@ Definition KRExprType (e: KRExpr) :=
   | KRBase m => KRTypeElem KRElemMod
   end.
 
-(*Fixpoint KRExprDenote' (tp:KRType) (e: KRExpr) : option (KRTypeDenote tp).
-  refine (match e return option (KRTypeDenote tp) with
-  (*| KRNil t => _
-  | KRVar t e => _*)
-  | KRCons t a b => match (KRExprDenote' t a),(KRExprDenote' (KRTypeList t) b) with
-                    | Some a',Some b' => _
-                    | _,_ => None
-                    end
-  (*| KRApp t a b => _
-  | KRMERegister e => _
-  | KRMERule r => _
-  | KRMEMeth m => _
-  | KRMakeModule_regs r => _
-  | KRMakeModule_rules r => _
-  | KRMakeModule_meths m => _
-  | KRRegisters l => _
-  | KRMethods l => _
-  | KRRules l => _
-  | KRgetRegisters l => _
-  | KRgetAllRegisters l => _
-  | KRgetRules l => _
-  | KRgetAllRules l => _
-  | KRgetMethods l => _
-  | KRgetAllMethods l => _
-  | KRMakeModule l => _
-  | KRBaseMod regs rules meths => _
-  | KRBase b => _*)
-  | _ => None
-  end).
-  (* - assert ({KRTypeList t=tp}+{KRTypeList t<>tp}).
-    + repeat (decide equality).
-    + destruct H.
-      * subst.
-        apply (Some (@nil (KRTypeDenote t))).
-      * apply None.
-  - assert ({t=tp}+{t<>tp}).
-    + repeat (decide equality).
-    + destruct H.
-      * subst.
-        apply (Some e).
-      * apply None. *)
-  - remember (beq_KRType (KRTypeList t) tp).
-    destruct b0.
-    + apply beq_KRType_eq in Heqb0.
-      subst.
-      apply (Some (cons a' b')).
-    + apply None.
-  (*assert ({KRTypeList (KRExprType a)=tp}+{KRTypeList (KRExprType a)<>tp}).
-    + repeat (decide equality).
-    + destruct H.
-      * subst.
-        assert ({KRExprType a=t}+{KRExprType a<>t}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ subst.
-              assert ({KRExprType b=KRTypeList (KRExprType a)}+{KRExprType b<>KRTypeList (KRExprType a)}).
-              ** repeat (decide equality).
-              ** destruct H.
-                 --- apply (match (KRExprDenote' (KRExprType a) a),(KRExprDenote' (KRTypeList (KRExprType a)) b) with
-                             | Some a',Some b' => Some (cons a' b')
-                             | _,_ => None
-                            end).
-                 --- apply None.
-           ++ apply None.
-      * apply None.*)
-  (* - assert ({KRExprType a=tp}+{KRExprType a<>tp}).
-    + repeat (decide equality).
-    + destruct H.
-      * subst.
-        assert ({KRExprType b=KRExprType a}+{KRExprType b<>KRExprType a}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ assert ({KRExprType a=KRTypeList t}+{KRExprType a<>KRTypeList t}).
-              ** repeat (decide equality).
-              ** destruct H.
-                 --- refine (match (KRExprDenote' (KRExprType a) a),(KRExprDenote' (KRExprType a) b) with
-                             | Some a',Some b' => Some (_)
-                             | _,_ => None
-                             end).
-                     rewrite e1 in a'.
-                     rewrite e1 in b'.
-                     rewrite e1.
-                     apply (app a' b').
-                 --- apply None.
-           ++ apply None.
-      * apply None.
-  - assert ({KRTypeElem KRElemRegInitT=KRExprType e}+{KRTypeElem KRElemRegInitT<>KRExprType e}).
-    + repeat (decide equality).
-    + destruct H.
-      * assert ({tp=KRTypeElem KRElemModuleElt}+{tp<>KRTypeElem KRElemModuleElt}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ subst.
-              apply (match KRExprDenote' (KRTypeElem KRElemRegInitT) e with
-                     | Some e' => Some (MERegister e')
-                     | None => None
-                     end).
-           ++ apply None.
-      * apply None.
-  - assert ({KRTypeList (KRTypeElem KRElemRegInitT)=KRExprType l}+{KRTypeList (KRTypeElem KRElemRegInitT)<>KRExprType l}).
-    + repeat (decide equality).
-    + destruct H.
-      * assert ({tp=KRTypeList (KRTypeElem KRElemModuleElt)}+{tp<>KRTypeList (KRTypeElem KRElemModuleElt)}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ subst.
-              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemRegInitT)) l with
-                     | Some e' => Some (Registers e')
-                     | None => None
-                     end).
-           ++ apply None.
-      * apply None.
-  - assert ({KRTypeList (KRTypeElem KRElemRule)=KRExprType l}+{KRTypeList (KRTypeElem KRElemRule)<>KRExprType l}).
-    + repeat (decide equality).
-    + destruct H.
-      * assert ({tp=KRTypeList (KRTypeElem KRElemModuleElt)}+{tp<>KRTypeList (KRTypeElem KRElemModuleElt)}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ subst.
-              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemRule)) l with
-                     | Some l' => Some (Rules l')
-                     | None => None
-                     end).
-           ++ apply None.
-      * apply None.
-  - assert ({KRTypeList (KRTypeElem KRElemDefMethT)=KRExprType l}+{KRTypeList (KRTypeElem KRElemDefMethT)<>KRExprType l}).
-    + repeat (decide equality).
-    + destruct H.
-      * assert ({tp=KRTypeList (KRTypeElem KRElemModuleElt)}+{tp<>KRTypeList (KRTypeElem KRElemModuleElt)}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ subst.
-              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemDefMethT)) l with
-                     | Some e' => Some (Methods e')
-                     | None => None
-                     end).
-           ++ apply None.
-      * apply None.
-  - assert ({KRTypeElem KRElemRule=KRExprType r}+{KRTypeElem KRElemRule<>KRExprType r}).
-    + repeat (decide equality).
-    + destruct H.
-      * assert ({tp=KRTypeElem KRElemModuleElt}+{tp<>KRTypeElem KRElemModuleElt}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ subst.
-              apply (match KRExprDenote' (KRTypeElem KRElemRule) r with
-                     | Some r' => Some (MERule r')
-                     | None => None
-                     end).
-           ++ apply None.
-      * apply None.
-  - assert ({KRTypeElem KRElemDefMethT=KRExprType m}+{KRTypeElem KRElemDefMethT<>KRExprType m}).
-    + repeat (decide equality).
-    + destruct H.
-      * assert ({tp=KRTypeElem KRElemModuleElt}+{tp<>KRTypeElem KRElemModuleElt}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ subst.
-              apply (match KRExprDenote' (KRTypeElem KRElemDefMethT) m with
-                     | Some m' => Some (MEMeth m')
-                     | None => None
-                     end).
-           ++ apply None.
-      * apply None.
-  - assert ({tp=KRTypeList (KRTypeElem KRElemRegInitT)}+{tp<>KRTypeList (KRTypeElem KRElemRegInitT)}).
-    + repeat (decide equality).
-    + destruct H.
-      * subst.
-        assert ({KRTypeElem KRElemBaseModule=KRExprType l}+{KRTypeElem KRElemBaseModule<>KRExprType l}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ** refine (match KRExprDenote' (KRTypeElem KRElemBaseModule) l with
-                      | Some l' => Some (getRegisters l')
-                      | None => None
-                      end).
-           ** apply None.
-      * apply None.
-  - assert ({tp=KRTypeList (KRTypeElem KRElemRegInitT)}+{tp<>KRTypeList (KRTypeElem KRElemRegInitT)}).
-    + repeat (decide equality).
-    + destruct H.
-      * subst.
-        assert ({KRTypeElem KRElemMod=KRExprType l}+{KRTypeElem KRElemMod<>KRExprType l}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ** refine (match KRExprDenote' (KRTypeElem KRElemMod) l with
-                      | Some l' => Some (getAllRegisters l')
-                      | None => None
-                      end).
-           ** apply None.
-      * apply None.
-  - assert ({tp=KRTypeList (KRTypeElem KRElemRule)}+{tp<>KRTypeList (KRTypeElem KRElemRule)}).
-    + repeat (decide equality).
-    + destruct H.
-      * subst.
-        assert ({KRTypeElem KRElemBaseModule=KRExprType l}+{KRTypeElem KRElemBaseModule<>KRExprType l}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ** refine (match KRExprDenote' (KRTypeElem KRElemBaseModule) l with
-                      | Some l' => Some (getRules l')
-                      | None => None
-                      end).
-           ** apply None.
-      * apply None.
-  - assert ({tp=KRTypeList (KRTypeElem KRElemRule)}+{tp<>KRTypeList (KRTypeElem KRElemRule)}).
-    + repeat (decide equality).
-    + destruct H.
-      * subst.
-        assert ({KRTypeElem KRElemMod=KRExprType l}+{KRTypeElem KRElemMod<>KRExprType l}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ** refine (match KRExprDenote' (KRTypeElem KRElemMod) l with
-                      | Some l' => Some (getAllRules l')
-                      | None => None
-                      end).
-           ** apply None.
-      * apply None.
-  - assert ({tp=KRTypeList (KRTypeElem KRElemDefMethT)}+{tp<>KRTypeList (KRTypeElem KRElemDefMethT)}).
-    + repeat (decide equality).
-    + destruct H.
-      * subst.
-        assert ({KRTypeElem KRElemBaseModule=KRExprType l}+{KRTypeElem KRElemBaseModule<>KRExprType l}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ** refine (match KRExprDenote' (KRTypeElem KRElemBaseModule) l with
-                      | Some l' => Some (getMethods l')
-                      | None => None
-                      end).
-           ** apply None.
-      * apply None.
-  - assert ({tp=KRTypeList (KRTypeElem KRElemDefMethT)}+{tp<>KRTypeList (KRTypeElem KRElemDefMethT)}).
-    + repeat (decide equality).
-    + destruct H.
-      * subst.
-        assert ({KRTypeElem KRElemMod=KRExprType l}+{KRTypeElem KRElemMod<>KRExprType l}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ** refine (match KRExprDenote' (KRTypeElem KRElemMod) l with
-                      | Some l' => Some (getAllMethods l')
-                      | None => None
-                      end).
-           ** apply None.
-      * apply None.
-  - assert ({tp=KRTypeList (KRTypeElem KRElemRegInitT)}+{tp<>KRTypeList (KRTypeElem KRElemRegInitT)}).
-    + repeat (decide equality).
-    + destruct H.
-      * assert ({KRTypeList (KRTypeElem KRElemModuleElt)=KRExprType r}+{KRTypeList (KRTypeElem KRElemModuleElt)<>KRExprType r}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ subst.
-              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemModuleElt)) r with
-                     | Some r' => Some (makeModule_regs r')
-                     | None => None
-                     end).
-           ++ apply None.
-      * apply None.
-  - assert ({tp=KRTypeList (KRTypeElem KRElemRule)}+{tp<>KRTypeList (KRTypeElem KRElemRule)}).
-    + repeat (decide equality).
-    + destruct H.
-      * assert ({KRTypeList (KRTypeElem KRElemModuleElt)=KRExprType r}+{KRTypeList (KRTypeElem KRElemModuleElt)<>KRExprType r}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ subst.
-              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemModuleElt)) r with
-                     | Some r' => Some (makeModule_rules r')
-                     | None => None
-                     end).
-           ++ apply None.
-      * apply None.
-  - assert ({tp=KRTypeList (KRTypeElem KRElemDefMethT)}+{tp<>KRTypeList (KRTypeElem KRElemDefMethT)}).
-    + repeat (decide equality).
-    + destruct H.
-      * assert ({KRTypeList (KRTypeElem KRElemModuleElt)=KRExprType m}+{KRTypeList (KRTypeElem KRElemModuleElt)<>KRExprType m}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ subst.
-              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemModuleElt)) m with
-                     | Some m' => Some (makeModule_meths m')
-                     | None => None
-                     end).
-           ++ apply None.
-      * apply None.
-  - assert ({KRTypeList (KRTypeElem KRElemModuleElt)=KRExprType l}+{KRTypeList (KRTypeElem KRElemModuleElt)<>KRExprType l}).
-    + repeat (decide equality).
-    + destruct H.
-      * assert ({KRTypeElem KRElemBaseModule=tp}+{KRTypeElem KRElemBaseModule<>tp}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ subst.
-              apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemModuleElt)) l with
-                     | Some l' => Some (makeModule l')
-                     | None => None
-                     end).
-           ++ apply None.
-      * apply None.
-  - assert ({KRTypeElem KRElemBaseModule=tp}+{KRTypeElem KRElemBaseModule<>tp}).
-    + repeat (decide equality).
-    + destruct H.
-      * assert ({KRTypeList (KRTypeElem KRElemRegInitT)=KRExprType regs}+{KRTypeList (KRTypeElem KRElemRegInitT)<>KRExprType regs}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ assert ({KRTypeList (KRTypeElem KRElemRule)=KRExprType rules}+{KRTypeList (KRTypeElem KRElemRule)<>KRExprType rules}).
-              ** repeat (decide equality).
-              ** destruct H.
-                 --- assert ({KRTypeList (KRTypeElem KRElemDefMethT)=KRExprType meths}+{KRTypeList (KRTypeElem KRElemDefMethT)<>KRExprType meths}).
-                     +++ repeat (decide equality).
-                     +++ destruct H.
-                         *** subst.
-                             apply (match KRExprDenote' (KRTypeList (KRTypeElem KRElemRegInitT)) regs,KRExprDenote' (KRTypeList (KRTypeElem KRElemRule)) rules,KRExprDenote' (KRTypeList (KRTypeElem KRElemDefMethT)) meths with
-                                     | Some regs',Some rules',Some meths' => Some (BaseMod regs' rules' meths')
-                                     | _,_,_ => None
-                                     end).
-                         *** apply None.
-                --- apply None.
-           ++ apply None.
-      * apply None.
-  - assert ({KRTypeElem KRElemMod=tp}+{KRTypeElem KRElemMod<>tp}).
-    + repeat (decide equality).
-    + destruct H.
-      * assert ({KRTypeElem KRElemBaseModule=KRExprType b}+{KRTypeElem KRElemBaseModule<>KRExprType b}).
-        -- repeat (decide equality).
-        -- destruct H.
-           ++ subst.
-              apply (match KRExprDenote' (KRTypeElem KRElemBaseModule) b with
-                     | Some b' => Some (Base b')
-                     | None => None
-                     end).
-           ++ apply None.
-      * apply None. *)
-Defined.
-
-(*Opaque app.
-Opaque map.
-Opaque Registers.
-Opaque KRTypeDenote.*)
-
 Inductive KRExprOption :=
 | KROption_Some : forall (tp: KRType), (KRTypeDenote tp) -> KRExprOption
 | KROption_None : KRExprOption.
@@ -491,204 +182,104 @@ Fixpoint KRExprDenote (e:KRExpr) : KRExprOption :=
   match e with
   | KRNil tp => KROption_Some (KRTypeList tp) nil
   | KRVar tp v => KROption_Some tp v
-  | KRCons tp f r => match KRExprDenote f,KRExprDenote r with
-                     | KROption_Some tp1 f', KROption_ListModuleElt r' => KROption_ListModuleElt (cons f' r')
+  | KRCons tp f r => match KRExprDenote f, KRExprDenote r with
+                     | KROption_Some tp1 f', KROption_Some (KRTypeList tp2) r' =>
+                       match KRType_dec tp1 tp2 with
+                       | left isEq => match KRType_dec (KRTypeList tp2) tp with
+                                      | left _ => KROption_Some (KRTypeList tp2) (cons match isEq in _ = Y return KRTypeDenote Y with
+                                                                                       | eq_refl => f'
+                                                                                       end r')
+                                      | right _ => KROption_None
+                                      end
+                       | right _ => KROption_None
+                       end
                      | _,_ => KROption_None
                      end
-  (*| KRCons (KRTypeList (KRTypeElem KRElemModuleElt)) f r => match KRExprDenote f,KRExprDenote r with
-                                                            | KROption_ListModuleElt f', KROption_ListListModuleElt r' => KROption_ListListModuleElt (cons f' r')
-                                                            | _,_ => KROption_None
-                                                            end*)
-  | KRCons _ _ _ => KROption_None
-  | KRApp _ _ _ =>  KROption_None
-  | KRMERegister e => KROption_None
-  | KRMERule r => KROption_None
-  | KRMEMeth m => KROption_None
-  | KRMakeModule_regs r => KROption_None
-  | KRMakeModule_rules r => KROption_None
-  | KRMakeModule_meths m => KROption_None
-  | KRRegisters l => KROption_None
-  | KRMethods l => KROption_None
-  | KRRules l => KROption_None
-  | KRgetRegisters l => KROption_None
-  | KRgetAllRegisters l => KROption_None
-  | KRgetRules l => KROption_None
-  | KRgetAllRules l => KROption_None
-  | KRgetMethods l => KROption_None
-  | KRgetAllMethods l => KROption_None
-  | KRMakeModule l => KROption_None
-  | KRBaseMod regs rules meths => KROption_None
-  | KRBase b => KROption_None
-  end.*)
-
-Inductive KRExprOption :=
-  | KROption_ModuleElt : ModuleElt -> KRExprOption
-  | KROption_RegInitT : RegInitT -> KRExprOption
-  | KROption_Rule : Attribute (Action Void) -> KRExprOption
-  | KROption_DefMethT : DefMethT -> KRExprOption
-  | KROption_BaseModule : BaseModule -> KRExprOption
-  | KROption_Mod : Mod -> KRExprOption
-  | KROption_ListModuleElt : list ModuleElt -> KRExprOption
-  | KROption_ListListModuleElt : list (list ModuleElt) -> KRExprOption
-  | KROption_ListRegInitT : list RegInitT -> KRExprOption
-  | KROption_ListRule : list (Attribute (Action Void)) -> KRExprOption
-  | KROption_ListDefMethT : list DefMethT -> KRExprOption
-  | KROption_ListBaseModule : list BaseModule -> KRExprOption
-  | KROption_ListMod : list Mod -> KRExprOption
-  | KROption_None : KRExprOption.
-
-Fixpoint KRExprDenote (e:KRExpr) : KRExprOption :=
-  match e with
-  | KRNil t => match t with
-               | (KRTypeElem KRElemModuleElt) => KROption_ListModuleElt nil
-               | (KRTypeList (KRTypeElem KRElemModuleElt)) => KROption_ListListModuleElt nil
-               | (KRTypeElem KRElemRegInitT) => KROption_ListRegInitT nil
-               | (KRTypeElem KRElemRule) => KROption_ListRule nil
-               | (KRTypeElem KRElemDefMethT) => KROption_ListDefMethT nil
-               | _ => KROption_None
-               end
-  | KRVar (KRTypeElem KRElemModuleElt) e => KROption_ModuleElt e
-  | KRVar (KRTypeElem KRElemRegInitT) e => KROption_RegInitT e
-  | KRVar (KRTypeElem KRElemRule) e => KROption_Rule e
-  | KRVar (KRTypeElem KRElemDefMethT) e => KROption_DefMethT e
-  | KRVar (KRTypeElem KRElemBaseModule) e => KROption_BaseModule e
-  | KRVar (KRTypeElem KRElemMod) e => KROption_Mod e
-  | KRVar (KRTypeList (KRTypeElem KRElemModuleElt)) e => KROption_ListModuleElt e
-  | KRVar (KRTypeList (KRTypeList (KRTypeElem KRElemModuleElt))) e => KROption_ListListModuleElt e
-  | KRVar (KRTypeList (KRTypeElem KRElemRegInitT)) e => KROption_ListRegInitT e
-  | KRVar (KRTypeList (KRTypeElem KRElemRule)) e => KROption_ListRule e
-  | KRVar (KRTypeList (KRTypeElem KRElemDefMethT)) e => KROption_ListDefMethT e
-  | KRVar (KRTypeList (KRTypeElem KRElemBaseModule)) e => KROption_ListBaseModule e
-  | KRVar (KRTypeList (KRTypeElem KRElemMod)) e => KROption_ListMod e
-  | KRVar _ _ => KROption_None
-  | KRCons (KRTypeElem KRElemModuleElt) f r => match KRExprDenote f,KRExprDenote r with
-                                               | KROption_ModuleElt f', KROption_ListModuleElt r' => KROption_ListModuleElt (cons f' r')
-                                               | _,_ => KROption_None
-                                               end
-  | KRCons (KRTypeElem KRElemRegInitT) f r => match KRExprDenote f,KRExprDenote r with
-                                              | KROption_RegInitT f', KROption_ListRegInitT r' => KROption_ListRegInitT (cons f' r')
-                                              | _,_ => KROption_None
-                                              end
-  | KRCons (KRTypeElem KRElemRule) f r => match KRExprDenote f,KRExprDenote r with
-                                          | KROption_Rule f', KROption_ListRule r' => KROption_ListRule (cons f' r')
-                                          | _,_ => KROption_None
-                                          end
-  | KRCons (KRTypeElem KRElemDefMethT) f r => match KRExprDenote f,KRExprDenote r with
-                                          | KROption_DefMethT f', KROption_ListDefMethT r' => KROption_ListDefMethT (cons f' r')
-                                          | _,_ => KROption_None
-                                          end
-  | KRCons (KRTypeElem KRElemBaseModule) f r => match KRExprDenote f,KRExprDenote r with
-                                          | KROption_BaseModule f', KROption_ListBaseModule r' => KROption_ListBaseModule (cons f' r')
-                                          | _,_ => KROption_None
-                                          end
-  | KRCons (KRTypeElem KRElemMod) f r => match KRExprDenote f,KRExprDenote r with
-                                         | KROption_Mod f', KROption_ListMod r' => KROption_ListMod (cons f' r')
-                                         | _,_ => KROption_None
-                                         end
-  | KRCons (KRTypeList (KRTypeElem KRElemModuleElt)) f r => match KRExprDenote f,KRExprDenote r with
-                                                            | KROption_ListModuleElt f', KROption_ListListModuleElt r' => KROption_ListListModuleElt (cons f' r')
-                                                            | _,_ => KROption_None
-                                                            end
-  | KRCons _ _ _ => KROption_None
-  | KRApp (KRTypeElem KRElemModuleElt) f r => match KRExprDenote f,KRExprDenote r with
-                                              | KROption_ListModuleElt f', KROption_ListModuleElt r' => KROption_ListModuleElt (app f' r')
-                                              | _,_ => KROption_None
-                                              end
-  | KRApp (KRTypeElem KRElemRegInitT) f r => match KRExprDenote f,KRExprDenote r with
-                                             | KROption_ListRegInitT f', KROption_ListRegInitT r' => KROption_ListRegInitT (app f' r')
-                                             | _,_ => KROption_None
-                                             end
-  | KRApp (KRTypeElem KRElemRule) f r => match KRExprDenote f,KRExprDenote r with
-                                         | KROption_ListRule f', KROption_ListRule r' => KROption_ListRule (app f' r')
-                                         | _,_ => KROption_None
-                                         end
-  | KRApp (KRTypeElem KRElemDefMethT) f r => match KRExprDenote f,KRExprDenote r with
-                                             | KROption_ListDefMethT f', KROption_ListDefMethT r' => KROption_ListDefMethT (app f' r')
-                                             | _,_ => KROption_None
-                                             end
-  | KRApp (KRTypeElem KRElemBaseModule) f r => match KRExprDenote f,KRExprDenote r with
-                                               | KROption_ListBaseModule f', KROption_ListBaseModule r' => KROption_ListBaseModule (app f' r')
-                                               | _,_ => KROption_None
-                                               end
-  | KRApp (KRTypeElem KRElemMod) f r => match KRExprDenote f,KRExprDenote r with
-                                        | KROption_ListMod f', KROption_ListMod r' => KROption_ListMod (app f' r')
-                                        | _,_ => KROption_None
-                                        end
-  | KRApp (KRTypeList (KRTypeElem KRElemModuleElt)) f r => match KRExprDenote f,KRExprDenote r with
-                                                           | KROption_ListModuleElt f', KROption_ListListModuleElt r' => KROption_ListListModuleElt (cons f' r')
-                                                           | _,_ => KROption_None
-                                                           end
-  | KRApp _ _ _ =>  KROption_None
-  | KRMERegister r => match KRExprDenote r with
-                      | KROption_RegInitT r' => KROption_ModuleElt (MERegister r')
+  | KRApp tp f r => match KRExprDenote f, KRExprDenote r with
+                     | KROption_Some (KRTypeList tp1) f', KROption_Some (KRTypeList tp2) r' =>
+                       match KRType_dec tp1 tp2 with
+                       | left isEq => match KRType_dec (KRTypeList tp2) tp with
+                                      | left _ => KROption_Some (KRTypeList tp2) (app match isEq in _ = Y return KRTypeDenote (KRTypeList Y) with
+                                                                                      | eq_refl => f'
+                                                                                      end r')
+                                      | right _ => KROption_None
+                                      end
+                       | right _ => KROption_None
+                       end
+                     | _,_ => KROption_None
+                     end
+  | KRMERegister e => match KRExprDenote e with
+                      | KROption_Some (KRTypeElem KRElemRegInitT) e' => KROption_Some (KRTypeElem KRElemModuleElt) (MERegister e')
                       | _ => KROption_None
                       end
-  | KRMERule r => match KRExprDenote r with
-                  | KROption_Rule r' => KROption_ModuleElt (MERule r')
+  | KRMERule e => match KRExprDenote e with
+                  | KROption_Some (KRTypeElem KRElemRule) e' => KROption_Some (KRTypeElem KRElemModuleElt) (MERule e')
                   | _ => KROption_None
                   end
-  | KRMEMeth m => match KRExprDenote m with
-                  | KROption_DefMethT m' => KROption_ModuleElt (MEMeth m')
+  | KRMEMeth e => match KRExprDenote e with
+                  | KROption_Some (KRTypeElem KRElemDefMethT) m' => KROption_Some (KRTypeElem KRElemModuleElt) (MEMeth m')
                   | _ => KROption_None
                   end
   | KRMakeModule_regs r => match KRExprDenote r with
-                           | KROption_ListModuleElt r' => KROption_ListRegInitT (makeModule_regs r')
+                           | KROption_Some (KRTypeList (KRTypeElem KRElemModuleElt)) r' => KROption_Some (KRTypeList (KRTypeElem KRElemRegInitT)) (makeModule_regs r')
                            | _ => KROption_None
                            end
   | KRMakeModule_rules r => match KRExprDenote r with
-                            | KROption_ListModuleElt r' => KROption_ListRule (makeModule_rules r')
+                            | KROption_Some (KRTypeList (KRTypeElem KRElemModuleElt)) r' => KROption_Some (KRTypeList (KRTypeElem KRElemRule)) (makeModule_rules r')
                             | _ => KROption_None
                             end
   | KRMakeModule_meths m => match KRExprDenote m with
-                            | KROption_ListModuleElt m' => KROption_ListDefMethT (makeModule_meths m')
+                            | KROption_Some (KRTypeList (KRTypeElem KRElemModuleElt)) m' => KROption_Some (KRTypeList (KRTypeElem KRElemDefMethT)) (makeModule_meths m')
                             | _ => KROption_None
                             end
   | KRRegisters l => match KRExprDenote l with
-                     | KROption_ListRegInitT l' => KROption_ListModuleElt (Registers l')
+                     | KROption_Some (KRTypeList (KRTypeElem KRElemRegInitT)) l' => KROption_Some (KRTypeList (KRTypeElem KRElemModuleElt)) (Registers l')
                      | _ => KROption_None
                      end
   | KRMethods l => match KRExprDenote l with
-                   | KROption_ListDefMethT l' => KROption_ListModuleElt (Methods l')
+                   | KROption_Some (KRTypeList (KRTypeElem KRElemDefMethT)) l' => KROption_Some (KRTypeList (KRTypeElem KRElemModuleElt)) (Methods l')
                    | _ => KROption_None
                    end
   | KRRules l => match KRExprDenote l with
-                 | KROption_ListRule l' => KROption_ListModuleElt (Rules l')
+                 | KROption_Some (KRTypeList (KRTypeElem KRElemRule)) l' => KROption_Some (KRTypeList (KRTypeElem KRElemModuleElt)) (Rules l')
                  | _ => KROption_None
                  end
-  | KRgetRegisters l => match KRExprDenote l with
-                        | KROption_BaseModule b' => KROption_ListRegInitT (getRegisters b')
+  | KRgetRegisters m => match KRExprDenote m with
+                        | KROption_Some (KRTypeElem KRElemBaseModule) m' => KROption_Some (KRTypeList (KRTypeElem KRElemRegInitT)) (getRegisters m')
                         | _ => KROption_None
                         end
-  | KRgetAllRegisters l => match KRExprDenote l with
-                           | KROption_Mod m' => KROption_ListRegInitT (getAllRegisters m')
+  | KRgetAllRegisters m => match KRExprDenote m with
+                           | KROption_Some (KRTypeElem KRElemMod) m' => KROption_Some (KRTypeList (KRTypeElem KRElemRegInitT)) (getAllRegisters m')
                            | _ => KROption_None
                            end
-  | KRgetRules l => match KRExprDenote l with
-                    | KROption_BaseModule b' => KROption_ListRule (getRules b')
+  | KRgetRules m => match KRExprDenote m with
+                    | KROption_Some (KRTypeElem KRElemBaseModule) m' => KROption_Some (KRTypeList (KRTypeElem KRElemRule)) (getRules m')
                     | _ => KROption_None
                     end
-  | KRgetAllRules l => match KRExprDenote l with
-                       | KROption_Mod m' => KROption_ListRule (getAllRules m')
+  | KRgetAllRules m => match KRExprDenote m with
+                       | KROption_Some (KRTypeElem KRElemMod) m' => KROption_Some (KRTypeList (KRTypeElem KRElemRule)) (getAllRules m')
                        | _ => KROption_None
                        end
-  | KRgetMethods l => match KRExprDenote l with
-                      | KROption_BaseModule b' => KROption_ListDefMethT (getMethods b')
-                      | _ => KROption_None
-                      end
-  | KRgetAllMethods l => match KRExprDenote l with
-                         | KROption_Mod m' => KROption_ListDefMethT (getAllMethods m')
-                         | _ => KROption_None
-                         end
+  | KRgetMethods m => match KRExprDenote m with
+                    | KROption_Some (KRTypeElem KRElemBaseModule) m' => KROption_Some (KRTypeList (KRTypeElem KRElemDefMethT)) (getMethods m')
+                    | _ => KROption_None
+                    end
+  | KRgetAllMethods m => match KRExprDenote m with
+                       | KROption_Some (KRTypeElem KRElemMod) m' => KROption_Some (KRTypeList (KRTypeElem KRElemDefMethT)) (getAllMethods m')
+                       | _ => KROption_None
+                       end
   | KRMakeModule l => match KRExprDenote l with
-                      | KROption_ListModuleElt l' => KROption_Mod (makeModule l')
+                      | KROption_Some (KRTypeList (KRTypeElem KRElemModuleElt)) l' => KROption_Some (KRTypeElem KRElemBaseModule) (makeModule l')
                       | _ => KROption_None
                       end
   | KRBaseMod regs rules meths => match KRExprDenote regs,KRExprDenote rules,KRExprDenote meths with
-                                  | KROption_ListRegInitT regs',KROption_ListRule rules',KROption_ListDefMethT meths' => KROption_BaseModule (BaseMod regs' rules' meths')
+                                  | KROption_Some (KRTypeList (KRTypeElem KRElemRegInitT)) regs',
+                                    KROption_Some (KRTypeList (KRTypeElem KRElemRule)) rules',
+                                    KROption_Some (KRTypeList (KRTypeElem KRElemDefMethT)) meths' => KROption_Some (KRTypeElem KRElemBaseModule) (BaseMod regs' rules' meths')
                                   | _,_,_ => KROption_None
                                   end
   | KRBase b => match KRExprDenote b with
-                | KROption_BaseModule b' => KROption_Mod (Base b')
+                | KROption_Some (KRTypeElem KRElemBaseModule) b' => KROption_Some (KRTypeElem KRElemMod) (Base b')
                 | _ => KROption_None
                 end
   end.
@@ -891,6 +482,189 @@ Proof.
   reflexivity.
 Qed.
 
+Hint Rewrite KRSimplifyCons : KRSimplify_simplify.
+
+Theorem KRSimplifyApp:
+  forall tp f r, KRSimplify (KRApp tp f r)=KRSimplifyTop (KRApp tp (KRSimplify f) (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyApp : KRSimplify_simplify.
+
+Theorem KRSimplifyMERegister:
+  forall r, KRSimplify (KRMERegister r)=KRSimplifyTop (KRMERegister (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyMERegister : KRSimplify_simplify.
+
+Theorem KRSimplifyRegisters:
+  forall r, KRSimplify (KRRegisters r)=KRSimplifyTop (KRRegisters (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyRegisters : KRSimplify_simplify.
+
+Theorem KRSimplifyRules:
+  forall r, KRSimplify (KRRules r)=KRSimplifyTop (KRRules (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyRules : KRSimplify_simplify.
+
+Theorem KRSimplifyMethods:
+  forall r, KRSimplify (KRMethods r)=KRSimplifyTop (KRMethods (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyMethods : KRSimplify_simplify.
+
+Theorem KRSimplifyMERule:
+  forall r, KRSimplify (KRMERule r)=KRSimplifyTop (KRMERule (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyMERule : KRSimplify_simplify.
+
+Theorem KRSimplifyMEMeth:
+  forall r, KRSimplify (KRMEMeth r)=KRSimplifyTop (KRMEMeth (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyMEMeth : KRSimplify_simplify.
+
+Theorem KRSimplifygetRegisters:
+  forall r, KRSimplify (KRgetRegisters r)=KRSimplifyTop (KRgetRegisters (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifygetRegisters : KRSimplify_simplify.
+
+Theorem KRSimplifygetAllRegisters:
+  forall r, KRSimplify (KRgetAllRegisters r)=KRSimplifyTop (KRgetAllRegisters (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifygetAllRegisters : KRSimplify_simplify.
+
+Theorem KRSimplifygetRules:
+  forall r, KRSimplify (KRgetRules r)=KRSimplifyTop (KRgetRules (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifygetRules : KRSimplify_simplify.
+
+Theorem KRSimplifygetAllRules:
+  forall r, KRSimplify (KRgetAllRules r)=KRSimplifyTop (KRgetAllRules (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifygetAllRules : KRSimplify_simplify.
+
+Theorem KRSimplifygetMethods:
+  forall r, KRSimplify (KRgetMethods r)=KRSimplifyTop (KRgetMethods (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifygetMethods : KRSimplify_simplify.
+
+Theorem KRSimplifygetAllMethods:
+  forall r, KRSimplify (KRgetAllMethods r)=KRSimplifyTop (KRgetAllMethods (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifygetAllMethods : KRSimplify_simplify.
+
+Theorem KRSimplifyMakeModule_regs:
+  forall r, KRSimplify (KRMakeModule_regs r)=KRSimplifyTop (KRMakeModule_regs (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyMakeModule_regs : KRSimplify_simplify.
+
+Theorem KRSimplifyMakeModule_rules:
+  forall r, KRSimplify (KRMakeModule_rules r)=KRSimplifyTop (KRMakeModule_rules (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyMakeModule_rules : KRSimplify_simplify.
+
+Theorem KRSimplifyMakeModule_meths:
+  forall r, KRSimplify (KRMakeModule_meths r)=KRSimplifyTop (KRMakeModule_meths (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyMakeModule_meths : KRSimplify_simplify.
+
+Theorem KRSimplifyMakeModule:
+  forall r, KRSimplify (KRMakeModule r)=KRSimplifyTop (KRMakeModule (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyMakeModule : KRSimplify_simplify.
+
+Theorem KRSimplifyBase:
+  forall r, KRSimplify (KRBase r)=KRSimplifyTop (KRBase (KRSimplify r)).
+Proof.
+  intros.
+  simpl.
+  reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyBase : KRSimplify_simplify.
+
+
 (*Theorem KRExprDenoteKRCons: forall k f r, KRExprDenote (KRCons k f r)=match (KRExprDenote f),(KRExprDenote r) with
                                                                                       | KRSome f',Some r' => Some (cons f' r')
                                                                                       | _,_ => None
@@ -910,8 +684,9 @@ Qed.
 Theorem KRSimplifySound: forall e, KRExprDenote e = KRExprDenote (KRSimplify e).
 Proof.
   intros.
-  induction e.
-  - reflexivity.
+  induction e; try (autorewrite with KRSimplify_simplify; rewrite <- KRSimplifyTopSound; simpl [KRExprDenote]; repeat (rewrite <- IHe)).
+Admitted.
+ (* - reflexivity.
   - reflexivity.
   - rewrite KRSimplifyCons.
     rewrite <- KRSimplifyTopSound.
@@ -919,9 +694,108 @@ Proof.
     + destruct k; try (simpl; rewrite <- IHe1; rewrite <- IHe2; reflexivity).
     + destruct k.
       * destruct k; try (simpl; try (rewrite <- IHe1; rewrite <- IHe2); reflexivity).
-      * reflexivity.
+      * simpl. rewrite <- IHe1. rewrite <- IHe2. reflexivity.
+  - rewrite KRSimplifyApp.
+    rewrite <- KRSimplifyTopSound.
+    destruct k.
+    + destruct k; try (simpl; rewrite <- IHe1; rewrite <- IHe2; reflexivity).
+    + destruct k.
+      * destruct k; try (simpl; try (rewrite <- IHe1; rewrite <- IHe2); reflexivity).
+      * simpl. rewrite <- IHe1. rewrite <- IHe2. reflexivity.
+  - simpl [KRSimplify].
+    repeat (rewrite <- KRSimplifyTopSound).
+    repeat (rewrite <- IHe). reflexivity.
+  - rewrite KRSimplifyRegisters.
+    rewrite <- KRSimplifyTopSound.
+    simpl [KRExprDenote].
+    repeat (rewrite <- IHe).
+    reflexivity.
+  - rewrite KRSimplifyRules.
+    rewrite <- KRSimplifyTopSound.
+    simpl [KRExprDenote].
+    repeat (rewrite <- IHe).
+    reflexivity.
+  - rewrite KRSimplifyMethods.
+    rewrite <- KRSimplifyTopSound.
+    simpl [KRExprDenote].
+    repeat (rewrite <- IHe).
+    reflexivity.
+  - rewrite KRSimplifyMERule.
+    rewrite <- KRSimplifyTopSound.
+    simpl [KRExprDenote].
+    repeat (rewrite <- IHe).
+    reflexivity.
+  - rewrite KRSimplifyMEMeth.
+    rewrite <- KRSimplifyTopSound.
+    simpl [KRExprDenote].
+    repeat (rewrite <- IHe).
+    reflexivity.
+  - rewrite KRSimplifygetRegisters.
+    rewrite <- KRSimplifyTopSound.
+    simpl [KRExprDenote].
+    repeat (rewrite <- IHe).
+    reflexivity.
+  - rewrite KRSimplifygetAllRegisters.
+    rewrite <- KRSimplifyTopSound.
+    simpl [KRExprDenote].
+    repeat (rewrite <- IHe).
+    reflexivity.
+  - rewrite KRSimplifygetRegisters.
+    rewrite <- KRSimplifyTopSound.
+    simpl [KRExprDenote].
+    repeat (rewrite <- IHe).
+    reflexivity.
+  - rewrite KRSimplifygetAllRegisters.
+    rewrite <- KRSimplifyTopSound.
+    simpl [KRExprDenote].
+    repeat (rewrite <- IHe).
+    reflexivity.
+  - rewrite KRSimplifygetRegisters.
+    rewrite <- KRSimplifyTopSound.
+    simpl [KRExprDenote].
+    repeat (rewrite <- IHe).
+    reflexivity.
+  - rewrite KRSimplifygetAllRegisters.
+    rewrite <- KRSimplifyTopSound.
+    simpl [KRExprDenote].
+    repeat (rewrite <- IHe).
+    reflexivity.
   -
-Admitted.
+    
+  - simpl [KRSimplify].
+    repeat (rewrite <- KRSimplifyTopSound).
+    repeat (rewrite <- IHe). reflexivity.
+  - simpl [KRSimplify].
+    repeat (rewrite <- KRSimplifyTopSound).
+    repeat (rewrite <- IHe). reflexivity.
+  - simpl [KRSimplify].
+    repeat (rewrite <- KRSimplifyTopSound).
+    repeat (rewrite <- IHe). reflexivity.
+  - simpl [KRSimplify].
+    repeat (rewrite <- KRSimplifyTopSound).
+    repeat (rewrite <- IHe). reflexivity.
+  - simpl [KRSimplify].
+    repeat (rewrite <- KRSimplifyTopSound).
+    repeat (rewrite <- IHe). reflexivity.
+  - simpl [KRSimplify].
+    repeat (rewrite <- KRSimplifyTopSound).
+    repeat (rewrite <- IHe). reflexivity.
+  - simpl [KRSimplify].
+    repeat (rewrite <- KRSimplifyTopSound).
+    repeat (rewrite <- IHe). reflexivity.
+  - simpl [KRSimplify].
+    repeat (rewrite <- KRSimplifyTopSound).
+    repeat (rewrite <- IHe). reflexivity.
+  - simpl [KRSimplify].
+    repeat (rewrite <- KRSimplifyTopSound).
+    repeat (rewrite <- IHe). reflexivity.
+  - simpl [KRSimplify].
+    repeat (rewrite <- KRSimplifyTopSound).
+    repeat (rewrite <- IHe). reflexivity.
+  - simpl [KRSimplify].
+    repeat (rewrite <- KRSimplifyTopSound).
+    repeat (rewrite <- IHe). reflexivity.
+Admitted.*)
 
 Theorem sum_elim: forall tp (x:tp) (y:tp), Some x=Some y -> x=y.
   intros.
