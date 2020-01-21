@@ -137,6 +137,14 @@ with KRExprDenote_list_ModuleElt (e:KRExpr_list_ModuleElt) : list ModuleElt :=
   | KRMethods m => Methods (KRExprDenote_list_DefMethT m)
   end
 
+with KRExprDenote_list_list_ModuleElt (e:KRExpr_list_list_ModuleElt) : list (list ModuleElt) :=
+  match e with
+  | KRVar_list_list_ModuleElt v => v
+  | KRNil_list_list_ModuleElt => nil
+  | KRCons_list_list_ModuleElt f r => cons (KRExprDenote_list_ModuleElt f) (KRExprDenote_list_list_ModuleElt r)
+  | KRApp_list_list_ModuleElt f r => app (KRExprDenote_list_list_ModuleElt f) (KRExprDenote_list_list_ModuleElt r)
+  end
+
 with KRExprDenote_BaseModule (e:KRExpr_BaseModule) : BaseModule :=
   match e with
   | KRVar_BaseModule v => v
@@ -272,7 +280,7 @@ Definition KRSimplifyTop_list_RegInitT (e : KRExpr_list_RegInitT) : KRExpr_list_
                     | KRCons_list_RegInitT ff rr => KRCons_list_RegInitT ff (KRApp_list_RegInitT rr c)
                     | KRNil_list_RegInitT => c
                     | x => match c with
-                           | KRNil_list_RegInitT => c
+                           | KRNil_list_RegInitT => f
                            | y => KRApp_list_RegInitT f c
                            end
                     end
@@ -299,7 +307,7 @@ Definition KRSimplifyTop_list_Rule (e : KRExpr_list_Rule) : KRExpr_list_Rule :=
                     | KRCons_list_Rule ff rr => KRCons_list_Rule ff (KRApp_list_Rule rr c)
                     | KRNil_list_Rule => c
                     | x => match c with
-                           | KRNil_list_Rule => c
+                           | KRNil_list_Rule => f
                            | y => KRApp_list_Rule f c
                            end
                     end
@@ -326,7 +334,7 @@ Definition KRSimplifyTop_list_DefMethT (e : KRExpr_list_DefMethT) : KRExpr_list_
                                | KRCons_list_DefMethT ff rr => KRCons_list_DefMethT ff (KRApp_list_DefMethT rr c)
                                | KRNil_list_DefMethT => c
                                | x => match c with
-                                      | KRNil_list_DefMethT => c
+                                      | KRNil_list_DefMethT => f
                                       | y => KRApp_list_DefMethT f c
                                       end
                                end
@@ -353,7 +361,7 @@ Definition KRSimplifyTop_list_ModuleElt (e : KRExpr_list_ModuleElt) : KRExpr_lis
                                 | KRCons_list_ModuleElt ff rr => KRCons_list_ModuleElt ff (KRApp_list_ModuleElt rr c)
                                 | KRNil_list_ModuleElt => c
                                 | x => match c with
-                                       | KRNil_list_ModuleElt => c
+                                       | KRNil_list_ModuleElt => f
                                        | y => KRApp_list_ModuleElt f c
                                        end
                                 end
@@ -366,7 +374,7 @@ Definition KRSimplifyTop_list_list_ModuleElt (e : KRExpr_list_list_ModuleElt) : 
                                      | KRCons_list_list_ModuleElt ff rr => KRCons_list_list_ModuleElt ff (KRApp_list_list_ModuleElt rr c)
                                      | KRNil_list_list_ModuleElt => c
                                      | x => match c with
-                                            | KRNil_list_list_ModuleElt => c
+                                            | KRNil_list_list_ModuleElt => f
                                             | y => KRApp_list_list_ModuleElt f c
                                             end
                                      end
@@ -569,414 +577,452 @@ with KRSimplify_Mod (e : KRExpr_Mod) : KRExpr_Mod :=
   end).*)
 
 Theorem KRSimplifyTopSound_RegInitT: forall e,
-    KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplifyTop_RegInitT e).
+    KRExprDenote_RegInitT (KRSimplifyTop_RegInitT e)=KRExprDenote_RegInitT e.
 Proof.
   intros.
   reflexivity.
 Qed.
+
+Hint Rewrite KRSimplifyTopSound_RegInitT : KRSimplifyTopSound.
 
 Theorem KRSimplifyTopSound_Rule: forall e,
-    KRExprDenote_Rule e = KRExprDenote_Rule (KRSimplifyTop_Rule e).
+     KRExprDenote_Rule (KRSimplifyTop_Rule e)=KRExprDenote_Rule e.
 Proof.
   intros.
   reflexivity.
 Qed.
+
+Hint Rewrite KRSimplifyTopSound_Rule : KRSimplifyTopSound.
 
 Theorem KRSimplifyTopSound_DefMethT: forall e,
-    KRExprDenote_DefMethT e = KRExprDenote_DefMethT (KRSimplifyTop_DefMethT e).
+    KRExprDenote_DefMethT (KRSimplifyTop_DefMethT e)=KRExprDenote_DefMethT e.
 Proof.
   intros.
   reflexivity.
 Qed.
+
+Hint Rewrite KRSimplifyTopSound_DefMethT : KRSimplifyTopSound.
 
 Theorem KRSimplifyTopSound_ModuleElt: forall e,
-    KRExprDenote_ModuleElt e = KRExprDenote_ModuleElt (KRSimplifyTop_ModuleElt e).
+    KRExprDenote_ModuleElt (KRSimplifyTop_ModuleElt e)=KRExprDenote_ModuleElt e.
 Proof.
   intros.
   reflexivity.
 Qed.
 
-(*  intros.
-  inversion H;subst;clear H.
-  induction e.
-  - cbv [KRSimplifyTop KRSimplify].
-    reflexivity.
-  - cbv [KRSimplifyTop KRSimplify].
-    reflexivity.
-  - cbv [KRSimplifyTop KRSimplify].
-    rewrite
-Qed.*)
+Hint Rewrite KRSimplifyTopSound_ModuleElt : KRSimplifyTopSound.
 
-(*Theorem KRSimplifyCons:
-  forall tp f r, KRSimplify (KRCons tp f r)=KRSimplifyTop (KRCons tp (KRSimplify f) (KRSimplify r)).
+Theorem KRSimplifyTopSound_list_RegInitT: forall e,
+    KRExprDenote_list_RegInitT (KRSimplifyTop_list_RegInitT e)=KRExprDenote_list_RegInitT e.
 Proof.
   intros.
-  simpl.
+  destruct e;try reflexivity.
+  - destruct e1;try reflexivity.
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+  - destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_list_RegInitT : KRSimplifyTopSound.
+
+Theorem KRSimplifyTopSound_list_Rule: forall e,
+   KRExprDenote_list_Rule (KRSimplifyTop_list_Rule e)=KRExprDenote_list_Rule e.
+Proof.
+  intros.
+  destruct e;try reflexivity.
+  - destruct e1;try reflexivity.
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+  - destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_list_Rule : KRSimplifyTopSound.
+
+Theorem KRSimplifyTopSound_list_DefMethT: forall e,
+    KRExprDenote_list_DefMethT (KRSimplifyTop_list_DefMethT e)=KRExprDenote_list_DefMethT e.
+Proof.
+  intros.
+  destruct e;try reflexivity.
+  - destruct e1;try reflexivity.
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+  - destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_list_DefMethT : KRSimplifyTopSound.
+
+Theorem KRSimplifyTopSound_list_ModuleElt: forall e,
+    KRExprDenote_list_ModuleElt (KRSimplifyTop_list_ModuleElt e)=KRExprDenote_list_ModuleElt e.
+Proof.
+  intros.
+  destruct e;try reflexivity.
+  - destruct e1;try reflexivity.
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_list_ModuleElt : KRSimplifyTopSound.
+
+Theorem KRSimplifyTopSound_list_list_ModuleElt: forall e,
+    KRExprDenote_list_list_ModuleElt (KRSimplifyTop_list_list_ModuleElt e)=KRExprDenote_list_list_ModuleElt e.
+Proof.
+  intros.
+  destruct e;try reflexivity.
+  - destruct e1;try reflexivity.
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_list_list_ModuleElt : KRSimplifyTopSound.
+
+Theorem KRSimplifyTopSound_BaseModule: forall e,
+    KRExprDenote_BaseModule (KRSimplifyTop_BaseModule e)=KRExprDenote_BaseModule e.
+Proof.
+  intros.
+  destruct e;try reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_BaseModule : KRSimplifyTopSound.
+
+Theorem KRSimplifyTopSound_Mod: forall e,
+     KRExprDenote_Mod (KRSimplifyTop_Mod e)=KRExprDenote_Mod e.
+Proof.
+  intros.
+  destruct e;try reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_Mod : KRSimplifyTopSound.
+
+Theorem KRSimplifySound_RegInitT: forall e,
+    KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplify_RegInitT e).
+Proof.
+  intros.
+  destruct e;try reflexivity.
+Qed.
+
+Theorem KRSimplifySound_Rule: forall e,
+    KRExprDenote_Rule e = KRExprDenote_Rule (KRSimplify_Rule e).
+Proof.
+  intros.
+  destruct e;try reflexivity.
+Qed.
+
+Theorem KRSimplifySound_DefMethT: forall e,
+    KRExprDenote_DefMethT e = KRExprDenote_DefMethT (KRSimplify_DefMethT e).
+Proof.
+  intros.
+  destruct e;try reflexivity.
+Qed.
+
+Scheme KRExpr_RegInitT_mut := Induction for KRExpr_RegInitT Sort Prop
+  with KRExpr_Rule_mut := Induction for KRExpr_Rule Sort Prop
+  with KRExpr_DefMethT_mut := Induction for KRExpr_DefMethT Sort Prop
+  with KRExpr_ModuleElt_mut := Induction for KRExpr_ModuleElt Sort Prop
+  with KRExpr_list_RegInitT_mut := Induction for KRExpr_list_RegInitT Sort Prop
+  with KRExpr_list_Rule_mut := Induction for KRExpr_list_Rule Sort Prop
+  with KRExpr_list_DefMethT_mut := Induction for KRExpr_list_DefMethT Sort Prop
+  with KRExpr_list_ModuleElt_mut := Induction for KRExpr_list_ModuleElt Sort Prop
+  with KRExpr_list_list_ModuleElt_mut := Induction for KRExpr_list_list_ModuleElt Sort Prop
+  with KRExpr_BaseModule_mut := Induction for KRExpr_BaseModule Sort Prop
+  with KRExpr_Mod_mut := Induction for KRExpr_Mod Sort Prop.
+
+Theorem KRSimplify_list_RegInitT_KRApp_list_RegInitT : forall k k0,
+    KRSimplify_list_RegInitT (KRApp_list_RegInitT k k0)=KRSimplifyTop_list_RegInitT (KRApp_list_RegInitT (KRSimplify_list_RegInitT k) (KRSimplify_list_RegInitT k0)).
+Proof.
   reflexivity.
 Qed.
 
-Hint Rewrite KRSimplifyCons : KRSimplify_simplify.
+Hint Rewrite KRSimplify_list_RegInitT_KRApp_list_RegInitT : KRSimplify.
 
-Theorem KRSimplifyApp:
-  forall tp f r, KRSimplify (KRApp tp f r)=KRSimplifyTop (KRApp tp (KRSimplify f) (KRSimplify r)).
+Theorem KRSimplify_list_RegInitT_KRMakeModule_regs:
+  forall k, KRSimplify_list_RegInitT (KRMakeModule_regs k)=KRSimplifyTop_list_RegInitT (KRMakeModule_regs (KRSimplify_list_ModuleElt k)).
 Proof.
-  intros.
-  simpl.
   reflexivity.
 Qed.
 
-Hint Rewrite KRSimplifyApp : KRSimplify_simplify.
+Hint Rewrite KRSimplify_list_RegInitT_KRMakeModule_regs : KRSimplify.
 
-Theorem KRSimplifyMERegister:
-  forall r, KRSimplify (KRMERegister r)=KRSimplifyTop (KRMERegister (KRSimplify r)).
+Theorem KRSimplify_list_Rule_KRApp_list_Rule : forall k k0,
+    KRSimplify_list_Rule (KRApp_list_Rule k k0)=KRSimplifyTop_list_Rule (KRApp_list_Rule (KRSimplify_list_Rule k) (KRSimplify_list_Rule k0)).
 Proof.
-  intros.
-  simpl.
   reflexivity.
 Qed.
 
-Hint Rewrite KRSimplifyMERegister : KRSimplify_simplify.
+Hint Rewrite KRSimplify_list_Rule_KRApp_list_Rule : KRSimplify.
 
-Theorem KRSimplifyRegisters:
-  forall r, KRSimplify (KRRegisters r)=KRSimplifyTop (KRRegisters (KRSimplify r)).
+Theorem KRSimplify_list_Rule_KRMakeModule_rules:
+  forall k, KRSimplify_list_Rule (KRMakeModule_rules k)=KRSimplifyTop_list_Rule (KRMakeModule_rules (KRSimplify_list_ModuleElt k)).
 Proof.
-  intros.
-  simpl.
   reflexivity.
 Qed.
 
-Hint Rewrite KRSimplifyRegisters : KRSimplify_simplify.
+Hint Rewrite KRSimplify_list_Rule_KRMakeModule_rules : KRSimplify.
 
-Theorem KRSimplifyRules:
-  forall r, KRSimplify (KRRules r)=KRSimplifyTop (KRRules (KRSimplify r)).
+Theorem KRSimplify_list_DefMethT_KRApp_list_DefMethT : forall k k0,
+    KRSimplify_list_DefMethT (KRApp_list_DefMethT k k0)=KRSimplifyTop_list_DefMethT (KRApp_list_DefMethT (KRSimplify_list_DefMethT k) (KRSimplify_list_DefMethT k0)).
 Proof.
-  intros.
-  simpl.
   reflexivity.
 Qed.
 
-Hint Rewrite KRSimplifyRules : KRSimplify_simplify.
+Hint Rewrite KRSimplify_list_DefMethT_KRApp_list_DefMethT : KRSimplify.
 
-Theorem KRSimplifyMethods:
-  forall r, KRSimplify (KRMethods r)=KRSimplifyTop (KRMethods (KRSimplify r)).
+Theorem KRSimplify_list_DefMethT_KRMakeModule_meths:
+  forall k, KRSimplify_list_DefMethT (KRMakeModule_meths k)=KRSimplifyTop_list_DefMethT (KRMakeModule_meths (KRSimplify_list_ModuleElt k)).
 Proof.
-  intros.
-  simpl.
   reflexivity.
 Qed.
 
-Hint Rewrite KRSimplifyMethods : KRSimplify_simplify.
+Hint Rewrite KRSimplify_list_DefMethT_KRMakeModule_meths : KRSimplify.
 
-Theorem KRSimplifyMERule:
-  forall r, KRSimplify (KRMERule r)=KRSimplifyTop (KRMERule (KRSimplify r)).
+Theorem KRSimplify_list_ModuleElt_KRApp_list_ModuleElt:
+  forall k k0, KRSimplify_list_ModuleElt (KRApp_list_ModuleElt k k0)=KRSimplifyTop_list_ModuleElt (KRApp_list_ModuleElt (KRSimplify_list_ModuleElt k) (KRSimplify_list_ModuleElt k0)).
 Proof.
-  intros.
-  simpl.
   reflexivity.
 Qed.
 
-Hint Rewrite KRSimplifyMERule : KRSimplify_simplify.
+Hint Rewrite  KRSimplify_list_ModuleElt_KRApp_list_ModuleElt : KRSimplify.
 
-Theorem KRSimplifyMEMeth:
-  forall r, KRSimplify (KRMEMeth r)=KRSimplifyTop (KRMEMeth (KRSimplify r)).
+Theorem KRSimplify_list_list_ModuleElt_KRApp_list_list_ModuleElt:
+  forall k k0, KRSimplify_list_list_ModuleElt (KRApp_list_list_ModuleElt k k0)=KRSimplifyTop_list_list_ModuleElt (KRApp_list_list_ModuleElt (KRSimplify_list_list_ModuleElt k) (KRSimplify_list_list_ModuleElt k0)).
 Proof.
-  intros.
-  simpl.
   reflexivity.
 Qed.
 
-Hint Rewrite KRSimplifyMEMeth : KRSimplify_simplify.
+Hint Rewrite  KRSimplify_list_list_ModuleElt_KRApp_list_list_ModuleElt : KRSimplify.
 
-Theorem KRSimplifygetRegisters:
-  forall r, KRSimplify (KRgetRegisters r)=KRSimplifyTop (KRgetRegisters (KRSimplify r)).
+Theorem KRSimplify_BaseModule_KRBaseMod:
+  forall k k0 k1, KRSimplify_BaseModule (KRBaseMod k k0 k1)=KRSimplifyTop_BaseModule (KRBaseMod (KRSimplify_list_RegInitT k) (KRSimplify_list_Rule k0) (KRSimplify_list_DefMethT k1)).
 Proof.
-  intros.
-  simpl.
   reflexivity.
 Qed.
 
-Hint Rewrite KRSimplifygetRegisters : KRSimplify_simplify.
+Hint Rewrite KRSimplify_BaseModule_KRBaseMod: KRSimplify.
 
-Theorem KRSimplifygetAllRegisters:
-  forall r, KRSimplify (KRgetAllRegisters r)=KRSimplifyTop (KRgetAllRegisters (KRSimplify r)).
+Theorem KRSimplifySound_ModuleElt: forall e,
+    KRExprDenote_ModuleElt e = KRExprDenote_ModuleElt (KRSimplify_ModuleElt e).
 Proof.
   intros.
-  simpl.
-  reflexivity.
+  eapply (KRExpr_ModuleElt_mut
+            (fun e : KRExpr_RegInitT => KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplify_RegInitT e))
+            (fun e : KRExpr_Rule => KRExprDenote_Rule e = KRExprDenote_Rule (KRSimplify_Rule e))
+            (fun e : KRExpr_DefMethT => KRExprDenote_DefMethT e = KRExprDenote_DefMethT (KRSimplify_DefMethT e))
+            (fun e : KRExpr_ModuleElt => KRExprDenote_ModuleElt e = KRExprDenote_ModuleElt (KRSimplify_ModuleElt e))
+            (fun e : KRExpr_list_RegInitT => KRExprDenote_list_RegInitT e = KRExprDenote_list_RegInitT (KRSimplify_list_RegInitT e))
+            (fun e : KRExpr_list_Rule => KRExprDenote_list_Rule e = KRExprDenote_list_Rule (KRSimplify_list_Rule e))
+            (fun e : KRExpr_list_DefMethT => KRExprDenote_list_DefMethT e = KRExprDenote_list_DefMethT (KRSimplify_list_DefMethT e))
+            (fun e : KRExpr_list_ModuleElt => KRExprDenote_list_ModuleElt e = KRExprDenote_list_ModuleElt (KRSimplify_list_ModuleElt e))
+            (fun e : KRExpr_list_list_ModuleElt => KRExprDenote_list_list_ModuleElt e = KRExprDenote_list_list_ModuleElt (KRSimplify_list_list_ModuleElt e))
+            (fun e : KRExpr_BaseModule => KRExprDenote_BaseModule e = KRExprDenote_BaseModule (KRSimplify_BaseModule e))
+            (fun e : KRExpr_Mod => KRExprDenote_Mod e = KRExprDenote_Mod (KRSimplify_Mod e)));try (intros;autorewrite with KRSimplify; autorewrite with KRSimplifyTopSound; simpl; try (rewrite <- H); try  (rewrite <- H0); try (rewrite <- H1); reflexivity).
 Qed.
 
-Hint Rewrite KRSimplifygetAllRegisters : KRSimplify_simplify.
+Print KRExpr_list_RegInitT_mut.
 
-Theorem KRSimplifygetRules:
-  forall r, KRSimplify (KRgetRules r)=KRSimplifyTop (KRgetRules (KRSimplify r)).
+Theorem KRSimplifySound_list_RegInitT: forall e,
+    KRExprDenote_list_RegInitT e = KRExprDenote_list_RegInitT (KRSimplify_list_RegInitT e).
 Proof.
   intros.
-  simpl.
-  reflexivity.
+  apply (KRExpr_list_RegInitT_mut
+            (fun e : KRExpr_RegInitT => KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplify_RegInitT e))
+            (fun e : KRExpr_Rule => KRExprDenote_Rule e = KRExprDenote_Rule (KRSimplify_Rule e))
+            (fun e : KRExpr_DefMethT => KRExprDenote_DefMethT e = KRExprDenote_DefMethT (KRSimplify_DefMethT e))
+            (fun e : KRExpr_ModuleElt => KRExprDenote_ModuleElt e = KRExprDenote_ModuleElt (KRSimplify_ModuleElt e))
+            (fun e : KRExpr_list_RegInitT => KRExprDenote_list_RegInitT e = KRExprDenote_list_RegInitT (KRSimplify_list_RegInitT e))
+            (fun e : KRExpr_list_Rule => KRExprDenote_list_Rule e = KRExprDenote_list_Rule (KRSimplify_list_Rule e))
+            (fun e : KRExpr_list_DefMethT => KRExprDenote_list_DefMethT e = KRExprDenote_list_DefMethT (KRSimplify_list_DefMethT e))
+            (fun e : KRExpr_list_ModuleElt => KRExprDenote_list_ModuleElt e = KRExprDenote_list_ModuleElt (KRSimplify_list_ModuleElt e))
+            (fun e : KRExpr_list_list_ModuleElt => KRExprDenote_list_list_ModuleElt e = KRExprDenote_list_list_ModuleElt (KRSimplify_list_list_ModuleElt e))
+            (fun e : KRExpr_BaseModule => KRExprDenote_BaseModule e = KRExprDenote_BaseModule (KRSimplify_BaseModule e))
+            (fun e : KRExpr_Mod => KRExprDenote_Mod e = KRExprDenote_Mod (KRSimplify_Mod e)));try (intros;autorewrite with KRSimplify; autorewrite with KRSimplifyTopSound; simpl; try (rewrite <- H); try  (rewrite <- H0); try (rewrite <- H1); reflexivity).
 Qed.
 
-Hint Rewrite KRSimplifygetRules : KRSimplify_simplify.
-
-Theorem KRSimplifygetAllRules:
-  forall r, KRSimplify (KRgetAllRules r)=KRSimplifyTop (KRgetAllRules (KRSimplify r)).
+Theorem KRSimplifySound_list_Rule: forall e,
+    KRExprDenote_list_Rule e = KRExprDenote_list_Rule (KRSimplify_list_Rule e).
 Proof.
   intros.
-  simpl.
-  reflexivity.
+  apply (KRExpr_list_Rule_mut
+            (fun e : KRExpr_RegInitT => KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplify_RegInitT e))
+            (fun e : KRExpr_Rule => KRExprDenote_Rule e = KRExprDenote_Rule (KRSimplify_Rule e))
+            (fun e : KRExpr_DefMethT => KRExprDenote_DefMethT e = KRExprDenote_DefMethT (KRSimplify_DefMethT e))
+            (fun e : KRExpr_ModuleElt => KRExprDenote_ModuleElt e = KRExprDenote_ModuleElt (KRSimplify_ModuleElt e))
+            (fun e : KRExpr_list_RegInitT => KRExprDenote_list_RegInitT e = KRExprDenote_list_RegInitT (KRSimplify_list_RegInitT e))
+            (fun e : KRExpr_list_Rule => KRExprDenote_list_Rule e = KRExprDenote_list_Rule (KRSimplify_list_Rule e))
+            (fun e : KRExpr_list_DefMethT => KRExprDenote_list_DefMethT e = KRExprDenote_list_DefMethT (KRSimplify_list_DefMethT e))
+            (fun e : KRExpr_list_ModuleElt => KRExprDenote_list_ModuleElt e = KRExprDenote_list_ModuleElt (KRSimplify_list_ModuleElt e))
+            (fun e : KRExpr_list_list_ModuleElt => KRExprDenote_list_list_ModuleElt e = KRExprDenote_list_list_ModuleElt (KRSimplify_list_list_ModuleElt e))
+            (fun e : KRExpr_BaseModule => KRExprDenote_BaseModule e = KRExprDenote_BaseModule (KRSimplify_BaseModule e))
+            (fun e : KRExpr_Mod => KRExprDenote_Mod e = KRExprDenote_Mod (KRSimplify_Mod e)));try (intros;autorewrite with KRSimplify; autorewrite with KRSimplifyTopSound; simpl; try (rewrite <- H); try  (rewrite <- H0); try (rewrite <- H1); reflexivity).
 Qed.
 
-Hint Rewrite KRSimplifygetAllRules : KRSimplify_simplify.
-
-Theorem KRSimplifygetMethods:
-  forall r, KRSimplify (KRgetMethods r)=KRSimplifyTop (KRgetMethods (KRSimplify r)).
+Theorem KRSimplifySound_list_DefMethT: forall e,
+    KRExprDenote_list_DefMethT e = KRExprDenote_list_DefMethT (KRSimplify_list_DefMethT e).
 Proof.
   intros.
-  simpl.
-  reflexivity.
+  apply (KRExpr_list_DefMethT_mut
+            (fun e : KRExpr_RegInitT => KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplify_RegInitT e))
+            (fun e : KRExpr_Rule => KRExprDenote_Rule e = KRExprDenote_Rule (KRSimplify_Rule e))
+            (fun e : KRExpr_DefMethT => KRExprDenote_DefMethT e = KRExprDenote_DefMethT (KRSimplify_DefMethT e))
+            (fun e : KRExpr_ModuleElt => KRExprDenote_ModuleElt e = KRExprDenote_ModuleElt (KRSimplify_ModuleElt e))
+            (fun e : KRExpr_list_RegInitT => KRExprDenote_list_RegInitT e = KRExprDenote_list_RegInitT (KRSimplify_list_RegInitT e))
+            (fun e : KRExpr_list_Rule => KRExprDenote_list_Rule e = KRExprDenote_list_Rule (KRSimplify_list_Rule e))
+            (fun e : KRExpr_list_DefMethT => KRExprDenote_list_DefMethT e = KRExprDenote_list_DefMethT (KRSimplify_list_DefMethT e))
+            (fun e : KRExpr_list_ModuleElt => KRExprDenote_list_ModuleElt e = KRExprDenote_list_ModuleElt (KRSimplify_list_ModuleElt e))
+            (fun e : KRExpr_list_list_ModuleElt => KRExprDenote_list_list_ModuleElt e = KRExprDenote_list_list_ModuleElt (KRSimplify_list_list_ModuleElt e))
+            (fun e : KRExpr_BaseModule => KRExprDenote_BaseModule e = KRExprDenote_BaseModule (KRSimplify_BaseModule e))
+            (fun e : KRExpr_Mod => KRExprDenote_Mod e = KRExprDenote_Mod (KRSimplify_Mod e)));try (intros;autorewrite with KRSimplify; autorewrite with KRSimplifyTopSound; simpl; try (rewrite <- H); try  (rewrite <- H0); try (rewrite <- H1); reflexivity).
 Qed.
 
-Hint Rewrite KRSimplifygetMethods : KRSimplify_simplify.
-
-Theorem KRSimplifygetAllMethods:
-  forall r, KRSimplify (KRgetAllMethods r)=KRSimplifyTop (KRgetAllMethods (KRSimplify r)).
+Theorem KRSimplifySound_list_ModuleElt: forall e,
+    KRExprDenote_list_ModuleElt e = KRExprDenote_list_ModuleElt (KRSimplify_list_ModuleElt e).
 Proof.
   intros.
-  simpl.
-  reflexivity.
+  apply (KRExpr_list_ModuleElt_mut
+            (fun e : KRExpr_RegInitT => KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplify_RegInitT e))
+            (fun e : KRExpr_Rule => KRExprDenote_Rule e = KRExprDenote_Rule (KRSimplify_Rule e))
+            (fun e : KRExpr_DefMethT => KRExprDenote_DefMethT e = KRExprDenote_DefMethT (KRSimplify_DefMethT e))
+            (fun e : KRExpr_ModuleElt => KRExprDenote_ModuleElt e = KRExprDenote_ModuleElt (KRSimplify_ModuleElt e))
+            (fun e : KRExpr_list_RegInitT => KRExprDenote_list_RegInitT e = KRExprDenote_list_RegInitT (KRSimplify_list_RegInitT e))
+            (fun e : KRExpr_list_Rule => KRExprDenote_list_Rule e = KRExprDenote_list_Rule (KRSimplify_list_Rule e))
+            (fun e : KRExpr_list_DefMethT => KRExprDenote_list_DefMethT e = KRExprDenote_list_DefMethT (KRSimplify_list_DefMethT e))
+            (fun e : KRExpr_list_ModuleElt => KRExprDenote_list_ModuleElt e = KRExprDenote_list_ModuleElt (KRSimplify_list_ModuleElt e))
+            (fun e : KRExpr_list_list_ModuleElt => KRExprDenote_list_list_ModuleElt e = KRExprDenote_list_list_ModuleElt (KRSimplify_list_list_ModuleElt e))
+            (fun e : KRExpr_BaseModule => KRExprDenote_BaseModule e = KRExprDenote_BaseModule (KRSimplify_BaseModule e))
+            (fun e : KRExpr_Mod => KRExprDenote_Mod e = KRExprDenote_Mod (KRSimplify_Mod e)));try (intros;autorewrite with KRSimplify; autorewrite with KRSimplifyTopSound; simpl; try (rewrite <- H); try  (rewrite <- H0); try (rewrite <- H1); reflexivity).
 Qed.
 
-Hint Rewrite KRSimplifygetAllMethods : KRSimplify_simplify.
-
-Theorem KRSimplifyMakeModule_regs:
-  forall r, KRSimplify (KRMakeModule_regs r)=KRSimplifyTop (KRMakeModule_regs (KRSimplify r)).
+Theorem KRSimplifySound_list_list_ModuleElt: forall e,
+    KRExprDenote_list_list_ModuleElt e = KRExprDenote_list_list_ModuleElt (KRSimplify_list_list_ModuleElt e).
 Proof.
   intros.
-  simpl.
-  reflexivity.
+  apply (KRExpr_list_list_ModuleElt_mut
+            (fun e : KRExpr_RegInitT => KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplify_RegInitT e))
+            (fun e : KRExpr_Rule => KRExprDenote_Rule e = KRExprDenote_Rule (KRSimplify_Rule e))
+            (fun e : KRExpr_DefMethT => KRExprDenote_DefMethT e = KRExprDenote_DefMethT (KRSimplify_DefMethT e))
+            (fun e : KRExpr_ModuleElt => KRExprDenote_ModuleElt e = KRExprDenote_ModuleElt (KRSimplify_ModuleElt e))
+            (fun e : KRExpr_list_RegInitT => KRExprDenote_list_RegInitT e = KRExprDenote_list_RegInitT (KRSimplify_list_RegInitT e))
+            (fun e : KRExpr_list_Rule => KRExprDenote_list_Rule e = KRExprDenote_list_Rule (KRSimplify_list_Rule e))
+            (fun e : KRExpr_list_DefMethT => KRExprDenote_list_DefMethT e = KRExprDenote_list_DefMethT (KRSimplify_list_DefMethT e))
+            (fun e : KRExpr_list_ModuleElt => KRExprDenote_list_ModuleElt e = KRExprDenote_list_ModuleElt (KRSimplify_list_ModuleElt e))
+            (fun e : KRExpr_list_list_ModuleElt => KRExprDenote_list_list_ModuleElt e = KRExprDenote_list_list_ModuleElt (KRSimplify_list_list_ModuleElt e))
+            (fun e : KRExpr_BaseModule => KRExprDenote_BaseModule e = KRExprDenote_BaseModule (KRSimplify_BaseModule e))
+            (fun e : KRExpr_Mod => KRExprDenote_Mod e = KRExprDenote_Mod (KRSimplify_Mod e)));try (intros;autorewrite with KRSimplify; autorewrite with KRSimplifyTopSound; simpl; try (rewrite <- H); try  (rewrite <- H0); try (rewrite <- H1); reflexivity).
 Qed.
 
-Hint Rewrite KRSimplifyMakeModule_regs : KRSimplify_simplify.
-
-Theorem KRSimplifyMakeModule_rules:
-  forall r, KRSimplify (KRMakeModule_rules r)=KRSimplifyTop (KRMakeModule_rules (KRSimplify r)).
+Theorem KRSimplifySound_BaseModule: forall e,
+    KRExprDenote_BaseModule e = KRExprDenote_BaseModule (KRSimplify_BaseModule e).
 Proof.
   intros.
-  simpl.
-  reflexivity.
+  apply (KRExpr_BaseModule_mut
+            (fun e : KRExpr_RegInitT => KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplify_RegInitT e))
+            (fun e : KRExpr_Rule => KRExprDenote_Rule e = KRExprDenote_Rule (KRSimplify_Rule e))
+            (fun e : KRExpr_DefMethT => KRExprDenote_DefMethT e = KRExprDenote_DefMethT (KRSimplify_DefMethT e))
+            (fun e : KRExpr_ModuleElt => KRExprDenote_ModuleElt e = KRExprDenote_ModuleElt (KRSimplify_ModuleElt e))
+            (fun e : KRExpr_list_RegInitT => KRExprDenote_list_RegInitT e = KRExprDenote_list_RegInitT (KRSimplify_list_RegInitT e))
+            (fun e : KRExpr_list_Rule => KRExprDenote_list_Rule e = KRExprDenote_list_Rule (KRSimplify_list_Rule e))
+            (fun e : KRExpr_list_DefMethT => KRExprDenote_list_DefMethT e = KRExprDenote_list_DefMethT (KRSimplify_list_DefMethT e))
+            (fun e : KRExpr_list_ModuleElt => KRExprDenote_list_ModuleElt e = KRExprDenote_list_ModuleElt (KRSimplify_list_ModuleElt e))
+            (fun e : KRExpr_list_list_ModuleElt => KRExprDenote_list_list_ModuleElt e = KRExprDenote_list_list_ModuleElt (KRSimplify_list_list_ModuleElt e))
+            (fun e : KRExpr_BaseModule => KRExprDenote_BaseModule e = KRExprDenote_BaseModule (KRSimplify_BaseModule e))
+            (fun e : KRExpr_Mod => KRExprDenote_Mod e = KRExprDenote_Mod (KRSimplify_Mod e)));try (intros;autorewrite with KRSimplify; autorewrite with KRSimplifyTopSound; simpl; try (rewrite <- H); try  (rewrite <- H0); try (rewrite <- H1); reflexivity).
 Qed.
 
-Hint Rewrite KRSimplifyMakeModule_rules : KRSimplify_simplify.
-
-Theorem KRSimplifyMakeModule_meths:
-  forall r, KRSimplify (KRMakeModule_meths r)=KRSimplifyTop (KRMakeModule_meths (KRSimplify r)).
+Theorem KRSimplifySound_Mod: forall e,
+    KRExprDenote_Mod e = KRExprDenote_Mod (KRSimplify_Mod e).
 Proof.
   intros.
-  simpl.
-  reflexivity.
+  apply (KRExpr_Mod_mut
+            (fun e : KRExpr_RegInitT => KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplify_RegInitT e))
+            (fun e : KRExpr_Rule => KRExprDenote_Rule e = KRExprDenote_Rule (KRSimplify_Rule e))
+            (fun e : KRExpr_DefMethT => KRExprDenote_DefMethT e = KRExprDenote_DefMethT (KRSimplify_DefMethT e))
+            (fun e : KRExpr_ModuleElt => KRExprDenote_ModuleElt e = KRExprDenote_ModuleElt (KRSimplify_ModuleElt e))
+            (fun e : KRExpr_list_RegInitT => KRExprDenote_list_RegInitT e = KRExprDenote_list_RegInitT (KRSimplify_list_RegInitT e))
+            (fun e : KRExpr_list_Rule => KRExprDenote_list_Rule e = KRExprDenote_list_Rule (KRSimplify_list_Rule e))
+            (fun e : KRExpr_list_DefMethT => KRExprDenote_list_DefMethT e = KRExprDenote_list_DefMethT (KRSimplify_list_DefMethT e))
+            (fun e : KRExpr_list_ModuleElt => KRExprDenote_list_ModuleElt e = KRExprDenote_list_ModuleElt (KRSimplify_list_ModuleElt e))
+            (fun e : KRExpr_list_list_ModuleElt => KRExprDenote_list_list_ModuleElt e = KRExprDenote_list_list_ModuleElt (KRSimplify_list_list_ModuleElt e))
+            (fun e : KRExpr_BaseModule => KRExprDenote_BaseModule e = KRExprDenote_BaseModule (KRSimplify_BaseModule e))
+            (fun e : KRExpr_Mod => KRExprDenote_Mod e = KRExprDenote_Mod (KRSimplify_Mod e)));try (intros;autorewrite with KRSimplify; autorewrite with KRSimplifyTopSound; simpl; try (rewrite <- H); try  (rewrite <- H0); try (rewrite <- H1); reflexivity).
 Qed.
 
-Hint Rewrite KRSimplifyMakeModule_meths : KRSimplify_simplify.
-
-Theorem KRSimplifyMakeModule:
-  forall r, KRSimplify (KRMakeModule r)=KRSimplifyTop (KRMakeModule (KRSimplify r)).
-Proof.
-  intros.
-  simpl.
-  reflexivity.
-Qed.
-
-Hint Rewrite KRSimplifyMakeModule : KRSimplify_simplify.
-
-Theorem KRSimplifyBase:
-  forall r, KRSimplify (KRBase r)=KRSimplifyTop (KRBase (KRSimplify r)).
-Proof.
-  intros.
-  simpl.
-  reflexivity.
-Qed.
-
-Hint Rewrite KRSimplifyBase : KRSimplify_simplify.
-
-
-(*Theorem KRExprDenoteKRCons: forall k f r, KRExprDenote (KRCons k f r)=match (KRExprDenote f),(KRExprDenote r) with
-                                                                                      | KRSome f',Some r' => Some (cons f' r')
-                                                                                      | _,_ => None
-                                                                                      end.*)
-(*Proof.
-  intros.
-  remember (KRExprDenote' k f).
-  destruct o.
-  -  remember (KRExprDenote' (KRTypeList k) r).
-     destruct o.
-     + simpl.
-       rewrite <- Heqo.
-       rewrite <- Heqo0.
-       erewrite beq_KRType_refl at 1.
-       simpl.*)
-
-Theorem KRSimplifySound: forall e, KRExprDenote e = KRExprDenote (KRSimplify e).
-Proof.
-  intros.
-  induction e; try (autorewrite with KRSimplify_simplify; rewrite <- KRSimplifyTopSound; simpl [KRExprDenote]; repeat (rewrite <- IHe)).
-Admitted.
- (* - reflexivity.
-  - reflexivity.
-  - rewrite KRSimplifyCons.
-    rewrite <- KRSimplifyTopSound.
-    destruct k.
-    + destruct k; try (simpl; rewrite <- IHe1; rewrite <- IHe2; reflexivity).
-    + destruct k.
-      * destruct k; try (simpl; try (rewrite <- IHe1; rewrite <- IHe2); reflexivity).
-      * simpl. rewrite <- IHe1. rewrite <- IHe2. reflexivity.
-  - rewrite KRSimplifyApp.
-    rewrite <- KRSimplifyTopSound.
-    destruct k.
-    + destruct k; try (simpl; rewrite <- IHe1; rewrite <- IHe2; reflexivity).
-    + destruct k.
-      * destruct k; try (simpl; try (rewrite <- IHe1; rewrite <- IHe2); reflexivity).
-      * simpl. rewrite <- IHe1. rewrite <- IHe2. reflexivity.
-  - simpl [KRSimplify].
-    repeat (rewrite <- KRSimplifyTopSound).
-    repeat (rewrite <- IHe). reflexivity.
-  - rewrite KRSimplifyRegisters.
-    rewrite <- KRSimplifyTopSound.
-    simpl [KRExprDenote].
-    repeat (rewrite <- IHe).
-    reflexivity.
-  - rewrite KRSimplifyRules.
-    rewrite <- KRSimplifyTopSound.
-    simpl [KRExprDenote].
-    repeat (rewrite <- IHe).
-    reflexivity.
-  - rewrite KRSimplifyMethods.
-    rewrite <- KRSimplifyTopSound.
-    simpl [KRExprDenote].
-    repeat (rewrite <- IHe).
-    reflexivity.
-  - rewrite KRSimplifyMERule.
-    rewrite <- KRSimplifyTopSound.
-    simpl [KRExprDenote].
-    repeat (rewrite <- IHe).
-    reflexivity.
-  - rewrite KRSimplifyMEMeth.
-    rewrite <- KRSimplifyTopSound.
-    simpl [KRExprDenote].
-    repeat (rewrite <- IHe).
-    reflexivity.
-  - rewrite KRSimplifygetRegisters.
-    rewrite <- KRSimplifyTopSound.
-    simpl [KRExprDenote].
-    repeat (rewrite <- IHe).
-    reflexivity.
-  - rewrite KRSimplifygetAllRegisters.
-    rewrite <- KRSimplifyTopSound.
-    simpl [KRExprDenote].
-    repeat (rewrite <- IHe).
-    reflexivity.
-  - rewrite KRSimplifygetRegisters.
-    rewrite <- KRSimplifyTopSound.
-    simpl [KRExprDenote].
-    repeat (rewrite <- IHe).
-    reflexivity.
-  - rewrite KRSimplifygetAllRegisters.
-    rewrite <- KRSimplifyTopSound.
-    simpl [KRExprDenote].
-    repeat (rewrite <- IHe).
-    reflexivity.
-  - rewrite KRSimplifygetRegisters.
-    rewrite <- KRSimplifyTopSound.
-    simpl [KRExprDenote].
-    repeat (rewrite <- IHe).
-    reflexivity.
-  - rewrite KRSimplifygetAllRegisters.
-    rewrite <- KRSimplifyTopSound.
-    simpl [KRExprDenote].
-    repeat (rewrite <- IHe).
-    reflexivity.
-  -
-    
-  - simpl [KRSimplify].
-    repeat (rewrite <- KRSimplifyTopSound).
-    repeat (rewrite <- IHe). reflexivity.
-  - simpl [KRSimplify].
-    repeat (rewrite <- KRSimplifyTopSound).
-    repeat (rewrite <- IHe). reflexivity.
-  - simpl [KRSimplify].
-    repeat (rewrite <- KRSimplifyTopSound).
-    repeat (rewrite <- IHe). reflexivity.
-  - simpl [KRSimplify].
-    repeat (rewrite <- KRSimplifyTopSound).
-    repeat (rewrite <- IHe). reflexivity.
-  - simpl [KRSimplify].
-    repeat (rewrite <- KRSimplifyTopSound).
-    repeat (rewrite <- IHe). reflexivity.
-  - simpl [KRSimplify].
-    repeat (rewrite <- KRSimplifyTopSound).
-    repeat (rewrite <- IHe). reflexivity.
-  - simpl [KRSimplify].
-    repeat (rewrite <- KRSimplifyTopSound).
-    repeat (rewrite <- IHe). reflexivity.
-  - simpl [KRSimplify].
-    repeat (rewrite <- KRSimplifyTopSound).
-    repeat (rewrite <- IHe). reflexivity.
-  - simpl [KRSimplify].
-    repeat (rewrite <- KRSimplifyTopSound).
-    repeat (rewrite <- IHe). reflexivity.
-  - simpl [KRSimplify].
-    repeat (rewrite <- KRSimplifyTopSound).
-    repeat (rewrite <- IHe). reflexivity.
-  - simpl [KRSimplify].
-    repeat (rewrite <- KRSimplifyTopSound).
-    repeat (rewrite <- IHe). reflexivity.
-Admitted.*)
-
-Theorem sum_elim: forall tp (x:tp) (y:tp), Some x=Some y -> x=y.
-  intros.
-  inversion H.
-  subst.
-  reflexivity.
-Qed.
-
+  
 Goal forall (a:ModuleElt) (b:list ModuleElt) c, app (cons a b) c=cons a (app b c).
   intros.
   match goal with
   | |- ?A = ?B => let x := (ltac:(KRExprReify A (KRTypeList (KRTypeElem KRElemModuleElt)))) in
-                  let H := fresh in
-                  assert (KROption_Some (KRTypeList (KRTypeElem KRElemModuleElt)) A = (KRExprDenote (KRSimplify x))) as H ; [ rewrite <- KRSimplifySound;idtac | idtac ]
-                      (*rewrite <- KRSimplifySound;[compute [KRExprDenote]; reflexivity |
-                                                  simpl; reflexivity |
-                                                  compute [KRExprDenote KRTypeDenote KRElemDenote KRExprType]; (*eapply ex_intro;reflexivity*) idtac] |
-                                                  cbv [KRSimplify KRSimplifyTop KRExprDenote] in H]*)
+                  change A with (KRExprDenote_list_ModuleElt x);
+                    rewrite KRSimplifySound_list_ModuleElt;
+                    cbv [KRSimplify_list_ModuleElt KRSimplifyTop_list_ModuleElt KRExprDenote_list_ModuleElt KRExprDenote_ModuleElt KRSimplifyTop_ModuleElt KRSimplify_ModuleElt]
   end.
-  assert (KRExprDenote (KRApp (KRTypeElem KRElemModuleElt) (KRVar (KRTypeList (KRTypeElem KRElemModuleElt)) c) (KRVar (KRTypeList (KRTypeElem KRElemModuleElt)) b))=KROption_Some (KRTypeList (KRTypeElem KRElemModuleElt)) []).
-  simpl.
-  
 Abort.
 
-(*  destruct H.
-  constructor H.
-  rewrite H.
-  cbv [KRExprDenote] in H.
-  simpl [KRSimplify KRSimplifyTop] in H.
-  simpl in H.
-  match goal with
-
-  end.
-
-
-  
-  compute in H.
-  destruct H.*)
-
 Ltac KRSimplifyTac e tp :=
-       let x := (ltac:(KRExprReify e tp)) in
-       let H := fresh in
-                (assert (Some e = (KRExprDenote tp x)) as H;
-                 [cbv [KRExprDenote KRExprDenote'];reflexivity | idtac];
-                 repeat (rewrite KRSimplifySound in H;[cbv [KRSimplify KRSimplifyTop] in H |
-                                                       simpl; reflexivity | compute [KRExprDenote KRExprDenote' KRTypeDenote KRElemDenote KRExprType]; eapply ex_intro; reflexivity]);
-                cbv [KRExprDenote KRExprDenote'] in H;apply sum_elim in H;rewrite H;clear H).
-
+  let x := (ltac:(KRExprReify e tp)) in
+  let denote := match tp with
+                | (KRTypeElem KRElemRegInitT) => KRExprDenote_RegInitT
+                | (KRTypeElem KRElemRule) => KRExprDenote_Rule
+                | (KRTypeElem KRElemDefMethT) => KRExprDenote_DefMethT
+                | (KRTypeElem KRElemModuleElt) => KRExprDenote_ModuleElt
+                | (KRTypeList (KRTypeElem KRElemRegInitT)) => KRExprDenote_list_RegInitT
+                | (KRTypeList (KRTypeElem KRElemRule)) => KRExprDenote_list_Rule
+                | (KRTypeList (KRTypeElem KRElemDefMethT)) => KRExprDenote_list_DefMethT
+                | (KRTypeList (KRTypeElem KRElemModuleElt)) => KRExprDenote_list_ModuleElt
+                | (KRTypeList (KRTypeList (KRTypeElem KRElemModuleElt))) => KRExprDenote_list_list_ModuleElt
+                | (KRTypeElem KRElemBaseModule) => KRExprDenote_BaseModule
+                | (KRTypeElem KRElemMod) => KRExprDenote_Mod
+                end in
+  let simplifySound := match tp with
+                | (KRTypeElem KRElemRegInitT) => KRSimplifySound_RegInitT
+                | (KRTypeElem KRElemRule) => KRSimplifySound_Rule
+                | (KRTypeElem KRElemDefMethT) => KRSimplifySound_DefMethT
+                | (KRTypeElem KRElemModuleElt) => KRSimplifySound_ModuleElt
+                | (KRTypeList (KRTypeElem KRElemRegInitT)) => KRSimplifySound_list_RegInitT
+                | (KRTypeList (KRTypeElem KRElemRule)) => KRSimplifySound_list_Rule
+                | (KRTypeList (KRTypeElem KRElemDefMethT)) => KRSimplifySound_list_DefMethT
+                | (KRTypeList (KRTypeElem KRElemModuleElt)) => KRSimplifySound_list_ModuleElt
+                | (KRTypeList (KRTypeList (KRTypeElem KRElemModuleElt))) => KRSimplifySound_list_list_ModuleElt
+                | (KRTypeElem KRElemBaseModule) => KRSimplifySound_BaseModule
+                | (KRTypeElem KRElemMod) => KRSimplifySound_Mod
+                end in
+  change e with (denote x);repeat (rewrite simplifySound;cbv [
+                KRSimplify_RegInitT KRSimplifyTop_RegInitT
+                KRSimplify_Rule KRSimplifyTop_Rule
+                KRSimplify_DefMethT KRSimplifyTop_DefMethT
+                KRSimplify_ModuleElt KRSimplifyTop_ModuleElt
+                KRSimplify_list_RegInitT KRSimplifyTop_list_RegInitT
+                KRSimplify_list_Rule KRSimplifyTop_list_Rule
+                KRSimplify_list_DefMethT KRSimplifyTop_list_DefMethT
+                KRSimplify_list_ModuleElt KRSimplifyTop_list_ModuleElt
+                KRSimplify_list_list_ModuleElt KRSimplifyTop_list_list_ModuleElt
+                KRSimplify_BaseModule KRSimplifyTop_BaseModule
+                KRSimplify_Mod KRSimplifyTop_Mod
+                                  ]);
+cbv [
+                KRExprDenote_RegInitT
+                KRExprDenote_Rule
+                KRExprDenote_DefMethT
+                KRExprDenote_ModuleElt
+                KRExprDenote_list_RegInitT
+                KRExprDenote_list_Rule
+                KRExprDenote_list_DefMethT
+                KRExprDenote_list_ModuleElt
+                KRExprDenote_list_list_ModuleElt
+                KRExprDenote_BaseModule
+                KRExprDenote_Mod].
 (*Ltac KRPrintReify e :=
   let x := (ltac:(KRExprReify e t)) in
   let t := eval compute in (KRTypeDenote x) in
@@ -992,7 +1038,7 @@ Goal forall a b c d e, Registers ([a;b]++[c;d])=e.
 Abort.
 Goal forall a b c d e, makeModule_regs [MERegister a;MERule b;MEMeth c;MERegister d]=e.
   intros.
-  match goal with
+  repeat match goal with
   | |- ?A = ?B => 
       KRSimplifyTac A (KRTypeList (KRTypeElem KRElemRegInitT))
   end.
@@ -1017,4 +1063,4 @@ Goal forall e, makeModule_regs []=e.
   | |- ?A = ?B => 
       KRSimplifyTac A (KRTypeList (KRTypeElem KRElemRegInitT))
   end.
-Abort.*)
+Abort.
