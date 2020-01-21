@@ -252,7 +252,7 @@ Ltac KRExprReify e t :=
   | ?X => match t with
           | (KRTypeElem KRElemRegInitT) => constr:(KRVar_RegInitT X)
           | (KRTypeElem KRElemRule) => constr:(KRVar_Rule X)
-          | (KRTypeElem KRElemDefMethT) => constr:(KRVar_RegInitT X)
+          | (KRTypeElem KRElemDefMethT) => constr:(KRVar_DefMethT X)
           | (KRTypeElem KRElemModuleElt) => constr:(KRVar_ModuleElt X)
           | (KRTypeList (KRTypeElem KRElemRegInitT)) => constr:(KRVar_list_RegInitT X)
           | (KRTypeList (KRTypeElem KRElemRule)) => constr:(KRVar_list_Rule X)
@@ -1038,7 +1038,7 @@ Goal forall a b c d e, Registers ([a;b]++[c;d])=e.
 Abort.
 Goal forall a b c d e, makeModule_regs [MERegister a;MERule b;MEMeth c;MERegister d]=e.
   intros.
-  repeat match goal with
+  match goal with
   | |- ?A = ?B => 
       KRSimplifyTac A (KRTypeList (KRTypeElem KRElemRegInitT))
   end.
@@ -1050,7 +1050,7 @@ Goal forall a b c d e, makeModule_rules [MERegister a;MERule b;MEMeth c;MERegist
       KRSimplifyTac A (KRTypeList (KRTypeElem KRElemRule))
   end.
 Abort.
-Goal forall a b c d e, makeModule_meths [MERegister a;MERule b;MEMeth c;MERegister d]=e.
+Goal forall a b c d e, makeModule_meths [MEMeth a;MERule b;MERegister c;MERegister d]=e.
   intros.
   match goal with
   | |- ?A = ?B => 
