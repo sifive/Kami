@@ -85,7 +85,7 @@ with KRExpr_list_list_DefMethT: Type :=
   | KRMap_list_RegFileBase_list_list_DefMethT : KRExpr_RegFileBase_list_DefMethT_Func -> KRExpr_list_RegFileBase -> KRExpr_list_list_DefMethT
   
 with KRExpr_Mod_list_DefMethT_Func :=
-  | KRVar_Mod_DefMethT_Func : (Mod-> list (DefMethT)) -> KRExpr_Mod_list_DefMethT_Func
+  | KRVar_Mod_list_DefMethT_Func : (Mod-> list (DefMethT)) -> KRExpr_Mod_list_DefMethT_Func
   | KRgetAllMethodsFunc : KRExpr_Mod_list_DefMethT_Func
 
 with KRExpr_RegFileBase_list_DefMethT_Func :=
@@ -116,18 +116,17 @@ with KRExpr_list_CallWithSign: Type :=
   | KRCons_list_CallWithSign : KRExpr_CallWithSign -> KRExpr_list_CallWithSign -> KRExpr_list_CallWithSign
   | KRApp_list_CallWithSign : KRExpr_list_CallWithSign -> KRExpr_list_CallWithSign -> KRExpr_list_CallWithSign
   | KRConcat_CallWithSign : KRExpr_list_list_CallWithSign -> KRExpr_list_CallWithSign
-  | KRgetCallsPerMod : KRExpr_Mod -> KRExpr_list_CallWithSign
 
 with KRExpr_list_list_CallWithSign: Type :=
   | KRVar_list_list_CallWithSign : list (list (string * (Kind * Kind))) -> KRExpr_list_list_CallWithSign
   | KRNil_list_list_CallWithSign : KRExpr_list_list_CallWithSign
   | KRCons_list_list_CallWithSign : KRExpr_list_CallWithSign -> KRExpr_list_list_CallWithSign -> KRExpr_list_list_CallWithSign
   | KRApp_list_list_CallWithSign : KRExpr_list_list_CallWithSign -> KRExpr_list_list_CallWithSign -> KRExpr_list_list_CallWithSign
-  | KRMap_list_Mod_list_list_CallWithSign : KRExpr_Mod_list_CallWithSign_Func -> KRExpr_list_Mod -> KRExpr_list_list_CallWithSign
+  (*| KRMap_list_Mod_list_list_CallWithSign : KRExpr_Mod_list_CallWithSign_Func -> KRExpr_list_Mod -> KRExpr_list_list_CallWithSign*)
 
-with KRExpr_Mod_list_CallWithSign_Func :=
-  | KRVar_Mod_list_CallWithSign_Func : (Mod-> list (DefMethT)) -> KRExpr_Mod_list_CallWithSign_Func
-  | KRgetCallsPerModFunc : KRExpr_Mod_list_CallWithSign_Func
+with KRExpr_Mod_list_string_Func :=
+  | KRVar_Mod_list_string_Func : (Mod-> list string) -> KRExpr_Mod_list_string_Func
+  | KRgetCallsPerModFunc : KRExpr_Mod_list_string_Func
 
 with KRExpr_BaseModule: Type :=
   | KRVar_BaseModule : BaseModule -> KRExpr_BaseModule
@@ -148,17 +147,17 @@ with KRExpr_Mod: Type :=
   | KRVar_Mod : Mod -> KRExpr_Mod
   | KRBase : KRExpr_BaseModule -> KRExpr_Mod
   | KRConcatMod : KRExpr_Mod -> KRExpr_Mod -> KRExpr_Mod
+  | KRFold_right_Mod : KRExpr_Mod_Mod_PairFunc -> KRExpr_Mod -> KRExpr_list_Mod -> KRExpr_Mod
 
 with KRExpr_Mod_Mod_PairFunc :=
   | KRVar_Mod_Mod_PairFunc : (Mod -> Mod -> Mod) -> KRExpr_Mod_Mod_PairFunc
   | KRConcatMod_Func : KRExpr_Mod_Mod_PairFunc
 
 with KRExpr_list_Mod: Type :=
-  | KRVar_list_Mod : Mod -> KRExpr_list_Mod
+  | KRVar_list_Mod : (list Mod) -> KRExpr_list_Mod
   | KRNil_list_Mod : KRExpr_list_Mod
   | KRCons_list_Mod : KRExpr_Mod -> KRExpr_list_Mod -> KRExpr_list_Mod
   | KRApp_list_Mod : KRExpr_list_Mod -> KRExpr_list_Mod -> KRExpr_list_Mod
-  | KRFold_right_list_Mod : KRExpr_Mod_Mod_PairFunc -> KRExpr_Mod -> KRExpr_list_Mod -> KRExpr_list_Mod
 
 with KRExpr_RegFileBase_Mod_Func :=
   | KRVar_CastFunc: KRExpr_RegFileBase_Mod_Func
@@ -168,6 +167,19 @@ with KRExpr_string: Type :=
   | KRVar_string : string -> KRExpr_string
   | KRstring_append : KRExpr_string -> KRExpr_string -> KRExpr_string
 
+with KRExpr_list_string: Type :=
+  | KRVar_list_string : list string -> KRExpr_list_string
+  | KRNil_list_string : KRExpr_list_string
+  | KRCons_list_string : KRExpr_string -> KRExpr_list_string -> KRExpr_list_string
+  | KRApp_list_string : KRExpr_list_string -> KRExpr_list_string -> KRExpr_list_string
+  | KRgetCallsPerMod : KRExpr_Mod -> KRExpr_list_string
+
+with KRExpr_list_list_string: Type :=
+  | KRVar_list_list_string : list (list string) -> KRExpr_list_list_string
+  | KRNil_list_list_string : KRExpr_list_list_string
+  | KRCons_list_list_string : KRExpr_list_string -> KRExpr_list_list_string -> KRExpr_list_list_string
+  | KRApp_list_list_string : KRExpr_list_list_string -> KRExpr_list_list_string -> KRExpr_list_list_string
+
 with KRExpr_Prop: Type :=
   | KRVar_Prop : Prop -> KRExpr_Prop
   | KRTrue_Prop : KRExpr_Prop
@@ -175,7 +187,11 @@ with KRExpr_Prop: Type :=
   | KRAnd_Prop : KRExpr_Prop -> KRExpr_Prop -> KRExpr_Prop
   | KROr_Prop : KRExpr_Prop -> KRExpr_Prop -> KRExpr_Prop.
 
-(*Fixpoint KRExprDenote_RegInitT (e:KRExpr_RegInitT) : RegInitT :=
+
+
+
+
+Fixpoint KRExprDenote_RegInitT (e:KRExpr_RegInitT) : RegInitT :=
   match e with
   | KRVar_RegInitT v => v
   end
@@ -283,7 +299,7 @@ with KRExprDenote_list_list_DefMethT (e:KRExpr_list_list_DefMethT) : list (list 
     
 with KRExprDenote_Mod_list_DefMethT_Func(f: KRExpr_Mod_list_DefMethT_Func) : (Mod -> list DefMethT) :=
   match f with
-  | KRVar_Mod_DefMethT_Func f => f
+  | KRVar_Mod_list_DefMethT_Func f => f
   | KRgetAllMethodsFunc => getAllMethods
   end
 
@@ -305,7 +321,6 @@ with KRExprDenote_list_CallWithSign(c: KRExpr_list_CallWithSign) :=
   | KRCons_list_CallWithSign f r => cons (KRExprDenote_CallWithSign f) (KRExprDenote_list_CallWithSign r)
   | KRApp_list_CallWithSign f r => app (KRExprDenote_list_CallWithSign f) (KRExprDenote_list_CallWithSign r)
   | KRConcat_CallWithSign l => concat (KRExprDenote_list_list_CallWithSign l)
-  | KRgetCallsPerMod m => getCallsPerMod (KRExprDenote_Mod m)
   end
 
 with KRExprDenote_list_list_CallWithSign(c:  KRExpr_list_list_CallWithSign) :=
@@ -314,12 +329,12 @@ with KRExprDenote_list_list_CallWithSign(c:  KRExpr_list_list_CallWithSign) :=
   | KRNil_list_list_CallWithSign => nil
   | KRCons_list_list_CallWithSign f r => cons (KRExprDenote_list_CallWithSign f) (KRExprDenote_list_list_CallWithSign r)
   | KRApp_list_list_CallWithSign f r => app (KRExprDenote_list_list_CallWithSign f) (KRExprDenote_list_list_CallWithSign r)
-  | KRMap_list_Mod_list_list_CallWithSign f l =>  (KRExprDenote_Mod_list_CallWithSign_Func f) (KRExprDenote_list_Mod l)
+  (*| KRMap_list_Mod_list_list_CallWithSign f l =>  (KRExprDenote_Mod_list_CallWithSign_Func f) (KRExprDenote_list_Mod l)*)
   end
 
-with KRExprDenote_Mod_list_CallWithSign_Func(f: KRExpr_Mod_list_CallWithSign_Func) :=
+with KRExprDenote_Mod_list_string_Func(f: KRExpr_Mod_list_string_Func) : (Mod -> (list string)) :=
   match f with
-  | KRVar_Mod_list_CallWithSign_Func f => f
+  | KRVar_Mod_list_string_Func f => f
   | KRgetCallsPerModFunc => getCallsPerMod
   end
     
@@ -347,6 +362,7 @@ with KRExprDenote_BaseModule (e:KRExpr_BaseModule) : BaseModule :=
   | KRVar_BaseModule v => v
   | KRMakeModule e => makeModule (KRExprDenote_list_ModuleElt e)
   | KRBaseMod regs rules meths => BaseMod (KRExprDenote_list_RegInitT regs) (KRExprDenote_list_Rule rules) (KRExprDenote_list_DefMethT meths)
+  | KRBaseRegFile b => BaseRegFile (KRExprDenote_RegFileBase b)
   end
 
 with KRExprDenote_RegFileBase(m: KRExpr_RegFileBase) :=
@@ -358,8 +374,8 @@ with KRExprDenote_list_RegFileBase(l: KRExpr_list_RegFileBase) :=
   match l with
   | KRVar_list_RegFileBase l => l
   | KRNil_list_RegFileBase => nil
-  | KRCons_list_RegFileBase f r => (KRExprDenote_RegFileBase f) (KRExprDenote_list_RegFileBase r)
-  | KRApp_list_RegFileBase a b => (KRExprDenote_list_RegFileBase a) (KRExprDenote_list_RegFileBase b)
+  | KRCons_list_RegFileBase f r => cons (KRExprDenote_RegFileBase f) (KRExprDenote_list_RegFileBase r)
+  | KRApp_list_RegFileBase a b => app (KRExprDenote_list_RegFileBase a) (KRExprDenote_list_RegFileBase b)
   end
 
 with KRExprDenote_Mod (e:KRExpr_Mod) : Mod :=
@@ -367,6 +383,7 @@ with KRExprDenote_Mod (e:KRExpr_Mod) : Mod :=
   | KRVar_Mod v => v
   | KRBase b => Base (KRExprDenote_BaseModule b)
   | KRConcatMod a b => ConcatMod (KRExprDenote_Mod a) (KRExprDenote_Mod b)
+  | KRFold_right_Mod f a b => fold_right (KRExprDenote_Mod_Mod_PairFunc f) (KRExprDenote_Mod a) (KRExprDenote_list_Mod b)
   end
 
 with KRExprDenote_Mod_Mod_PairFunc(f: KRExpr_Mod_Mod_PairFunc) :=
@@ -381,19 +398,35 @@ with KRExprDenote_list_Mod(m: KRExpr_list_Mod) : list Mod :=
   | KRNil_list_Mod => nil
   | KRCons_list_Mod f r => cons (KRExprDenote_Mod f) (KRExprDenote_list_Mod r)
   | KRApp_list_Mod f r => app (KRExprDenote_list_Mod f) (KRExprDenote_list_Mod r)
-  | KRFold_right_list_Mod f a b => (KRExprDenote_Mod_Mod_PairFunc f) (KRExprDenote_Mod f) (KRExpr_list_Mod r)
   end
 
 with KRExprDenote_RegFileBase_Mod_Func(f: KRExpr_RegFileBase_Mod_Func) :=
   match f with
-  | KRVar_CastFunc => (fun m => Base (RegFileBase m))
+  | KRVar_CastFunc => (fun m : RegFileBase => Base (BaseRegFile m))
   | KRVar_RegFileBase_Mod_Func f => f
   end
 
 with KRExprDenote_string(s:KRExpr_string) :=
   match s with
   | KRVar_string s => s
-  | KRstring_append a b => (KRExprDenote_string a) (KRExprDenote_string b)
+  | KRstring_append a b => ((KRExprDenote_string a)++(KRExprDenote_string b))%string
+  end
+
+with KRExprDenote_list_string(l: KRExpr_list_string) : list string :=
+  match l with
+  | KRVar_list_string v => v
+  | KRNil_list_string => nil
+  | KRCons_list_string a b => cons (KRExprDenote_string a) (KRExprDenote_list_string b)
+  | KRApp_list_string a b => app (KRExprDenote_list_string a) (KRExprDenote_list_string b)
+  | KRgetCallsPerMod m => getCallsPerMod (KRExprDenote_Mod m)
+  end
+
+with KRExprDenote_list_list_string(l : KRExpr_list_list_string) : list (list string) :=
+  match l with
+  | KRVar_list_list_string v => v
+  | KRNil_list_list_string => nil
+  | KRCons_list_list_string a b => cons (KRExprDenote_list_string a) (KRExprDenote_list_list_string b)
+  | KRApp_list_list_string a b => app (KRExprDenote_list_list_string a) (KRExprDenote_list_list_string b)
   end
 
 with KRExprDenote_Prop(p: KRExpr_Prop) :=
@@ -405,13 +438,32 @@ with KRExprDenote_Prop(p: KRExpr_Prop) :=
   | KROr_Prop a b => (KRExprDenote_Prop a) \/ (KRExprDenote_Prop b)
   end.
 
+
+
+
+
+
+
 Inductive KRElem: Type :=
 | KRElemRegInitT : KRElem
 | KRElemRule : KRElem
 | KRElemDefMethT : KRElem
 | KRElemModuleElt: KRElem
 | KRElemMod : KRElem
-| KRElemBaseModule : KRElem.
+| KRElemBaseModule : KRElem
+| KRElemString : KRElem
+| KRElemProp : KRElem
+| KRElemRegFileBase : KRElem
+| KRElemCallWithSign : KRElem
+| KRElemMod_Mod_PairFunc : KRElem
+| KRElemRegFileBase_list_RegInitT_Func : KRElem
+| KRElemRegFileBase_Mod_Func : KRElem
+| KRElemMod_list_string_Func : KRElem
+| KRElemMod_list_DefMethT_Func : KRElem
+| KRElemRegFileBase_list_DefMethT_Func : KRElem
+| KRElemMod_list_Rule_Func : KRElem
+| KRElemMod_list_RegInitT_Func : KRElem.
+
 
 Inductive KRType : Type :=
   | KRTypeElem: KRElem -> KRType
@@ -421,36 +473,81 @@ Ltac KRExprReify e t :=
   match e with
   | nil => match t with
            | KRTypeList (KRTypeElem KRElemRegInitT) => constr:(@KRNil_list_RegInitT)
+           | KRTypeList (KRTypeList (KRTypeElem KRElemRegInitT)) => constr:(@KRNil_list_list_RegInitT)
            | KRTypeList (KRTypeElem KRElemRule) => constr:(@KRNil_list_Rule)
+           | KRTypeList (KRTypeList (KRTypeElem KRElemRule)) => constr:(@KRNil_list_list_Rule)
            | KRTypeList (KRTypeElem KRElemDefMethT) => constr:(@KRNil_list_DefMethT)
+           | KRTypeList (KRTypeList (KRTypeElem KRElemDefMethT)) => constr:(@KRNil_list_list_DefMethT)
            | KRTypeList (KRTypeElem KRElemModuleElt) => constr:(@KRNil_list_ModuleElt)
            | KRTypeList (KRTypeList (KRTypeElem KRElemModuleElt)) => constr:(@KRNil_list_list_ModuleElt)
+           | KRTypeList (KRTypeElem KRElemMod) => constr:(@KRNil_list_Mod)
+           | KRTypeList (KRTypeElem KRElemCallWithSign) => constr:(@KRNil_list_CallWithSign)
+           | KRTypeList (KRTypeList (KRTypeElem KRElemCallWithSign)) => constr:(@KRNil_list_list_CallWithSign)
+           | KRTypeList (KRTypeElem KRElemString) => constr:(@KRNil_list_string)
+           | KRTypeList (KRTypeList (KRTypeElem KRElemString)) => constr:(@KRNil_list_list_string)
            end
   | cons ?F ?R => match t with
                   | KRTypeList (KRTypeElem KRElemRegInitT)  => let fr :=ltac:(KRExprReify F (KRTypeElem KRElemRegInitT)) in
                                                                let re:=ltac:(KRExprReify R (KRTypeList (KRTypeElem KRElemRegInitT))) in
                                                                constr:(KRCons_list_RegInitT fr re)
+                  | KRTypeList (KRTypeList (KRTypeElem KRElemRegInitT))  => let fr :=ltac:(KRExprReify F (KRTypeList (KRTypeElem KRElemRegInitT))) in
+                                                               let re:=ltac:(KRExprReify R (KRTypeList (KRTypeList (KRTypeElem KRElemRegInitT)))) in
+                                                               constr:(KRCons_list_list_RegInitT fr re)
                   | KRTypeList (KRTypeElem KRElemRule)  => let fr :=ltac:(KRExprReify F (KRTypeElem KRElemRule)) in
                                                                let re:=ltac:(KRExprReify R (KRTypeList (KRTypeElem KRElemRule))) in
                                                                constr:(KRCons_list_Rule fr re)
+                  | KRTypeList (KRTypeList (KRTypeElem KRElemRule))  => let fr :=ltac:(KRExprReify F (KRTypeList (KRTypeElem KRElemRule))) in
+                                                               let re:=ltac:(KRExprReify R (KRTypeList (KRTypeList (KRTypeElem KRElemRule)))) in
+                                                               constr:(KRCons_list_list_Rule fr re)
                   | KRTypeList (KRTypeElem KRElemDefMethT)  => let fr :=ltac:(KRExprReify F (KRTypeElem KRElemDefMethT)) in
                                                                let re:=ltac:(KRExprReify R (KRTypeList (KRTypeElem KRElemDefMethT))) in
                                                                constr:(KRCons_list_DefMethT fr re)
+                  | KRTypeList (KRTypeList (KRTypeElem KRElemDefMethT))  => let fr :=ltac:(KRExprReify F (KRTypeList (KRTypeElem KRElemDefMethT))) in
+                                                               let re:=ltac:(KRExprReify R (KRTypeList (KRTypeList (KRTypeElem KRElemDefMethT)))) in
+                                                               constr:(KRCons_list_list_DefMethT fr re)
                   | KRTypeList (KRTypeElem KRElemModuleElt)  => let fr :=ltac:(KRExprReify F (KRTypeElem KRElemModuleElt)) in
                                                                let re:=ltac:(KRExprReify R (KRTypeList (KRTypeElem KRElemModuleElt))) in
                                                                constr:(KRCons_list_ModuleElt fr re)
                   | KRTypeList (KRTypeList (KRTypeElem KRElemModuleElt))  => let fr :=ltac:(KRExprReify F (KRTypeList (KRTypeElem KRElemModuleElt))) in
                                                                let re:=ltac:(KRExprReify R (KRTypeList (KRTypeList (KRTypeElem KRElemModuleElt)))) in
                                                                constr:(KRCons_list_list_ModuleElt fr re)
+                  | KRTypeList (KRTypeElem KRElemMod)  => let fr :=ltac:(KRExprReify F (KRTypeElem KRElemMod)) in
+                                                               let re:=ltac:(KRExprReify R (KRTypeList (KRTypeElem KRElemMod))) in
+                                                               constr:(KRCons_list_Mod fr re)
+                  | KRTypeList (KRTypeElem KRElemCallWithSign)  => let fr :=ltac:(KRExprReify F (KRTypeElem KRElemCallWithSign)) in
+                                                               let re:=ltac:(KRExprReify R (KRTypeList (KRTypeElem KRElemCallWithSign))) in
+                                                               constr:(KRCons_list_CallWithSign fr re)
+                  | KRTypeList (KRTypeList (KRTypeElem KRElemCallWithSign))  => let fr :=ltac:(KRExprReify F (KRTypeList (KRTypeElem KRElemCallWithSign))) in
+                                                               let re:=ltac:(KRExprReify R (KRTypeList (KRTypeList (KRTypeElem KRElemCallWithSign)))) in
+                                                               constr:(KRCons_list_list_CallWithSign fr re)
+                  | KRTypeList (KRTypeElem KRElemString)  => let fr :=ltac:(KRExprReify F (KRTypeElem KRElemString)) in
+                                                               let re:=ltac:(KRExprReify R (KRTypeList (KRTypeElem KRElemString))) in
+                                                               constr:(KRCons_list_string fr re)
+                  | KRTypeList (KRTypeList (KRTypeElem KRElemString))  => let fr :=ltac:(KRExprReify F (KRTypeList (KRTypeElem KRElemString))) in
+                                                               let re:=ltac:(KRExprReify R (KRTypeList (KRTypeList (KRTypeElem KRElemString)))) in
+                                                               constr:(KRCons_list_list_string fr re)
                   end
   | app ?F ?R => let x1 := ltac:(KRExprReify F t) in
                  let x2 := ltac:(KRExprReify R t) in
                  match t with
                  | KRTypeList (KRTypeElem KRElemRegInitT) => constr:(KRApp_list_RegInitT x1 x2)
+                 | KRTypeList (KRTypeList (KRTypeElem KRElemRegInitT)) => constr:(KRApp_list_list_RegInitT x1 x2)
                  | KRTypeList (KRTypeElem KRElemRule) => constr:(KRApp_list_Rule x1 x2)
+                 | KRTypeList (KRTypeList (KRTypeElem KRElemRule)) => constr:(KRApp_list_list_Rule x1 x2)
                  | KRTypeList (KRTypeElem KRElemDefMethT) => constr:(KRApp_list_DefMethT x1 x2)
+                 | KRTypeList (KRTypeList (KRTypeElem KRElemDefMethT)) => constr:(KRApp_list_list_DefMethT x1 x2)
                  | KRTypeList (KRTypeElem KRElemModuleElt) => constr:(KRApp_list_ModuleElt x1 x2)
                  | KRTypeList (KRTypeList (KRTypeElem KRElemModuleElt)) => constr:(KRApp_list_list_ModuleElt x1 x2)
+                 | KRTypeList (KRTypeElem KRElemMod) => constr:(KRApp_list_Mod x1 x2)
+                 | KRTypeList (KRTypeElem KRElemCallWithSign) => constr:(KRApp_list_CallWithSign x1 x2)
+                 | KRTypeList (KRTypeElem KRElemString) => constr:(KRApp_list_string x1 x2)
+                 | KRTypeList (KRTypeList (KRTypeElem KRElemString)) => constr:(KRApp_list_list_string x1 x2)
+                 end
+  | concat ?F => let x := ltac:(KRExprReify F (KRTypeList t)) in
+                 match t with
+                 | KRTypeList (KRTypeElem KRElemRegInitT) => constr:(KRConcat_RegInitT x)
+                 | KRTypeList (KRTypeElem KRElemRule) => constr:(KRConcat_Rule x)
+                 | KRTypeList (KRTypeElem KRElemDefMethT) => constr:(KRConcat_DefMethT x)
                  end
   | MERegister ?E => let x := ltac:(KRExprReify E (KRTypeElem KRElemRegInitT)) in
                          constr:(KRMERegister x)
@@ -508,10 +605,28 @@ Ltac KRExprReify e t :=
           | (KRTypeList (KRTypeList (KRTypeElem KRElemModuleElt))) => constr:(KRVar_list_list_ModuleElt X)
           | (KRTypeElem KRElemBaseModule) => constr:(KRVar_BaseModule X)
           | (KRTypeElem KRElemMod) => constr:(KRVar_Mod X)
+          | (KRTypeList (KRTypeElem KRElemMod)) => constr:(KRVar_list_Mod X)
+          | (KRTypeElem KRElemString) => constr:(KRVar_string X)
+          | (KRTypeList (KRTypeElem KRElemString)) => constr:(KRVar_list_string X)
+          | (KRTypeList (KRTypeList (KRTypeElem KRElemString))) => constr:(KRVar_list_list_string X)
+          | (KRTypeElem KRElemProp) => constr:(KRVar_Prop X)
+          | (KRTypeElem KRElemRegFileBase) => constr:(KRVar_RegFileBase X)
+          | (KRTypeList (KRTypeElem KRElemRegFileBase)) => constr:(KRVar_list_RegFileBase X)
+          | (KRTypeElem KRElemCallWithSign) => constr:(KRVar_CallWithSign X)
+          | (KRTypeList (KRTypeElem KRElemCallWithSign)) => constr:(KRVar_list_CallWithSign X)
+          | (KRTypeList (KRTypeList (KRTypeElem KRElemCallWithSign))) => constr:(KRVar_list_list_CallWithSign X)
+          | (KRTypeElem KRElemMod_Mod_PairFunc) => constr:(KRVar_Mod_Mod_PairFunc)
+          | (KRTypeElem KRElemRegFileBase_list_RegInitT_Func) => constr:(KRVar_RegFileBase_list_RegInitT_Func)
+          | (KRTypeElem KRElemRegFileBase_Mod_Func) => constr:(KRVar_RegFileBase_Mod_Func)
+          | (KRTypeElem KRElemMod_list_string_Func) => constr:(KRVar_Mod_list_string_Func)
+          | (KRTypeElem KRElemMod_list_DefMethT_Func) => constr:(KRVar_Mod_list_DefMethT_Func)
+          | (KRTypeElem KRElemRegFileBase_list_DefMethT_Func) => constr:(KRVar_RegFileBase_list_DefMethT_Func)
+          | (KRTypeElem KRElemMod_list_Rule_Func) => constr:(KRVar_RegFileBase_list_DefMethT_Func)
+          | (KRTypeElem KRElemMod_list_RegInitT_Func) => constr:(KRVar_RegFileBase_list_RegInitT_Func)
           end
   end.
 
-Axiom cheat: forall x, x.
+(*Axiom cheat: forall x, x.
 
 Definition KRSimplifyTop_RegInitT (e : KRExpr_RegInitT) := e.
 
