@@ -307,7 +307,7 @@ Notation "'Ret' expr" :=
   (Return expr%kami_expr)%kami_expr (at level 13) : kami_action_scope.
 Notation "'Retv'" := (Return (Const _ (k := Void) Default)) : kami_action_scope.
 
-Notation "'PReadReqRf' meth ( addr : idxT ) ; cont" :=
+Notation "'ReadReqRf' meth ( addr : idxT ) ; cont" :=
   (MCall
     meth%string
     (idxT, Void)
@@ -315,7 +315,7 @@ Notation "'PReadReqRf' meth ( addr : idxT ) ; cont" :=
     (fun _ => cont))
   (at level 13, right associativity) : kami_action_scope.
 
-Notation "'PReadResRf' val : k <- meth ; cont" :=
+Notation "'ReadResRf' val : k <- meth ; cont" :=
   (MCall meth%string (Void, Array 1 k) (Const _ (@ConstBit 0 WO))
     (fun raw =>  
       LetExpr
@@ -324,7 +324,7 @@ Notation "'PReadResRf' val : k <- meth ; cont" :=
         (fun val => cont)))
   (at level 13, right associativity) : kami_action_scope.
 
-Notation "'PWriteMaskRf' meth , lgMemSz , k , num , addr , data , mask ; cont" :=
+Notation "'WriteMaskRf' meth , lgMemSz , k , num , addr , data , mask ; cont" :=
   (LetExpr
     (k := WriteRqMask lgMemSz num k)
     (getStructVal
