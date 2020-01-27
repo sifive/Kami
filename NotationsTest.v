@@ -156,3 +156,18 @@ Local Close Scope kami_action.
 
 Local Definition testFieldUpd (ty: Kind -> Type) := 
   ((testStructVal (ty := ty)) @%[ "hello" <- Const ty (natToWord 10 23) ])%kami_expr.
+
+
+Local Open Scope kami_expr.
+Local Open Scope kami_action.
+Local Definition rftest1 ty : ActionT ty Void :=
+  ReadRf val : Bool <- "test" ($0: Bit 1); System [DispHex #val]; Retv.
+Local Definition rftest2 ty : ActionT ty Void :=
+  ReadReqRf "test" ($0: Bit 1); Retv.
+Local Definition rftest3 ty : ActionT ty Void :=
+  ReadResRf val : Bool <- "test" (); System [DispHex #val]; Retv.
+Local Definition rftest4 ty : ActionT ty Void :=
+  WriteRf "test" ($1 : 1 ; $$ true : Bool); Retv.
+Local Close Scope kami_action.
+Local Close Scope kami_expr.
+
