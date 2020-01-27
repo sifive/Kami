@@ -307,6 +307,50 @@ Notation "'Ret' expr" :=
   (Return expr%kami_expr)%kami_expr (at level 13) : kami_action_scope.
 Notation "'Retv'" := (Return (Const _ (k := Void) Default)) : kami_action_scope.
 
+Notation "'PReadReqRf' meth ( addr : idxT ) ; cont" :=
+  (MCall
+    meth%string
+    (idxT, Void)
+    addr%kami_expr
+    (fun _ => cont))
+  (at level 13, right associativity) : kami_action_scope.
+
+Notation "'PReadResRf' val : k <- meth ; cont" :=
+  (MCall meth%string (Void, Array 1 k) (Const _ (@ConstBit 0 WO))
+    (fun raw =>  
+      LetExpr
+        (k := SyntaxKind k)
+        (ReadArrayConst (Var _ (SyntaxKind (Array 1 k)) raw) Fin.F1)
+        (fun val => cont)))
+  (at level 13, right associativity) : kami_action_scope.
+
+Notation "'PWriteMaskRf' meth , lgMemSz , k , num , addr , data , mask ; cont" :=
+  (LetExpr
+    (k := WriteRqMask lgMemSz num k)
+    (getStructVal
+      (cons
+        (existT
+          (fun attrib : Attribute Kind => SyntaxKind (snd attrib))
+          ("addr", Bit lgMemSz)
+          addr)
+        (cons
+          (existT
+            (fun attrib : Attribute Kind => SyntaxKind (snd attrib))
+            ("data", Array num k)
+            (unpack (Array num k) data))
+          (cons
+            (existT
+              (fun attrib : Attribute Kind => SyntaxKind (snd attrib))
+              ("mask", Array num Bool)
+              mask)
+            nil))))
+    (fun req =>
+      MCall meth%string
+        (WriteRqMask lgMemSz num k)
+        (Var ltac:(assumption) req)
+        (fun _ => cont)))
+  (at level 13, right associativity) : kami_action_scope.
+
 Delimit Scope kami_action_scope with kami_action.
 
 (* Complex List Actions *)
