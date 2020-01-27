@@ -309,6 +309,23 @@ Notation "'Retv'" := (Return (Const _ (k := Void) Default)) : kami_action_scope.
 
 Delimit Scope kami_action_scope with kami_action.
 
+Notation "'ReadRf' val : k <- meth ( addr : idxT ) ; cont" :=
+  (Call raw : Array 1 k <- meth (addr: idxT); LETA val : k <- ReadArrayConst raw Fin.F1; cont)%kami_action
+  (at level 13, right associativity): kami_action_scope.
+
+Notation "'ReadReqRf' meth ( addr : idxT ) ; cont" :=
+  (Call meth (addr : idxT); cont)%kami_action
+  (at level 13, right associativity): kami_action_scope.
+
+Notation "'ReadResRf' val : k <- meth () ; cont" :=
+  (Call raw : Array 1 k <- meth (); LETA val : k <- ReadArrayConst raw Fin.F1; cont)%kami_action
+  (at level 13, right associativity): kami_action_scope.
+
+Notation "'WriteRf' meth ( addr : idxNum , data : k ) ; cont" :=
+  (Call meth ( (STRUCT { "addr" ::= addr ; "data" ::= fun _ => data }) : WriteRq (Nat.log2_up idxNum) (Array 1 k)); cont)%kami_action
+  (at level 13, right associativity): kami_action_scope.
+
+
 (* Complex List Actions *)
 Fixpoint gatherActions (ty: Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_out
          (cont: list (Expr ty (SyntaxKind k_in)) -> ActionT ty k_out): ActionT ty k_out :=
