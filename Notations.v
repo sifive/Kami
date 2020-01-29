@@ -454,7 +454,8 @@ Notation "'STRUCT_CONST' { s1 ; .. ; sN }" :=
   (getStructConst (cons (s1%struct_initial)%word ..
                         (cons (sN%struct_initial)%word nil) ..)).
 
-Notation "i #: n" := (@Fin.of_nat_lt (i)%nat (n)%nat ltac:(lia)) (at level 10, only parsing).
+Notation "i #: n" := (ltac:(let y := eval cbv in (@Fin.of_nat_lt (i)%nat (n)%nat ltac:(cbv; lia)) in exact y))
+                       (at level 10, only parsing).
 
 Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_expr
                                                                        (at level 100, only parsing) : kami_expr_scope.
