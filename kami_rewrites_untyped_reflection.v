@@ -1278,16 +1278,57 @@ Ltac match_KRExprType t :=
   | KRExpr_DefMethT => idtac
   | KRExpr_list_DefMethT => idtac
   | KRExpr_list_list_DefMethT => idtac
+  | KRExpr_ModuleElt => idtac
+  | KRExpr_list_ModuleElt => idtac
+  | KRExpr_list_list_ModuleElt => idtac
   end.
+
+Ltac match_KRExprDenote d :=
+  match d with
+  | KRExprDenote_RegInitT => idtac
+  | KRExprDenote_list_RegInitT => idtac
+  | KRExprDenote_list_list_RegInitT => idtac
+  | KRExprDenote_Rule => idtac
+  | KRExprDenote_list_Rule => idtac
+  | KRExprDenote_list_list_Rule => idtac
+  | KRExprDenote_DefMethT => idtac
+  | KRExprDenote_list_DefMethT => idtac
+  | KRExprDenote_list_list_DefMethT => idtac
+  | KRExprDenote_ModuleElt => idtac
+  | KRExprDenote_list_ModuleElt => idtac
+  | KRExprDenote_list_list_ModuleElt => idtac
+  end.
+
+Ltac isVar x :=
+  match x with
+  | ?A ?B => fail 1
+  | _ => idtac
+  end.
+
+Ltac step_KRSimplifyTopSound :=
+  match goal with
+  | _ => progress intros
+  | _ => progress simpl
+  | _ => progress (autorewrite with kami_rewrite_db)
+  | _ => progress reflexivity
+  end.
+
+Ltac solve_contKRSimplifyTopSound :=
+  try (intros;reflexivity);
+  match goal with
+  | _ => progress (repeat step_KRSimplifyTopSound)
+  | |- context [ (?D (match ?E with _ => _ end)) ] => match_KRExprDenote D;isVar E;induction E;try reflexivity
+  end.
+
 
 Ltac solve_KRSimplifyTopSound :=
   try (intros;reflexivity);
   match goal with
-  | E: ?T |- _ => match_KRExprType T;induction E;try reflexivity
-  | _ => idtac
+  | _ => progress (repeat step_KRSimplifyTopSound)
+  | V: ?T |- _ => match_KRExprType T;induction V;try reflexivity
   end.
 
-(*Theorem KRSimplifyTopSound_RegInitT: forall e,
+Theorem KRSimplifyTopSound_RegInitT: forall e,
     KRExprDenote_RegInitT (KRSimplifyTop_RegInitT e)=KRExprDenote_RegInitT e.
 Proof.
   solve_KRSimplifyTopSound.
@@ -1322,22 +1363,8 @@ Hint Rewrite KRSimplifyTopSound_ModuleElt : KRSimplifyTopSound.
 Theorem KRSimplifyTopSound_list_RegInitT: forall e,
     KRExprDenote_list_RegInitT (KRSimplifyTop_list_RegInitT e)=KRExprDenote_list_RegInitT e.
 Proof.
-  intros.
-  induction e;try reflexivity.
-  - destruct e1;try reflexivity.
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-  - induction k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + induction k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-      induction k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-      induction k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + induction k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-  - destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+  solve_KRSimplifyTopSound;solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
 Qed.
 
 Hint Rewrite KRSimplifyTopSound_list_RegInitT : KRSimplifyTopSound.
@@ -1345,13 +1372,8 @@ Hint Rewrite KRSimplifyTopSound_list_RegInitT : KRSimplifyTopSound.
 Theorem KRSimplifyTopSound_list_list_RegInitT: forall e,
    KRExprDenote_list_list_RegInitT (KRSimplifyTop_list_list_RegInitT e)=KRExprDenote_list_list_RegInitT e.
 Proof.
-  intros.
-  destruct e;try reflexivity.
-  - destruct e1;try reflexivity.
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+  solve_KRSimplifyTopSound;solve_KRSimplifyTopSound;
+    repeat solve_contKRSimplifyTopSound.
 Qed.
 
 Hint Rewrite KRSimplifyTopSound_list_list_RegInitT : KRSimplifyTopSound.
@@ -1359,19 +1381,8 @@ Hint Rewrite KRSimplifyTopSound_list_list_RegInitT : KRSimplifyTopSound.
 Theorem KRSimplifyTopSound_list_Rule: forall e,
    KRExprDenote_list_Rule (KRSimplifyTop_list_Rule e)=KRExprDenote_list_Rule e.
 Proof.
-  intros.
-  destruct e;try reflexivity.
-  - destruct e1;try reflexivity.
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-  - destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-  - destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+  solve_KRSimplifyTopSound;solve_KRSimplifyTopSound;
+    repeat solve_contKRSimplifyTopSound.
 Qed.
 
 Hint Rewrite KRSimplifyTopSound_list_Rule : KRSimplifyTopSound.
@@ -1379,12 +1390,8 @@ Hint Rewrite KRSimplifyTopSound_list_Rule : KRSimplifyTopSound.
 Theorem KRSimplifyTopSound_list_list_Rule: forall e,
    KRExprDenote_list_list_Rule (KRSimplifyTop_list_list_Rule e)=KRExprDenote_list_list_Rule e.
 Proof.
-  intros.
-  destruct e;try reflexivity.
-  - destruct e1;try reflexivity.
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+  solve_KRSimplifyTopSound;solve_KRSimplifyTopSound;
+    repeat solve_contKRSimplifyTopSound.
 Qed.
 
 Hint Rewrite KRSimplifyTopSound_list_list_Rule : KRSimplifyTopSound.
@@ -1392,26 +1399,19 @@ Hint Rewrite KRSimplifyTopSound_list_list_Rule : KRSimplifyTopSound.
 Theorem KRSimplifyTopSound_list_DefMethT: forall e,
     KRExprDenote_list_DefMethT (KRSimplifyTop_list_DefMethT e)=KRExprDenote_list_DefMethT e.
 Proof.
-  intros.
-  destruct e;try reflexivity.
-  - destruct e1;try reflexivity.
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-  - destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-  - destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct k;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+  solve_KRSimplifyTopSound;solve_KRSimplifyTopSound;
+    repeat solve_contKRSimplifyTopSound.
 Qed.
 
 Hint Rewrite KRSimplifyTopSound_list_DefMethT : KRSimplifyTopSound.
-
+(*
 Theorem KRSimplifyTopSound_list_ModuleElt: forall e,
     KRExprDenote_list_ModuleElt (KRSimplifyTop_list_ModuleElt e)=KRExprDenote_list_ModuleElt e.
 Proof.
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
+  simpl. 
   intros.
   destruct e;try reflexivity.
   - destruct e1;try reflexivity.
