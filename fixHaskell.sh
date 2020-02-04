@@ -61,3 +61,56 @@ do
   fi
 done
 
+for file in $(grep -l "Data\.BitVector" $1/*.hs)
+do
+  grep -q "import qualified Data\.BitVector" $file
+  if [ $? -ne 0 ]
+  then
+    $SED -i -e '0,/^import/{s/^import/import qualified Data.BitVector\nimport/}' $file
+  fi
+done
+
+for file in $(grep -l "Data\.Vector" $1/*.hs)
+do
+  grep -q "import qualified Data\.Vector" $file
+  if [ $? -ne 0 ]
+  then
+    $SED -i -e '0,/^import/{s/^import/import qualified Data.Vector\nimport/}' $file
+  fi
+done
+
+for file in $(grep -l "System\.Exit" $1/*.hs)
+do
+  grep -q "import qualified System\.Exit" $file
+  if [ $? -ne 0 ]
+  then
+    $SED -i -e '0,/^import/{s/^import/import qualified System.Exit\nimport/}' $file
+  fi
+done
+
+for file in $(grep -l "System\.IO" $1/*.hs)
+do
+  grep -q "import qualified System\.IO" $file
+  if [ $? -ne 0 ]
+  then
+    $SED -i -e '0,/^import/{s/^import/import qualified System.IO\nimport/}' $file
+  fi
+done
+
+for file in $(grep -l "Data\.Map" $1/*.hs)
+do
+  grep -q "import qualified Data\.Map" $file
+  if [ $? -ne 0 ]
+  then
+    $SED -i -e '0,/^import/{s/^import/import qualified Data.Map\nimport/}' $file
+  fi
+done
+
+for file in $(grep -l "ParseExtract" $1/*.hs)
+do
+  grep -q "import qualified ParseExtract" $file
+  if [ $? -ne 0 ]
+  then
+    $SED -i -e '0,/^import/{s/^import/import qualified ParseExtract\nimport/}' $file
+  fi
+done
