@@ -932,12 +932,12 @@ Definition KRSimplifyTop_Prop (e: KRExpr_Prop) : KRExpr_Prop :=
                               | KRApp_list_RegInitT x y => KRAnd_Prop (KRDisjKey_RegInitT x b) (KRDisjKey_RegInitT y b)
                               | KRCons_list_RegInitT x y => KRAnd_Prop (KRNot_Prop (KRIn_string_Prop (KRfst_RegInitT_string x) (KRmap_RegInitT_string KRfst_RegInitT_string_Func b))) (KRDisjKey_RegInitT y b)
                               | _ => match b with
-                                     | KRApp_list_RegInitT x y => KRAnd_Prop (KRDisjKey_RegInitT b x) (KRDisjKey_RegInitT b y)
+                                     | KRApp_list_RegInitT x y => KRAnd_Prop (KRDisjKey_RegInitT a x) (KRDisjKey_RegInitT a y)
                                      | KRCons_list_RegInitT x y => KRAnd_Prop (KRNot_Prop (KRIn_string_Prop (KRfst_RegInitT_string x) (KRmap_RegInitT_string KRfst_RegInitT_string_Func a))) (KRDisjKey_RegInitT a y)
                                      | _ => KRDisjKey_RegInitT a b
                                      end
                               end
-  | KRIn_string_Prop x (KRApp_list_string a b) => (KRAnd_Prop (KRIn_string_Prop x a) (KRIn_string_Prop x b))
+  | KRIn_string_Prop x (KRApp_list_string a b) => (KROr_Prop (KRIn_string_Prop x a) (KRIn_string_Prop x b))
   | e => e
   end.
 
@@ -1281,6 +1281,14 @@ Ltac match_KRExprType t :=
   | KRExpr_ModuleElt => idtac
   | KRExpr_list_ModuleElt => idtac
   | KRExpr_list_list_ModuleElt => idtac
+  | KRExpr_string => idtac
+  | KRExpr_Prop => idtac
+  | KRExpr_list_string => idtac
+  | KRExpr_list_list_string => idtac
+  | KRExpr_Mod => idtac
+  | KRExpr_list_Mod => idtac
+  | KRExpr_RegFileBase => idtac
+  | KRExpr_list_RegFileBase => idtac
   end.
 
 Ltac match_KRExprDenote d :=
@@ -1297,6 +1305,14 @@ Ltac match_KRExprDenote d :=
   | KRExprDenote_ModuleElt => idtac
   | KRExprDenote_list_ModuleElt => idtac
   | KRExprDenote_list_list_ModuleElt => idtac
+  | KRExprDenote_Prop => idtac
+  | KRExprDenote_string => idtac
+  | KRExprDenote_list_string => idtac
+  | KRExprDenote_list_list_string => idtac
+  | KRExprDenote_Mod => idtac
+  | KRExprDenote_list_Mod => idtac
+  | KRExprDenote_RegFileBase => idtac
+  | KRExprDenote_list_RegFileBase => idtac
   end.
 
 Ltac isVar x :=
@@ -1318,6 +1334,7 @@ Ltac solve_contKRSimplifyTopSound :=
   match goal with
   | _ => progress (repeat step_KRSimplifyTopSound)
   | |- context [ (?D (match ?E with _ => _ end)) ] => match_KRExprDenote D;isVar E;induction E;try reflexivity
+  | |- {?A = ?B}+{?A <> ?B} => repeat (decide equality)
   end.
 
 
@@ -1404,22 +1421,13 @@ Proof.
 Qed.
 
 Hint Rewrite KRSimplifyTopSound_list_DefMethT : KRSimplifyTopSound.
-(*
+
 Theorem KRSimplifyTopSound_list_ModuleElt: forall e,
     KRExprDenote_list_ModuleElt (KRSimplifyTop_list_ModuleElt e)=KRExprDenote_list_ModuleElt e.
 Proof.
   solve_KRSimplifyTopSound;
   solve_KRSimplifyTopSound;
   repeat solve_contKRSimplifyTopSound.
-  simpl. 
-  intros.
-  destruct e;try reflexivity.
-  - destruct e1;try reflexivity.
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
 Qed.
 
 Hint Rewrite KRSimplifyTopSound_list_ModuleElt : KRSimplifyTopSound.
@@ -1427,20 +1435,48 @@ Hint Rewrite KRSimplifyTopSound_list_ModuleElt : KRSimplifyTopSound.
 Theorem KRSimplifyTopSound_list_list_ModuleElt: forall e,
     KRExprDenote_list_list_ModuleElt (KRSimplifyTop_list_list_ModuleElt e)=KRExprDenote_list_list_ModuleElt e.
 Proof.
-  intros.
-  destruct e;try reflexivity.
-  - destruct e1;try reflexivity.
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
-    + destruct e2;try (simpl;autorewrite with kami_rewrite_db;reflexivity).
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
 Qed.
 
 Hint Rewrite KRSimplifyTopSound_list_list_ModuleElt : KRSimplifyTopSound.
 
+Theorem KRSimplifyTopSound_string: forall e,
+    KRExprDenote_string (KRSimplifyTop_string e)=KRExprDenote_string e.
+Proof.
+  solve_KRSimplifyTopSound;solve_KRSimplifyTopSound;
+    repeat solve_contKRSimplifyTopSound.
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_string : KRSimplifyTopSound.
+
+Theorem KRSimplifyTopSound_list_string: forall e,
+    KRExprDenote_list_string (KRSimplifyTop_list_string e)=KRExprDenote_list_string e.
+Proof.
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_list_string : KRSimplifyTopSound.
+
+Theorem KRSimplifyTopSound_list_list_string: forall e,
+    KRExprDenote_list_list_string (KRSimplifyTop_list_list_string e)=KRExprDenote_list_list_string e.
+Proof.
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_list_list_string : KRSimplifyTopSound.
+
 Theorem KRSimplifyTopSound_BaseModule: forall e,
     KRExprDenote_BaseModule (KRSimplifyTop_BaseModule e)=KRExprDenote_BaseModule e.
 Proof.
-  intros.
-  destruct e;try reflexivity.
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
 Qed.
 
 Hint Rewrite KRSimplifyTopSound_BaseModule : KRSimplifyTopSound.
@@ -1448,31 +1484,121 @@ Hint Rewrite KRSimplifyTopSound_BaseModule : KRSimplifyTopSound.
 Theorem KRSimplifyTopSound_Mod: forall e,
      KRExprDenote_Mod (KRSimplifyTop_Mod e)=KRExprDenote_Mod e.
 Proof.
-  intros.
-  destruct e;try reflexivity.
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
 Qed.
 
 Hint Rewrite KRSimplifyTopSound_Mod : KRSimplifyTopSound.
 
-Theorem KRSimplifySound_RegInitT: forall e,
-    KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplify_RegInitT e).
+Theorem KRSimplifyTopSound_list_Mod: forall e,
+     KRExprDenote_list_Mod (KRSimplifyTop_list_Mod e)=KRExprDenote_list_Mod e.
 Proof.
-  intros.
-  destruct e;try reflexivity.
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_list_Mod : KRSimplifyTopSound.
+
+Theorem KRSimplifyTopSound_RegFileBase: forall e,
+     KRExprDenote_RegFileBase (KRSimplifyTop_RegFileBase e)=KRExprDenote_RegFileBase e.
+Proof.
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_RegFileBase : KRSimplifyTopSound.
+
+Theorem KRSimplifyTopSound_list_RegFileBase: forall e,
+     KRExprDenote_list_RegFileBase (KRSimplifyTop_list_RegFileBase e)=KRExprDenote_list_RegFileBase e.
+Proof.
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_list_RegFileBase : KRSimplifyTopSound.
+
+Theorem my_in_app_iff: forall A (a:A) (l1:list A) (l2:list A), (@In A a (l1++l2)) = (@In A a l1 \/ @In A a l2).
+Admitted.
+
+Hint Rewrite my_in_app_iff : kami_rewrite_db.
+
+Theorem my_DisjKey_Append1:
+  forall T Q (x:list (T*Q)) y z,
+  (DisjKey (x++y) z)=(DisjKey x z /\ DisjKey y z).
+Admitted.
+
+Hint Rewrite my_DisjKey_Append1 : kami_rewrite_db.
+
+Theorem my_DisjKey_Append2:
+    forall T Q (x:list (T*Q)) y z,
+           (DisjKey x (y++z))=(DisjKey x y /\ DisjKey x z).
+Admitted.
+
+Hint Rewrite my_DisjKey_Append2 : kami_rewrite_db.
+
+Theorem my_DisjKey_In_map2:
+  forall A B a (k:A) r l, @DisjKey A B a ((k,r)::l)=(~List.In k (List.map fst a) /\ (DisjKey a l)).
+Admitted.
+
+Hint Rewrite my_DisjKey_In_map2 : kami_rewrite_db.
+
+Theorem my_DisjKey_In_map1: forall A B b (k:A) r l,
+    (@DisjKey A B ((k,r)::l) b)=(~List.In k (List.map fst b) /\ (DisjKey l b)).
+Admitted.
+
+Hint Rewrite my_DisjKey_In_map1 : kami_rewrite_db.
+
+Theorem my_DisjKey_In_map_fst2: forall A B a (f:(A*B)) l,
+    @DisjKey A B a (f::l)=(~List.In (fst f) (List.map fst a) /\ (DisjKey a l)).
+Admitted.
+
+Hint Rewrite my_DisjKey_In_map_fst2 : kami_rewrite_db.
+
+Theorem my_DisjKey_In_map_fst1: forall A B b (f:(A*B)) l (W:forall (a1:A) (a2:A), {a1=a2}+{a1<>a2}),
+    @DisjKey A B (f::l) b=(~List.In (fst f) (List.map fst b) /\ (DisjKey l b)).
+Admitted.
+    
+Hint Rewrite my_DisjKey_In_map_fst1 : kami_rewrite_db.
+
+Theorem KRSimplifyTopSound_Prop: forall e,
+    KRExprDenote_Prop (KRSimplifyTop_Prop e)=KRExprDenote_Prop e.
+Proof.
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
+Qed.
+
+Hint Rewrite KRSimplifyTopSound_Prop : KRSimplifyTopSound.
+
+
+(*************************************************************************************)
+
+Theorem KRSimplifySound_RegInitT: forall e,
+    KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplifyTop_RegInitT e).
+Proof.
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
 Qed.
 
 Theorem KRSimplifySound_Rule: forall e,
     KRExprDenote_Rule e = KRExprDenote_Rule (KRSimplify_Rule e).
 Proof.
-  intros.
-  destruct e;try reflexivity.
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
 Qed.
 
 Theorem KRSimplifySound_DefMethT: forall e,
     KRExprDenote_DefMethT e = KRExprDenote_DefMethT (KRSimplify_DefMethT e).
 Proof.
-  intros.
-  destruct e;try reflexivity.
+  solve_KRSimplifyTopSound;
+  solve_KRSimplifyTopSound;
+  repeat solve_contKRSimplifyTopSound.
 Qed.
 
 Scheme KRExpr_RegInitT_mut := Induction for KRExpr_RegInitT Sort Prop
@@ -1483,9 +1609,21 @@ Scheme KRExpr_RegInitT_mut := Induction for KRExpr_RegInitT Sort Prop
   with KRExpr_list_Rule_mut := Induction for KRExpr_list_Rule Sort Prop
   with KRExpr_list_DefMethT_mut := Induction for KRExpr_list_DefMethT Sort Prop
   with KRExpr_list_ModuleElt_mut := Induction for KRExpr_list_ModuleElt Sort Prop
+  with KRExpr_list_list_RegInitT_mut := Induction for KRExpr_list_list_RegInitT Sort Prop
+  with KRExpr_list_list_Rule_mut := Induction for KRExpr_list_list_Rule Sort Prop
+  with KRExpr_list_list_DefMethT_mut := Induction for KRExpr_list_list_DefMethT Sort Prop
   with KRExpr_list_list_ModuleElt_mut := Induction for KRExpr_list_list_ModuleElt Sort Prop
+  with KRExpr_RegFileBase_mut := Induction for KRExpr_RegFileBase Sort Prop
+  with KRExpr_list_RegFileBase_mut := Induction for KRExpr_list_RegFileBase Sort Prop
   with KRExpr_BaseModule_mut := Induction for KRExpr_BaseModule Sort Prop
-  with KRExpr_Mod_mut := Induction for KRExpr_Mod Sort Prop.
+  with KRExpr_Mod_mut := Induction for KRExpr_Mod Sort Prop
+  with KRExpr_list_Mod_mut := Induction for KRExpr_list_Mod Sort Prop
+  with KRExpr_CallWithSign_mut := Induction for KRExpr_CallWithSign Sort Prop
+  with KRExpr_list_CallWithSign_mut := Induction for KRExpr_list_CallWithSign Sort Prop
+  with KRExpr_string_mut := Induction for KRExpr_string Sort Prop
+  with KRExpr_list_string_mut := Induction for KRExpr_list_string Sort Prop
+  with KRExpr_list_list_string_mut := Induction for KRExpr_list_list_string Sort Prop
+  with KRExpr_Prop_mut := Induction for KRExpr_Prop Sort Prop.
 
 (*Combined Scheme KRExpr_mutind from KRExpr_RegInitT_mut, KRExpr_Rule_mut, KRExpr_DefMethT_mut,
 KRExpr_ModuleElt_mut, KRExpr_list_RegInitT_mut, KRExpr_list_Rule_mut, KRExpr_list_DefMethT_mut,
@@ -1574,20 +1712,47 @@ Proof.
   reflexivity.
 Qed.
 
+Ltac noDenote x :=
+  match x with
+  | context [ ?D _ ] => match_KRExprDenote ?D;fail 1
+  | _ => idtac
+  end.
+
 Ltac KRSimplifySound_unit :=
   match goal with
   | _ => reflexivity
   | _ => progress simpl
-  | |- _ = KRExprDenote_Mod (match KRSimplify_Mod ?V with
+  (*| |- _ = KRExprDenote_Mod (match KRSimplify_Mod ?V with
                             _ => _
                              end) => let Q := fresh in remember V as Q;destruct Q
+  | |- _ = KRExprDenote_list_DefMethT (match KRSimplify_Mod ?V with
+                                       _ => _
+                                       end) => let Q := fresh in remember V as Q;destruct Q*)
   | H: _ = _ |- _ => progress (simpl in H)
   | H: Base _ = Base _ |- _ => inversion H;subst;clear H
+  | H: KRVar_RegInitT_string_Func _ =  KRVar_RegInitT_string_Func _ |- _ => inversion H;subst;clear H
+  | _ => progress subst
   | _ => progress (autorewrite with kami_rewrite_db)
-  | H: KRExprDenote_BaseModule _ = _ |- _ => rewrite H
-  | H: KRExprDenote_Mod _ = _ |- _ => rewrite H
+  | H: KRExprDenote_BaseModule _ = ?R |- _ => noDenote R;rewrite H
+  | H: KRExprDenote_string _ = _ |- ?R => noDenote R;rewrite H
+  | H: KRExprDenote_list_string _ = _ |- ?R => noDenote R;rewrite H
+  | H: KRExprDenote_list_list_string _ = _ |- ?R => noDenote R;rewrite H
+  | H: KRExprDenote_Mod _ = _ |- ?R => noDenote R;rewrite H
+  | H: KRExprDenote_list_Mod _ = ?R |- _ => noDenote R;rewrite H
+  | H: KRExprDenote_RegInitT _ = ?R |- _ => noDenote R;rewrite H
+  | H: KRExprDenote_list_RegInitT _ = ?R |- _ => noDenote R;rewrite H
+  | H: KRExprDenote_list_list_RegInitT _ = ?R |- _ => noDenote R;rewrite H
+  | H: KRExprDenote_Rule _ = _ |- ?R => noDenote R;rewrite H
+  | H: KRExprDenote_list_Rule _ = _ |- ?R => noDenote R;rewrite H
+  | H: KRExprDenote_list_list_Rule _ = _ |- ?R => noDenote R;rewrite H
+  | H: KRExprDenote_DefMethT _ = _ |- ?R => noDenote R;rewrite H
+  | H: KRExprDenote_list_DefMethT _ = _ |- ?R => noDenote R;rewrite H
+  | H: KRExprDenote_list_list_DefMethT _ = ?R |- _ => noDenote R;rewrite H
+  | H: KRExprDenote_RegFileBase _ = _ |- ?R => noDenote R;rewrite H
+  | H: KRExprDenote_list_RegFileBase _ = _ |- ?R => noDenote R;rewrite H
   (*| |- context [match ?Q with _ => _ end ] => let R := fresh in (remember Q as R;destruct R; try reflexivity)*)
   end.
+
 Ltac KRSimplifySound_setup mut H H0 H1 :=
   intros;
   eapply (mut
@@ -1599,35 +1764,184 @@ Ltac KRSimplifySound_setup mut H H0 H1 :=
             (fun e : KRExpr_list_Rule => KRExprDenote_list_Rule e = KRExprDenote_list_Rule (KRSimplify_list_Rule e))
             (fun e : KRExpr_list_DefMethT => KRExprDenote_list_DefMethT e = KRExprDenote_list_DefMethT (KRSimplify_list_DefMethT e))
             (fun e : KRExpr_list_ModuleElt => KRExprDenote_list_ModuleElt e = KRExprDenote_list_ModuleElt (KRSimplify_list_ModuleElt e))
+            (fun e : KRExpr_list_list_RegInitT => KRExprDenote_list_list_RegInitT e = KRExprDenote_list_list_RegInitT (KRSimplify_list_list_RegInitT e))
+            (fun e : KRExpr_list_list_Rule => KRExprDenote_list_list_Rule e = KRExprDenote_list_list_Rule (KRSimplify_list_list_Rule e))
+            (fun e : KRExpr_list_list_DefMethT => KRExprDenote_list_list_DefMethT e = KRExprDenote_list_list_DefMethT (KRSimplify_list_list_DefMethT e))
             (fun e : KRExpr_list_list_ModuleElt => KRExprDenote_list_list_ModuleElt e = KRExprDenote_list_list_ModuleElt (KRSimplify_list_list_ModuleElt e))
+            (fun e : KRExpr_RegFileBase => KRExprDenote_RegFileBase e = KRExprDenote_RegFileBase (KRSimplify_RegFileBase e))
+            (fun e : KRExpr_list_RegFileBase => KRExprDenote_list_RegFileBase e = KRExprDenote_list_RegFileBase (KRSimplify_list_RegFileBase e))
             (fun e : KRExpr_BaseModule => KRExprDenote_BaseModule e = KRExprDenote_BaseModule (KRSimplify_BaseModule e))
-            (fun e : KRExpr_Mod => KRExprDenote_Mod e = KRExprDenote_Mod (KRSimplify_Mod e)));
+            (fun e : KRExpr_Mod => KRExprDenote_Mod e = KRExprDenote_Mod (KRSimplify_Mod e))
+            (fun e : KRExpr_list_Mod => KRExprDenote_list_Mod e = KRExprDenote_list_Mod (KRSimplify_list_Mod e))
+            (fun e : KRExpr_CallWithSign => KRExprDenote_CallWithSign e = KRExprDenote_CallWithSign (KRSimplify_CallWithSign e))
+            (fun e : KRExpr_list_CallWithSign => KRExprDenote_list_CallWithSign e = KRExprDenote_list_CallWithSign (KRSimplify_list_CallWithSign e))
+            (fun e : KRExpr_string => KRExprDenote_string e = KRExprDenote_string (KRSimplify_string e))
+            (fun e : KRExpr_list_string => KRExprDenote_list_string e = KRExprDenote_list_string (KRSimplify_list_string e))
+            (fun e : KRExpr_list_list_string => KRExprDenote_list_list_string e = KRExprDenote_list_list_string (KRSimplify_list_list_string e))
+            (fun e : KRExpr_Prop => KRExprDenote_Prop e = KRExprDenote_Prop (KRSimplify_Prop e))
+         );
   try (intros;autorewrite with KRSimplify; autorewrite with KRSimplifyTopSound; simpl; try (rewrite <- H); try  (rewrite <- H0); try (rewrite <- H1); reflexivity);intros.
 
 Ltac KRSimplifySound_crunch :=
   match goal with
   | |- context [ KRExprDenote_Mod (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_string (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_list_string (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_list_list_string (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_list_Mod (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
   | |- context [ KRExprDenote_BaseModule (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
   | |- context [ KRExprDenote_list_RegInitT (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
-  | _ => KRSimplifySound_unit
+  | |- context [ KRExprDenote_list_list_RegInitT (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_list_DefMethT (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_list_list_DefMethT (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_list_Rule (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_list_list_Rule (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_list_CallWithSign (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_list_ModuleElt (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_list_RegFileBase (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_Prop (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_Mod_list_RegInitT_Func ?Q ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_Mod_list_DefMethT_Func ?Q ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_Mod_list_Rule_Func ?Q ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_RegFileBase_list_RegInitT_Func ?Q ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_RegFileBase_list_DefMethT_Func ?Q ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_RegInitT_string_Func ?Q ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_Mod_Mod_PairFunc ?Q ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | _ => KRSimplifySound_unit;repeat KRSimplifySound_unit
+  | |- { ?A = ?B } + { ?A <> ?B } => intros;repeat (decide equality)
+  | |- forall _, _ => intros
+  | H:  KRVar_RegInitT_string_Func _ = KRfst_RegInitT_string_Func |- _ => inversion H
+  | H: KRfst_RegInitT_string_Func = KRVar_RegInitT_string_Func _ |- _ => inversion H
   end.
 
 Hint Rewrite KRSimplify_BaseModule_KRBaseMod: KRSimplify.
 
-Theorem KRSimplifySound_ModuleElt: forall e,
+Set Printing Implicit.
+
+(*Theorem my_in_app_iff: forall A (a:A) (l1:list A) (l2:list A), (@In A a (l1++l2)) = (@In A a l1 \/ @In A a l2).
+Admitted.
+
+Hint Rewrite my_in_app_iff : kami_rewrite_db.
+
+Theorem my_DisjKey_Append1:
+  forall T Q (x:list (T*Q)) y z,
+  (DisjKey (x++y) z)=(DisjKey x z /\ DisjKey y z).
+Admitted.
+
+Hint Rewrite my_DisjKey_Append1 : kami_rewrite_db.
+
+Theorem my_DisjKey_Append2:
+    forall T Q (x:list (T*Q)) y z,
+           (DisjKey x (y++z))=(DisjKey x y /\ DisjKey x z).
+Admitted.
+
+Hint Rewrite my_DisjKey_Append2 : kami_rewrite_db.
+
+Theorem my_DisjKey_In_map2:
+  forall A B a (k:A) r l, @DisjKey A B a ((k,r)::l)=(~List.In k (List.map fst a) /\ (DisjKey a l)).
+Admitted.
+
+Hint Rewrite my_DisjKey_In_map2 : kami_rewrite_db.
+
+Theorem my_DisjKey_In_map1: forall A B b (k:A) r l,
+    (@DisjKey A B ((k,r)::l) b)=(~List.In k (List.map fst b) /\ (DisjKey l b)).
+Admitted.
+
+Hint Rewrite my_DisjKey_In_map1 : kami_rewrite_db.
+
+Theorem my_DisjKey_In_map_fst2: forall A B a (f:(A*B)) l,
+    @DisjKey A B a (f::l)=(~List.In (fst f) (List.map fst a) /\ (DisjKey a l)).
+Admitted.
+
+Hint Rewrite my_DisjKey_In_map_fst2 : kami_rewrite_db.
+
+Theorem my_DisjKey_In_map_fst1: forall A B b (f:(A*B)) l (W:forall (a1:A) (a2:A), {a1=a2}+{a1<>a2}),
+    @DisjKey A B (f::l) b=(~List.In (fst f) (List.map fst b) /\ (DisjKey l b)).
+Admitted.
+    
+Hint Rewrite my_DisjKey_In_map_fst1 : kami_rewrite_db.*)
+
+(*Theorem KRSimplifySound_ModuleElt: forall e,
     KRExprDenote_ModuleElt e = KRExprDenote_ModuleElt (KRSimplify_ModuleElt e).
 Proof.
-  KRSimplifySound_setup KRExpr_ModuleElt_mut H H0 H1.
-  repeat KRSimplifySound_unit.
+  KRSimplifySound_setup KRExpr_ModuleElt_mut H H0 H1; repeat KRSimplifySound_unit;
   repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch. rewrite H0. repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H. repeat KRSimplifySound_crunch. apply H0.
+  - repeat KRSimplifySound_crunch. rewrite H. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. simpl.
+  - repeat KRSimplifySound_crunch. rewrite H0. repeat KRSimplifySound_crunch. 
+  - repeat KRSimplifySound_crunch. rewrite H0. repeat KRSimplifySound_crunch. 
+  -
 Qed.
 
 Theorem KRSimplifySound_list_RegInitT: forall e,
     KRExprDenote_list_RegInitT e = KRExprDenote_list_RegInitT (KRSimplify_list_RegInitT e).
 Proof.
   KRSimplifySound_setup KRExpr_list_RegInitT_mut H H0 H1.
-  repeat KRSimplifySound_unit.
-  repeat KRSimplifySound_crunch.
+  repeat KRSimplifySound_unit;
+    repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+Qed.
+
+Theorem KRSimplifySound_list_list_RegInitT: forall e,
+    KRExprDenote_list_list_RegInitT e = KRExprDenote_list_list_RegInitT (KRSimplify_list_list_RegInitT e).
+Proof.
+  KRSimplifySound_setup KRExpr_list_list_RegInitT_mut H H0 H1.
+  repeat KRSimplifySound_unit;
+    repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Theorem KRSimplifySound_list_Rule: forall e,
@@ -1636,14 +1950,110 @@ Proof.
   KRSimplifySound_setup KRExpr_list_Rule_mut H H0 H1.
   repeat KRSimplifySound_unit.
   repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
 Qed.
   
+Theorem KRSimplifySound_list_list_Rule: forall e,
+    KRExprDenote_list_list_Rule e = KRExprDenote_list_list_Rule (KRSimplify_list_list_Rule e).
+Proof.
+  KRSimplifySound_setup KRExpr_list_list_Rule_mut H H0 H1.
+  repeat KRSimplifySound_unit.
+  repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+Qed.
+  
+Theorem KRSimplifySound_list_list_DefMethT: forall e,
+    KRExprDenote_list_list_DefMethT e = KRExprDenote_list_list_DefMethT (KRSimplify_list_list_DefMethT e).
+Proof.
+  KRSimplifySound_setup KRExpr_list_list_DefMethT_mut H H0 H1.
+  repeat KRSimplifySound_unit.
+  repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+Qed.
+
 Theorem KRSimplifySound_list_DefMethT: forall e,
     KRExprDenote_list_DefMethT e = KRExprDenote_list_DefMethT (KRSimplify_list_DefMethT e).
 Proof.
   KRSimplifySound_setup KRExpr_list_DefMethT_mut H H0 H1.
   repeat KRSimplifySound_unit.
   repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Theorem KRSimplifySound_list_ModuleElt: forall e,
@@ -1652,6 +2062,26 @@ Proof.
   KRSimplifySound_setup KRExpr_list_ModuleElt_mut H H0 H1.
   repeat KRSimplifySound_unit.
   repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Theorem KRSimplifySound_list_list_ModuleElt: forall e,
@@ -1660,6 +2090,26 @@ Proof.
   KRSimplifySound_setup KRExpr_list_list_ModuleElt_mut H H0 H1.
   repeat KRSimplifySound_unit.
   repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Theorem KRSimplifySound_BaseModule: forall e,
@@ -1668,6 +2118,96 @@ Proof.
   KRSimplifySound_setup KRExpr_BaseModule_mut H H0 H1.
   repeat KRSimplifySound_unit.
   repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+Qed.
+
+Theorem KRSimplifySound_RegFileBase: forall e,
+    KRExprDenote_RegFileBase e = KRExprDenote_RegFileBase (KRSimplify_RegFileBase e).
+Proof.
+  intros.
+  destruct e. reflexivity.
+Qed.
+
+Theorem KRSimplifySound_CallWithSign: forall e,
+    KRExprDenote_CallWithSign e = KRExprDenote_CallWithSign (KRSimplify_CallWithSign e).
+Proof.
+  intros.
+  destruct e. reflexivity.
+Qed.
+
+Theorem KRSimplifySound_list_CallWithSign: forall e,
+    KRExprDenote_list_CallWithSign e = KRExprDenote_list_CallWithSign (KRSimplify_list_CallWithSign e).
+Proof.
+  KRSimplifySound_setup KRExpr_list_CallWithSign_mut H H0 H1.
+  repeat KRSimplifySound_unit.
+  repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+Qed.
+
+Theorem KRSimplifySound_list_RegFileBase: forall e,
+    KRExprDenote_list_RegFileBase e = KRExprDenote_list_RegFileBase (KRSimplify_list_RegFileBase e).
+Proof.
+  KRSimplifySound_setup KRExpr_list_RegFileBase_mut H H0 H1.
+  repeat KRSimplifySound_unit.
+  repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Theorem KRSimplifySound_Mod: forall e,
@@ -1676,6 +2216,82 @@ Proof.
   KRSimplifySound_setup KRExpr_Mod_mut H H0 H1.
   repeat KRSimplifySound_unit.
   repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+Qed.
+
+Theorem KRSimplifySound_list_Mod: forall e,
+    KRExprDenote_list_Mod e = KRExprDenote_list_Mod (KRSimplify_list_Mod e).
+Proof.
+  KRSimplifySound_setup KRExpr_list_Mod_mut H H0 H1.
+  repeat KRSimplifySound_unit.
+  repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+Qed.
+
+Theorem KRSimplifySound_Prop: forall e,
+    KRExprDenote_Prop e = KRExprDenote_Prop (KRSimplify_Prop e).
+Proof.
+  KRSimplifySound_setup KRExpr_Prop_mut H H0 H1.
+  repeat KRSimplifySound_unit.
+  repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Goal forall (a:ModuleElt) (b:list ModuleElt) c, app (cons a b) c=cons a (app b c).

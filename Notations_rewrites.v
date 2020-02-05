@@ -42,6 +42,8 @@ Proof.
     reflexivity.
 Qed.
 
+Hint Rewrite Registers_dist_append : kami_rewrite_db.
+
 Lemma app_rewrite2: forall A (f:A) (r:list A), [f]++r=f::r.
   Proof. reflexivity. Qed.
 
@@ -792,4 +794,6 @@ Proof.
 Qed.
 
 Hint Rewrite getAllRules_makeModule_Registers : kami_rewrite_db.
+
+Hint Rewrite map_app : kami_rewrite_db.
 
