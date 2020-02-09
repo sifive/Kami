@@ -5,6 +5,8 @@ Lib/*.v.d
 *.glob
 Lib/*.glob
 *.vo
+*.vok
+*.vos
 Lib/*.vo
 *.aux
 Target.hs

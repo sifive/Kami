@@ -99,17 +99,17 @@ Definition write_val_2 : word Xlen := Xlen 'h"3e".
 
 Lemma read_under_bounds : read_under_index < write_index < read_under_index + num.
 Proof.
-  cbv delta; lia.
+  cbv delta; try split; lia.
 Qed.
 
 Lemma read_over_bounds : read_over_index < write_index + num < read_over_index + num.
 Proof.
-  cbv delta; lia.
+  cbv delta; try split; lia.
 Qed.
 
 Lemma read_disjoint_bounds : write_index + num < read_disjoint_index /\ read_disjoint_index + num < idxNum.
 Proof.
-  cbv delta; lia.
+  cbv delta; try split; lia.
 Qed.
 
 (*good masks*)
