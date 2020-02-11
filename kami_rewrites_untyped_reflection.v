@@ -954,6 +954,74 @@ Fixpoint sappend (s1 s2 : string) : string :=
   | String c s1' => String c (sappend s1' s2)
   end.
 
+Fixpoint srev (s : string) : string :=
+  match s with
+  | EmptyString => EmptyString
+  | (String f r) => sappend (srev r) (String f EmptyString)
+  end.
+
+Theorem srev_eqb : forall s1 s2, String.eqb s1 s2=String.eqb (srev s1) (srev s2).
+Proof.
+  intros.
+  induction s1.
+  - destruct s2.
+    + reflexivity.
+    + simpl.
+      remember (srev s2).
+      destruct s.
+      * reflexivity.
+      * reflexivity.
+  - destruct s2.
+    + simpl.
+      remember (srev s1).
+      destruct s.
+      * reflexivity.
+      * reflexivity.
+    + simpl.
+      remember (a =? a0)%char.
+      destruct b.
+      * simpl.
+        assert (forall s1 c1 s2 c2, String.eqb (sappend s1 (String c1 "")) (sappend s2 (String c2 ""))=if (c1 =? c2)%char then String.eqb s1 s2 else false).
+        -- simpl.
+           intros.
+           induction s0.
+           ++ simpl.
+              destruct s3.
+              ** reflexivity.
+              ** simpl.
+                 destruct s3.
+                 --- simpl.
+                     destruct (c1 =? a1)%char.
+                     +++ destruct (c1 =? c2)%char.
+                         *** reflexivity.
+                         *** reflexivity.
+                     +++ destruct (c1 =? c2)%char.
+                         *** reflexivity.
+                         *** reflexivity.
+                 --- simpl.
+                     destruct (c1 =? a1)%char.
+                     +++ destruct (c1 =? c2)%char.
+                         *** reflexivity.
+                         *** reflexivity.
+                     +++ destruct (c1 =? c2)%char.
+                         *** reflexivity.
+                         *** reflexivity.
+           ++ simpl.
+Admitted.
+
+Fixpoint sdisjPrefix (s1: string) (s2: string) :=
+  match s1,s2 with
+  | (String c1 s1'),(String c2 s2') => if (c1 =? c2)%char then sdisjPrefix s1' s2' else true
+  | _,_ => false
+  end.
+
+(*Goal sdisjPrefix (srev "_mode") (srev "_int_data_reg")=true.
+  simpl.*)
+  
+Theorem sdisjPrefix_false: forall p1 p2 s1 s2,
+    sdisjPrefix (srev s1) (srev s2)=true -> False=(p1++s1=p2++s2)%string.
+Admitted.
+
 Theorem sappend_append: forall s1 s2, sappend s1 s2=String.append s1 s2.
 Proof.
   intros.
@@ -1034,6 +1102,7 @@ Definition KRSimplifyTop_Prop (e: KRExpr_Prop) : KRExpr_Prop :=
   | KRIn_string_Prop x (KRApp_list_string a b) => (KROr_Prop (KRIn_string_Prop x a) (KRIn_string_Prop x b))
   | KRIn_string_Prop x (KRCons_list_string a b) => (KROr_Prop (KREq_string_Prop x a) (KRIn_string_Prop x b))
   | KRIn_string_Prop x (KRNil_list_string) => KRFalse_Prop
+  | KREq_string_Prop (KRstring_append p (KRConst_string a)) (KRstring_append q (KRConst_string b)) => if sdisjPrefix (srev a) (srev b) then KRFalse_Prop else e
   (*| KREq_string_Prop (KRstring_append (KRVar_string p) a) (KRstring_append (KRVar_string q) b) => if String.eqb p q then (KREq_string_Prop a b) else KREq_string_Prop (KRstring_append (KRVar_string p) a) (KRstring_append (KRVar_string q) b)
   | KREq_string_Prop (KRVar_string a) (KRVar_string b) => if String.eqb a b then KRTrue_Prop else
                                                             (KREq_string_Prop (KRVar_string a) (KRVar_string b))*)
@@ -1758,6 +1827,13 @@ Proof.
   repeat solve_contKRSimplifyTopSound.
   replace (KRExprDenote_string k=KRExprDenote_string k0) with (KRExprDenote_string k0=KRExprDenote_string k). reflexivity.
   apply my_eq_refl.
+  remember (sdisjPrefix (srev s) (srev s0)).
+  destruct b.
+  - simpl.
+    apply sdisjPrefix_false.
+    rewrite Heqb.
+    reflexivity.
+  - reflexivity.
 Qed.
 
 Hint Rewrite KRSimplifyTopSound_Prop : KRSimplifyTopSound.
@@ -2084,6 +2160,10 @@ Proof.
   replace (KRExprDenote_string k1=KRExprDenote_string (KRSimplify_string k)) with
       (KRExprDenote_string (KRSimplify_string k)=KRExprDenote_string k1). reflexivity.
   apply my_eq_refl.
+  erewrite sdisjPrefix_false.
+  reflexivity.
+  rewrite HeqH2.
+  reflexivity.
 Qed.
 
 Theorem KRSimplifySound_list_RegInitT: forall e,
@@ -2122,6 +2202,11 @@ Proof.
     replace (KRExprDenote_string k1 = KRExprDenote_string (KRSimplify_string k)) with
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
   - repeat KRSimplifySound_crunch.
 Qed.
 
@@ -2162,6 +2247,11 @@ Proof.
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Theorem KRSimplifySound_list_Rule: forall e,
@@ -2199,6 +2289,11 @@ Proof.
     replace (KRExprDenote_string k1 = KRExprDenote_string (KRSimplify_string k)) with
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
   - repeat KRSimplifySound_crunch.
 Qed.
   
@@ -2238,6 +2333,11 @@ Proof.
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
+  - repeat KRSimplifySound_crunch.
 Qed.
   
 Theorem KRSimplifySound_list_list_DefMethT: forall e,
@@ -2275,6 +2375,11 @@ Proof.
     replace (KRExprDenote_string k1 = KRExprDenote_string (KRSimplify_string k)) with
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
   - repeat KRSimplifySound_crunch.
 Qed.
 
@@ -2314,6 +2419,11 @@ Proof.
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Theorem KRSimplifySound_list_ModuleElt: forall e,
@@ -2351,6 +2461,11 @@ Proof.
     replace (KRExprDenote_string k1 = KRExprDenote_string (KRSimplify_string k)) with
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
   - repeat KRSimplifySound_crunch.
 Qed.
 
@@ -2390,6 +2505,11 @@ Proof.
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Theorem KRSimplifySound_BaseModule: forall e,
@@ -2427,6 +2547,11 @@ Proof.
     replace (KRExprDenote_string k1 = KRExprDenote_string (KRSimplify_string k)) with
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
   - repeat KRSimplifySound_crunch.
 Qed.
 
@@ -2480,6 +2605,11 @@ Proof.
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Theorem KRSimplifySound_list_RegFileBase: forall e,
@@ -2517,6 +2647,11 @@ Proof.
     replace (KRExprDenote_string k1 = KRExprDenote_string (KRSimplify_string k)) with
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
   - repeat KRSimplifySound_crunch.
 Qed.
 
@@ -2556,6 +2691,11 @@ Proof.
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Theorem KRSimplifySound_list_Mod: forall e,
@@ -2593,6 +2733,11 @@ Proof.
     replace (KRExprDenote_string k1 = KRExprDenote_string (KRSimplify_string k)) with
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
   - repeat KRSimplifySound_crunch.
 Qed.
 
@@ -2632,6 +2777,11 @@ Proof.
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Theorem KRSimplifySound_list_string: forall e,
@@ -2669,6 +2819,11 @@ Proof.
     replace (KRExprDenote_string k1 = KRExprDenote_string (KRSimplify_string k)) with
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
   - repeat KRSimplifySound_crunch.
 Qed.
 
@@ -2708,6 +2863,11 @@ Proof.
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
+  - repeat KRSimplifySound_crunch.
 Qed.
 
 Theorem KRSimplifySound_Prop: forall e,
@@ -2745,6 +2905,11 @@ Proof.
     replace (KRExprDenote_string k1 = KRExprDenote_string (KRSimplify_string k)) with
         (KRExprDenote_string (KRSimplify_string k) = KRExprDenote_string k1). reflexivity.
     apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    erewrite sdisjPrefix_false.
+    + reflexivity.
+    + rewrite HeqH2.
+      reflexivity.
   - repeat KRSimplifySound_crunch.
 Qed.
 
@@ -2812,6 +2977,7 @@ Ltac KRSimplifyTac e tp :=
                 | (KRTypeElem KRElemProp) => KRSimplifySound_Prop
                 end in
   change e with (denote x);repeat (rewrite simplifySound;cbv [
+                sappend srev sdisjPrefix String.eqb Ascii.eqb Bool.eqb
                 KRSimplify_RegInitT KRSimplifyTop_RegInitT
                 KRSimplify_RegInitValT KRSimplifyTop_RegInitValT
                 KRSimplify_Rule KRSimplifyTop_Rule
@@ -2836,7 +3002,7 @@ Ltac KRSimplifyTac e tp :=
                 KRSimplify_Prop KRSimplifyTop_Prop
                                   ]);
   cbv [
-                sappend
+      sappend srev sdisjPrefix String.eqb Ascii.eqb Bool.eqb
                 KRExprDenote_RegInitT
                 KRExprDenote_RegInitValT
                 KRExprDenote_Rule
@@ -2936,7 +3102,7 @@ Goal forall proc_name, ~(( proc_name ++ "_" ++ "a")%string = (proc_name ++ "_" +
                 KRSimplify_Mod KRSimplifyTop_list_Mod
                 KRSimplify_Prop KRSimplifyTop_Prop
     ].
-  cbv [         sappend
+  cbv [         sappend srev sdisjPrefix
                 KRExprDenote_RegInitT
                 KRExprDenote_Rule
                 KRExprDenote_DefMethT
@@ -2958,4 +3124,10 @@ Goal forall proc_name, ~(( proc_name ++ "_" ++ "a")%string = (proc_name ++ "_" +
                 KRExprDenote_list_string
                 KRExprDenote_list_list_string
                 KRExprDenote_Prop].
-
+Abort.
+Goal forall p, ~ In (String.append p "mode") [(String.append p "int_data_reg")] /\ ~ In (String.append p "pc") [String.append p "int_data_reg"].
+  intros.
+  match goal with
+  | |- ?A /\ ?B => KRSimplifyTac (A /\ B) (KRTypeElem KRElemProp)
+  end.
+Abort.
