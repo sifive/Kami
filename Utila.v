@@ -1419,4 +1419,24 @@ Section utila.
 
   End ArrayList.
 
+  Local Open Scope kami_action.
+
+  (*
+    Accepts a list of register names [ls] that contains [len]
+    register names, and an index [idx] that references one of
+    these registers and returns the value of type [k] stored in
+    the referenced register.
+  *)
+  Definition readReg ty (ls: list string) len (idx: Bit (Nat.log2_up len) @# ty) k :=
+    GatherActions (map (fun '(i, reg) => Read val: k <- reg;
+                                         Ret (IF $i == idx then pack #val else $0)) (tag ls)) as vals;
+      Ret (unpack k (CABit Bor vals)).
+      
+  Definition writeReg ty (ls: list string) len (idx: Bit (Nat.log2_up len) @# ty) k (newval: k @# ty) :=
+    GatherActions (map (fun '(i, reg) => Read val: k <- reg;
+                                         Write reg: k <- (IF $i == idx then newval else #val);
+                                         Retv) (tag ls)) as _;
+      Retv.
+    
+  Local Close Scope kami_action.
 End utila.
