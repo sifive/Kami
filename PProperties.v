@@ -1622,19 +1622,19 @@ Qed.
 
 Lemma WfActionT_ReadsWellDefined_perm : forall (k : Kind)(a : ActionT type k)(retl : type k)
                                           (m1 : BaseModule)(o readRegs newRegs : RegsT)(calls : MethsT),
-    WfActionT m1 a ->
+    WfActionT (getRegisters m1) a ->
     PSemAction o a readRegs newRegs calls retl ->
     SubList (getKindAttr readRegs) (getKindAttr (getRegisters m1)).
 Proof.
   intros.
   apply (PSemAction_SemAction) in H0; dest.
   rewrite H0.
-  eapply (WfActionT_ReadsWellDefined H H3); eauto.
+  eapply (WfActionT_ReadsWellDefined _ H H3); eauto.
 Qed.
 
 Lemma WfActionT_WritesWellDefined_perm : forall (k : Kind)(a : ActionT type k)(retl : type k)
                                            (m1 : BaseModule)(o readRegs newRegs : RegsT)(calls : MethsT),
-    WfActionT m1 a ->
+    WfActionT (getRegisters m1) a ->
     PSemAction o a readRegs newRegs calls retl ->
     SubList (getKindAttr newRegs) (getKindAttr (getRegisters m1)).
 Proof.
@@ -1646,7 +1646,7 @@ Qed.
 
 Lemma WfActionT_PSemAction : forall (k : Kind)(a : ActionT type k)(retl : type k)
                                    (m1 : BaseModule)(o readRegs newRegs : RegsT)(calls : MethsT),
-    WfActionT m1 a ->
+    WfActionT (getRegisters m1) a ->
     NoDup (map fst o) ->
     PSemAction o a readRegs newRegs calls retl ->
     (forall (o1 : RegsT),

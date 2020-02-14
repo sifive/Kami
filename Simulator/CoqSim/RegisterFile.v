@@ -85,8 +85,6 @@ Proof.
   - exact None.
 Defined.
 
-Axiom cheat : forall {X},X.
-
 Definition file_sync_readresp(state : FileState)(file : RegFile)(regName : string) : option (Val (Array (chunk_size file) (kind file))). refine
   match map_lookup (M := M) regName (int_regs state) with
   | None => None
@@ -109,7 +107,7 @@ Proof.
     * rewrite Kind_decb_eq in Keq.
       rewrite Keq in v.
       exact (Some v).
-    * exact (Some cheat).
+    * exact None.
 Defined.
 
 Definition file_writes_mask(file : RegFile)(i : nat)(mask : Val (Array (chunk_size file) Bool))(vals : Val (Array (chunk_size file) (kind file))) : list (nat * Val (kind file)) :=

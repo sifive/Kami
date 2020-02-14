@@ -33,8 +33,6 @@ Definition print_BF(bf : BitFormat){n} : Word n -> string :=
   | Hex => print_word_hex
   end.
 
-Axiom cheat : forall {X},X.
-
 Fixpoint print_Kind(k : Kind)(ff : FullFormat k) : eval_Kind k -> string :=
   match ff with
   | FBool n _ => fun x => space_pad n (if x then "1" else "0")
@@ -180,11 +178,7 @@ Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   | BuildArray n k v => make_vec (fun i => eval_Expr (v i))
   end.
 
-(* Fixpoint chop_word{n x} : Word (n * x) -> Vec n (Word x) :=
-  match n with
-  | 
-
-Fixpoint val_unpack'(k : Kind) : Word (size k) -> eval_Kind k.
+(* Fixpoint val_unpack'(k : Kind) : Word (size k) -> eval_Kind k.
 Proof.
   induction k; simpl; intro e.
   (* Bool *)
@@ -217,4 +211,3 @@ Fixpoint eval_list_SysT(xs : list (SysT eval_Kind)) : M unit :=
   end.
 
 End Eval.
-

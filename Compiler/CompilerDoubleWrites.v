@@ -204,7 +204,7 @@ Section DoubleWritesProof.
     forall regMap regMapExpr (bexpr : Bool @# type) (WfRegMap : WfRegMapExpr regMapExpr regMap) (HPriorityUpds : PriorityUpds oInit uInit o) ,
       getKindAttr o = getKindAttr (getRegisters m) ->
       getKindAttr oInit = getKindAttr (getRegisters m) ->
-      WfActionT m a -> 
+      WfActionT (getRegisters m) a -> 
       evalExpr bexpr = false ->
       exists retl,
         SemCompActionT (compileAction (oInit,uInit) a bexpr regMapExpr) regMap nil retl.
@@ -255,6 +255,7 @@ Section DoubleWritesProof.
       intros.
       inversion H2; EqDep_subst.
       specialize (getRegisterValue); intros.
+      change (fun x0 : FullKind => RegInitValT x0) with RegInitValT in H9.
       rewrite <- H0 in H9.
       specialize (H4 _ _ _ H9).
       destruct H4.
@@ -367,7 +368,7 @@ Section DoubleWritesProof.
       SemActionDoubleWrites o a readRegs newRegs calls retl ->
       NoDup (map fst newRegs) ->
       getKindAttr oInit = getKindAttr (getRegisters m) ->
-      WfActionT m a -> 
+      WfActionT (getRegisters m) a -> 
       forall old writeMap upds
              (HConsistent: getKindAttr o = getKindAttr old)
              (HCheck : forall s, In s (map fst newRegs) -> ~ In s (map fst (hd nil upds))),

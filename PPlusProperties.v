@@ -2094,17 +2094,17 @@ Proof.
     apply PPlusSubsteps_inlined_undef_Rule; auto.
 Qed.      
 
-Lemma WfActionT_inline_Rule (k : Kind) m (a : ActionT type k) rn f:
-  WfActionT m a ->
-  WfActionT (inlineSingle_Rule_BaseModule f rn m) a.
+Lemma WfActionT_inline_Rule ty (k : Kind) m (a : ActionT ty k) rn f:
+  WfActionT (getRegisters m) a ->
+  WfActionT (getRegisters (inlineSingle_Rule_BaseModule f rn m)) a.
 Proof.
   intros; induction H; econstructor; auto.
 Qed.
 
-Lemma WfActionT_inline_Rule_inline_action (k : Kind) m (a : ActionT type k) rn (f : DefMethT):
-  WfActionT m a ->
-  (forall v, WfActionT m (projT2 (snd f) type v)) ->
-  WfActionT (inlineSingle_Rule_BaseModule f rn m) (inlineSingle a f).
+Lemma WfActionT_inline_Rule_inline_action ty (k : Kind) m (a : ActionT ty k) rn (f : DefMethT):
+  WfActionT (getRegisters m) a ->
+  (forall v, WfActionT (getRegisters m) (projT2 (snd f) ty v)) ->
+  WfActionT (getRegisters (inlineSingle_Rule_BaseModule f rn m)) (inlineSingle a f).
 Proof.
   induction 1; try econstructor; eauto.
   simpl.
@@ -2112,7 +2112,10 @@ Proof.
   econstructor.
   intros.
   specialize (H1 v).
-  apply (WfActionT_inline_Rule); auto.
+  eapply WfActionT_inline_Rule; auto.
+  Unshelve.
+  exact meth.
+  exact f.
 Qed.
 
 Lemma inlineSingle_Rule_BaseModule_dec ty rule f rn l:
@@ -2162,16 +2165,24 @@ Lemma WfMod_Rule_inlined m f rn :
   WfMod (Base (inlineSingle_Rule_BaseModule f rn m)).
 Proof.
   intros; inv H; econstructor; eauto.
-  - inv HWfBaseModule.
-    split; intros; simpl in *; dest; try inv HWfBaseModule; eauto; repeat split; intros; pose proof (H1 _ H0); auto.
-    + destruct (inlineSingle_Rule_BaseModule_dec type _ _ _ _ H2).
-      * specialize (H _ H7); apply WfActionT_inline_Rule; auto.
+  - inv HWfBaseModule. 
+    split; intros; simpl in *; dest; try inv HWfBaseModule; eauto; repeat split; intros. pose proof (H1 ty _ H0); auto.
+    + destruct (inlineSingle_Rule_BaseModule_dec ty _ _ _ _ H2).
+      * specialize (H ty _ H7). eapply WfActionT_inline_Rule; auto.
       * dest.
-        specialize (H _ H7).
+        specialize (H ty _ H7).
         rewrite <- H9.
-        apply WfActionT_inline_Rule_inline_action; auto.
-    + apply WfActionT_inline_Rule; auto.
+        eapply WfActionT_inline_Rule_inline_action; auto.
+    + eapply WfActionT_inline_Rule; auto.
+    + auto.
+    + auto.
     + rewrite <- inlineSingle_Rule_preserves_names; auto.
+    Unshelve.
+    exact rn.
+    exact f.
+    exact rn.
+    exact rn.
+    exact f.
 Qed.    
 
 Lemma PPlusStrongTraceInclusion_inlining_Rules_r m f rn :
@@ -2925,17 +2936,17 @@ Proof.
   specialize (H1 _ HInDef); assumption.
 Qed.
 
-Lemma WfActionT_inline_Meth (k : Kind) m (a : ActionT type k) rn f:
-  WfActionT m a ->
-  WfActionT (inlineSingle_Meth_BaseModule f rn m) a.
+Lemma WfActionT_inline_Meth ty (k : Kind) m (a : ActionT ty k) rn f:
+  WfActionT (getRegisters m) a ->
+  WfActionT (getRegisters (inlineSingle_Meth_BaseModule f rn m)) a.
 Proof.
   intros; induction H; econstructor; auto.
 Qed.
 
-Lemma WfActionT_inline_Meth_inline_action (k : Kind) m (a : ActionT type k) gn (f : DefMethT):
-  WfActionT m a ->
-  (forall v, WfActionT m (projT2 (snd f) type v)) ->
-  WfActionT (inlineSingle_Meth_BaseModule f gn m) (inlineSingle a f).
+Lemma WfActionT_inline_Meth_inline_action ty (k : Kind) m (a : ActionT ty k) gn (f : DefMethT):
+  WfActionT (getRegisters m) a ->
+  (forall v, WfActionT (getRegisters m) (projT2 (snd f) ty v)) ->
+  WfActionT (getRegisters (inlineSingle_Meth_BaseModule f gn m)) (inlineSingle a f).
 Proof.
   induction 1; try econstructor; eauto.
   simpl.
@@ -2943,7 +2954,10 @@ Proof.
   econstructor.
   intros.
   specialize (H1 v).
-  apply (WfActionT_inline_Meth); auto.
+  eapply (WfActionT_inline_Meth); auto.
+  Unshelve.
+  exact gn.
+  exact f.
 Qed.
 
 Lemma inlineSingle_Meth_BaseModule_dec meth f gn l:
@@ -2976,18 +2990,26 @@ Proof.
   specialize (H).
   inv H; econstructor; eauto.
   - split; intros; simpl in *; inv HWfBaseModule.
-    + apply WfActionT_inline_Meth; auto.
+    + eapply WfActionT_inline_Meth; auto.
     + repeat split; dest; intros; try rewrite SameKeys_inline_Meth; auto.
       * destruct (inlineSingle_Meth_BaseModule_dec _ _ _ _ H5).
-        -- specialize (H1 _ H6 v); apply WfActionT_inline_Meth; auto.
+        -- specialize (H1 _ _ H6 v); eapply WfActionT_inline_Meth; auto.
         -- dest.
            destruct x, s0, meth, s1; simpl in *.
            inv H7; destruct String.eqb.
            ++ inv H10; EqDep_subst; simpl in *.
-              specialize (H1 _ H6 v); simpl in *; apply WfActionT_inline_Meth; assumption.
+              specialize (H1 _ _ H6 v); simpl in *; eapply WfActionT_inline_Meth; assumption.
            ++ inv H10; EqDep_subst.
-              apply WfActionT_inline_Meth_inline_action; auto.
-              specialize (H1 _ H6 v); simpl in *; assumption.
+              eapply WfActionT_inline_Meth_inline_action; auto.
+              specialize (H1 _ _ H6 v); simpl in *; assumption.
+  Unshelve.
+  exact gn.
+  exact f.
+  exact gn.
+  exact f.
+  exact gn.
+  exact f.
+  exact gn.
 Qed.
 
 Lemma PPlusStrongTraceInclusion_inlining_Meth_r m f gn :
@@ -3329,7 +3351,6 @@ Proof.
     inv P2; eauto.
   - apply Nat.nlt_ge in n.
     rewrite inlineSingle_transform_gt; auto.
-    assert (WfMod m) as P1;[constructor; auto| apply (WfMod_WfBaseMod_flat P1)].
 Qed.
 
 Definition inline_nth_Meth_BaseModuleWf {f} {m : BaseModuleWf} i
@@ -3423,7 +3444,6 @@ Proof.
     inv P2; eauto.
   - apply Nat.nlt_ge in n.
     rewrite inlineSingle_transform_gt; auto.
-    assert (WfMod m) as P1;[constructor; auto| apply (WfMod_WfBaseMod_flat P1)].
 Qed.
 
 Definition inline_nth_Rule_BaseModuleWf {f} {m : BaseModuleWf} i
@@ -4401,11 +4421,8 @@ Proof.
   specialize (TraceInclusion_inlineAll_pos (WfMod_WfBase_getFlat (wfMod m))) as P1; dest.
   inv H; unfold WfBaseModule in *; dest.
   econstructor; repeat split; unfold removeHides; simpl in *; intros; eauto.
-  - specialize (H _ H5).
-    unfold inlineAll_All in *.
-    induction H; econstructor; eauto.
   - rewrite filter_In in H5; dest.
-    specialize (H1 _ H5 v).
+    specialize (H1 ty _ H5 v).
     induction H1; econstructor; eauto.
   - clear - H2.
     induction (inlineAll_Meths (getAllMethods m)); simpl; auto.
@@ -4757,9 +4774,9 @@ Proof.
   rewrite removeHides_cons, removeMeth_removeHides; reflexivity.
 Qed.
 
-Lemma removeHidesWfActionT (m : BaseModule)(k : Kind) (a : ActionT type k) (l : list string):
-  WfActionT m a ->
-  WfActionT (removeHides m l) a.
+Lemma removeHidesWfActionT ty (m : BaseModule)(k : Kind) (a : ActionT ty k) (l : list string):
+  WfActionT (getRegisters m) a ->
+  WfActionT (getRegisters (removeHides m l)) a.
 Proof.
   induction 1; econstructor; eauto.
 Qed.
@@ -4784,11 +4801,9 @@ Proof.
   intros.
   inv H; inv H1; inv H2; inv H3.
   repeat split; intros; auto.
-  - specialize (H0 _ H3).
-    apply removeHidesWfActionT; assumption.
   - simpl in H3.
     rewrite (filter_In) in H3; inv H3.
-    specialize (H _ H5 v).
+    specialize (H ty _ H5 v).
     apply removeHidesWfActionT; auto.
   - simpl.
     apply NoDup_filtered_keys; auto.
@@ -8366,9 +8381,9 @@ Qed.
 Lemma WfBaseMod_inlineSingle (m : BaseModule) (HWfMod : WfBaseModule m) k (a : ActionT type k):
   forall  (f : DefMethT),
     In f (getMethods m) ->
-    WfActionT m a ->
-    WfActionT m (inlineSingle a f).
-Proof. 
+    WfActionT (getRegisters m) a ->
+    WfActionT (getRegisters m) (inlineSingle a f).
+Proof.
   induction a; simpl; intros; (inv H1||inv H0); EqDep_subst; try (econstructor; eauto).
   unfold WfBaseModule in *; dest.
   destruct String.eqb; [destruct Signature_dec; subst|]; repeat (econstructor; eauto).
@@ -8387,8 +8402,8 @@ Qed.
 Lemma WfExpand k (a : ActionT type k):
   forall  (m1 m2 : BaseModule),
     SubList (getRegisters m1) (getRegisters m2) ->
-    WfActionT m1 a ->
-    WfActionT m2 a.
+    WfActionT (getRegisters m1) a ->
+    WfActionT (getRegisters m2) a.
 Proof.
   induction a; intros; (inv H1||inv H0); EqDep_subst; econstructor; eauto.
   - rewrite in_map_iff in H7; dest; inv H1; specialize (H0 _ H2).

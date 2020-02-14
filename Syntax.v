@@ -704,21 +704,78 @@ Fixpoint type (k: Kind): Type :=
   end.
 
 Section WfBaseMod.
-  Variable m: BaseModule.
-  
-  Inductive WfActionT: forall lretT, ActionT type lretT -> Prop :=
-  | WfMCall meth s e lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (MCall meth s e c)
-  | WfLetExpr k (e: Expr type k) lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (LetExpr e c)
-  | WfLetAction k (a: ActionT type k) lretT c: WfActionT a -> (forall v, WfActionT (c v)) -> @WfActionT lretT (LetAction a c)
-  | WfReadNondet k lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (ReadNondet k c)
-  | WfReadReg r k lretT c: (forall v, WfActionT (c v)) -> In (r, k) (getKindAttr (getRegisters m)) ->
-                           @WfActionT lretT (ReadReg r k c)
-  | WfWriteReg r k (e: Expr type k) lretT c: WfActionT c  -> In (r, k) (getKindAttr (getRegisters m)) ->
-                                             @WfActionT lretT (WriteReg r e c)
-  | WfIfElse p k (atrue: ActionT type k) afalse lretT c: (forall v, WfActionT (c v)) -> WfActionT atrue ->
-                                                         WfActionT afalse -> @WfActionT lretT (IfElse p atrue afalse c)
-  | WfSys ls lretT c: WfActionT c -> @WfActionT lretT (Sys ls c)
-  | WfReturn lretT e: @WfActionT lretT (Return e).
+
+  Section WfActionT.
+
+    Variable regs : list (string * {x : FullKind & RegInitValT x}).
+    Variable ty : Kind -> Type.
+
+    Inductive WfActionT: forall lretT, ActionT ty lretT -> Prop :=
+    | WfMCall meth s e lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (MCall meth s e c)
+    | WfLetExpr k (e: Expr ty k) lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (LetExpr e c)
+    | WfLetAction k (a: ActionT ty k) lretT c: WfActionT a -> (forall v, WfActionT (c v)) -> @WfActionT lretT (LetAction a c)
+    | WfReadNondet k lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (ReadNondet k c)
+    | WfReadReg r k lretT c: (forall v, WfActionT (c v)) -> In (r, k) (getKindAttr regs) ->
+                             @WfActionT lretT (ReadReg r k c)
+    | WfWriteReg r k (e: Expr ty k) lretT c: WfActionT c  -> In (r, k) (getKindAttr regs) ->
+                                               @WfActionT lretT (WriteReg r e c)
+    | WfIfElse p k (atrue: ActionT ty k) afalse lretT c: (forall v, WfActionT (c v)) -> WfActionT atrue ->
+                                                           WfActionT afalse -> @WfActionT lretT (IfElse p atrue afalse c)
+    | WfSys ls lretT c: WfActionT c -> @WfActionT lretT (Sys ls c)
+    | WfReturn lretT e: @WfActionT lretT (Return e).
+
+    Definition lookup{K X} : (K -> K -> bool) -> K -> list (K * X) -> option X :=
+      fun eqbk key pairs => match List.find (fun p => eqbk key (fst p)) pairs with
+                            | Some p => Some (snd p)
+                            | None => None
+                            end.
+
+    Lemma lookup_cons : forall K V (eqb : K -> K -> bool) k k' v (ps : list (K*V)), lookup eqb k ((k',v)::ps) =
+      if eqb k k' then Some v else lookup eqb k ps.
+    Proof.
+      intros.
+      unfold lookup.
+      unfold find.
+      simpl.
+      destruct (eqb k k'); auto.
+    Qed.
+
+    Fixpoint WfActionT_new{k}(a : ActionT ty k) : Prop :=
+    match a with
+    | MCall meth s e cont => forall x, WfActionT_new (cont x)
+    | LetExpr k e cont => forall x, WfActionT_new (cont x)
+    | LetAction k a cont => (WfActionT_new a /\ forall x, WfActionT_new (cont x))
+    | ReadNondet k cont => forall x, WfActionT_new (cont x)
+    | ReadReg r k' cont => match lookup String.eqb r regs with
+                           | None => False
+                           | Some (existT k'' _) => k' = k'' /\ forall x, WfActionT_new (cont x)
+                           end
+    | WriteReg r k' e a => match lookup String.eqb r regs with
+                           | None => False
+                           | Some (existT k'' _) => k' = k'' /\ WfActionT_new a
+                           end
+    | IfElse e k1 a1 a2 cont => (WfActionT_new a1 /\ WfActionT_new a2 /\ forall x, WfActionT_new (cont x))
+    | Sys _ a => WfActionT_new a
+    | Return _ => True
+    end.
+
+    Fixpoint WfRules(rules : list RuleT) :=
+      match rules with
+      | [] => True
+      | r::rs => WfActionT_new (snd r ty) /\ WfRules rs
+      end.
+
+    Fixpoint WfMeths(meths : list (string * {x : Signature & MethodT x})) :=
+      match meths with
+      | [] => True
+      | m::ms => (forall v, WfActionT_new (projT2 (snd m) ty v)) /\ WfMeths ms
+      end.
+
+  End WfActionT.
+
+  Section WfActionT'.
+
+  Variable m : BaseModule.
 
    Inductive WfActionT': forall lretT, ActionT type lretT -> Prop :=
   | WfMCall' meth s e lretT c v: (WfActionT' (c v)) -> @WfActionT' lretT (MCall meth s e c)
@@ -734,24 +791,367 @@ Section WfBaseMod.
   | WfSys' ls lretT c: WfActionT' c -> @WfActionT' lretT (Sys ls c)
   | WfReturn' lretT e: @WfActionT' lretT (Return e).
 
- (* Lemma WfActionTEquiv lret a: @WfActionT' lret a -> WfActionT a.
-   Proof.
-     induction a; intros.
-     -
-       inv H0; EqDep_subst.
-       econstructor; intros.
-       intros. *)
+  End WfActionT'.
 
- Definition WfBaseModule :=
-    (forall rule, In rule (getRules m) -> WfActionT (snd rule type)) /\
-    (forall meth, In meth (getMethods m) -> forall v, WfActionT (projT2 (snd meth) type v)) /\
+  Definition WfBaseModule(m : BaseModule) :=
+    (forall ty rule, In rule (getRules m) -> WfActionT (getRegisters m) (snd rule ty)) /\
+    (forall ty meth, In meth (getMethods m) -> forall v, WfActionT (getRegisters m) (projT2 (snd meth) ty v)) /\
     NoDup (map fst (getMethods m)) /\ NoDup (map fst (getRegisters m)) /\ NoDup (map fst (getRules m)).
-  
-  Lemma WfLetExprSyntax k (e: LetExprSyntax type k): WfActionT (convertLetExprSyntax_ActionT e).
+
+  Definition WfBaseModule_new(m : BaseModule) :=
+    (forall ty, WfRules (getRegisters m) ty (getRules m)) /\
+    (forall ty, WfMeths (getRegisters m) ty (getMethods m)) /\
+    (NoDup (map fst (getMethods m))) /\
+    (NoDup (map fst (getRegisters m))) /\
+    (NoDup (map fst (getRules m))).
+
+  Lemma WfLetExprSyntax k m (e: LetExprSyntax type k): WfActionT (getRegisters m) (convertLetExprSyntax_ActionT e).
   Proof.
     induction e; constructor; auto.
   Qed.
 End WfBaseMod.
+
+Section WfBaseModProofs.
+
+(*
+Lemma change_rules : forall ty dms regs (rule : RuleT) rules rules', WfActionT (BaseMod regs rules dms) (snd rule ty) -> WfActionT (BaseMod regs rules' dms) (snd rule ty).
+Proof.
+  intros.
+  induction H.
+  - apply WfMCall; auto.
+  - apply WfLetExpr; auto.
+  - apply WfLetAction; auto.
+  - apply WfReadNondet; auto.
+  - apply WfReadReg; auto.
+  - apply WfWriteReg; auto.
+  - apply WfIfElse; auto.
+  - apply WfSys; auto.
+  - apply WfReturn; auto.
+Qed.
+
+Lemma change_meths : forall ty dms dms' rules regs (a : string * {x : Signature & MethodT x}), (forall v, WfActionT (BaseMod regs rules dms) (projT2 (snd a) ty v))
+  -> forall v, WfActionT (BaseMod regs rules dms') (projT2 (snd a) ty v).
+Proof.
+  intros.
+  induction (H v).
+  - apply WfMCall; auto.
+  - apply WfLetExpr; auto.
+  - apply WfLetAction; auto.
+  - apply WfReadNondet; auto.
+  - apply WfReadReg; auto.
+  - apply WfWriteReg; auto.
+  - apply WfIfElse; auto.
+  - apply WfSys; auto.
+  - apply WfReturn; auto.
+Qed.
+*)
+
+Lemma In_getKindAttr : forall r k (regs : list (string * {x : FullKind & RegInitValT x})), In (r,k) (getKindAttr regs) -> In r (map fst regs).
+Proof.
+  intros.
+  rewrite in_map_iff in H.
+  dest.
+  inv H.
+  apply in_map; auto.
+Qed.
+
+Lemma In_lookup : forall r k (regs : list (string * {x : FullKind & RegInitValT x})), NoDup (map fst regs) -> In (r,k) (getKindAttr regs) -> exists k' v, k = k' /\ lookup String.eqb r regs = Some (existT _ k' v).
+Proof.
+  induction regs; intros.
+  - destruct H0.
+  - destruct H0.
+    + destruct a.
+      destruct s0.
+      destruct r0.
+      * inversion H0.
+        exists x; eexists.
+        split.
+        ** auto.
+        ** unfold lookup; simpl.
+           rewrite String.eqb_refl.
+           reflexivity.
+      * inversion H0.
+        exists k; eexists.
+        split.
+        ** auto.
+        ** unfold lookup; simpl.
+           rewrite String.eqb_refl.
+           simpl.
+           reflexivity.
+    + assert (NoDup (map fst regs)).
+      inversion H; auto.
+      destruct (IHregs H1 H0) as [k' [v [Hk' Hv]]].
+      exists k', v.
+      split.
+      * auto.
+      * destruct a.
+        destruct s0.
+        destruct r0.
+        ** rewrite lookup_cons.
+           destruct (r =? s) eqn:G.
+           *** rewrite String.eqb_eq in G.
+               rewrite <- G in H.
+               inversion H.
+               elim H4.
+               eapply In_getKindAttr.
+               exact H0.
+           *** auto.
+        ** rewrite lookup_cons.
+           destruct (r =? s) eqn:G.
+           *** rewrite String.eqb_eq in G.
+               rewrite <- G in H.
+               inversion H.
+               elim H4.
+               eapply In_getKindAttr.
+               exact H0.
+           *** auto.
+Qed.
+
+Lemma lookup_In : forall r k v regs, lookup String.eqb r (regs) = Some (existT RegInitValT k v) -> In (r,k) (getKindAttr regs).
+Proof.
+  induction regs; intros.
+  - discriminate H.
+  - destruct a.
+    destruct s0.
+    rewrite lookup_cons in H.
+    + destruct (r =? s) eqn:G.
+      * rewrite String.eqb_eq in G.
+        inversion H.
+        left; simpl; congruence.
+      * right.
+        apply IHregs.
+        auto.
+Qed.
+
+Lemma WfActionT_WfActionT_new{ty lret} : forall regs (a : ActionT ty lret), NoDup (map fst regs) -> WfActionT regs a -> WfActionT_new regs a.
+Proof.
+  intros.
+  induction a; simpl; intros.
+  - apply H1.
+    inversion H0.
+    EqDep_subst.
+    apply H4.
+  - apply H1.
+    inversion H0.
+    EqDep_subst.
+    apply H4.
+  - inversion H0.
+    split.
+    + apply IHa.
+      EqDep_subst.
+      auto.
+    + EqDep_subst.
+      intro.
+      auto.
+  - inversion H0.
+    apply H1.
+    EqDep_subst.
+    auto.
+  - inversion H0.
+    unfold getRegisters in H7.
+    destruct (In_lookup _ _ _ H H7) as [k' [v [Hk Hv]]].
+    rewrite Hv.
+    split.
+    + auto.
+    + intro.
+      apply H1.
+      EqDep_subst.
+      apply H5.
+  - inversion H0.
+    unfold getRegisters in H7.
+    destruct (In_lookup _ _ _ H H7) as [k' [v [Hk Hv]]].
+    rewrite Hv.
+    split.
+    + auto.
+    + apply IHa.
+      EqDep_subst; auto.
+  - inversion H0.
+   repeat split.
+    + apply IHa1.
+      EqDep_subst.
+      auto.
+    + apply IHa2.
+      EqDep_subst.
+      auto.
+    + intro; apply H1.
+      EqDep_subst.
+      apply H6.
+  - apply IHa.
+    inversion H0.
+    EqDep_subst.
+    auto.
+  - auto.
+Qed.
+
+Lemma wf_rules_In : forall ty regs rules, NoDup (map fst regs) -> (forall rule : RuleT, In rule rules -> WfActionT regs (snd rule ty)) -> WfRules regs ty rules.
+Proof.
+  induction rules; intros.
+  - simpl; auto.
+  - simpl.
+    split.
+    + eapply WfActionT_WfActionT_new.
+      * auto.
+      * apply H0; left; auto.
+    + eapply IHrules.
+      * auto.
+      * intros.
+        apply H0.
+        right; auto.
+Qed.
+
+Lemma wf_meths_In : forall ty regs dms, NoDup (map fst regs) -> (forall (meth : string * {x : Signature & MethodT x}),
+    In meth dms -> forall v : ty (fst (projT1 (snd meth))), WfActionT regs (projT2 (snd meth) ty v)) -> WfMeths regs ty dms.
+Proof.
+  induction dms; intros.
+  - simpl; auto.
+  - simpl.
+    split.
+    + intro; eapply WfActionT_WfActionT_new; auto.
+      apply H0.
+      left; auto.
+    + eapply IHdms.
+      * auto.
+      * intros.
+        apply H0.
+        right; auto.
+Qed.
+
+(* 
+Lemma wf_meths_In_BaseRegFile : forall ty rfs (ms : list (string * {x : Signature & MethodT x})), NoDup (map fst (getRegisters (BaseRegFile rfs))) ->   (forall meth, In meth ms ->
+ forall v : ty (fst (projT1 (snd meth))) , WfActionT (BaseRegFile rfs) (projT2 (snd meth) ty v)) -> WfMeths (BaseRegFile rfs) ty ms.
+Proof.
+  induction ms; intros.
+  - simpl; auto.
+  - simpl; split.
+    + intro; eapply WfActionT_WfActionT_new.
+      * auto.
+      * apply H0.
+        left; auto.
+    + apply IHms; auto.
+      intros; apply H0; right; auto.
+Qed.
+ *)
+
+Check WfBaseModule.
+
+Lemma Wf_Wf_new_bm : forall bm, WfBaseModule bm -> WfBaseModule_new bm.
+Proof.
+  intros bm [wf_actions [wf_meths [nodup_meths [nodup_regs nodup_rules]]]].
+  unfold WfBaseModule_new.
+  repeat split.
+  - intro.
+    destruct bm.
+    + exact I.
+    + simpl.
+      eapply wf_rules_In; auto.
+  - simpl.
+    intro; eapply wf_meths_In; auto.
+  - auto.
+  - auto.
+  - auto.
+Qed.
+
+Lemma WfActionT_new_WfActionT{ty lret} : forall (a : ActionT ty lret) m, WfActionT_new m a -> WfActionT m a.
+Proof.
+  intros.
+  induction a; simpl in *.
+  - apply WfMCall.
+    intro; apply H0; apply H.
+  - apply WfLetExpr.
+    intro; apply H0; apply H.
+  - apply WfLetAction.
+    + apply IHa; tauto.
+    + intro; apply H0; apply H.
+  - apply WfReadNondet.
+    intro; apply H0; apply H.
+  - apply WfReadReg.
+    + intro; apply H0.
+      destruct lookup.
+      * destruct s; apply H.
+      * destruct H.
+    + destruct lookup eqn:G.
+      * destruct s.
+        destruct H.
+        rewrite H.
+        unfold getRegisters.
+        eapply lookup_In.
+        exact G.
+      * destruct H.
+  - apply WfWriteReg.
+    + apply IHa.
+      destruct lookup.
+      * destruct s; apply H.
+      * destruct H.
+    + destruct lookup eqn:G.
+      * destruct s.
+        destruct H.
+        rewrite H.
+        unfold getRegisters.
+        eapply lookup_In.
+        exact G.
+      * destruct H.
+  - apply WfIfElse.
+    + intro; apply H0; apply H.
+    + tauto.
+    + tauto.
+  - apply WfSys; tauto.
+  - apply WfReturn.
+Qed.
+
+Lemma In_wf_rules : forall ty regs rules, NoDup (map fst regs) -> WfRules regs ty rules -> (forall rule : RuleT, In rule rules -> WfActionT regs (snd rule ty)).
+Proof.
+  induction rules; intros.
+  - destruct H1.
+  - simpl in H0; destruct H0.
+    destruct H1.
+    + eapply WfActionT_new_WfActionT; congruence.
+    + apply IHrules; auto.
+Qed.
+
+Lemma In_wf_meths : forall ty regs dms, NoDup (map fst regs) -> WfMeths regs ty dms -> forall meth : string * {x : Signature & MethodT x}, In meth dms -> forall v : ty (fst (projT1 (snd meth))),
+  WfActionT regs (projT2 (snd meth) ty v).
+Proof.
+  induction dms; intros.
+  - destruct H1.
+  - simpl in H0; destruct H0.
+    destruct H1.
+    + eapply WfActionT_new_WfActionT.
+      rewrite H1 in H0.
+      apply H0.
+    + apply IHdms; auto.
+Qed.
+
+(*
+Lemma In_wf_meths_BaseRegFile : forall ty rfs ms, WfMeths (BaseRegFile rfs) ty ms ->
+  forall meth : string * {x : Signature & MethodT x}, In meth ms -> forall v : ty (fst (projT1 (snd meth))),
+  WfActionT (BaseRegFile rfs) (projT2 (snd meth) ty v).
+Proof.
+  induction ms; intros.
+  - destruct H0.
+  - simpl in H; destruct H.
+    destruct H0.
+    + eapply WfActionT_new_WfActionT.
+      rewrite H0 in H.
+      apply H.
+    + apply IHms; auto.
+Qed.
+*)
+
+Lemma Wf_new_Wf_bm : forall bm, WfBaseModule_new bm -> WfBaseModule bm.
+Proof.
+  intros bm [wf_actions [wf_meths [nodup_meths [nodup_regs nodup_rules]]]].
+  unfold WfBaseModule.
+  repeat split.
+  - intros.
+    + eapply In_wf_rules; auto.
+  - intros.
+    + eapply In_wf_meths; auto.
+  - auto.
+  - auto.
+  - auto.
+Qed.
+
+End WfBaseModProofs.
 
 Inductive WfConcatActionT : forall lretT, ActionT type lretT -> Mod -> Prop :=
 | WfConcatMCall meth s e lretT c m' :(forall v, WfConcatActionT (c v) m') -> ~In meth (getHidden m') ->

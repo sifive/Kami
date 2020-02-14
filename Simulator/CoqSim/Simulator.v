@@ -37,14 +37,36 @@ Definition SimRegs := list SimReg.
 
 Section Regs.
 
+Variable init_regs : list (string * {x : FullKind & RegInitValT x}).
+
 Variable regs : SimRegs.
+
+Definition kind_consistent := forall r k, 
+    (exists v, lookup String.eqb r init_regs = Some (existT _ k v)) <-> (exists v', lookup String.eqb r regs = Some (existT _ k v')).
+
+Variable kc : kind_consistent.
+
+(* helper lemmas *)
+Lemma kc_init_sim : forall r k v, lookup String.eqb r init_regs = Some (existT _ k v) -> exists v', lookup String.eqb r regs = Some (existT _ k v').
+Proof.
+  intros.
+  apply kc.
+  exists v; auto.
+Qed.
+
+Lemma kc_sim_init : forall r k v, lookup String.eqb r regs = Some (existT _ k v) -> exists v', lookup String.eqb r init_regs = Some (existT _ k v').
+Proof.
+  intros.
+  apply kc.
+  exists v; auto.
+Qed.
 
 Record Update := {
   reg_name : string;
   kind : FullKind;
-  old_val : fullType eval_K kind;
+  init_val : RegInitValT kind;
   new_val : fullType eval_K kind;
-  lookup_match : lookup String.eqb reg_name regs = Some (existT _ kind old_val)
+  lookup_match : lookup String.eqb reg_name init_regs = Some (existT _ kind init_val)
   }.
 
 Definition Updates := list Update.
@@ -85,27 +107,8 @@ Defined.
 Definition reg_not_found{X} : string -> M X :=
   fun reg => error ("register " ++ reg ++ " not found.").
 
-Fixpoint wf_action{k}(a : ActionT eval_K k) : Prop :=
-  match a with
-  | MCall meth s e cont => forall x, wf_action (cont x)
-  | LetExpr k e cont => forall x, wf_action (cont x)
-  | LetAction k a cont => (wf_action a /\ forall x, wf_action (cont x))
-  | ReadNondet k cont => forall x, wf_action (cont x)
-  | ReadReg r k' cont => match lookup String.eqb r regs with
-                         | None => False
-                         | Some (existT k'' _) => k' = k'' /\ forall x, wf_action (cont x)
-                         end
-  | WriteReg r k' e a => match lookup String.eqb r regs with
-                         | None => False
-                         | Some (existT k'' _) => k' = k'' /\ wf_action a
-                         end
-  | IfElse e k1 a1 a2 cont => (wf_action a1 /\ wf_action a2 /\ forall x, wf_action (cont x))
-  | Sys _ a => wf_action a
-  | Return _ => True
-  end.
-
-Fixpoint eval_ActionT{k}{E}`{Environment E}(env : E)(state : @FileState Vec Word Map)(meths : list (string * Signature))(updates : Updates)(fupdates : FileUpdates)(a : ActionT eval_K k)(a_wf : wf_action a)(fs : mkProd (List.map dec_sig meths)){struct a} : M (Updates * FileUpdates * eval_K k).
-  refine (match a return wf_action a -> _ with
+Fixpoint eval_ActionT{k}{E}`{Environment E}(env : E)(state : @FileState Vec Word Map)(meths : list (string * Signature))(updates : Updates)(fupdates : FileUpdates)(a : ActionT eval_K k)(a_wf : WfActionT_new init_regs a)(fs : mkProd (List.map dec_sig meths)){struct a} : M (Updates * FileUpdates * eval_K k).
+  refine (match a return WfActionT_new init_regs a -> _ with
   | MCall meth s e cont => fun pf => 
        match rf_methcall state meth (existT _ (fst s) (eval_E e)) with
       | Some (o, existT k v) => match Kind_dec k (snd s) with
@@ -129,14 +132,11 @@ Fixpoint eval_ActionT{k}{E}`{Environment E}(env : E)(state : @FileState Vec Word
       do v <- rand_val_FK k;
       eval_ActionT _ _ _ env state meths updates fupdates (cont v) _ fs
       )
-  | ReadReg r k cont => fun pf=> match lookup String.eqb r regs with
+  | ReadReg r k cont => fun pf=> _
+  | WriteReg r k e a => fun pf => (* match lookup String.eqb r regs with
                         | None => reg_not_found r
                         | Some p => _
-                        end
-  | WriteReg r k e a => fun pf => match lookup String.eqb r regs with
-                        | None => reg_not_found r
-                        | Some p => _
-                        end
+                        end *) _
   | IfElse e k a1 a2 cont => fun pf => let a := if (eval_Expr e) then a1 else a2 in (
       do p <- eval_ActionT _ _ _ env state meths updates fupdates a _ fs;
       eval_ActionT _ _ _ env state meths (fst (fst p)) (snd (fst p)) (cont ((snd p))) _ fs
@@ -158,30 +158,49 @@ Proof.
   - apply pf.
   - apply pf.
   - apply pf.
-  
   (* ReadReg *)
-  - destruct p.
-    simpl in pf.
-    destruct lookup in pf.
-    * destruct s; destruct pf as [keq pf'].
-      rewrite <- keq in f0.
-      exact (eval_ActionT _ _ _ env state meths updates fupdates (cont f0) (pf' _) fs).
-    * destruct pf.
+  - destruct (lookup String.eqb r regs) eqn:G.
+    + simpl in pf.
+      destruct lookup eqn:G' in pf.
+      * destruct s0.
+        destruct s.
+        assert (x = x0).
+        ** destruct (kc_init_sim _ G') as [v Hv].
+           rewrite Hv in G.
+           inversion G; auto.
+        ** destruct pf.
+           clear G.
+           rewrite <- H6, <- H7 in f.
+           exact (eval_ActionT _ _ _ env state meths updates fupdates (cont f) (H8 _) fs).
+      * destruct pf.
+   + exact (reg_not_found r).
   (* WriteReg *)
   - simpl in pf.
     destruct lookup eqn:lk in pf.
-    * destruct s.
+    + destruct s.
       destruct pf as [keq pf'].
       rewrite keq in e.
-      pose (upd := {|
-        reg_name := r;
-        kind := x;
-        old_val := f;
-        new_val := eval_Expr e;
-        lookup_match := lk
-        |}).
-      exact (eval_ActionT _ _ _ env state meths (upd::updates) fupdates a pf' fs).
-    * destruct pf.
+      destruct (lookup String.eqb r regs) eqn:G.
+      * destruct s.
+        assert (x = x0).
+        ** destruct (kc_init_sim _ lk) as [v Hv].
+           rewrite Hv in G.
+           inversion G.
+           reflexivity.
+        ** pose (upd := {|
+                    reg_name := r;
+                    kind := x;
+                    init_val := r0;
+                    new_val := eval_Expr e;
+                    lookup_match := lk
+                    |}).
+           exact (eval_ActionT _ _ _ env state meths (upd::updates) fupdates a pf' fs).
+      * absurd (lookup String.eqb r regs = None).
+        ** destruct (kc_init_sim _ lk) as [v Hv].
+           rewrite Hv in G.
+           discriminate G.
+        ** auto.
+    + destruct pf.
   - simpl in pf; destruct (eval_Expr e); tauto.
   - apply pf.
   - exact pf.
@@ -199,7 +218,7 @@ Fixpoint curry(X : Type)(ts : list Type) : (mkProd ts -> X) -> curried X ts :=
   | T::ts' => fun f t => curry ts' (fun xs => f (t,xs))
   end.
 
-Definition eval_RuleT{E}`{Environment E}(env : E)(state : FileState)(meths : list (string * Signature))(r : RuleT)(r_wf : wf_action (snd r eval_K))(fs : mkProd (List.map dec_sig meths)) : M (Updates * FileUpdates * eval_K Void) :=
+Definition eval_RuleT{E}`{Environment E}(env : E)(state : FileState)(meths : list (string * Signature))(r : RuleT)(r_wf : WfActionT_new init_regs (snd r eval_K))(fs : mkProd (List.map dec_sig meths)) : M (Updates * FileUpdates * eval_K Void) :=
   eval_ActionT env state meths [] [] ((snd r) eval_K) r_wf fs.
 
 Fixpoint do_single_update(upd : Update)(regs : SimRegs) : SimRegs :=
@@ -213,23 +232,32 @@ Definition do_updates(upds : Updates)(regs : SimRegs) : SimRegs :=
 
 End Regs.
 
+Check eval_ActionT.
+
 Section Regs2.
 
-Definition consistent(regs1 regs2 : SimRegs) := forall r k v,
-  lookup String.eqb r regs1 = Some (existT _ k v) -> exists v', lookup String.eqb r regs2 = Some (existT _ k v').
+(* Definition consistent(regs1 regs2 : SimRegs) := forall r k,
+  (exists v, lookup String.eqb r regs1 = Some (existT _ k v)) <-> (exists v', lookup String.eqb r regs2 = Some (existT _ k v')).
 
 Lemma consistent_refl : forall regs, consistent regs regs.
 Proof.
-  intros regs r k v lk.
-  exists v; auto.
+  intros regs r k; tauto.
+Qed.
+
+Lemma consistent_sym : forall regs1 regs2, consistent regs1 regs2 -> consistent regs2 regs1.
+Proof.
+  unfold consistent.
+  intros.
+  split; intro; apply H5; auto.
 Qed.
 
 Lemma consistent_trans : forall regs1 regs2 regs3, consistent regs1 regs2 -> consistent regs2 regs3 -> consistent regs1 regs3.
 Proof.
-  intros regs1 regs2 regs3 cons12 cons23 r k v Hv.
-  destruct (cons12 r k v) as [v' Hv']; auto.
-  destruct (cons23 r k v') as [v'' Hv'']; auto.
-  exists v''; auto.
+  unfold consistent.
+  intros.
+  split; intro.
+  - apply H6; apply H5; auto.
+  - apply H5; apply H6; auto.
 Qed.
 
 Lemma lookup_cons : forall K V (eqb : K -> K -> bool) k k' v (ps : list (K*V)), lookup eqb k ((k',v)::ps) =
@@ -244,74 +272,283 @@ Qed.
 
 Lemma consistent_cons_cong : forall (regs1 regs2 : SimRegs)(r : SimReg), consistent regs1 regs2 -> consistent (r::regs1) (r::regs2).
 Proof.
-  intros regs1 regs2 r cons12 s k v Hv.
+  unfold consistent.
+  intros regs regs2 r.
   destruct r.
-  rewrite lookup_cons in Hv.
-  rewrite lookup_cons.
-  destruct (String.eqb s s0).
-  - exists v; auto.
-  - destruct (cons12 s k v); auto.
-    exists x; auto.
+  split.
+  - repeat rewrite lookup_cons.
+    destruct String.eqb.
+    + auto.
+    + apply H5.
+  - repeat rewrite lookup_cons.
+    destruct String.eqb.
+    + auto.
+    + apply H5.
 Qed.
 
-(*
-Lemma consistent_do_update_cong : forall (regs1 regs2 : SimRegs)(upd : Update regs1),
-  consistent regs1 regs2 -> consistent (do_single_update upd regs1) (do_single_update upd regs2).
+Lemma consistent_lemma : forall {k v r regs1 regs2}, consistent regs1 regs2 -> lookup String.eqb r regs1 = Some (existT _ k v) ->
+  exists v', lookup String.eqb r regs2 = Some (existT _ k v').
 Proof.
-Admitted.
+  intros.
+  apply H5.
+  exists v; auto.
+Qed.
 
-Lemma update_consistent : forall (regs : SimRegs)(upd : Update regs), consistent regs (do_single_update upd regs).
-Proof.
-  intros regs upd r k v Hv.
-  pose (lookup_match upd).
-  Print Update.
-*)
-
-Lemma wf_consistent_stable : forall {k} (a : ActionT eval_K k) regs1 regs2, consistent regs1 regs2 -> wf_action regs1 a -> wf_action regs2 a.
+Lemma wf_consistent_stable : forall {k} (a : ActionT eval_K k) init_regs regs1 regs2, consistent regs1 regs2 -> WfActionT_new init_regs a -> WfActionT_new init_regs a.
 Proof.
   intros.
   induction a; simpl.
-Admitted.
+  - intro.
+    apply H7.
+    apply H6.
+  - intro.
+    apply H7.
+    apply H6.
+  - split.
+    + apply IHa.
+      apply H6.
+    + intro.
+      apply H7.
+      apply H6.
+  - intro.
+    apply H7.
+    apply H6.
+  - destruct lookup eqn:G.
+    + destruct s; split.
+      * simpl in H6.
+        destruct lookup eqn:G1 in H6.
+        ** destruct s.
+           rewrite G1 in G.
+           inversion G.
+           destruct H6.
+           congruence.
+        ** destruct H6.
+      * intro.
+        apply H7.
+        simpl in H6.
+        destruct lookup in H6.
+        ** destruct s; destruct H6.
+           apply H8.
+        ** destruct H6.
+   + simpl in H6.
+     destruct lookup eqn:G1.
+     * inversion G.
+     * auto.
+  - destruct lookup eqn:G.
+    + simpl in H6.
+      destruct lookup eqn:G1.
+      * destruct s.
+        split; destruct s0.
+        ** inversion G.
+           destruct H6.
+           congruence.
+        ** apply IHa; tauto.
+      * destruct H6.
+    + simpl in H6.
+      destruct lookup eqn:G1.
+      * destruct s.
+        inversion G.
+      * auto.
+  - simpl in H6.
+    repeat split.
+    + apply IHa1; tauto.
+    + apply IHa2; tauto.
+    + intro; apply H7.
+      apply H6.
+  - apply IHa.
+    exact H6.
+  - exact I.
+Qed.
+
+Lemma update_consistent : forall regs1 regs2 (upd : Update regs2), consistent regs1 regs2 -> consistent regs1 (do_single_update upd regs1).
+Proof.
+  intros.
+  split; intros [v Hv].
+  - pose (lookup_match upd).
+    destruct (r =? (reg_name upd)) eqn:G.
+    + rewrite String.eqb_eq in G.
+      rewrite G.
+      rewrite (@update_hit _ _ k v).
+      * rewrite <- G in e.
+        destruct (consistent_lemma H5 Hv) as [v' Hv'].
+        rewrite Hv' in e.
+        inversion e.
+        rewrite H7.
+        eexists; auto.
+      * rewrite <- G; auto.
+   + eexists.
+     rewrite String.eqb_neq in G.
+     rewrite update_miss; auto.
+     exact Hv.
+  - pose (lookup_match upd).
+    destruct (r =? (reg_name upd)) eqn:G.
+    + rewrite String.eqb_eq in G.
+      rewrite G in Hv.
+      assert (consistent regs2 regs1). apply consistent_sym; auto.
+      destruct (consistent_lemma H6 e) as [v' Hv'].
+      rewrite (@update_hit _ _ (kind upd) v') in Hv.
+      * rewrite <- G in e.
+        inversion Hv.
+        exists v'. rewrite G. exact Hv'.
+      * auto.
+   + eexists.
+     rewrite String.eqb_neq in G.
+     rewrite update_miss in Hv; auto.
+     exact Hv.
+Qed.
 
 Lemma updates_consistent : forall (regs : SimRegs)(upds : Updates regs), consistent regs (do_updates upds regs).
 Proof.
   intros; induction upds; simpl.
   - apply consistent_refl.
-  - apply (@consistent_trans _ (do_single_update a regs) _).
-Admitted.
+  - apply (@consistent_trans _ (do_updates upds regs)).
+    * auto.
+    * apply update_consistent.
+      apply consistent_sym.
+      auto.
+Qed. *)
 
-Lemma wf_updates_stable{k} : forall (regs : SimRegs)(upds : Updates regs)(a : ActionT eval_K k),
-  wf_action regs a -> wf_action (do_updates upds regs) a.
+(* Lemma wf_updates_stable{k} : forall (regs : SimRegs)(upds : Updates regs)(a : ActionT eval_K k),
+  WfActionT_new regs a -> WfActionT_new (do_updates upds regs) a.
 Proof.
   intros.
   apply (@wf_consistent_stable _ _ regs).
   - apply updates_consistent.
   - auto.
+Qed. *)
+
+(*
+Definition maintain_wf{k} regs (upds : Updates regs) (a : ActionT eval_K k) : {r : RuleT & wf_action regs a} -> {r : RuleT & wf_action (do_updates upds regs) a}.
+Proof.
+   intros [r w].
+   exists r.
+   apply wf_updates_stable.
+   exact w.
+Defined.
+*)
+
+Lemma update_hit : forall init_regs regs k v (upd : Update init_regs), lookup String.eqb (reg_name upd) regs = Some (existT _ k v) -> lookup String.eqb (reg_name upd) (do_single_update upd regs) = Some (existT _ (kind upd) (new_val upd)).
+Proof.
+  induction regs; intros.
+  - discriminate H5.
+  - simpl do_single_update.
+    destruct a.
+    destruct String.eqb eqn:G.
+    + rewrite lookup_cons.
+      rewrite G.
+      reflexivity.
+    + rewrite lookup_cons.
+      rewrite G.
+      eapply IHregs.
+      rewrite lookup_cons in H5.
+      rewrite G in H5.
+      exact H5.
 Qed.
 
-Definition maintain_wf{k} regs (upds : Updates regs) (a : ActionT eval_K k) : {r : RuleT & wf_action regs a} -> {r : RuleT & wf_action (do_updates upds regs) a}.
-Admitted.
+Lemma update_miss : forall r init_regs regs (upd : Update init_regs), r <> reg_name upd -> lookup String.eqb r (do_single_update upd regs) = lookup String.eqb r regs.
+Proof.
+  induction regs; intros.
+  - auto.
+  - simpl do_single_update.
+    destruct a.
+    destruct String.eqb eqn:G.
+    + repeat rewrite lookup_cons.
+      rewrite String.eqb_eq in G.
+      rewrite G in H5.
+      rewrite <- String.eqb_neq in H5.
+      rewrite H5.
+      auto.
+    + repeat rewrite lookup_cons.
+      destruct (r =? s).
+      * auto.
+      * apply IHregs; auto.
+Qed.
 
-(* TODO: FIGURE OUT IF THE ENV NEEDS TO BE UPDATED AT SOME POINT *)
-Check envPre.
-Print RuleT.
+Lemma lookup_update : forall init_regs regs k x (upd : Update init_regs) r, lookup String.eqb r (do_single_update upd regs) = Some (existT (fun x : FullKind => fullType eval_K x) k x) -> exists k' y, lookup String.eqb r regs = Some (existT _ k' y).
+Proof.
+  induction regs; intros.
+  - discriminate H5.
+  - simpl do_single_update in H5.
+    destruct a.
+    destruct (reg_name upd =? s).
+    + rewrite lookup_cons in H5.
+      rewrite lookup_cons.
+      destruct (r =? s).
+      * destruct s0; repeat eexists; reflexivity.
+      * repeat eexists; exact H5.
+    + rewrite lookup_cons in H5.
+      rewrite lookup_cons.
+      destruct (r =? s).
+      * destruct s0; repeat eexists; reflexivity.
+      * eapply IHregs.
+        exact H5.
+Qed.
 
-Fixpoint eval_Rules{E}`{Environment E}(env : E)(state : FileState (V := Vec) (W := Word) (M := Map))(timeout : nat)(meths : list (string * Signature))(init_regs : SimRegs)(rules : Stream {r : RuleT & wf_action init_regs (snd r eval_K)}){struct timeout} : mkProd (List.map dec_sig meths) -> M unit. refine
-  match timeout with
+Lemma update_consistent : forall (curr_regs : SimRegs)(init_regs : list RegInitT)(upd : Update init_regs),
+  kind_consistent init_regs curr_regs -> kind_consistent init_regs (do_single_update upd curr_regs).
+Proof.
+  intros curr_regs init_regs upd kc r k.
+  split; intros [].
+  - destruct (String.eqb r (reg_name upd)) eqn:G.
+    + rewrite String.eqb_eq in G.
+      rewrite G.
+      destruct (kc_init_sim kc _ H5).
+      erewrite update_hit.
+      * pose (lookup_match upd) as lk.
+        rewrite <- G in lk.
+        rewrite H5 in lk.
+        inversion lk.
+        rewrite H8 in *.
+        eexists; auto.
+      * rewrite <- G.
+        destruct (kc_init_sim kc _ H5).
+        exact H6.
+    + rewrite String.eqb_neq in G.
+      erewrite update_miss; auto.
+      apply kc.
+      eexists; exact H5.
+  - destruct (String.eqb r (reg_name upd)) eqn:G.
+    + rewrite String.eqb_eq in G.
+      rewrite G in H5.
+      destruct (lookup_update _ _ _ H5) as [k' [y Hy]].
+      erewrite update_hit in H5.
+      * pose (lookup_match upd) as lk.
+        rewrite G.
+        inversion H5.
+        eexists; exact lk.
+      * exact Hy.
+    + rewrite String.eqb_neq in G.
+      erewrite update_miss in H5; auto.
+      destruct (kc_sim_init kc _ H5).
+      eexists; exact H6.
+Qed.
+
+Lemma updates_consistent : forall (init_regs : list RegInitT)(curr_regs : SimRegs)(upds : list (Update init_regs)),
+  kind_consistent init_regs curr_regs -> kind_consistent init_regs (do_updates upds curr_regs).
+Proof.
+  induction upds; intro.
+  - exact H5.
+  - apply update_consistent; auto.
+Qed.
+
+Fixpoint eval_Rules{E}`{Environment E}(env : E)(state : FileState (V := Vec) (W := Word) (M := Map))(numRules : nat)(meths : list (string * Signature))(init_regs : list (string * {x : FullKind & RegInitValT x}))(curr_regs : SimRegs)(kc_curr : kind_consistent init_regs curr_regs)(rules : Stream {r : RuleT & WfActionT_new init_regs (snd r eval_K)}){struct numRules} : mkProd (List.map dec_sig meths) -> M unit. refine
+  match numRules with
   | 0 => fun fs => error "TIMEOUT"
-  | S timeout' => fun fs => match rules with
+  | S numRules' => fun fs => match rules with
                             | Cons r rules' => (
-                                do env' <- envPre env state init_regs (fst (projT1 r));
-                                do p <- eval_RuleT init_regs env' state meths (projT1 r) (projT2 r)  fs;
-                                do env'' <- envPost env' state init_regs (fst (projT1 r));
-                                eval_Rules _ _  env'' (exec_file_updates state (snd (fst p))) timeout' meths (do_updates (fst (fst p)) init_regs) (Streams.map _ rules') fs
+                                do env' <- envPre env state curr_regs (fst (projT1 r));
+                                do p <- eval_RuleT _ env' state meths (projT1 r) (projT2 r)  fs;
+                                do env'' <- envPost env' state curr_regs (fst (projT1 r));
+                                eval_Rules _ _  env'' (exec_file_updates state (snd (fst p))) numRules' meths init_regs (do_updates (fst (fst p)) curr_regs) _ (Streams.map _ rules') fs
                                 )
                             end
   end.
 Proof.
-  intros [rule wf].
-  exists rule.
-  apply wf_updates_stable; auto.
+  - exact kc_curr.
+  - apply updates_consistent; auto.
+  - intros [rule wf].
+    exists rule.
+    exact wf.
 Defined.
 
 Definition initialize_SimRegs(regs : list RegInitT) : SimRegs :=
@@ -325,30 +562,46 @@ Proof.
   discriminate.
 Qed.
 
-Fixpoint wf_rules(regs : SimRegs)(rules : list RuleT) :=
-  match rules with
-  | [] => True
-  | r::rs => wf_action regs (snd r eval_K) /\ wf_rules regs rs
-  end.
 
-Definition wf_bm(basemod : BaseModule) : Prop :=
-  match basemod with
-  | BaseRegFile rf => False
-  | BaseMod regs rules dms => wf_rules (initialize_SimRegs regs) rules
-  end.
-
-Definition get_wf_rules : forall regs rules, wf_rules (initialize_SimRegs regs) rules -> 
-  list {r : RuleT & wf_action (initialize_SimRegs regs) (snd r eval_K)}.
+Definition get_wf_rules{ty} : forall init_regs rules, WfRules init_regs ty rules -> 
+  list {r : RuleT & WfActionT_new init_regs (snd r ty)}.
 Proof.
   intros.
   induction rules.
   - exact [].
   - simpl in H5; destruct H5.
-    exact ((existT _ a H5)::IHrules H6).
+    exact ((existT _ a H5) :: (IHrules H6)).
 Defined.
 
-Definition eval_Basemodule_rr{E}`{Environment E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : wf_bm basemod) : mkProd (List.map dec_sig meths) -> M unit. refine (
-  match basemod return wf_bm basemod -> _ with
+Lemma kc_nil : kind_consistent [] [].
+Proof.
+  intros r k; split; intros []; discriminate.
+Qed.
+
+Lemma kc_cons : forall init_regs regs r k v v', kind_consistent init_regs regs -> kind_consistent ((r,(existT _ k v)) :: init_regs) ((r, (existT _ k v')) :: regs).
+Proof.
+  intros.
+  intros r' k'; split; intro; rewrite lookup_cons in *; destruct (r' =? r) eqn:G; destruct H6.
+  - inversion H6.
+    eexists; auto.
+  - apply (kc_init_sim H5 _ H6).
+  - inversion H6.
+    eexists; auto.
+  - apply (kc_sim_init H5 _ H6).
+Qed.
+
+Lemma init_regs_kc : forall init_regs, kind_consistent init_regs (initialize_SimRegs init_regs).
+Proof.
+  induction init_regs.
+  - exact kc_nil.
+  - simpl initialize_SimRegs.
+    destruct a.
+    destruct s0.
+    destruct r; apply kc_cons; auto.
+Qed.
+
+Definition eval_Basemodule_rr{E}`{Environment E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule_new basemod) : mkProd (List.map dec_sig meths) -> M unit. refine (
+  match basemod return WfBaseModule_new basemod -> _ with
   | BaseRegFile rf => fun pf fs => _
   | BaseMod regs rules dms =>
       match rules with
@@ -357,19 +610,38 @@ Definition eval_Basemodule_rr{E}`{Environment E}(env : E)(args : list (string * 
       end
   end wf).
 Proof.
-  - destruct pf.
-  - unfold wf_bm in pf.
+  - exact (error "BaseRegFile not simulatable").
+  - unfold WfBaseModule_new in pf.
+    destruct pf.
     refine (do state <- initialize_files args rfbs;
-    eval_Rules env state timeout meths (initialize_SimRegs regs) (unwind_list (get_wf_rules _ _ pf) _) fs).
-    simpl.
-    destruct pf; discriminate.
+    eval_Rules env state (timeout * length rules) meths _ (unwind_list (get_wf_rules _ _ (H6 _)) _) fs).
+    + apply init_regs_kc.
+    + simpl.
+      destruct H6; discriminate.
 Defined.
 
-Definition eval_BaseMod{E}`{Environment E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : wf_bm basemod) :=
-  curry _ (eval_Basemodule_rr env args rfbs timeout meths basemod wf).
+Definition eval_BaseMod{E}`{Environment E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule_new basemod) :=
+  curry _ (eval_Basemodule_rr env args rfbs timeout meths wf).
 
 End Regs2.
 
 End EvalAction.
 
-Definition eval_BaseMod_Haskell := @eval_BaseMod HWord HVec HMap IO _ _ _ _ _ _.
+Definition eval_BaseMod_Haskell := @eval_BaseMod HWord HVec HMap IO _ _ _ _.
+
+Section Eval_Wf.
+
+Variable Word : nat -> Type.
+Variable Vec : nat -> Type -> Type.
+Variable Map : Type -> Type.
+Variable M : Type -> Type.
+
+Context `{IsWord Word}.
+Context `{IsVector Vec}.
+Context `{StringMap Map}.
+Context `{IOMonad Word Vec M}.
+
+Definition eval_BaseMod_Wf{E}`{Environment _ _ _ _ E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule basemod) :=
+  curry _ (eval_Basemodule_rr env args rfbs timeout meths (Wf_Wf_new_bm wf)).
+
+End Eval_Wf.

@@ -414,7 +414,6 @@ Notation "'MODULE' { m1 'with' .. 'with' mN }" :=
   (makeModule ((app m1%kami .. (app mN%kami nil) ..)))
     (only parsing).
 
-
 Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
   {| baseModuleWf := {| baseModule := (makeModule ((app m1%kami .. (app mN%kami nil) ..))) ;
                         wfBaseModule := ltac:(discharge_wf) |} ;
@@ -466,7 +465,8 @@ Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_
 Section mod_test.
   Variable a: string.
   Local Notation "^ x" := (a ++ "." ++ x)%string (at level 0).
-  Local Example test := MOD_WF{
+
+  Local Example test : ModWf := MOD_WF{
                               (concat [Register (^"x") : Bool <- true; Register (^"z") : Bool <- false])
                                 with Register (^"y") : Bool <- false
                                 with Rule (^"r1") := ( Read y: Bool <- ^"y";
