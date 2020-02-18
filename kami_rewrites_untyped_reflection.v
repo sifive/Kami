@@ -147,7 +147,7 @@ with KRExpr_BaseModule: Type :=
   | KRBaseRegFile : KRExpr_RegFileBase -> KRExpr_BaseModule
 
 with KRExpr_list_BaseModule: Type :=
-  | KRVar_list_BaseModule : list RegFileBase -> KRExpr_list_RegFileBase
+  | KRVar_list_BaseModule : list BaseModule -> KRExpr_list_BaseModule
   | KRNil_list_BaseModule : KRExpr_list_BaseModule
   | KRCons_list_BaseModule : KRExpr_BaseModule -> KRExpr_list_BaseModule -> KRExpr_list_BaseModule
   | KRApp_list_BaseModule : KRExpr_list_BaseModule -> KRExpr_list_BaseModule -> KRExpr_list_BaseModule
@@ -431,6 +431,14 @@ with KRExprDenote_BaseModule (e:KRExpr_BaseModule) : BaseModule :=
   | KRMakeModule e => makeModule (KRExprDenote_list_ModuleElt e)
   | KRBaseMod regs rules meths => BaseMod (KRExprDenote_list_RegInitT regs) (KRExprDenote_list_Rule rules) (KRExprDenote_list_DefMethT meths)
   | KRBaseRegFile b => BaseRegFile (KRExprDenote_RegFileBase b)
+  end
+
+with KRExprDenote_list_BaseModule(e:KRExpr_list_BaseModule): list BaseModule :=
+  match e with
+  | KRVar_list_BaseModule v => v
+  | KRNil_list_BaseModule => nil
+  | KRCons_list_BaseModule f r => cons (KRExprDenote_BaseModule f) (KRExprDenote_list_BaseModule r)
+  | KRApp_list_BaseModule f r => app (KRExprDenote_list_BaseModule f) (KRExprDenote_list_BaseModule r)
   end
 
 with KRExprDenote_RegFileBase(m: KRExpr_RegFileBase) :=
@@ -899,7 +907,8 @@ Goal forall meth mdev, In meth (concat (map getAllMethods (map (fun m : RegFileB
   match goal with
   | |- ?X => let r := (ltac:(KRExprReify X (KRTypeElem KRElemProp))) in idtac r
   end.
-  
+Abort.
+
 Axiom cheat: forall x, x.
 
 Definition KRSimplifyTop_RegInitT (e : KRExpr_RegInitT) := e.
