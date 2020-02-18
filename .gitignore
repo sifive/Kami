@@ -5,6 +5,8 @@ Lib/*.v.d
 *.glob
 Lib/*.glob
 *.vo
+*.vok
+*.vos
 Lib/*.vo
 *.aux
 Target.hs
@@ -24,3 +26,9 @@ Makefile.coq
 *.md
 *.hs
 FixLits
+.*.swk
+.*.swl
+.*.swm
+.*.swn
+.*.swo
+.*.swp

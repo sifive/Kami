@@ -46,7 +46,7 @@ Section utila.
       (width : Bit n @# ty)
       (x : Bit m @# ty)
       :  Bit m @# ty
-      := (x & ~($$(wones m) << width)).
+      := (x .& ~($$(wones m) << width)).
 
     Definition slice
       (n m k : nat)
@@ -54,7 +54,7 @@ Section utila.
       (width : Bit m @# ty)
       (x : Bit k @# ty)
       :  Bit k @# ty
-      := ((x >> offset) & ~($$(wones k) << width)).
+      := ((x >> offset) .& ~($$(wones k) << width)).
 
     Definition utila_opt_pkt
       (k : Kind)
@@ -249,7 +249,7 @@ Section utila.
         := mbind k
              (utila_mfoldr
                (fun (x : k @# ty) (acc : Bit (size k) @# ty)
-                  => ((ITE (f x) (pack x) ($0)) | acc))
+                  => ((ITE (f x) (pack x) ($0)) .| acc))
                ($0)
                x_exprs)
              (fun (y : ty (Bit (size k)))
@@ -318,7 +318,7 @@ Section utila.
       := LETE y
          :  Bit (size k)
          <- (utila_expr_foldr
-               (fun x acc => ((ITE (f x) (pack x) ($0)) | acc))
+               (fun x acc => ((ITE (f x) (pack x) ($0)) .| acc))
                ($0)
                xs_exprs);
          RetE (unpack k (#y)).
@@ -862,12 +862,12 @@ Section utila.
               @X by utila_sem_unit_correct (unpack k (Var type (SyntaxKind (Bit (size k))) (natToWord (size k) 0)))
            || [[munit (unpack k (Var type (SyntaxKind (Bit (size k))) X))]] = {{utila_null k}}
               @X by utila_sem_foldr_nil_correct
-                      (fun x acc => (ITE (f x) (pack x) ($0) | acc))
+                      (fun x acc => (ITE (f x) (pack x) ($0) .| acc))
                       ($0)
            || X = {{utila_null k}}
               @X by utila_sem_bind_correct
                       (utila_mfoldr
-                         (fun x acc => (ITE (f x) (pack x) ($0) | acc))
+                         (fun x acc => (ITE (f x) (pack x) ($0) .| acc))
                          ($0)
                          [])
                       (fun y => munit (unpack k (Var type (SyntaxKind (Bit (size k))) y))).
@@ -1006,7 +1006,7 @@ Section utila.
       (* The clauses used in Kami switch expressions. *)
       Let case (k : Kind) (f : k @# type -> Bool @# type) (x : k @# type) (acc : Bit (size k) @# type)
         :  Bit (size k) @# type
-        := (ITE (f x) (pack x) ($ 0) | acc).
+        := (ITE (f x) (pack x) ($ 0) .| acc).
 
       Conjecture unpack_pack
         : forall (k : Kind)
@@ -1258,7 +1258,7 @@ Section utila.
         replace
           (fun (x0 : Expr type (SyntaxKind k))
                (acc : Expr type (SyntaxKind (Bit (size k))))
-           => (IF f x0 then pack x0 else Const type ($0)%word | acc))
+           => (IF f x0 then pack x0 else Const type ($0)%word .| acc))
           with (case f).
         (rewrite (utila_expr_find_lm2 f xs H)).
         (apply unpack_pack).
@@ -1419,4 +1419,24 @@ Section utila.
 
   End ArrayList.
 
+  Local Open Scope kami_action.
+
+  (*
+    Accepts a list of register names [ls] that contains [len]
+    register names, and an index [idx] that references one of
+    these registers and returns the value of type [k] stored in
+    the referenced register.
+  *)
+  Definition readReg ty (ls: list string) len (idx: Bit (Nat.log2_up len) @# ty) k :=
+    GatherActions (map (fun '(i, reg) => Read val: k <- reg;
+                                         Ret (IF $i == idx then pack #val else $0)) (tag ls)) as vals;
+      Ret (unpack k (CABit Bor vals)).
+      
+  Definition writeReg ty (ls: list string) len (idx: Bit (Nat.log2_up len) @# ty) k (newval: k @# ty) :=
+    GatherActions (map (fun '(i, reg) => Read val: k <- reg;
+                                         Write reg: k <- (IF $i == idx then newval else #val);
+                                         Retv) (tag ls)) as _;
+      Retv.
+    
+  Local Close Scope kami_action.
 End utila.

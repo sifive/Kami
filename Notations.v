@@ -125,11 +125,11 @@ Notation "a $#[ i : j ]":=
 
 Notation "e1 + e2" := (CABit (Add) (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 * e2" := (CABit (Mul) (e1 :: e2 :: nil)) : kami_expr_scope.
-Notation "e1 & e2" := (CABit (Band) (e1 :: e2 :: nil)) (at level 201)
-                      : kami_expr_scope.
-Notation "e1 | e2" := (CABit (Bor) (e1 :: e2 :: nil)) (at level 201)
-                      : kami_expr_scope.
-Notation "e1 ^ e2" := (CABit (Bxor) (e1 :: e2 :: nil)) : kami_expr_scope.
+Notation "e1 .& e2" := (CABit (Band) (e1 :: e2 :: nil)) (at level 201)
+                       : kami_expr_scope.
+Notation "e1 .| e2" := (CABit (Bor) (e1 :: e2 :: nil)) (at level 201)
+                       : kami_expr_scope.
+Notation "e1 .^ e2" := (CABit (Bxor) (e1 :: e2 :: nil)) (at level 201) : kami_expr_scope.
 Infix "-" := (BinBit (Sub _)) : kami_expr_scope.
 Infix "/" := (BinBit (Div _)) : kami_expr_scope.
 Infix "%%" := (BinBit (Rem _)) (at level 100): kami_expr_scope.
@@ -297,6 +297,22 @@ Notation "'Retv'" := (Return (Const _ (k := Void) Default)) : kami_action_scope.
 
 Delimit Scope kami_action_scope with kami_action.
 
+Notation "'ReadRf' val : k <- meth ( addr : idxT ) ; cont" :=
+  (MCall meth (idxT, Array 1 k) addr
+         (fun raw => LetExpr (ReadArrayConst (@Var _ (SyntaxKind (Array 1 k)) raw) Fin.F1) (fun val => cont)))%kami_action
+  (at level 13, right associativity, meth at level 0, addr at level 99, val at level 0): kami_action_scope.
+Notation "'ReadReqRf' meth ( addr : idxT ) ; cont" :=
+  (MCall meth (idxT, Void) addr (fun _ => cont))%kami_action
+  (at level 13, right associativity, meth at level 0, addr at level 99): kami_action_scope.
+Notation "'ReadResRf' val : k <- meth () ; cont" :=
+  (MCall meth (Void, Array 1 k) (@Const _ Void (getDefaultConst Void))
+         (fun raw => LetExpr (ReadArrayConst (@Var _ (SyntaxKind (Array 1 k)) raw) Fin.F1) (fun val => cont)))%kami_action
+  (at level 13, right associativity, meth at level 0, val at level 0): kami_action_scope.
+Notation "'WriteRf' meth ( addr : lgIdxNum ; data : k ) ; cont" :=
+  (MCall meth (WriteRq lgIdxNum (Array 1 k), Void) (STRUCT { "addr" ::= addr ; "data" ::= BuildArray (fun _ => data) })%kami_expr
+         (fun _ => cont))%kami_action
+  (at level 13, right associativity, meth at level 0, addr at level 99, data at level 99): kami_action_scope.
+
 (* Complex List Actions *)
 Fixpoint gatherActions (ty: Kind -> Type) k_in (acts: list (ActionT ty k_in)) k_out
          (cont: list (Expr ty (SyntaxKind k_in)) -> ActionT ty k_out): ActionT ty k_out :=
@@ -386,7 +402,6 @@ Notation "'MODULE' { m1 'with' .. 'with' mN }" :=
   (makeModule ((app m1%kami .. (app mN%kami nil) ..)))
     (only parsing).
 
-
 Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
   {| baseModuleWf := {| baseModule := (makeModule ((app m1%kami .. (app mN%kami nil) ..))) ;
                         wfBaseModule := ltac:(discharge_wf) |} ;
@@ -426,7 +441,8 @@ Notation "'STRUCT_CONST' { s1 ; .. ; sN }" :=
   (getStructConst (cons (s1%struct_initial)%word ..
                         (cons (sN%struct_initial)%word nil) ..)).
 
-Notation "i #: n" := (@Fin.of_nat_lt (i)%nat (n)%nat ltac:(lia)) (at level 10, only parsing).
+Notation "i #: n" := (ltac:(let y := eval cbv in (@Fin.of_nat_lt (i)%nat (n)%nat ltac:(cbv; lia)) in exact y))
+                       (at level 10, only parsing).
 
 Notation "'Valid' x" := (STRUCT { "valid" ::= $$ true ; "data" ::= x })%kami_expr
                                                                        (at level 100, only parsing) : kami_expr_scope.
@@ -437,7 +453,8 @@ Notation "'InvData' x" := (STRUCT { "valid" ::= $$ false ; "data" ::= x })%kami_
 Section mod_test.
   Variable a: string.
   Local Notation "^ x" := (a ++ "." ++ x)%string (at level 0).
-  Local Example test := MOD_WF{
+
+  Local Example test : ModWf := MOD_WF{
                               (concat [Register (^"x") : Bool <- true; Register (^"z") : Bool <- false])
                                 with Register (^"y") : Bool <- false
                                 with Rule (^"r1") := ( Read y: Bool <- ^"y";

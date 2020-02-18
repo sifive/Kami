@@ -75,8 +75,8 @@ Definition mergeSeparatedSingle (b : BaseModule) (lrf : list RegFileBase) : Mod 
 Lemma WfBaseMod_inlineSingle_map (m : BaseModule) (HWfMod : WfBaseModule m) k (a : ActionT type k) (n : nat):
   forall  (lf : list DefMethT),
     SubList lf (getMethods m) ->
-    WfActionT m a ->
-    WfActionT m (apply_nth (map (fun f a' => @inlineSingle type k a' f) lf) a n).
+    WfActionT (getRegisters m) a ->
+    WfActionT (getRegisters m) (apply_nth (map (fun f a' => @inlineSingle type k a' f) lf) a n).
 Proof.
   intros.
   unfold apply_nth; remember (nth_error _ _) as err0; symmetry in Heqerr0; destruct err0; auto.
@@ -88,8 +88,8 @@ Qed.
 Lemma WfBaseMod_inlineSome_map (m : BaseModule) (HWfMod : WfBaseModule m) xs:
   forall  (lf : list DefMethT) k (a : ActionT type k),
     SubList lf (getMethods m) ->
-    WfActionT m a ->
-    WfActionT m (fold_left (apply_nth (map (fun f a' => @inlineSingle type k a' f) lf)) xs a).
+    WfActionT (getRegisters m) a ->
+    WfActionT (getRegisters m) (fold_left (apply_nth (map (fun f a' => @inlineSingle type k a' f) lf)) xs a).
 Proof.
   induction xs; simpl; intros; eauto.
   apply IHxs; auto.
@@ -1720,7 +1720,7 @@ Lemma FalseSemCompAction_Ext k (a : ActionT type k) :
          (HConsistent : getKindAttr o = getKindAttr old)
          (WfMap : WfRegMapExpr writeMap (old, upds))
          (HRegConsist : getKindAttr o = getKindAttr (getRegisters m))
-         (HWf : WfActionT m a)
+         (HWf : WfActionT (getRegisters m) a)
          (HFalse : evalExpr bexpr = false),
   exists retl,
     @SemCompActionT k (compileAction (oInit, uInit) a bexpr writeMap) (old, upds) nil retl.
@@ -1747,6 +1747,7 @@ Proof.
     exists x.
     econstructor; eauto.
   - inv HWf; EqDep_subst.
+    change (fun x0 : FullKind => RegInitValT x0) with RegInitValT in H5.
     rewrite <- HRegConsist in H5.
     rewrite in_map_iff in H5; dest; inv H0.
     destruct x, s0; simpl in *.
@@ -1806,7 +1807,7 @@ Lemma ActionsEEquivWeak k a:
          (HConsistent : getKindAttr o = getKindAttr old)
          (WfMap : WfRegMapExpr writeMap (old, upds))
          (HRegConsist : getKindAttr o = getKindAttr (getRegisters m))
-         (HWf : WfActionT m a),
+         (HWf : WfActionT (getRegisters m) a),
   forall uml retl upds' calls,
     upds' = (old, match (UpdOrMeths_RegsT uml) with
                   |nil => upds
@@ -1964,7 +1965,7 @@ Proof.
             destruct upds; [contradiction|].
             apply (H1 r0 (in_eq _ _)); assumption.
       }
-      specialize (FalseSemCompAction_Ext _ HPriorityUpds HConsistent P1 HRegConsist H13 P0) as P2; dest.
+      specialize (FalseSemCompAction_Ext _ _ HPriorityUpds HConsistent P1 HRegConsist H13 P0) as P2; dest.
       rewrite <- Extension_Compiles_iff in H0.
       econstructor.
       * eapply SemCompActionEEquivBexpr with (bexpr1 := (Const type true && ! e)%kami_expr); eauto.
@@ -1981,7 +1982,7 @@ Proof.
            firstorder fail.
     + assert (evalExpr (Const type true && e)%kami_expr = false) as P0.
       { simpl; rewrite HFalse; reflexivity. }
-      specialize (FalseSemCompAction_Ext _ HPriorityUpds HConsistent WfMap HRegConsist H12 P0) as P2; dest.
+      specialize (FalseSemCompAction_Ext _ _ HPriorityUpds HConsistent WfMap HRegConsist H12 P0) as P2; dest.
       rewrite <- Extension_Compiles_iff in H0.
       econstructor 8; eauto.
       * eapply SemCompActionEEquivBexpr with (bexpr1 := (Const type true && e)%kami_expr);
@@ -2041,7 +2042,7 @@ Corollary ECompCongruence k (ea : EActionT type k) (a : ActionT type k) :
          (HConsistent : getKindAttr o = getKindAttr old)
          (WfMap : WfRegMapExpr writeMap (old, upds))
          (HRegConsist : getKindAttr o = getKindAttr (getRegisters m))
-         (HWf : WfActionT m a),
+         (HWf : WfActionT (getRegisters m) a),
     (forall uml retl, ESemAction o ea uml retl -> ESemAction o (Action_EAction a) uml retl) ->
     forall upds' calls retl, 
       @SemCompActionT k (EcompileAction (oInit, uInit) ea (Const type true) writeMap) upds' calls retl ->
@@ -5374,7 +5375,7 @@ Proof.
       unfold flatten_inline_everything in P2; rewrite WfMod_createHide in P2; dest; simpl in *; inv H6; assumption.
     +unfold mergeSeparatedSingle in H2; inv H2; inv HWf1.
      unfold WfBaseModule in *; dest.
-     specialize (H2 _ (H1 _ (or_introl eq_refl))); simpl in H2.
+     specialize (H2 type _ (H1 _ (or_introl eq_refl))); simpl in H2.
      eapply WfExpand; eauto.
      unfold inlineAll_All_mod; simpl; apply SubList_app_r, SubList_refl.
   - apply inlineEeach_Somelist_inlineEach.
