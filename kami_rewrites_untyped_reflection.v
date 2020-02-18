@@ -146,6 +146,12 @@ with KRExpr_BaseModule: Type :=
   | KRBaseMod : KRExpr_list_RegInitT -> KRExpr_list_Rule -> KRExpr_list_DefMethT -> KRExpr_BaseModule
   | KRBaseRegFile : KRExpr_RegFileBase -> KRExpr_BaseModule
 
+with KRExpr_list_BaseModule: Type :=
+  | KRVar_list_BaseModule : list RegFileBase -> KRExpr_list_RegFileBase
+  | KRNil_list_BaseModule : KRExpr_list_BaseModule
+  | KRCons_list_BaseModule : KRExpr_BaseModule -> KRExpr_list_BaseModule -> KRExpr_list_BaseModule
+  | KRApp_list_BaseModule : KRExpr_list_BaseModule -> KRExpr_list_BaseModule -> KRExpr_list_BaseModule
+
 with KRExpr_RegFileBase: Type :=
   | KRVar_RegFileBase: RegFileBase -> KRExpr_RegFileBase
 
@@ -221,6 +227,12 @@ with KRExpr_Prop: Type :=
   | KRNot_Prop : KRExpr_Prop -> KRExpr_Prop
   | KRIn_string_Prop : KRExpr_string -> KRExpr_list_string -> KRExpr_Prop
   | KREq_string_Prop : KRExpr_string -> KRExpr_string -> KRExpr_Prop
+  | KRIn_RegInitT_Prop : KRExpr_RegInitT -> KRExpr_list_RegInitT -> KRExpr_Prop
+  | KREq_RegInitT_Prop : KRExpr_RegInitT -> KRExpr_RegInitT -> KRExpr_Prop
+  | KRIn_Rule_Prop : KRExpr_Rule -> KRExpr_list_Rule -> KRExpr_Prop
+  | KREq_Rule_Prop : KRExpr_Rule -> KRExpr_Rule -> KRExpr_Prop
+  | KRIn_DefMethT_Prop : KRExpr_DefMethT -> KRExpr_list_DefMethT -> KRExpr_Prop
+  | KREq_DefMethT_Prop : KRExpr_DefMethT -> KRExpr_DefMethT -> KRExpr_Prop
   | KRDisjKey_RegInitT : KRExpr_list_RegInitT -> KRExpr_list_RegInitT -> KRExpr_Prop
   | KRDisjKey_DefMethT : KRExpr_list_DefMethT -> KRExpr_list_DefMethT -> KRExpr_Prop
   | KRDisjKey_Rule : KRExpr_list_Rule -> KRExpr_list_Rule -> KRExpr_Prop.
@@ -521,6 +533,12 @@ with KRExprDenote_Prop(p: KRExpr_Prop) :=
   | KRNot_Prop a => ~(KRExprDenote_Prop a)
   | KRIn_string_Prop a b => In (KRExprDenote_string a) (KRExprDenote_list_string b)
   | KREq_string_Prop a b => ((KRExprDenote_string a)=(KRExprDenote_string b))
+  | KRIn_RegInitT_Prop a b => In (KRExprDenote_RegInitT a) (KRExprDenote_list_RegInitT b)
+  | KREq_RegInitT_Prop a b => ((KRExprDenote_RegInitT a)=(KRExprDenote_RegInitT b))
+  | KRIn_Rule_Prop a b => In (KRExprDenote_Rule a) (KRExprDenote_list_Rule b)
+  | KREq_Rule_Prop a b => ((KRExprDenote_Rule a)=(KRExprDenote_Rule b))
+  | KRIn_DefMethT_Prop a b => In (KRExprDenote_DefMethT a) (KRExprDenote_list_DefMethT b)
+  | KREq_DefMethT_Prop a b => ((KRExprDenote_DefMethT a)=(KRExprDenote_DefMethT b))
   | KRDisjKey_RegInitT a b => DisjKey (KRExprDenote_list_RegInitT a) (KRExprDenote_list_RegInitT b)
   | KRDisjKey_DefMethT a b => DisjKey (KRExprDenote_list_DefMethT a) (KRExprDenote_list_DefMethT b)
   | KRDisjKey_Rule a b => DisjKey (KRExprDenote_list_Rule a) (KRExprDenote_list_Rule b)
@@ -766,6 +784,12 @@ Ltac KRExprReify e t :=
                         constr:(KRBaseMod regs rules meths)
   | Base ?B => let m := ltac:(KRExprReify B (KRTypeElem KRElemBaseModule)) in
                constr:(KRBase m)
+  | ConcatMod ?A ?B => match t with
+                       | (KRTypeElem KRElemMod) => let a := ltac:(KRExprReify A (KRTypeElem KRElemMod)) in
+                                                   let b := ltac:(KRExprReify B (KRTypeElem KRElemMod)) in
+                                                   constr:(KRConcatMod a b)
+                       | _ => fail 1
+                       end
   | True => constr:(KRTrue_Prop)
   | False => constr:(KRFalse_Prop)
   | ?A /\ ?B => let a := ltac:(KRExprReify A (KRTypeElem KRElemProp)) in
@@ -787,6 +811,15 @@ Ltac KRExprReify e t :=
   | In ?A ?B => let a := ltac:(KRExprReify A (KRTypeElem KRElemString)) in
              let b := ltac:(KRExprReify B (KRTypeList (KRTypeElem KRElemString))) in
              constr:(KRIn_string_Prop a b)
+  | In ?A ?B => let a := ltac:(KRExprReify A (KRTypeElem KRElemRegInitT)) in
+             let b := ltac:(KRExprReify B (KRTypeList (KRTypeElem KRElemRegInitT))) in
+             constr:(KRIn_RegInitT_Prop a b)
+  | In ?A ?B => let a := ltac:(KRExprReify A (KRTypeElem KRElemRule)) in
+             let b := ltac:(KRExprReify B (KRTypeList (KRTypeElem KRElemRule))) in
+             constr:(KRIn_Rule_Prop a b)
+  | In ?A ?B => let a := ltac:(KRExprReify A (KRTypeElem KRElemDefMethT)) in
+             let b := ltac:(KRExprReify B (KRTypeList (KRTypeElem KRElemDefMethT))) in
+             constr:(KRIn_DefMethT_Prop a b)
   | DisjKey ?A ?B => let a := ltac:(KRExprReify A (KRTypeList (KRTypeElem KRElemRegInitT))) in
                      let b := ltac:(KRExprReify B (KRTypeList (KRTypeElem KRElemRegInitT))) in
                      constr:(KRDisjKey_RegInitT a b)
@@ -809,9 +842,17 @@ Ltac KRExprReify e t :=
                                             let b := ltac:(KRExprReify B (KRTypeElem KRElemString)) in
                                             constr:(KREq_string_Prop a b)
                end
+  | fold_right ConcatMod ?M ?L =>
+          match t with
+          | (KRTypeElem KRElemMod) => let m := ltac:(KRExprReify M (KRTypeElem KRElemMod)) in
+                                      let l := ltac:(KRExprReify L (KRTypeList (KRTypeElem KRElemMod))) in
+                                      constr:(KRFold_right_Mod KRConcatMod_Func m l)
+          | _ => fail 1
+          end
   | ?X => match t with
           | (KRTypeElem KRElemString) => let q := isStringConstant X in
                                          constr:(KRConst_string X)
+          | _ => fail 1
           end
   | ?X => match t with
           | (KRTypeElem KRElemRegInitT) => constr:(KRVar_RegInitT X)
@@ -822,8 +863,11 @@ Ltac KRExprReify e t :=
           | (KRTypeElem KRElemMethodT) => constr:(KRVar_MethodT X)
           | (KRTypeElem KRElemModuleElt) => constr:(KRVar_ModuleElt X)
           | (KRTypeList (KRTypeElem KRElemRegInitT)) => constr:(KRVar_list_RegInitT X)
+          | (KRTypeList (KRTypeList (KRTypeElem KRElemRegInitT))) => constr:(KRVar_list_list_RegInitT X)
           | (KRTypeList (KRTypeElem KRElemRule)) => constr:(KRVar_list_Rule X)
-          | (KRTypeList (KRTypeElem KRElemDefMethT)) => constr:(KRVar_list_RegInitT X)
+          | (KRTypeList (KRTypeList (KRTypeElem KRElemRule))) => constr:(KRVar_list_list_Rule X)
+          | (KRTypeList (KRTypeElem KRElemDefMethT)) => constr:(KRVar_list_DefMethT X)
+          | (KRTypeList (KRTypeList (KRTypeElem KRElemDefMethT))) => constr:(KRVar_list_list_DefMethT X)
           | (KRTypeList (KRTypeElem KRElemModuleElt)) => constr:(KRVar_list_ModuleElt X)
           | (KRTypeList (KRTypeList (KRTypeElem KRElemModuleElt))) => constr:(KRVar_list_list_ModuleElt X)
           | (KRTypeElem KRElemBaseModule) => constr:(KRVar_BaseModule X)
@@ -850,6 +894,12 @@ Ltac KRExprReify e t :=
           end
   end.
 
+Goal forall meth mdev, In meth (concat (map getAllMethods (map (fun m : RegFileBase => Base (BaseRegFile m)) mdev))).
+  intros.
+  match goal with
+  | |- ?X => let r := (ltac:(KRExprReify X (KRTypeElem KRElemProp))) in idtac r
+  end.
+  
 Axiom cheat: forall x, x.
 
 Definition KRSimplifyTop_RegInitT (e : KRExpr_RegInitT) := e.
@@ -1229,6 +1279,15 @@ Definition KRSimplifyTop_Prop (e: KRExpr_Prop) : KRExpr_Prop :=
   | KRIn_string_Prop x (KRApp_list_string a b) => (KROr_Prop (KRIn_string_Prop x a) (KRIn_string_Prop x b))
   | KRIn_string_Prop x (KRCons_list_string a b) => (KROr_Prop (KREq_string_Prop x a) (KRIn_string_Prop x b))
   | KRIn_string_Prop x (KRNil_list_string) => KRFalse_Prop
+  | KRIn_RegInitT_Prop x (KRApp_list_RegInitT a b) => (KROr_Prop (KRIn_RegInitT_Prop x a) (KRIn_RegInitT_Prop x b))
+  | KRIn_RegInitT_Prop x (KRCons_list_RegInitT a b) => (KROr_Prop (KREq_RegInitT_Prop x a) (KRIn_RegInitT_Prop x b))
+  | KRIn_RegInitT_Prop x (KRNil_list_RegInitT) => KRFalse_Prop
+  | KRIn_Rule_Prop x (KRApp_list_Rule a b) => (KROr_Prop (KRIn_Rule_Prop x a) (KRIn_Rule_Prop x b))
+  | KRIn_Rule_Prop x (KRCons_list_Rule a b) => (KROr_Prop (KREq_Rule_Prop x a) (KRIn_Rule_Prop x b))
+  | KRIn_Rule_Prop x (KRNil_list_Rule) => KRFalse_Prop
+  | KRIn_DefMethT_Prop x (KRApp_list_DefMethT a b) => (KROr_Prop (KRIn_DefMethT_Prop x a) (KRIn_DefMethT_Prop x b))
+  | KRIn_DefMethT_Prop x (KRCons_list_DefMethT a b) => (KROr_Prop (KREq_DefMethT_Prop x a) (KRIn_DefMethT_Prop x b))
+  | KRIn_DefMethT_Prop x (KRNil_list_DefMethT) => KRFalse_Prop
   | KREq_string_Prop (KRstring_append p (KRConst_string a)) (KRstring_append q (KRConst_string b)) => if sdisjPrefix (srev a) (srev b) then KRFalse_Prop else e
   (*| KREq_string_Prop (KRstring_append (KRVar_string p) a) (KRstring_append (KRVar_string q) b) => if String.eqb p q then (KREq_string_Prop a b) else KREq_string_Prop (KRstring_append (KRVar_string p) a) (KRstring_append (KRVar_string q) b)
   | KREq_string_Prop (KRVar_string a) (KRVar_string b) => if String.eqb a b then KRTrue_Prop else
@@ -1543,10 +1602,16 @@ with KRSimplify_Prop(p:KRExpr_Prop) :=
                            | KROr_Prop a b => KROr_Prop (KRSimplify_Prop a) (KRSimplify_Prop b)
                            | KRNot_Prop a => KRNot_Prop (KRSimplify_Prop a)
                            | KRIn_string_Prop a b => KRIn_string_Prop (KRSimplify_string a) (KRSimplify_list_string b)
+                           | KRIn_RegInitT_Prop a b => KRIn_RegInitT_Prop (KRSimplify_RegInitT a) (KRSimplify_list_RegInitT b)
+                           | KRIn_DefMethT_Prop a b => KRIn_DefMethT_Prop (KRSimplify_DefMethT a) (KRSimplify_list_DefMethT b)
+                           | KRIn_Rule_Prop a b => KRIn_Rule_Prop (KRSimplify_Rule a) (KRSimplify_list_Rule b)
                            | KRDisjKey_RegInitT a b => KRDisjKey_RegInitT (KRSimplify_list_RegInitT a) (KRSimplify_list_RegInitT b)
                            | KRDisjKey_DefMethT a b => KRDisjKey_DefMethT (KRSimplify_list_DefMethT a) (KRSimplify_list_DefMethT b)
                            | KRDisjKey_Rule a b => KRDisjKey_Rule (KRSimplify_list_Rule a) (KRSimplify_list_Rule b)
                            | KREq_string_Prop a b => KREq_string_Prop (KRSimplify_string a) (KRSimplify_string b)
+                           | KREq_RegInitT_Prop a b => KREq_RegInitT_Prop (KRSimplify_RegInitT a) (KRSimplify_RegInitT b)
+                           | KREq_Rule_Prop a b => KREq_Rule_Prop (KRSimplify_Rule a) (KRSimplify_Rule b)
+                           | KREq_DefMethT_Prop a b => KREq_DefMethT_Prop (KRSimplify_DefMethT a) (KRSimplify_DefMethT b)
                            | p => p
                            end).
 
@@ -1962,15 +2027,21 @@ Proof.
   solve_KRSimplifyTopSound;
   solve_KRSimplifyTopSound;
   repeat solve_contKRSimplifyTopSound.
-  replace (KRExprDenote_string k=KRExprDenote_string k0) with (KRExprDenote_string k0=KRExprDenote_string k). reflexivity.
-  apply my_eq_refl.
-  remember (sdisjPrefix (srev s) (srev s0)).
-  destruct b.
-  - simpl.
-    apply sdisjPrefix_false.
-    rewrite Heqb.
-    reflexivity.
-  - reflexivity.
+  - replace (KRExprDenote_string k=KRExprDenote_string k0) with (KRExprDenote_string k0=KRExprDenote_string k). reflexivity.
+    apply my_eq_refl.
+  - remember (sdisjPrefix (srev s) (srev s0)).
+    destruct b.
+    + simpl.
+      apply sdisjPrefix_false.
+      rewrite Heqb.
+      reflexivity.
+    + reflexivity.
+  - replace (KRExprDenote_RegInitT k=KRExprDenote_RegInitT k0) with (KRExprDenote_RegInitT k0=KRExprDenote_RegInitT k). reflexivity.
+    apply my_eq_refl.
+  - replace (KRExprDenote_Rule k=KRExprDenote_Rule k0) with (KRExprDenote_Rule k0=KRExprDenote_Rule k). reflexivity.
+    apply my_eq_refl.
+  - replace (KRExprDenote_DefMethT k=KRExprDenote_DefMethT k0) with (KRExprDenote_DefMethT k0=KRExprDenote_DefMethT k). reflexivity.
+    apply my_eq_refl.
 Qed.
 
 Hint Rewrite KRSimplifyTopSound_Prop : KRSimplifyTopSound.
@@ -2207,6 +2278,9 @@ Ltac KRSimplifySound_crunch :=
   match goal with
   | |- context [ KRExprDenote_Mod (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
   | |- context [ KRExprDenote_string (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_RegInitT (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_Rule (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
+  | |- context [ KRExprDenote_DefMethT (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
   | |- context [ KRExprDenote_list_string (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
   | |- context [ KRExprDenote_list_list_string (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
   | |- context [ KRExprDenote_list_Mod (match ?Q with _ => _ end) ] => let R := fresh in (remember Q as R;destruct R;repeat KRSimplifySound_unit)
@@ -2311,6 +2385,15 @@ Proof.
   reflexivity.
   rewrite HeqH2.
   reflexivity.
+  replace (KRExprDenote_RegInitT k1=KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+      (KRExprDenote_RegInitT (KRSimplify_RegInitT k)=KRExprDenote_RegInitT k1). reflexivity.
+  apply my_eq_refl.
+  replace (KRExprDenote_Rule k1=KRExprDenote_Rule (KRSimplify_Rule k)) with
+      (KRExprDenote_Rule (KRSimplify_Rule k)=KRExprDenote_Rule k1). reflexivity.
+  apply my_eq_refl.
+  replace (KRExprDenote_DefMethT k1=KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+      (KRExprDenote_DefMethT (KRSimplify_DefMethT k)=KRExprDenote_DefMethT k1). reflexivity.
+  apply my_eq_refl.
 Qed.
 
 Theorem KRSimplifySound_list_RegInitT: forall e,
@@ -2358,6 +2441,18 @@ Proof.
     + reflexivity.
     + rewrite HeqH2.
       reflexivity.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
@@ -2409,6 +2504,18 @@ Proof.
     + rewrite HeqH2.
       reflexivity.
   - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
 Qed.
@@ -2457,6 +2564,18 @@ Proof.
     + reflexivity.
     + rewrite HeqH2.
       reflexivity.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
@@ -2507,6 +2626,18 @@ Proof.
     + rewrite HeqH2.
       reflexivity.
   - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
 Qed.
@@ -2555,6 +2686,18 @@ Proof.
     + reflexivity.
     + rewrite HeqH2.
       reflexivity.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
@@ -2605,6 +2748,18 @@ Proof.
     + rewrite HeqH2.
       reflexivity.
   - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
 Qed.
@@ -2653,6 +2808,18 @@ Proof.
     + reflexivity.
     + rewrite HeqH2.
       reflexivity.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
@@ -2703,6 +2870,18 @@ Proof.
     + rewrite HeqH2.
       reflexivity.
   - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
 Qed.
@@ -2751,6 +2930,18 @@ Proof.
     + reflexivity.
     + rewrite HeqH2.
       reflexivity.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
@@ -2815,6 +3006,18 @@ Proof.
     + rewrite HeqH2.
       reflexivity.
   - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
 Qed.
@@ -2863,6 +3066,18 @@ Proof.
     + reflexivity.
     + rewrite HeqH2.
       reflexivity.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
@@ -2913,6 +3128,18 @@ Proof.
     + rewrite HeqH2.
       reflexivity.
   - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
 Qed.
@@ -2961,6 +3188,18 @@ Proof.
     + reflexivity.
     + rewrite HeqH2.
       reflexivity.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
@@ -3011,6 +3250,18 @@ Proof.
     + rewrite HeqH2.
       reflexivity.
   - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
 Qed.
@@ -3059,6 +3310,18 @@ Proof.
     + reflexivity.
     + rewrite HeqH2.
       reflexivity.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
@@ -3109,6 +3372,18 @@ Proof.
     + rewrite HeqH2.
       reflexivity.
   - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
 Qed.
@@ -3157,6 +3432,18 @@ Proof.
     + reflexivity.
     + rewrite HeqH2.
       reflexivity.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_RegInitT k1 = KRExprDenote_RegInitT (KRSimplify_RegInitT k)) with
+        (KRExprDenote_RegInitT (KRSimplify_RegInitT k) = KRExprDenote_RegInitT k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_Rule k1 = KRExprDenote_Rule (KRSimplify_Rule k)) with
+        (KRExprDenote_Rule (KRSimplify_Rule k) = KRExprDenote_Rule k1). reflexivity.
+    apply my_eq_refl.
+  - repeat KRSimplifySound_crunch.
+    replace (KRExprDenote_DefMethT k1 = KRExprDenote_DefMethT (KRSimplify_DefMethT k)) with
+        (KRExprDenote_DefMethT (KRSimplify_DefMethT k) = KRExprDenote_DefMethT k1). reflexivity.
+    apply my_eq_refl.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
   - repeat KRSimplifySound_crunch.
