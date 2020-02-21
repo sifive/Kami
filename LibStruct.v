@@ -67,7 +67,7 @@ Lemma WfConcatActionT_BuildStructActionCont:
  forall m k n kinds names acts cont,
    (forall (i:Fin.t n), WfConcatActionT (acts i) m) ->
    (forall x, WfConcatActionT (cont x) m) ->
-   @WfConcatActionT k (@BuildStructActionCont type k
+   @WfConcatActionT type k (@BuildStructActionCont type k
                                               n kinds names acts cont) m.
 Proof.
   induction n; simpl; intros; auto.

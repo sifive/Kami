@@ -642,6 +642,6 @@ Context `{StringMap Map}.
 Context `{IOMonad Word Vec M}.
 
 Definition eval_BaseMod_Wf{E}`{Environment _ _ _ _ E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule basemod) :=
-  curry _ (eval_Basemodule_rr env args rfbs timeout meths (Wf_Wf_new_bm wf)).
+  curry _ (eval_Basemodule_rr env args rfbs timeout meths (WfBaseModule_WfBaseModule_new wf)).
 
 End Eval_Wf.
