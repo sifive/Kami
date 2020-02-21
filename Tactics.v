@@ -98,6 +98,22 @@ Ltac discharge_wf :=
          end;
   discharge_DisjKey.
 
+Ltac discharge_wf_new :=
+  repeat match goal with
+         | |- @WfBaseModule_new _ => unfold WfBaseModule_new
+         | |- @WfMod_new _ => constructor_simpl
+         | |- _ /\ _ => constructor_simpl
+         | |- @WfActionT_new _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
+         | |- @WfActionT _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
+         | |- NoDup _ => constructor_simpl
+         | H: _ \/ _ |- _ => destruct H; subst; simpl
+         | |- forall _, _ => intros
+         | |- _ -> _ => intros 
+         | H: In _ (getAllMethods _) |- _ => simpl in H;inversion H;subst;clear H;simpl
+         | |- _ => unfold lookup; simpl; repeat rewrite strip_pref
+         end;
+  discharge_DisjKey.
+
 Lemma string_dec_refl {A} : forall (s: string) (T E: A),
   (if String.eqb s s then T else E) = T.
 Proof.

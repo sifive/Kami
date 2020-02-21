@@ -1964,6 +1964,19 @@ Section Forall.
   Qed.
 End Forall.
 
+Section Stringb.
+
+Lemma strip_pref : forall pre x y, ((pre ++ x) =? (pre ++ y) = (x =? y))%string.
+Proof.
+  induction pre; intros.
+  auto.
+  simpl.
+  rewrite Ascii.eqb_refl.
+  apply IHpre.
+Qed.
+
+End Stringb.
+
 Section Silly.
 
 (*used to avoid ill-typed term error messages*)

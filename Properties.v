@@ -4148,8 +4148,17 @@ Proof.
            ++ eapply NoDup_DisjKey; eauto.
 Qed.
 
+Theorem flatten_WfMod_new m : WfMod_new m -> WfMod_new (flatten m).
+Proof.
+  repeat rewrite WfMod_new_WfMod_iff.
+  apply flatten_WfMod.
+Qed.
+
 Definition flatten_ModWf m: ModWf :=
   (Build_ModWf (flatten_WfMod (wfMod m))).
+
+Definition flatten_ModWf_new m: ModWf_new :=
+  (Build_ModWf_new _ (flatten_WfMod_new _ (wfMod_new m))).
 
 Section TraceSubstitute.
   Variable m: ModWf.
@@ -4201,6 +4210,57 @@ Section TraceSubstitute.
       assumption.
   Qed.
 End TraceSubstitute.
+
+Section TraceSubstitute_new.
+  Variable m: ModWf_new.
+
+  Lemma Trace_flatten_same1_new: forall o l,  Trace m o l -> Trace (flatten m) o l.
+  Proof.
+    induction 1; subst.
+    - constructor 1; auto.
+      unfold flatten.
+      rewrite createHide_Regs.
+      auto.
+    - apply (@Step_substitute) in HStep; auto.
+      + econstructor 2; eauto.
+      + destruct m; apply WfMod_new_WfMod; auto.
+  Qed.
+
+  Lemma Trace_flatten_same2_new : forall o l, Trace (flatten m) o l -> (exists l', (PermutationEquivLists l l') /\ Trace m o l').
+  Proof.
+    induction 1; subst.
+    - rewrite getAllRegisters_flatten in *.
+      exists nil;split;constructor 1; auto.
+    - apply substitute_Step in HStep;auto; dest.
+      exists (x0::x);split.
+      + constructor; auto.
+      + econstructor 2; eauto.
+        apply (Permutation_map fst) in H2.
+        eapply UpdRegs_perm; eauto.
+      + destruct m; apply WfMod_new_WfMod; auto.
+  Qed.
+
+  Theorem TraceInclusion_flatten_r_new : TraceInclusion m (flatten_ModWf_new m).
+  Proof.
+    unfold TraceInclusion; intros.
+    exists o1, ls1.
+    repeat split; auto; intros; unfold nthProp2; intros; try destruct (nth_error ls1 i); auto; repeat split; intros; try firstorder.
+    apply Trace_flatten_same1_new; auto.
+  Qed.
+
+  Theorem TraceInclusion_flatten_l_new : TraceInclusion (flatten_ModWf_new m) m.
+  Proof.
+    apply TraceInclusion'_TraceInclusion.
+    unfold TraceInclusion'; intros.
+    apply Trace_flatten_same2_new in H.
+    dest.
+    exists x.
+    split.
+    - unfold TraceList; exists o; auto.
+    - apply PermutationEquivLists_WeakInclusions.
+      assumption.
+  Qed.
+End TraceSubstitute_new.
 
 Lemma word0_neq: forall w : word 1, w <> WO~0 -> w = WO~1.
 Proof.
@@ -4443,7 +4503,6 @@ Proof.
     + eauto.
 Qed.
 
-
 Section ModularSubstitution.
   Variable a b a' b': Mod.
   Variable SameList_a: forall (x : MethT),
@@ -4617,6 +4676,32 @@ Section ModularSubstitution.
   
 End ModularSubstitution.
 
+Section ModularSubstitution_new.
+  Variable a b a' b': Mod.
+  Variable SameList_a: forall (x : MethT),
+      (In (fst x, projT1 (snd x)) (getKindAttr (getAllMethods a)) /\
+       ~ In (fst x) (getHidden a)) <->
+      (In (fst x, projT1 (snd x)) (getKindAttr (getAllMethods a')) /\
+       ~ In (fst x) (getHidden a')).
+  Variable SameList_b: forall (x : MethT),
+      (In (fst x, projT1 (snd x)) (getKindAttr (getAllMethods b)) /\
+       ~ In (fst x) (getHidden b)) <->
+      (In (fst x, projT1 (snd x)) (getKindAttr (getAllMethods b')) /\
+       ~ In (fst x) (getHidden b')).
+
+  Variable wfAConcatB: WfMod_new (ConcatMod a b).
+  Variable wfA'ConcatB': WfMod_new (ConcatMod a' b').
+
+  Theorem ModularSubstitution_new : TraceInclusion a a' ->
+                             TraceInclusion b b' ->
+                             TraceInclusion (ConcatMod a b) (ConcatMod a' b').
+  Proof.
+    rewrite WfMod_new_WfMod_iff in wfAConcatB, wfA'ConcatB'.
+    apply ModularSubstitution; auto.
+  Qed.
+
+End ModularSubstitution_new.
+
 Section Fold.
   Variable k: Kind.
 
@@ -4778,6 +4863,44 @@ Section SimulationZeroAct.
   Qed.
 
 End SimulationZeroAct.
+
+Section SimulationZeroAct_new.
+  Variable imp spec: BaseModuleWf_new.
+  Variable simRel: RegsT -> RegsT -> Prop.
+  Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
+                                 exists rspec, Forall2 regInit rspec (getRegisters spec) /\ simRel rimp rspec.
+
+  Variable NoMeths: getMethods imp = [].
+  Variable NoMethsSpec: getMethods spec = [].
+
+  Variable simulation:
+    forall oImp rImp uImp rleImp csImp oImp' aImp,
+      In (rleImp, aImp) (getRules imp) ->
+      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      UpdRegs [uImp] oImp oImp' ->
+      forall oSpec,
+        simRel oImp oSpec ->
+        ((simRel oImp' oSpec /\ csImp = []) \/
+         (exists rleSpec aSpec,
+             In (rleSpec, aSpec) (getRules spec) /\
+             exists rSpec uSpec,
+               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               exists oSpec',
+                 UpdRegs [uSpec] oSpec oSpec' /\
+                 simRel oImp' oSpec')).
+
+  Theorem simulationZeroAct_new :
+    TraceInclusion (Base imp) (Base spec).
+  Proof.
+    destruct imp, spec.
+    Print WfBaseModule.
+    pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new)) as x.
+    pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new0)) as y.
+    eapply (simulationZeroAct x y); eauto.
+  Qed.
+
+End SimulationZeroAct_new.
 
 Section LemmaNoSelfCall.
   Variable m: BaseModule.
@@ -5075,6 +5198,73 @@ Section SimulationGen.
         split; intros; auto.
   Qed.
 End SimulationGen.    
+
+Section SimulationGen_new.
+  Variable imp spec: BaseModuleWf_new.
+  Variable NoSelfCalls: NoSelfCallBaseModule spec.
+  
+  Variable simRel: RegsT -> RegsT -> Prop.
+  Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
+                                 exists rspec, Forall2 regInit rspec (getRegisters spec) /\ simRel rimp rspec.
+
+  Variable simulationRule:
+    forall oImp rImp uImp rleImp csImp oImp' aImp,
+      In (rleImp, aImp) (getRules imp) ->
+      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      UpdRegs [uImp] oImp oImp' ->
+      forall oSpec,
+        simRel oImp oSpec ->
+        ((simRel oImp' oSpec /\ csImp = []) \/
+         (exists rleSpec aSpec,
+             In (rleSpec, aSpec) (getRules spec) /\
+             exists rSpec uSpec,
+               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               exists oSpec',
+                 UpdRegs [uSpec] oSpec oSpec' /\
+                 simRel oImp' oSpec')).
+
+  Variable simulationMeth:
+    forall oImp rImp uImp meth csImp oImp' sign aImp arg ret,
+      In (meth, existT _ sign aImp) (getMethods imp) ->
+      SemAction oImp (aImp type arg) rImp uImp csImp ret ->
+      UpdRegs [uImp] oImp oImp' ->
+      forall oSpec,
+        simRel oImp oSpec ->
+          exists aSpec rSpec uSpec,
+            In (meth, existT _ sign aSpec) (getMethods spec) /\
+            SemAction oSpec (aSpec type arg) rSpec uSpec csImp ret /\
+              exists oSpec',
+                UpdRegs [uSpec] oSpec oSpec' /\
+                simRel oImp' oSpec'.
+
+  Variable notMethMeth:
+    forall oImp rImpl1 uImpl1 meth1 sign1 aImp1 arg1 ret1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (meth1, existT _ sign1 aImp1) (getMethods imp) ->
+      SemAction oImp (aImp1 type arg1) rImpl1 uImpl1 csImp1 ret1 ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+          
+  Variable notRuleMeth:
+    forall oImp rImpl1 uImpl1 rleImpl1 aImp1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (rleImpl1, aImp1) (getRules imp) ->
+      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 WO ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+
+  Theorem simulationGen_new :
+    TraceInclusion (Base imp) (Base spec).
+  Proof.
+    destruct imp, spec.
+    pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new)) as x.
+    pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new0)) as y.
+    eapply (simulationGen x y); eauto.
+  Qed.
+End SimulationGen_new.
 
 Lemma findRegs_Some u:
   NoDup (map fst u) ->
@@ -5566,6 +5756,76 @@ Section SimulationGeneralEx.
   Qed.
 End SimulationGeneralEx.
 
+Section SimulationGeneralEx_new.
+  Variable imp spec: BaseModuleWf_new.
+  Variable NoSelfCalls: NoSelfCallBaseModule spec.
+  
+  Variable simRel: RegsT -> RegsT -> Prop.
+  Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
+  Variable simRelImpGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oImp = getKindAttr (getRegisters imp).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
+                                 exists rspec, Forall2 regInit rspec (getRegisters spec) /\ simRel rimp rspec.
+
+  Variable simulationRule:
+    forall oImp rImp uImp rleImp csImp aImp,
+      In (rleImp, aImp) (getRules imp) ->
+      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      forall oSpec,
+        simRel oImp oSpec ->
+        ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = []) \/
+         (exists rleSpec aSpec,
+             In (rleSpec, aSpec) (getRules spec) /\
+             exists rSpec uSpec,
+               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               exists oSpec',
+                 UpdRegs [uSpec] oSpec oSpec' /\
+                 simRel (doUpdRegs uImp oImp) oSpec')).
+
+  Variable simulationMeth:
+    forall oImp rImp uImp meth csImp sign aImp arg ret,
+      In (meth, existT _ sign aImp) (getMethods imp) ->
+      SemAction oImp (aImp type arg) rImp uImp csImp ret ->
+      forall oSpec,
+        simRel oImp oSpec ->
+          exists aSpec rSpec uSpec,
+            In (meth, existT _ sign aSpec) (getMethods spec) /\
+            SemAction oSpec (aSpec type arg) rSpec uSpec csImp ret /\
+              exists oSpec',
+                UpdRegs [uSpec] oSpec oSpec' /\
+                simRel (doUpdRegs uImp oImp) oSpec'.
+
+  Variable notMethMeth:
+    forall oImp rImpl1 uImpl1 meth1 sign1 aImp1 arg1 ret1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (meth1, existT _ sign1 aImp1) (getMethods imp) ->
+      SemAction oImp (aImp1 type arg1) rImpl1 uImpl1 csImp1 ret1 ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+          
+  Variable notRuleMeth:
+    forall oImp rImpl1 uImpl1 rleImpl1 aImp1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (rleImpl1, aImp1) (getRules imp) ->
+      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 WO ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+
+  Theorem simulationGeneralEx_new:
+    TraceInclusion (Base imp) (Base spec).
+  Proof.
+    destruct imp, spec.
+    pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new)) as x.
+    pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new0)) as y.
+    eapply (simulationGeneralEx x y); eauto.
+  Qed.
+
+End SimulationGeneralEx_new.
+
+
+
+
 Section SimulationZeroA.
   Variable imp spec: BaseModuleWf.
   Variable simRel: RegsT -> RegsT -> Prop.
@@ -5613,6 +5873,45 @@ Section SimulationZeroA.
     eapply simulation; eauto.
   Qed.
 End SimulationZeroA.
+
+Section SimulationZeroA_new.
+  Variable imp spec: BaseModuleWf_new.
+  Variable simRel: RegsT -> RegsT -> Prop.
+  Variable simRelGood: forall oImp oSpec, simRel oImp oSpec ->
+                                          getKindAttr oSpec = getKindAttr (getRegisters spec).
+  Variable simRelImpGood: forall oImp oSpec, simRel oImp oSpec ->
+                                             getKindAttr oImp = getKindAttr (getRegisters imp).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
+                                 exists rspec, Forall2 regInit rspec (getRegisters spec) /\
+                                               simRel rimp rspec.
+
+  Variable NoMeths: getMethods imp = [].
+  Variable NoMethsSpec: getMethods spec = [].
+
+  Variable simulation:
+    forall oImp rImp uImp rleImp csImp aImp,
+      In (rleImp, aImp) (getRules imp) ->
+      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      forall oSpec,
+        simRel oImp oSpec ->
+        ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = []) \/
+         (exists rleSpec aSpec,
+             In (rleSpec, aSpec) (getRules spec) /\
+             exists rSpec uSpec,
+               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+               exists oSpec',
+                 UpdRegs [uSpec] oSpec oSpec' /\
+                 simRel (doUpdRegs uImp oImp) oSpec')).
+
+  Theorem simulationZeroA_new:
+    TraceInclusion (Base imp) (Base spec).
+  Proof.
+    destruct imp, spec.
+    pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new)) as x.
+    pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new0)) as y.
+    eapply (simulationZeroA x y); eauto.
+  Qed.
+End SimulationZeroA_new.
 
 Section SimulationGeneral.
   Variable imp spec: BaseModuleWf.
@@ -5710,6 +6009,70 @@ Section SimulationGeneral.
   Qed.
 End SimulationGeneral.
 
+Section SimulationGeneral_new.
+  Variable imp spec: BaseModuleWf_new.
+  Variable NoSelfCalls: NoSelfCallBaseModule spec.
+  
+  Variable simRel: RegsT -> RegsT -> Prop.
+  Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
+  Variable simRelImpGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oImp = getKindAttr (getRegisters imp).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
+                                 exists rspec, Forall2 regInit rspec (getRegisters spec) /\ simRel rimp rspec.
+
+  Variable simulationRule:
+    forall oImp rImp uImp rleImp csImp aImp,
+      In (rleImp, aImp) (getRules imp) ->
+      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      forall oSpec,
+        simRel oImp oSpec ->
+        ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = []) \/
+         (exists rleSpec aSpec,
+             In (rleSpec, aSpec) (getRules spec) /\
+             exists rSpec uSpec,
+               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+                 simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec))).
+
+  Variable simulationMeth:
+    forall oImp rImp uImp meth csImp sign aImp arg ret,
+      In (meth, existT _ sign aImp) (getMethods imp) ->
+      SemAction oImp (aImp type arg) rImp uImp csImp ret ->
+      forall oSpec,
+        simRel oImp oSpec ->
+          exists aSpec rSpec uSpec,
+            In (meth, existT _ sign aSpec) (getMethods spec) /\
+            SemAction oSpec (aSpec type arg) rSpec uSpec csImp ret /\
+                simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec).
+
+  Variable notMethMeth:
+    forall oImp rImpl1 uImpl1 meth1 sign1 aImp1 arg1 ret1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (meth1, existT _ sign1 aImp1) (getMethods imp) ->
+      SemAction oImp (aImp1 type arg1) rImpl1 uImpl1 csImp1 ret1 ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+          
+  Variable notRuleMeth:
+    forall oImp rImpl1 uImpl1 rleImpl1 aImp1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (rleImpl1, aImp1) (getRules imp) ->
+      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 WO ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+
+  Theorem simulationGeneral_new :
+    TraceInclusion (Base imp) (Base spec).
+  Proof.
+    destruct imp, spec.
+    pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new)) as x.
+    pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new0)) as y.
+    eapply (simulationGeneral x y); eauto.
+  Qed.
+
+End SimulationGeneral_new.
+
+
 Section SimulationZeroAction.
   Variable imp spec: BaseModuleWf.
   Variable simRel: RegsT -> RegsT -> Prop.
@@ -5762,6 +6125,44 @@ Section SimulationZeroAction.
     eapply doUpdRegs_UpdRegs; eauto.
   Qed.
 End SimulationZeroAction.
+
+Section SimulationZeroAction_new.
+  Variable imp spec: BaseModuleWf_new.
+  Variable simRel: RegsT -> RegsT -> Prop.
+  Variable simRelGood: forall oImp oSpec, simRel oImp oSpec ->
+                                          getKindAttr oSpec = getKindAttr (getRegisters spec).
+  Variable simRelImpGood: forall oImp oSpec, simRel oImp oSpec ->
+                                             getKindAttr oImp = getKindAttr (getRegisters imp).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
+                                 exists rspec, Forall2 regInit rspec (getRegisters spec) /\
+                                               simRel rimp rspec.
+
+  Variable NoMeths: getMethods imp = [].
+  Variable NoMethsSpec: getMethods spec = [].
+
+  Variable simulation:
+    forall oImp rImp uImp rleImp csImp aImp,
+      In (rleImp, aImp) (getRules imp) ->
+      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      forall oSpec,
+        simRel oImp oSpec ->
+        ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = []) \/
+         (exists rleSpec aSpec,
+             In (rleSpec, aSpec) (getRules spec) /\
+             exists rSpec uSpec,
+               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+                 simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec))).
+
+  Theorem simulationZeroAction_new :
+    TraceInclusion (Base imp) (Base spec).
+  Proof.
+    destruct imp, spec.
+    pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new)) as x.
+    pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new0)) as y.
+    eapply (simulationZeroAction x y); eauto.
+  Qed.
+
+End SimulationZeroAction_new.
 
 Lemma SemAction_if k1 k (e: Expr type (SyntaxKind Bool)) (a1 a2: ActionT type k1) (a: type k1 -> ActionT type k) o reads u cs v:
   (if evalExpr e
@@ -5827,8 +6228,6 @@ Proof.
       apply H in H2; dest; subst.
       repeat split; auto.
 Qed.
-
-
 
 Section Simulation.
   Variable imp spec: BaseModule.
@@ -5897,3 +6296,67 @@ Section Simulation.
     eapply simulationGeneral; eauto; intros.
   Qed.
 End Simulation.
+
+Section Simulation_new.
+  Variable imp spec: BaseModule.
+  Variable impWf: WfBaseModule_new imp.
+  Variable specWf: WfBaseModule_new spec.
+  Variable NoSelfCalls: NoSelfCallBaseModule spec.
+  
+  Variable simRel: RegsT -> RegsT -> Prop.
+  Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
+  Variable simRelImpGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oImp = getKindAttr (getRegisters imp).
+  Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
+                                 exists rspec, Forall2 regInit rspec (getRegisters spec) /\ simRel rimp rspec.
+
+  Variable simulationRule:
+    forall oImp rImp uImp rleImp csImp aImp,
+      In (rleImp, aImp) (getRules imp) ->
+      SemAction oImp (aImp type) rImp uImp csImp WO ->
+      forall oSpec,
+        simRel oImp oSpec ->
+        ((simRel (doUpdRegs uImp oImp) oSpec /\ csImp = nil) \/
+         (exists rleSpec aSpec,
+             In (rleSpec, aSpec) (getRules spec) /\
+             exists rSpec uSpec,
+               SemAction oSpec (aSpec type) rSpec uSpec csImp WO /\
+                 simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec))).
+
+  Variable simulationMeth:
+    forall oImp rImp uImp meth csImp sign aImp arg ret,
+      In (meth, existT _ sign aImp) (getMethods imp) ->
+      SemAction oImp (aImp type arg) rImp uImp csImp ret ->
+      forall oSpec,
+        simRel oImp oSpec ->
+          exists aSpec rSpec uSpec,
+            In (meth, existT _ sign aSpec) (getMethods spec) /\
+            SemAction oSpec (aSpec type arg) rSpec uSpec csImp ret /\
+                simRel (doUpdRegs uImp oImp) (doUpdRegs uSpec oSpec).
+
+  Variable notMethMeth:
+    forall oImp rImpl1 uImpl1 meth1 sign1 aImp1 arg1 ret1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (meth1, existT _ sign1 aImp1) (getMethods imp) ->
+      SemAction oImp (aImp1 type arg1) rImpl1 uImpl1 csImp1 ret1 ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+          
+  Variable notRuleMeth:
+    forall oImp rImpl1 uImpl1 rleImpl1 aImp1 csImp1
+           rImpl2 uImpl2 meth2 sign2 aImp2 arg2 ret2 csImp2,
+      In (rleImpl1, aImp1) (getRules imp) ->
+      SemAction oImp (aImp1 type) rImpl1 uImpl1 csImp1 WO ->
+      In (meth2, existT _ sign2 aImp2) (getMethods imp) ->
+      SemAction oImp (aImp2 type arg2) rImpl2 uImpl2 csImp2 ret2 ->
+      exists k, In k (map fst uImpl1) /\ In k (map fst uImpl2).
+
+  Theorem simulation_new :
+    TraceInclusion (Base imp) (Base spec).
+  Proof.
+    eapply simulation; eauto.
+    - apply WfBaseModule_new_WfBaseModule; auto.
+    - apply WfBaseModule_new_WfBaseModule; auto.
+  Qed.
+
+End Simulation_new.

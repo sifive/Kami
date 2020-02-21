@@ -1,6 +1,6 @@
 Require Import Kami.Syntax Kami.Lib.EclecticLib Kami.Tactics.
 Require Import RecordUpdate.RecordSet.
-Require Import Wf.
+Require Import Program.Wf.
 Require Import Wf_nat.
 Require Import BinNums.
 
@@ -426,6 +426,18 @@ Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
      modOrd := getOrder ((app m1%kami .. (app mN%kami nil) ..)) |}
     (only parsing).
 
+Notation "'MODULE_WF_new' { m1 'with' .. 'with' mN }" :=
+  {| baseModuleWf_new := {| baseModule_new := (makeModule ((app m1%kami .. (app mN%kami nil) ..))) ;
+                        wfBaseModule_new := ltac:(discharge_wf_new) |} ;
+     baseModuleOrd_new := getOrder ((app m1%kami .. (app mN%kami nil) ..)) |}
+    (only parsing).
+
+Notation "'MOD_WF_new' { m1 'with' .. 'with' mN }" :=
+  {| modWf_new := {| module_new := Base (makeModule ((app m1%kami .. (app mN%kami nil) ..))) ;
+                 wfMod_new := ltac:(discharge_wf_new) |} ;
+     modOrd_new := getOrder ((app m1%kami .. (app mN%kami nil) ..)) |}
+    (only parsing).
+
 (* Notation "'RegisterVec' name 'using' nums : type <- init" := *)
 (*   (MERegAry ( *)
 (*        map (fun idx => *)
@@ -482,6 +494,24 @@ Section mod_test.
                                                         Write (^"x"): Bool <- #y;
                                                         Retv )
                            }.
+
+  Local Example test_new : ModWf_new := MOD_WF_new {
+                              (concat [Register (^"x") : Bool <- true; Register (^"z") : Bool <- false])
+                                with Register (^"y") : Bool <- false
+                                with Rule (^"r1") := ( Read y: Bool <- ^"y";
+                                                         Write (^"x"): Bool <- #y;
+                                                         Retv )
+                          }.
+
+  Local Example test1_new := MODULE_WF{
+                             (concat [Register (^"x") : Bool <- true; Register (^"w"): Bool <- true;
+                                        Register (^"t"): Bit 0 <- WO])
+                               with Register (^"y") : Bool <- false
+                               with Rule (^"r1") := ( Read y: Bool <- ^"y";
+                                                        Write (^"x"): Bool <- #y;
+                                                        Retv )
+                           }.
+
 End mod_test.
 
 Definition Registers := (map MERegister).
