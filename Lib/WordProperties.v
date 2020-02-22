@@ -1,5 +1,6 @@
 Require Import Coq.ZArith.BinIntDef Coq.ZArith.BinInt Coq.ZArith.Zdiv Eqdep.
 Require Import Kami.Lib.Word.
+Require Import Kami.Lib.EclecticLib.
 Require Import Lia.
 Require Import Omega.
 Require Import Coq.Arith.Even.
@@ -611,28 +612,6 @@ Proof.
   simpl; auto.
   lia.
 Qed.
-
-(* Lemma combine_wones_WO sz: *)
-(*   forall w, w <> ZToWord sz 0 -> *)
-(*             truncMsb (outSz := sz+1) *)
-(*                      (wadd _ (wconcat (wones sz) (ZToWord 1 0)) *)
-(*                            (wconcat w (@ZToWord 1 0))) *)
-(*             = (WO~1)%word. *)
-(* Proof. *)
-(*   intros. *)
-(*   arithmetizeWord. *)
-(*   rewrite Z.mod_1_l by reflexivity. *)
-(*   + rewrite Z.pow_pos_fold. *)
-(*     simpl in *. *)
-(*     rewrite Z.mod_0_l by (let H := fresh in intro H; discriminate). *)
-(*     rewrite Nat.add_sub. *)
-(*     rewrite Z.pow_pos_fold. *)
-(*     rewrite Z.pow_1_r. *)
-(*     repeat (rewrite Z.add_0_r). *)
-    
-(*     simpl. *)
-(*     admit. *)
-(* Admitted. *)
 
 Lemma word1_neq (w: word 1):
   w <> (ZToWord 1 0) ->
@@ -1691,7 +1670,7 @@ Proof.
     rewrite Z2Nat.inj_iff in H1; subst; lia.
 Qed.
 
-Lemma Zmod_mod (n m : Z) :
+Lemma Zmod_mod' (n m : Z) :
   (0 < m)%Z ->
   (0 <= n)%Z ->
   (Z.to_nat (n mod m) = (Z.to_nat n) mod (Z.to_nat m)).
@@ -1824,7 +1803,7 @@ Proof.
   unfold wordToNat.
   arithmetizeWord.
   simpl.
-  rewrite Zmod_mod; try lia.
+  rewrite Zmod_mod'; try lia.
   - rewrite <- Zpow_of_nat, Nat2Z.id; reflexivity.
   - apply (Z.gt_lt _ _ (Z_pow_2_gt_0 _ (Z.le_ge _ _ (Nat2Z.is_nonneg _)))).
 Qed.
@@ -1836,7 +1815,7 @@ Proof.
   intros.
   unfold wordToNat.
   arithmetizeWord. simpl.
-  rewrite Zmod_mod; try lia.
+  rewrite Zmod_mod'; try lia.
   rewrite <- Zpow_of_nat, Nat2Z.id, Z2Nat.inj_add; lia.
 Qed.
 
@@ -2012,19 +1991,10 @@ Proof.
         + specialize (pow2_zero (sz + (Z.to_nat 1))) as TMP; lia.
       - apply Z.pow_nonneg; lia.
     }
-    specialize (Z.div_small_iff) as P2.
-  (* - apply Z.lt_le_incl. *)
-  (*   rewrite pow2_of_nat, <- (Z2Nat.id wordVal), <- (Z2Nat.id 0); try lia. *)
-  (*   specialize (pow2_zero sz) as P0. *)
-  (*   rewrite <- div_Zdiv; try lia. *)
-  (*   apply inj_lt. *)
-  (*   replace (Z.to_nat 0) with 0; auto. *)
-  (*   rewrite Nat.div_str_pos_iff; try lia. *)
-  (* - replace (Z.pow_pos 2 1) with 2%Z; auto. *)
-  (*   rewrite  *)
-            
-(* Qed. *)
-Admitted.
+    destruct (Z.div_small_iff (wordVal / 2 ^ Z.of_nat sz) _ P0) as [P2 P3]; clear P3.
+    destruct (P2 P1); auto.
+    exfalso; lia.
+Qed.
 
 Lemma neq0_wneq0 sz (n : word sz) : wordToNat _ n <> 0 <-> n <> natToWord sz 0.
 Proof.
@@ -2047,26 +2017,6 @@ Proof.
   induction n; intros; try lia.
 Qed.
 
-(* Lemma wmsb_1_natToWord sz n default : *)
-(*   2 ^ sz <= n < 2 * 2 ^ sz -> *)
-(*   wmsb _ (natToWord (S sz) n) default = false. *)
-(* Proof. *)
-(*   intros. *)
-(*   unfold wmsb. *)
-(*   destruct (Nat.eqb _ _) eqn:G. *)
-(*   - exfalso. *)
-(*     rewrite Nat.eqb_eq in G; discriminate. *)
-(*   - rewrite Nat.ltb_ge. *)
-(*     unfold wordToNat, natToWord; simpl. *)
-(*     rewrite Natlt_0, Nat.div_small_iff, Z.mod_small; try split; try lia. *)
-(*     + rewrite Nat2Z.id; lia. *)
-(*     + rewrite Z.pow_pos_fold, Zpos_P_of_succ_nat, <- Nat2Z.inj_succ, <- Nat.add_1_l, Nat2Z.inj_add, Z.pow_add_r; try lia. *)
-(*       repeat rewrite <- Zpow_of_nat. *)
-(*       rewrite <- Nat2Z.inj_mul. *)
-(*       apply inj_lt. *)
-(*       rewrite Nat.pow_1_r; destruct H; auto. *)
-(* Qed. *)
-
 Lemma wmsb_1_natToWord sz n default :
   2 ^ sz <= n < 2 * 2 ^ sz ->
   wmsb _ (natToWord (S sz) n) default = true.
@@ -2079,4 +2029,460 @@ Proof.
   - rewrite Nat.ltb_lt.
     rewrite Nat.div_str_pos_iff.
     + unfold wordToNat, natToWord; simpl.
-Admitted.
+      rewrite Z.pow_pos_fold, Zpos_P_of_succ_nat, <- Nat2Z.inj_succ, <- (Nat.add_1_l sz), Nat2Z.inj_add, Z.pow_add_r; try lia.
+      destruct H.
+      rewrite <- minus_n_O, Z.mod_small.
+      * rewrite Nat2Z.id; assumption.
+      * split; [apply Nat2Z.is_nonneg|].
+        repeat rewrite <- Zpow_of_nat.
+        rewrite <- Nat2Z.inj_mul.
+        apply inj_lt.
+        assumption.
+    + intro.
+      specialize (pow2_zero (S sz - 1)); lia.
+Qed.
+
+
+Lemma equal_expWidth_sigWidth:
+  forall s, 2^s + 4 > s + 2.
+Proof.
+  induction s; simpl; auto.
+  rewrite Nat.add_0_r.
+  pose proof (pow2_zero s).
+  Omega.omega.
+Qed.
+
+Unset Implicit Arguments.
+
+Lemma natToWord_wordToNat sz (w : word sz) : natToWord sz (wordToNat _ w) = w.
+Proof.
+  unfold natToWord, wordToNat.
+  rewrite Z2Nat.id; arithmetizeWord; intuition.
+Qed.
+
+Set Implicit Arguments.
+
+Lemma one_lt_pow2' : forall n, n > 0 -> 1 < 2 ^ n.
+Proof.
+  intros; specialize (pow2_gt_1 _ H); auto.
+Qed.
+
+Lemma wzero_wones : forall sz, sz >= 1 -> natToWord sz 0 <> wones sz.
+Proof.
+  intros.
+  unfold natToWord.
+  simpl.
+  apply weqb_false.
+  unfold weqb.
+  apply Z.eqb_neq.
+  simpl.
+  rewrite Z.mod_0_l, Z.mod_small; try split; try lia.
+  rewrite <- Zpow_of_nat.
+  assert (sth : (1 < Z.of_nat (2 ^ sz))%Z). {
+    replace 1%Z with (Z.of_nat 1); auto.
+    apply Nat2Z.inj_lt.
+    apply one_lt_pow2'.
+    lia.
+  }
+  lia.
+  assert (sth : (1 <= Z.of_nat (2 ^ sz))%Z). {
+    replace 1%Z with (Z.of_nat 1); auto.
+    apply Nat2Z.inj_le.
+    apply one_le_pow2.
+  }
+  rewrite <- Zpow_of_nat.
+  lia.
+  apply Z.pow_nonzero; lia.
+Qed.
+
+Lemma combine_wones_WO :
+  forall (sz : nat) (w : word sz),
+    w <> wzero sz ->
+    @truncMsb 1 (sz + 1) (wconcat (natToWord 1 0) (wones sz) ^+ wconcat (natToWord 1 0) w) = natToWord 1 1.
+Proof.
+  intros.
+  arithmetizeWord.
+  simpl.
+  assert (Z.pow_pos 2 1 = 2)%Z by auto; rewrite !H1; simpl; clear H1.
+  assert (1 mod 2 = 1)%Z by auto; rewrite H1.
+  rewrite Nat.add_sub.
+  rewrite Zplus_mod_idemp_r, Zplus_mod_idemp_l, (Zmod_small (_ - 1) _); [|lia].
+  rewrite (Zmod_small (_ + wordVal)).
+  - assert (0 <= wordVal - 1 < 2 ^ Z.of_nat sz)%Z as P0.
+    {
+      split; [|lia].
+      apply Zlt_0_le_0_pred.
+      destruct H0; destruct (Zle_lt_or_eq _ _ H0); auto.
+      exfalso; apply H.
+      rewrite <- H3, Zmod_0_l; reflexivity.
+    }
+    erewrite <- (Z.div_unique_pos _ _ 1 _ P0); [assumption|lia].
+  - rewrite Nat2Z.inj_add, Z.pow_add_r; simpl; lia.
+Qed.
+
+Lemma wones_pow2_minus_one : forall sz, wordToNat _ (wones sz) = 2 ^ sz - 1.
+Proof.
+  intros.
+  unfold wordToNat.
+  arithmetizeWord.
+  simpl.
+  rewrite Z.mod_small; try split; try lia.
+  rewrite Z2Nat.inj_sub; try lia.
+  rewrite <- Zpow_of_nat, Nat2Z.id; auto.
+  assert (H : (1 <= 2 ^ Z.of_nat sz)%Z) by (apply Zpow_1_le; lia).
+  lia.
+Qed.
+
+Lemma split1_combine_wplus :
+  forall sz1 sz2 (w11 w21 : word sz1) (w12 w22 : word sz2),
+    @truncLsb sz1 (sz1 + sz2) (wconcat w12 w11 ^+ wconcat w22 w21) = w11 ^+ w21.
+Proof.
+  intros.
+  unfold truncLsb.
+  arithmetizeWord.
+  rewrite Zplus_mod_idemp_r, Zplus_mod_idemp_l,
+  Nat2Z.inj_add, Z.pow_add_r, <- Znumtheory.Zmod_div_mod; try lia.
+  - assert ((wordVal0 * 2 ^ Z.of_nat sz1 + wordVal2 + (wordVal * 2 ^ Z.of_nat sz1 + wordVal1))
+            = (wordVal2 + wordVal1 + ((wordVal0 + wordVal) * 2 ^ Z.of_nat sz1)))%Z as P0 by lia.
+    rewrite P0, Z_mod_plus_full.
+    reflexivity.
+  - apply Z.mul_pos_pos; try lia.
+  - rewrite Z.mul_comm; eexists; reflexivity.
+Qed.
+
+Lemma wordToNat_combine :
+  forall sz1 (w1 : word sz1) sz2 (w2 : word sz2) outSz,
+    outSz = sz1 + sz2 ->
+    wordToNat _ (@wconcat _ _ outSz w2 w1) = wordToNat _ w1 + 2 ^ sz1 * wordToNat _ w2.
+Proof.
+  intros.
+  unfold wordToNat.
+  arithmetizeWord; simpl.
+  rewrite H, Zmod_small.
+  - rewrite Z2Nat.inj_add, Z2Nat.inj_mul, pow2_of_nat, Nat2Z.id ; try lia.
+    apply Z.mul_nonneg_nonneg; lia.
+  - split.
+    + apply Z.add_nonneg_nonneg; [|lia].
+      apply Z.mul_nonneg_nonneg; lia.
+    + rewrite Nat2Z.inj_add, Z.pow_add_r; try lia.
+      apply (Z.lt_le_trans _ ( 2 ^ Z.of_nat sz1 * (wordVal  + 1)) _);[lia|].
+      rewrite <- Z.mul_le_mono_pos_l; lia.
+Qed.
+
+Lemma wordToNat_natToWord_idempotent' : forall sz n , n < 2 ^ sz -> wordToNat _ (natToWord sz n) = n.
+Proof.
+  intros.
+  unfold wordToNat, natToWord.
+  simpl.
+  rewrite <- Zpow_of_nat.
+  rewrite <- mod_Zmod.
+  rewrite Nat2Z.id.
+  rewrite Nat.mod_small; auto.
+  apply Nat.pow_nonzero; auto.
+Qed.
+
+Lemma wones_natToWord : forall sz, wones sz = natToWord sz (2 ^ sz - 1).
+Proof.
+  intros.
+  unfold natToWord, wones.
+  arithmetizeWord.
+  rewrite Nat2Z.inj_sub, Zpow_of_nat.
+  auto.
+  apply one_le_pow2.
+Qed.
+
+Lemma natToWord_plus : forall sz n m, natToWord sz (n + m) = natToWord sz n ^+ natToWord sz m.
+Proof.
+  intros.
+  unfold natToWord.
+  arithmetizeWord.
+  rewrite Nat2Z.inj_add, Zplus_mod.
+  auto.
+Qed.
+
+Lemma natToWord_pow2_add : forall sz n, natToWord sz (n + 2 ^ sz) = natToWord sz n.
+Proof.
+  intros. unfold natToWord.
+  arithmetizeWord.
+  rewrite Nat2Z.inj_add.
+  rewrite Zpow_of_nat.
+  rewrite Zplus_mod, Z_mod_same_full, Z.add_0_r.
+  rewrite Zmod_mod.
+  auto.
+Qed.
+
+Lemma split2_zero : forall sz1 sz2, @truncMsb sz2 (sz1 + sz2) (natToWord (sz1 + sz2) 0) = natToWord sz2 0.
+Proof.
+  intros.
+  unfold natToWord.
+  simpl.
+  arithmetizeWord. 
+  rewrite !Z.mod_0_l; auto; apply Z.pow_nonzero; lia.
+Qed.
+
+Lemma wordToNat_bound : forall sz (w : word sz), wordToNat _ w < 2 ^ sz.
+Proof.
+  intros. unfold wordToNat.
+  arithmetizeWord. 
+  apply Nat2Z.inj_lt.
+  rewrite Z2Nat.id, Zpow_of_nat; intuition.
+Qed.
+
+Lemma wminus_minus :
+  forall sz (a b : word sz), (wltu _ b a = true) ->
+                             wordToNat _ (a ^- b) = wordToNat _ a - wordToNat _ b.
+Proof.
+  intros. unfold wordToNat, wltu in *.
+  arithmetizeWord.
+  simpl in *.
+  rewrite Z.mod_small.
+  rewrite Z2Nat.inj_sub; intuition.
+  apply Z.ltb_lt in H. lia.
+Qed.
+
+Lemma lt_minus' :
+  forall a b c : nat, b <= a -> b < c -> a < c -> a - b < c.
+Proof. intros. lia. Qed.
+
+Lemma Nat2Z_ZToWord :
+  forall sz (n : nat), ZToWord sz (Z.of_nat n) = natToWord _ n.
+Proof. intros; auto. Qed.
+
+Lemma mod_sub' : forall a b, b <> 0 -> a < b * 2 -> a >= b -> a mod b = a - b.
+Proof.
+  intros.
+  rewrite <- (@mod_sub _ 1 _); try lia.
+  rewrite Nat.mod_small; lia.
+Qed.
+
+Lemma wordVal_pos : forall sz (w : word sz), (0 <= wordVal _ w)%Z.
+Proof. intros. arithmetizeWord. lia. Qed.
+
+Lemma wordToNat_lt1 sz (a b : word sz) : wltu _ a b = true -> wordToNat _ a < wordToNat _ b.
+Proof.
+  unfold wltu, wordToNat.
+  intros.
+  arithmetizeWord. 
+  simpl in *.
+  apply Z.ltb_lt in H.
+  apply Z2Nat.inj_lt; lia.
+Qed.
+
+Lemma wordToNat_natToWord_eqn sz n : wordToNat _ (natToWord sz n) = n mod (2 ^ sz).
+Proof.
+  unfold wordToNat, natToWord.
+  simpl.
+  rewrite <- Zpow_of_nat.
+  rewrite <- mod_Zmod.
+  rewrite Nat2Z.id. auto.
+  apply Nat.pow_nonzero; auto.
+Qed.
+
+Lemma move_wplus_wminus' sz (a b c : word sz) : a ^+ b = c <-> a = c ^- b. 
+Proof.
+  apply move_wadd_wminus.
+Qed.
+
+
+Lemma wltu_wordToNat sz (w w' : word sz) :
+  wltu _ w w' = (wordToNat _ w <? wordToNat _ w').
+Proof.
+  unfold wordToNat, wltu.
+  case_eq (wordVal _ w <? wordVal _ w')%Z; intros; [apply Z.ltb_lt in H | apply Z.ltb_nlt in H]; symmetry.
+  + apply Nat.ltb_lt.
+    apply Z2Nat.inj_lt; try apply wordVal_pos; auto.
+  + apply Nat.ltb_nlt.
+    intros H'.
+    apply Z2Nat.inj_lt in H'; try apply wordVal_pos; auto.
+Qed.
+
+Lemma wleu_wordToNat sz (w w' : word sz) :
+  wleu _ w w' = (wordToNat _ w <=? wordToNat _ w').
+Proof.
+  unfold wordToNat, wleu.
+  case_eq (wordVal _ w <=? wordVal _ w')%Z; intros; [apply Z.leb_le in H | apply Z.leb_nle in H]; symmetry.
+  + apply Nat.leb_le.
+    apply Z2Nat.inj_le; try apply wordVal_pos; auto.
+  + apply Nat.leb_nle.
+    intros H'.
+    apply Z2Nat.inj_le in H'; try apply wordVal_pos; auto.
+Qed.
+
+Lemma pow2_wzero sz : natToWord sz (2 ^ sz) = wzero sz.
+Proof.
+  arithmetizeWord.
+  rewrite <- Zpow_of_nat.
+  rewrite Z_mod_same_full.
+  rewrite Z.mod_0_l.
+  auto.
+  rewrite Zpow_of_nat.
+  apply Z.pow_nonzero; lia.
+Qed.
+
+Lemma concat_split' sz1 sz2 (w : word (sz2 + sz1)) :
+  @wconcat sz1 sz2 (sz2 + sz1) (@truncMsb sz1 (sz2 + sz1) w) (@truncLsb sz2 (sz2 + sz1) w) = w.
+Proof.
+  intros. 
+  arithmetizeWord. 
+  erewrite Nat.add_sub, Z.add_comm, Z.mul_comm, <- Z.rem_mul_r.
+  - erewrite <- Z.pow_add_r, <- Nat2Z.inj_add,  Nat.add_comm; try apply Nat2Z.is_nonneg.
+    rewrite Nat.add_comm.
+    repeat rewrite wordBound; auto.
+  - intro.
+    specialize (Z_of_nat_pow_2_gt_0 sz2) as P0; lia.
+  - specialize (Z_of_nat_pow_2_gt_0 sz1) as P0; lia.
+Qed.
+
+Lemma combine_natToWord_wzero n x : 
+  x < 2 ^ n -> wconcat (natToWord 1 0) (natToWord n x) = natToWord (n + 1) x.
+Proof.
+  intros.
+  unfold natToWord.
+  simpl.
+  arithmetizeWord.
+  simpl.
+  assert (H' : (Z.of_nat x < 2 ^ Z.of_nat n)%Z).
+  { rewrite <- Zpow_of_nat. apply Nat2Z.inj_lt. auto. }
+  assert (sth : (Z.of_nat x mod 2 ^ Z.of_nat n = Z.of_nat x)%Z).
+  { apply Z.mod_small; lia. }
+  rewrite sth.
+  auto.
+Qed.
+
+Lemma split1_combine sz1 sz2 (w : word sz1) (z : word sz2) :
+  @truncLsb sz1 (sz1 + sz2) (wconcat z w) = w.
+Proof.
+  rewrite plus_comm.
+  rewrite truncLsb_concat.
+  auto.
+Qed.
+
+Lemma split1_fits_natToWord n sz:
+  n < 2 ^ sz -> 
+  (@truncLsb sz _ (natToWord (sz + 1) n) = natToWord sz n).
+Proof.
+  intro.
+  rewrite <- combine_natToWord_wzero; auto.
+  rewrite split1_combine; auto.
+Qed.
+
+
+Unset Implicit Arguments.
+
+Lemma getBool_weq sz (w1 w2: word sz):
+  getBool (weq _ w1 w2) = true -> w1 = w2.
+Proof.
+  intros.
+  destruct (weq _ w1 w2); [auto | discriminate].
+Qed.
+
+Lemma if_same A (x: A) (p: bool): (if p then x else x) = x.
+Proof.
+  destruct p; auto.
+Qed.
+
+Lemma mod_factor a b c:
+  b <> 0 ->
+  c <> 0 ->
+  (a mod (b * c)) mod b = a mod b.
+Proof.
+  intros.
+  pose proof (Nat.mod_mul_r a _ _ H H0).
+  rewrite H1.
+  rewrite Nat.add_mod_idemp_l by auto.
+  rewrite Nat.add_mod by auto.
+  assert (sth: b * ((a/b) mod c) = (a/b) mod c * b) by (apply Nat.mul_comm).
+  rewrite sth.
+  rewrite Nat.mod_mul by auto.
+  rewrite Nat.add_0_r.
+  rewrite Nat.mod_mod by auto.
+  auto.
+Qed.
+
+Lemma mod_factor' a b c d:
+  b <> 0 -> c <> 0 -> d = b * c -> (a mod d) mod b = a mod b.
+Proof. 
+  pose proof (@mod_factor a b c).
+  intros.
+  subst.
+  eapply H; eauto.
+Qed.
+
+Lemma if_bool_2 A (x y: A) (p1 p2: bool):
+  p1 = p2 ->
+  (if p1 then x else y) = (if p2 then x else y).
+Proof.
+  intros sth.
+  rewrite sth.
+  auto.
+Qed.
+
+Lemma mod_cancel_l:
+  forall a b x n,
+    n <> 0 ->
+    a mod n = b mod n ->
+    (x + a) mod n = (x + b) mod n.
+Proof.
+  intros.
+  rewrite <- Nat.add_mod_idemp_r; auto.
+  rewrite H0.
+  rewrite Nat.add_mod_idemp_r; auto.
+Qed.
+
+Lemma pow2_1_iff_0 n:
+  2 ^ n = 1 <-> n = 0.
+Proof.
+  induction n; split; intro; try lia.
+  simpl. reflexivity.
+  destruct IHn.
+  pose proof (one_lt_pow2 n) as sth1.
+  rewrite H in sth1.
+  apply False_ind.
+  inversion sth1.
+  inversion H3.
+Qed.
+
+Lemma pow2_lt_S n:
+  n > 0 ->
+  2 ^ n + 1 < 2 ^ (n + 1).
+Proof.
+  pose proof (pow2_le_S n) as sth.
+  apply Nat.lt_eq_cases in sth.
+  destruct sth; auto.
+  intro sth.
+  apply False_ind.
+  apply Nat.add_sub_eq_l in H.
+  pose proof (pow2_1_iff_0 n) as sth1.
+  replace (2 ^ n) with (2 ^ n * 1) in H by lia.
+  rewrite pow2_add_mul in H.
+  rewrite <- Nat.mul_sub_distr_l in H.
+  simpl in H.
+  destruct sth1 as [sth2 sth3].
+  rewrite sth2 in sth; lia.
+Qed.
+
+Lemma pow2_lt_2 n:
+  1 < n -> 2 < 2 ^ n.
+Proof.
+  intro sth.
+  induction n.
+  inversion sth.
+  simpl.
+  assert (sth1: n = 1 \/ n > 1) by lia.
+  destruct sth1.
+  rewrite H.
+  simpl.
+  auto.
+  simpl.
+  apply Nat.lt_lt_add_l.
+  rewrite Nat.add_0_r.
+  lia.
+Qed.
+
+Lemma pow2_lt_pow2_S n : 2 ^ n < 2 ^ (n + 1).
+Proof.
+  rewrite Nat.add_1_r.
+  simpl.
+  assert (0 < 2 ^ n) by apply zero_lt_pow2.
+  lia.
+Qed.
