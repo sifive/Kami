@@ -146,7 +146,22 @@ Section Word.
 
   Definition wsplitr (sz1 sz2 : nat) (w : @word (sz1 + sz2)) : @word sz2 :=
     ZToWord _ ((wordVal _ w) mod (Z.pow 2 (Z.of_nat sz2)))%Z.
-  
+
+  Fixpoint nat_cast (P : nat -> Type) {n m} : n = m -> P n -> P m.
+    refine match n, m return n = m -> P n -> P m with
+           | O, O => fun _ => id
+           | S n, S m => fun pf => @nat_cast (fun n => P (S n)) n m (f_equal pred pf)
+           | _, _ => fun pf => match _ pf : False with end
+           end;
+      clear; abstract congruence.
+  Defined.
+
+  Definition wmsb sz (w : word sz) (b : bool) :=
+    if (sz =? 0)%nat then b else (0 <? wordToNat _ w / 2 ^ (sz - 1)).
+
+  Definition wleu sz (x y : word sz) :=
+    (wordVal _ x <=? wordVal _ y)%Z.
+
 End Word.
 
 Module Notations.
