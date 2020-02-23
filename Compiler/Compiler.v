@@ -727,8 +727,8 @@ Section EActionT_Semantics.
   Variable o : RegsT.
 
   Inductive UpdOrMeth : Type :=
-  | Upd : RegT -> UpdOrMeth
-  | Meth : MethT -> UpdOrMeth.
+  | umUpd : RegT -> UpdOrMeth
+  | umMeth : MethT -> UpdOrMeth.
 
   Definition UpdOrMeths := list UpdOrMeth.
 
@@ -736,8 +736,8 @@ Section EActionT_Semantics.
     match uml with
     | um :: uml' =>
       match um with
-      | Upd u => u :: (UpdOrMeths_RegsT uml')
-      | Meth _ => (UpdOrMeths_RegsT uml')
+      | umUpd u => u :: (UpdOrMeths_RegsT uml')
+      | umMeth _ => (UpdOrMeths_RegsT uml')
       end
     | nil => nil
     end.
@@ -746,8 +746,8 @@ Section EActionT_Semantics.
     match uml with
     | um :: uml' =>
       match um with 
-      | Upd _ => (UpdOrMeths_MethsT uml')
-      | Meth m => m :: (UpdOrMeths_MethsT uml')
+      | umUpd _ => (UpdOrMeths_MethsT uml')
+      | umMeth m => m :: (UpdOrMeths_MethsT uml')
       end
     | nil => nil
     end.
@@ -756,7 +756,7 @@ Section EActionT_Semantics.
     forall k, EActionT type k -> UpdOrMeths -> type k -> Prop :=
   | ESemCall (meth : string) (s : Kind * Kind) (marg : Expr type (SyntaxKind (fst s))) (mret : type (snd s)) (retK : Kind)
              (fret : type retK) (cont : type (snd s) -> EActionT type retK) (uml : UpdOrMeths) (auml : list UpdOrMeth)
-             (HNewList : auml = (Meth (meth, existT SignT s (evalExpr marg, mret)) :: uml))
+             (HNewList : auml = (umMeth (meth, existT SignT s (evalExpr marg, mret)) :: uml))
              (HESemAction : ESemAction (cont mret) uml fret) :
       ESemAction (EMCall meth s marg cont) auml fret
   | ESemLetExpr (k : FullKind) (e : Expr type k) (retK : Kind) (fret : type retK) (cont : fullType type k -> EActionT type retK)
@@ -781,7 +781,7 @@ Section EActionT_Semantics.
                  (newUml : list UpdOrMeth) (anewUml : list UpdOrMeth)
                  (HRegVal : In (r, k) (getKindAttr o))
                  (HDisjRegs : key_not_In r (UpdOrMeths_RegsT newUml))
-                 (HANewUml : anewUml = (Upd (r, existT _ _ (evalExpr e))) :: newUml)
+                 (HANewUml : anewUml = (umUpd (r, existT _ _ (evalExpr e))) :: newUml)
                  (HESemAction : ESemAction cont newUml fret):
       ESemAction (EWriteReg r e cont) anewUml fret
   | ESemIfElseTrue (p : Expr type (SyntaxKind Bool)) (k1 : Kind) (ea ea' : EActionT type k1) (r1 : type k1) (k2 : Kind) (cont : type k1 -> EActionT type k2)
@@ -829,7 +829,7 @@ Section EActionT_Semantics.
                   (HRegVal : In (dataArray, (existT _ (SyntaxKind (Array idxNum Data)) regV)) o)
                   (HMask : optMask = Some mask)
                   (HANewUml : anewUml =
-                              (Upd (dataArray, existT _ _
+                              (umUpd (dataArray, existT _ _
                                                       (evalExpr (fold_left (fun newArr i =>
                                                                       ITE
                                                                         (ReadArrayConst mask i)
@@ -849,7 +849,7 @@ Section EActionT_Semantics.
                   (HRegVal : In (dataArray, (existT _ (SyntaxKind (Array idxNum Data)) regV)) o)
                   (HMask : optMask = None)
                   (HANewUml : anewUml =
-                              (Upd (dataArray, existT _ _
+                              (umUpd (dataArray, existT _ _
                                                       (evalExpr (fold_left (fun newArr i =>
                                                                       (UpdateArray newArr
                                                                                    (CABit Add (idx :: Const type (natToWord _ (proj1_sig (Fin.to_nat i)))
@@ -865,7 +865,7 @@ Section EActionT_Semantics.
                         (HisAddr : isAddr = true)
                         (HRegVal : In (readRegName, (SyntaxKind (Bit (Nat.log2_up idxNum)))) (getKindAttr o))
                         (HDisjRegs : key_not_In readRegName (UpdOrMeths_RegsT newUml))
-                        (HANewUml : anewUml = (Upd (readRegName, existT _ _ (evalExpr idx))) :: newUml)
+                        (HANewUml : anewUml = (umUpd (readRegName, existT _ _ (evalExpr idx))) :: newUml)
                         (HESemAction : ESemAction cont newUml fret):
       ESemAction (ESyncReadReq idxNum num readReqName readRegName dataArray idx Data isAddr cont) anewUml fret
   | ESemSyncReadReqFalse (idxNum num : nat) (readReqName readRegName dataArray : string) (idx : Bit (Nat.log2_up idxNum) @# type) (Data : Kind) (isAddr : bool)
@@ -876,7 +876,7 @@ Section EActionT_Semantics.
                          (HRegVal2 : In (dataArray, (existT _ (SyntaxKind (Array idxNum Data)) regV)) o)
                          (HDisjRegs : key_not_In readRegName (UpdOrMeths_RegsT newUml))
                          (HANewUml : anewUml =
-                                     (Upd (readRegName, existT _ _
+                                     (umUpd (readRegName, existT _ _
                                                                (evalExpr
                                                                   (BuildArray (fun i : Fin.t num =>
                                                      ReadArray

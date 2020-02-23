@@ -4894,7 +4894,6 @@ Section SimulationZeroAct_new.
     TraceInclusion (Base imp) (Base spec).
   Proof.
     destruct imp, spec.
-    Print WfBaseModule.
     pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new)) as x.
     pose (Build_BaseModuleWf (WfBaseModule_new_WfBaseModule wfBaseModule_new0)) as y.
     eapply (simulationZeroAct x y); eauto.

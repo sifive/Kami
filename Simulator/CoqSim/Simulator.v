@@ -232,8 +232,6 @@ Definition do_updates(upds : Updates)(regs : SimRegs) : SimRegs :=
 
 End Regs.
 
-Check eval_ActionT.
-
 Section Regs2.
 
 (* Definition consistent(regs1 regs2 : SimRegs) := forall r k,
