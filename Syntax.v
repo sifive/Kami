@@ -1005,8 +1005,6 @@ Proof.
 Qed.
  *)
 
-Check WfBaseModule.
-
 Lemma WfBaseModule_WfBaseModule_new : forall bm, WfBaseModule bm -> WfBaseModule_new bm.
 Proof.
   intros bm [wf_actions [wf_meths [nodup_meths [nodup_regs nodup_rules]]]].
