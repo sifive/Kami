@@ -99,8 +99,8 @@ Delimit Scope kami_struct_scope with kami_struct.
 (** Notations for expressions *)
 
 Notation "k @# ty" := (Expr ty (SyntaxKind k)) (no associativity, at level 98, only parsing).
-Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (only parsing) : kami_expr_scope.
-Notation "$ n" := (Const _ (natToWord _ n)): kami_expr_scope.
+Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (no associativity, at level 0, only parsing) : kami_expr_scope.
+Notation "$ n" := (Const _ (natToWord _ n)) (no associativity, at level 0): kami_expr_scope.
 Notation "$$ e" := (Const ltac:(assumption) e) (at level 8, only parsing) : kami_expr_scope.
 
 Notation "! v" := (UniBool Neg v) (at level 35): kami_expr_scope.
@@ -152,15 +152,15 @@ Notation "{< a , .. , b >}" :=
   ((BinBit (Concat _ _)) a .. (BinBit (Concat _ _) b (@Const _ (Bit 0) WO)) ..)
     (at level 100, a at level 99): kami_expr_scope.
 Notation "{< a , .. , b >}" :=
-  (Word.combine b .. (Word.combine a WO) ..)
+  (wcombine b .. (wcombine a WO) ..)
     (at level 100, a at level 99): word_scope.
 
 Infix "<" := (BinBitBool (LessThan _)) : kami_expr_scope.
 Notation "x > y" := (BinBitBool (LessThan _) y x) : kami_expr_scope.
 Notation "x >= y" := (UniBool Neg (BinBitBool (LessThan _) x y)) : kami_expr_scope.
 Notation "x <= y" := (UniBool Neg (BinBitBool (LessThan _) y x)) : kami_expr_scope.
-Infix "<s" := (Slt _) : kami_expr_scope.
-Notation "x >s y" := (Slt _ y x) : kami_expr_scope.
+Infix "<s" := (Slt _) (at level 70): kami_expr_scope.
+Notation "x >s y" := (Slt _ y x) (at level 70, y at next level): kami_expr_scope.
 Notation "x >=s y" := (UniBool Neg (Slt _ x y)) (at level 100) : kami_expr_scope.
 Notation "x <=s y" := (UniBool Neg (Slt _ y x)) (at level 100): kami_expr_scope.
 Infix "==" := Eq (at level 39, no associativity) : kami_expr_scope.
@@ -346,7 +346,7 @@ Definition callNames (ty: Kind -> Type) k names := map (fun r =>
 Definition writeNames (ty: Kind -> Type) k namesVals :=
   map (fun r => 
          (@WriteReg _ _ (fst r) (SyntaxKind k) (snd r)
-                    (Return (Const ty WO)))) namesVals.
+                    (Return (Const ty (ZToWord 0 0))))) namesVals.
 
 (* Complex list action notations *)
 Notation "'GatherActions' actionList 'as' val ; cont" :=

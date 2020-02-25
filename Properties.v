@@ -475,11 +475,13 @@ Section evalExpr.
   Lemma evalExpr_Void (e: Expr type (SyntaxKind (Bit 0))):
     evalExpr e = WO.
   Proof.
-    inversion e; auto.
+    destruct (evalExpr e).
+    arithmetizeWord; simpl in *.
+    rewrite Z.mod_1_r; lia.
   Qed.
 
   Lemma evalExpr_countLeadingZeros ni: forall no (e: Expr type (SyntaxKind (Bit ni))),
-      evalExpr (countLeadingZeros no e) = countLeadingZerosWord no (evalExpr e).
+      evalExpr (countLeadingZeros no e) = countLeadingZerosWord _ no (evalExpr e).
   Proof.
     induction ni; simpl; intros; auto.
     rewrite evalExpr_castBits.
@@ -507,11 +509,11 @@ Section evalExpr.
   Proof.
     intros.
     pose proof (log2_up_pow2 n); pose proof (fin_to_nat_bound i).
-    rewrite wordToNat_natToWord_2; lia.
+    rewrite wordToNat_natToWord; lia.
   Qed.
 
   Lemma eval_ReadArray_in_bounds : forall A n (arr : Expr type (SyntaxKind (Array n A))) i m,
-    n <= pow2 m ->
+    n <= 2 ^ m ->
     evalExpr
       (ReadArray arr
         (Var type (SyntaxKind (Bit m))
@@ -519,11 +521,15 @@ Section evalExpr.
     evalExpr arr i.
   Proof.
     intros.
+    simpl.
     pose proof (fin_to_nat_bound i).
+    rewrite Z.mod_small.
+    rewrite Nat2Z.id.
+    destruct (lt_dec (proj1_sig (to_nat i)) n); try lia.
     unfold evalExpr at 1.
-    rewrite wordToNat_natToWord_2 by lia.
-    destruct (Compare_dec.lt_dec _ _) as [? | ?]; [| exfalso; auto].
     erewrite Fin.of_nat_ext, Fin.of_nat_to_nat_inv; eauto.
+    split; try lia. rewrite pow2_of_nat.
+    apply Nat2Z.inj_lt. lia.
   Qed.
 
   Corollary eval_ReadArray_in_bounds_log : forall A n (arr : Expr type (SyntaxKind (Array n A))) i,
@@ -534,7 +540,7 @@ Section evalExpr.
     evalExpr arr i.
   Proof. intros; apply eval_ReadArray_in_bounds, log2_up_pow2. Qed.
 
-  Corollary eval_ReadArray_in_bounds_pow : forall A n (arr : Expr type (SyntaxKind (Array (pow2 n) A))) i,
+  Corollary eval_ReadArray_in_bounds_pow : forall A n (arr : Expr type (SyntaxKind (Array (2 ^ n) A))) i,
     evalExpr
       (ReadArray arr
         (Var type (SyntaxKind (Bit n))
@@ -1196,7 +1202,8 @@ Proof.
       simpl.
       destruct (in_dec string_dec rn (map fst (getAllRules m1))); simpl; auto.
       apply (in_map fst) in HInRules.
-      clear - DisjRules DisjMeths HInRules i; firstorder.
+      clear - DisjRules DisjMeths HInRules i.
+      specialize (DisjRules rn); specialize (DisjMeths rn); tauto.
     + eapply IHSubsteps; eauto.
   - simpl in *.
     destruct H0.
@@ -1204,7 +1211,8 @@ Proof.
       simpl.
       destruct (in_dec string_dec fn (map fst (getAllMethods m1))); simpl; auto.
       apply (in_map fst) in HInMeths.
-      clear - DisjRules DisjMeths HInMeths i; firstorder.
+      clear - DisjRules DisjMeths HInMeths i.
+      specialize (DisjRules fn); specialize (DisjMeths fn); tauto.
     + eapply IHSubsteps; eauto.
 Qed.
 
@@ -1226,14 +1234,17 @@ Proof.
         (clear - DisjRules; unfold DisjKey in *; simpl in *;
          rewrite ?map_app in *; setoid_rewrite in_app_iff in DisjRules; firstorder fail).
     assert (sth2: DisjKey (getAllMethods m1) (getAllMethods m0)) by
-        (clear - DisjMeths; unfold DisjKey in *; simpl in *;
-         rewrite ?map_app in *; setoid_rewrite in_app_iff in DisjMeths; firstorder fail).
+    (clear - DisjMeths; unfold DisjKey in *; simpl in *; intro k;
+        rewrite ?map_app in *; specialize (DisjMeths k); rewrite in_app_iff in DisjMeths;
+          tauto).
     assert (sth3: DisjKey (getAllRules m1) (getAllRules m2)) by
-        (clear - DisjRules; unfold DisjKey in *; simpl in *;
-         rewrite ?map_app in *; setoid_rewrite in_app_iff in DisjRules; firstorder fail).
+        (clear - DisjRules; unfold DisjKey in *; simpl in *; intro k;
+        rewrite ?map_app in *; specialize (DisjRules k); rewrite in_app_iff in DisjRules;
+          tauto).
     assert (sth4: DisjKey (getAllMethods m1) (getAllMethods m2)) by
-        (clear - DisjMeths; unfold DisjKey in *; simpl in *;
-         rewrite ?map_app in *; setoid_rewrite in_app_iff in DisjMeths; firstorder fail).
+        (clear - DisjMeths; unfold DisjKey in *; simpl in *; intro k;
+        rewrite ?map_app in *; specialize (DisjMeths k); rewrite in_app_iff in DisjMeths;
+          tauto).
     specialize (IHStep1 sth1 sth2 fv).
     specialize (IHStep2 sth3 sth4 fv).
     rewrite ?map_app, in_app_iff in *.
@@ -1242,7 +1253,8 @@ Proof.
       match goal with
       | |- getBool ?P = _ => destruct P
       end; simpl; auto;
-        rewrite ?in_app_iff in *; simpl in *; firstorder fail.
+        rewrite ?in_app_iff in *; simpl in *;
+          clear - IHStep1 IHStep2 H1; firstorder fail.
 Qed.
   
 Lemma DisjMeths_1_id m1 o1 l1 m2 o2 l2:
@@ -1278,7 +1290,7 @@ Proof.
     + eapply Step_rm_In; eauto.
   - eapply Step_rm_not_In; eauto.
     + clear - DisjRules; firstorder fail.
-    + clear - DisjMeths; firstorder fail.
+    + clear - DisjMeths; intro k; specialize (DisjMeths k); tauto.
 Qed.
   
 Lemma DisjMeths_1_negb m1 o1 l1 m2 o2 l2:
@@ -1318,7 +1330,7 @@ Proof.
   - setoid_rewrite negb_true_iff.
     eapply Step_rm_not_In; eauto.
     + clear - DisjRules; firstorder fail.
-    + clear - DisjMeths; firstorder fail.
+    + clear - DisjMeths; intro k; specialize (DisjMeths k); tauto.
 Qed.
 
 Lemma Substeps_upd_SubList_key m o l:
@@ -1611,7 +1623,7 @@ Section SplitJoin.
     rewrite in_app_iff in *.
     destruct H1; auto.
     pose proof (Step_upd_SubList_key H0 _ _ _ H1 H2) as sth.
-    firstorder fail.
+    specialize (DisjRegs s); tauto.
   Qed.
     
   Lemma Step_upd_2 o l:
@@ -1633,7 +1645,7 @@ Section SplitJoin.
     rewrite in_app_iff in *.
     destruct H1; auto.
     pose proof (Step_upd_SubList_key H _ _ _ H1 H2) as sth.
-    firstorder fail.
+    specialize (DisjRegs s); tauto.
   Qed.
 
   Local Notation optFullType := (fun fk => option (fullType type fk)).
@@ -1817,14 +1829,14 @@ Section SplitJoin.
           -- split; auto.
              intro.
              dest.
-             destruct H11; [firstorder fail|].
+             destruct H11;[apply H8; eexists; eauto|].
              rewrite in_map_iff in H12; dest.
              destruct x0.
              subst.
              simpl in *.
              pose proof (Step_upd_SubList_key HStep0 _ _ _ H11 H13).
              pose proof (Step_read HStep _ _ H10).
-             firstorder fail.
+             specialize (DisjRegs s0); tauto.
         * specialize (H0 _ _ H9).
           rewrite ?map_app.
           repeat setoid_rewrite in_app_iff.
@@ -1833,14 +1845,14 @@ Section SplitJoin.
           -- split; auto.
              intro.
              dest.
-             destruct H11; [|firstorder fail].
+             destruct H11; [|apply H0; eexists; eauto].
              rewrite in_map_iff in H12; dest.
              destruct x0.
              subst.
              simpl in *.
              pose proof (Step_upd_SubList_key HStep _ _ _ H11 H13).
              pose proof (Step_read HStep0 _ _ H10).
-             firstorder fail.
+             specialize (DisjRegs s0); tauto.
   Qed.
 
   Lemma JoinTrace_len l1:
@@ -1888,7 +1900,7 @@ Section SplitJoin.
     repeat rewrite mapProp_len_conj; auto.
     pose proof (@JoinTrace_len l1 l2 o1 o2 H).
     intros; dest.
-    firstorder fail.
+    eapply H0; eauto.
   Qed.
 End SplitJoin.
 
@@ -1928,8 +1940,9 @@ Proof.
   - eapply Substeps_meth_In; eauto.
   - eauto.
   - rewrite map_app, in_app_iff in *.
-    clear - IHStep1 IHStep2 H1;
-      firstorder fail.
+    clear - IHStep1 IHStep2 H1.
+    specialize (IHStep1 u f cs); specialize (IHStep2 u f cs).
+    tauto.
 Qed.
 
 Lemma Step_meth_InExec m o l:
@@ -2857,7 +2870,7 @@ Proof.
       specialize (IHl0 HStep); dest.
       split; [auto| split; [auto| intros]].
       rewrite createHide_Meths in *; simpl in *.
-      destruct H3; [subst |clear - H1 H2 H3; firstorder fail].
+      destruct H3; [subst |clear - H1 H2 H3; apply H1; auto].
       eapply HHidden; eauto.
   - induction (getHidden m); simpl; auto; dest.
     + constructor; auto.
@@ -3157,7 +3170,7 @@ Proof.
   specialize (H f H0).
   simpl in *. apply H.
   rewrite (map_app) in *; apply in_app_iff; apply in_app_iff in H1.
-  firstorder fail.
+  tauto.
 Qed.
 
 Lemma MatchingExecCalls_Base_comm : forall (l : list FullLabel) (m1 m2 : BaseModule),
@@ -3166,7 +3179,7 @@ Proof.
   repeat intro.
   specialize (H f).
   simpl in *; apply H; auto.
-  rewrite map_app, in_app_iff in *; firstorder fail.
+  rewrite map_app, in_app_iff in *; tauto.
 Qed.
 
 
@@ -3592,7 +3605,7 @@ Qed.
 
 Lemma WeakEqualitySym : forall l1 l2, WeakEquality l1 l2 -> WeakEquality l2 l1.
   intros.
-  firstorder.
+  destruct H; split; auto.
 Qed.
 
 Lemma WfNoDups m (HWfMod : WfMod m) :
@@ -3770,12 +3783,10 @@ Proof.
     setoid_rewrite in_app_iff in H.
     assert (sth1: (forall rule : RuleT, In rule (getAllRules m0) -> WfConcatActionT (snd rule type) m1) /\
                (forall meth : string * {x : Signature & MethodT x},
-                   In meth (getAllMethods m0) -> forall v : type (fst (projT1 (snd meth))), WfConcatActionT (projT2 (snd meth) type v) m1)) by
-        (firstorder fail).
+                   In meth (getAllMethods m0) -> forall v : type (fst (projT1 (snd meth))), WfConcatActionT (projT2 (snd meth) type v) m1)) by (split; dest; intros; auto).
     assert (sth2: (forall rule : RuleT, In rule (getAllRules m2) -> WfConcatActionT (snd rule type) m1) /\
                (forall meth : string * {x : Signature & MethodT x},
-                   In meth (getAllMethods m2) -> forall v : type (fst (projT1 (snd meth))), WfConcatActionT (projT2 (snd meth) type v) m1) ) by
-        (firstorder fail).
+                   In meth (getAllMethods m2) -> forall v : type (fst (projT1 (snd meth))), WfConcatActionT (projT2 (snd meth) type v) m1) ) by (split; dest; intros; auto).
     specialize (IHStep1 sth1).
     specialize (IHStep2 sth2).
     rewrite getNumCalls_app; Omega.omega.
@@ -4085,7 +4096,8 @@ Proof.
   split.
   - induction l; simpl; intros; split; unfold SubList; simpl; intros; try tauto.
     + inv H.
-      destruct H0; subst; rewrite createHide_Meths in *; firstorder fail.
+      destruct H0; subst; rewrite createHide_Meths in *; auto.
+      specialize (IHl HWf); dest; apply H0; assumption.
     + inv H.
       destruct (IHl HWf); assumption.
   - unfold SubList; induction l; simpl; intros; try tauto; dest; constructor.
@@ -4098,7 +4110,8 @@ Proof.
   split.
   - induction l; simpl; intros; split; unfold SubList; simpl; intros; try tauto.
     + inv H.
-      destruct H0; subst; rewrite createHideMod_Meths in *; firstorder fail.
+      destruct H0; subst; rewrite createHideMod_Meths in *; auto.
+      specialize (IHl HWf); dest; apply H0; assumption.
     + inv H.
       destruct (IHl HWf); assumption.
   - unfold SubList; induction l; simpl; intros; try tauto; dest; constructor.
@@ -4244,7 +4257,7 @@ Section TraceSubstitute_new.
   Proof.
     unfold TraceInclusion; intros.
     exists o1, ls1.
-    repeat split; auto; intros; unfold nthProp2; intros; try destruct (nth_error ls1 i); auto; repeat split; intros; try firstorder.
+    repeat split; auto; intros; unfold nthProp2; intros; try destruct (nth_error ls1 i); auto; repeat split; intros; auto.
     apply Trace_flatten_same1_new; auto.
   Qed.
 
@@ -4262,14 +4275,6 @@ Section TraceSubstitute_new.
   Qed.
 End TraceSubstitute_new.
 
-Lemma word0_neq: forall w : word 1, w <> WO~0 -> w = WO~1.
-Proof.
-  intros.
-  shatter_word w.
-  destruct x; auto.
-  tauto.
-Qed.
-
 Section test.
   Variable ty: Kind -> Type.
   Definition Slt2 n (e1 e2: Expr ty (SyntaxKind (Bit (n + 1)))) :=
@@ -4282,39 +4287,45 @@ Lemma Slt_same n e1 e2: evalExpr (Slt2 n e1 e2) = evalExpr (Slt n e1 e2).
 Proof.
   unfold Slt2, Slt.
   simpl.
-  destruct (weq (split2 n 1 (evalExpr e1)) WO~0); simpl; auto.
+  destruct (weq (@truncMsb 1 (n+1) (evalExpr e1)) (ZToWord 1 0)); simpl; auto.
   - rewrite e.
-    destruct (weq (split2 n 1 (evalExpr e2)) WO~0); simpl; auto.
+    destruct (weq (@truncMsb 1 (n+1) (evalExpr e2)) (ZToWord 1 0)); simpl; auto.
     + rewrite e0.
-      destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
-    + destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
-      * destruct (weq WO~0 (split2 n 1 (evalExpr e2))); simpl; auto.
-      * destruct (weq WO~0 (split2 n 1 (evalExpr e2))); simpl; auto.
+      destruct (wltu (evalExpr e1) (evalExpr e2)); simpl; auto.
+    + case_eq (wltu (evalExpr e1) (evalExpr e2)); intros; simpl; auto.
+      * destruct (weq (ZToWord 1 0) (@truncMsb 1 (n+1) (evalExpr e2))); simpl; auto.
+      * destruct (weq (ZToWord 1 0) (@truncMsb 1 (n+1) (evalExpr e2))); simpl; auto.
         apply word0_neq in n0.
-        pre_word_omega.
-        rewrite wordToNat_split2 in *.
-        pose proof (pow2_zero n) as sth0.
-        rewrite Nat.div_small_iff in e by lia.
-        assert (sth: 0 < #(evalExpr e2) / pow2 n) by lia.
-        rewrite Nat.div_str_pos_iff in sth; lia.
-  - destruct (weq (split2 n 1 (evalExpr e2)) WO~0); simpl; auto.
+        rewrite n0 in n1.
+        assert ((wordVal 1 (truncMsb (evalExpr e1))) < (wordVal 1 (truncMsb (evalExpr e2))))%Z.
+        rewrite e. rewrite n0.
+        simpl. rewrite Zmod_0_l.
+        rewrite Zmod_1_l. lia.
+        rewrite Z.pow_pos_fold. lia.
+        specialize truncMsbLtTrue. intros.
+        specialize (H1 (n+1) 1 (evalExpr e1) (evalExpr e2) H0).
+        rewrite H1 in H. eapply (eq_sym H).
+  - destruct (weq (@truncMsb 1 (n+1) (evalExpr e2)) (ZToWord 1 0)); simpl; auto.
     + rewrite e.
-      destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
-      * destruct (weq (split2 n 1 (evalExpr e1)) WO~0); simpl; auto.
+      case_eq (wltu (evalExpr e1) (evalExpr e2)); intros; simpl; auto.
+      * destruct (weq (@truncMsb 1 (n+1) (evalExpr e1)) (ZToWord 1 0)); simpl; auto.
         apply word0_neq in n1.
-        pre_word_omega.
-        rewrite wordToNat_split2 in *.
-        pose proof (pow2_zero n) as sth0.
-        rewrite Nat.div_small_iff in e by lia.
-        assert (sth: 0 < #(evalExpr e1) / pow2 n) by lia.
-        rewrite Nat.div_str_pos_iff in sth; lia.
-      * destruct (weq (split2 n 1 (evalExpr e1)) WO~0); simpl; auto.
+        
+        assert (sth:
+                  (wordVal 1 (truncMsb (evalExpr e2)) < wordVal 1 (truncMsb (evalExpr e1)))%Z).
+        {
+          rewrite e, n1.
+          reflexivity.
+        }
+        pose proof (@truncMsbLtFalse (n+1) 1 (evalExpr e2) (evalExpr e1) sth) as sth2.
+        congruence.
+      * destruct (weq (@truncMsb 1 (n+1) (evalExpr e1)) (ZToWord 1 0)); simpl; auto.
         tauto.
     + apply word0_neq in n0.
       apply word0_neq in n1.
       rewrite ?n0, ?n1.
       simpl.
-      destruct (wlt_dec (evalExpr e1) (evalExpr e2)); simpl; auto.
+      case_eq (wltu (evalExpr e1) (evalExpr e2)); intros; simpl; auto.
 Qed.
 
 Lemma mergeSeparatedBaseFile_noHides (rfl : list RegFileBase) :
@@ -4641,11 +4652,11 @@ Section ModularSubstitution.
         assert (sth5: exists rle, In (Rle rle)
                                      (map (fun x => fst (snd x))
                                           (filterExecs id a l))) by
-            (clear - H18 sth3; firstorder fail).
+            (clear - H18 sth3; eauto).
         assert (sth6: exists rle, In (Rle rle)
                                      (map (fun x => fst (snd x))
                                           (filterExecs id b l))) by
-            (clear - H17 sth4; firstorder fail).
+            (clear - H17 sth4; eauto).
         dest.
         rewrite in_map_iff in *; dest.
         specialize (H15 _ _ H24 H23).
@@ -4671,7 +4682,9 @@ Section ModularSubstitution.
       + dest.
         rewrite H17. rewrite map_app, in_app_iff in *; setoid_rewrite in_app_iff.
         clear - H19 H18 H14.
-        firstorder fail.
+        destruct H14.
+        specialize (H19 (ex_intro _ x3 H )); dest; eauto.
+        specialize (H18 (ex_intro _ x3 H )); dest; eauto.
   Qed.
   
 End ModularSubstitution.

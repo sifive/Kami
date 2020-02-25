@@ -113,7 +113,7 @@ Section DoubleWritesProof.
     (* Write *)
     - inv H0; simpl in *; EqDep_subst.
       assert (val_a = evalExpr (Const type WO)) as P0.
-      {rewrite (shatter_word_0 val_a); auto. }
+      {rewrite (unique_word_0 val_a); auto. }
       subst.
       inversion HSemCompActionT_a; EqDep_subst.
       destruct regMap_a.

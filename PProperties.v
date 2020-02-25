@@ -1361,9 +1361,8 @@ Proof.
   - rewrite HUNewRegs in *.
     rewrite map_app, in_app_iff in *.
     destruct H1; firstorder fail.
-  - subst; rewrite HANewRegs in *;firstorder; simpl in *.
-    subst.
-    assumption.
+  - subst; rewrite HANewRegs in *.
+    destruct H0; subst; simpl; auto.
   - rewrite HUNewRegs in *.
     rewrite map_app, in_app_iff in *.
     destruct H1; intuition.
@@ -1563,13 +1562,14 @@ Proof.
       specialize (IHl0 HPStep); dest.
       split; [auto| split; [auto| intros]].
       rewrite createHide_Meths in *; simpl in *.
-      destruct H3; [subst |clear - H1 H2 H3; firstorder fail].
-      firstorder fail.
+      destruct H3; [subst |clear - H1 H2 H3; apply H1; auto].
+      apply HHidden; assumption.
   - induction (getHidden m); simpl; auto; dest.
     + constructor; auto.
-    + assert (sth: PStep (createHide (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) l0) o l) by firstorder fail.
-      assert (sth2: forall v, In (a, projT1 v) (getKindAttr (getAllMethods m)) -> (getListFullLabel_diff (a, v) l = 0%Z)).
-      {intros; apply H1; auto; left; reflexivity. }
+    + assert (sth: PStep (createHide (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) l0) o l) by
+      (apply IHl0; repeat split; auto; intros; apply H1; simpl; auto).
+      assert (sth2: forall v, In (a, projT1 v) (getKindAttr (getAllMethods m)) -> (getListFullLabel_diff (a, v) l = 0%Z)) by
+      (intros; apply H1; auto; left; reflexivity).
       constructor; auto.
       rewrite createHide_Meths.
       auto.

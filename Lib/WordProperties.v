@@ -9,50 +9,6 @@ Require Import Coq.NArith.NArith.
 Require Import Arith_base.
 Require Import Arith Coq.ZArith.Znat Psatz.
 
-Lemma eq_wordVal {sz} {x y : word sz} : wordVal _ x = wordVal _ y -> x = y.
-Proof.
-  intros.
-  destruct x as [x px].
-  destruct y as [y py].
-  intros.
-  simpl in *; subst; auto.
-  apply f_equal, Eqdep_dec.UIP_dec. eapply Z.eq_dec.
-Qed.
-
-
-Lemma weqb_true: forall sz (a b: word sz), weqb _ a b = true -> a = b.
-Proof.
-  intros.
-  unfold weqb in H.
-  rewrite Z.eqb_eq in H.
-  apply eq_wordVal.
-  assumption.
-Qed.
-
-
-Lemma weqb_false: forall sz (a b: word sz), weqb _ a b = false -> a <> b.
-Proof.
-  intros.
-  unfold weqb in H.
-  rewrite Z.eqb_neq in H. congruence.
-Qed.
-
-Definition wlt_dec : forall sz (l r : word sz), {(wltu _ l r) = true} +  {(wltu _ l r) = false}.
-Proof.
-  intros.
-  destruct (wltu sz l r).
-  left. reflexivity.
-  right.
-  reflexivity.
-Qed.
-
-Definition weq sz (x y: word sz): {x = y} + {x <> y} :=
-  match weqb _ x y as sth return weqb _ x y = sth -> {x = y} + {x <> y} with
-  | true => fun s => left (weqb_true _ _ _ s)
-  | false => fun s => right (weqb_false _ _ _ s)
-  end eq_refl.
-
-
 Lemma nat_cast_eq_rect: forall (P : nat -> Type),
     forall (n m : nat)  (e: n = m) (pn: P n),
       nat_cast P e pn = eq_rect n P pn m e.
@@ -74,8 +30,8 @@ Fixpoint countLeadingZerosWord ni no: word ni -> word no :=
   match ni return word ni -> word no with
   | 0 => fun _ => (ZToWord _ 0)
   | S m => fun e =>
-             if (weq _ (@truncMsb 1 (m+1) (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e)) (ZToWord 1 0))
-             then (wadd _ (ZToWord _ 1) (@countLeadingZerosWord m no (@truncLsb m (m+1) (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e))))
+             if (weq (@truncMsb 1 (m+1) (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e)) (ZToWord 1 0))
+             then (wadd (ZToWord _ 1) (@countLeadingZerosWord m no (@truncLsb m (m+1) (nat_cast (fun n => word n) (eq_sym (Nat.add_1_r m)) e))))
              else (ZToWord _ 0)
   end.
 
@@ -166,14 +122,14 @@ Proof.
   lia.
 Qed.
 
-Lemma wor_wzero : forall sz w, wor _ (ZToWord sz 0) w = w.
+Lemma wor_wzero : forall sz w, wor (ZToWord sz 0) w = w.
 Proof.
   intros.
   arithmetizeWord.
   assumption.
 Qed.
 
-Lemma wzero_wor: forall sz w, wor _  w (ZToWord sz 0) = w.
+Lemma wzero_wor: forall sz w, wor w (ZToWord sz 0) = w.
 Proof.
   intros.
   arithmetizeWord.
@@ -191,14 +147,14 @@ Proof.
   lia.
 Qed.
 
-Lemma wzero_wplus: forall sz w, wadd _ (ZToWord sz 0) w = w.
+Lemma wzero_wplus: forall sz w, wadd (ZToWord sz 0) w = w.
 Proof.
   intros.
   arithmetizeWord.
   assumption.
 Qed.
 
-Lemma wplus_wzero : forall sz w, wadd _ w (ZToWord sz 0) = w.
+Lemma wplus_wzero : forall sz w, wadd w (ZToWord sz 0) = w.
 Proof.
   intros.
   arithmetizeWord.
@@ -207,7 +163,7 @@ Proof.
   assumption.
 Qed.
 
-Lemma wor_idemp :  forall (n : nat) (x0 : word n), wor _ x0 x0 = x0.
+Lemma wor_idemp :  forall (n : nat) (x0 : word n), wor x0 x0 = x0.
 Proof.
   intros.
   induction x0.
@@ -219,7 +175,7 @@ Qed.
 
 Lemma truncMsbLtTrue : forall (n x : nat) (w1 w2 : word n),
     (wordVal _ (@truncMsb x _ w1) < wordVal _ (@truncMsb x _ w2))%Z ->
-    wltu _ w1 w2 = true.
+    wltu w1 w2 = true.
 Proof.
   intros.
   arithmetizeWord.
@@ -296,7 +252,7 @@ Qed.
 
 Lemma truncMsbLtFalse : forall (n x : nat) (w1 w2 : word n),
     (wordVal _ (@truncMsb x _ w1) < wordVal _ (@truncMsb x _ w2))%Z ->
-    wltu _ w2 w1 = false.
+    wltu w2 w1 = false.
 Proof.
   intros.
   specialize (truncMsbLtTrue _ _ _ _ H).
@@ -307,7 +263,7 @@ Proof.
   lia.
 Qed.
 
-Theorem wplus_unit : forall sz (x : word sz), wadd _ (ZToWord sz 0) x = x.
+Theorem wplus_unit : forall sz (x : word sz), wadd (ZToWord sz 0) x = x.
 Proof.
   intros.
   arithmetizeWord.
@@ -346,7 +302,7 @@ Proof.
 Qed.
 
 Lemma wordToNat_natToWord : forall (sz : nat) (w : nat),
-    (w < 2 ^ sz)%nat -> wordToNat _ (natToWord sz w) = w.
+    (w < 2 ^ sz)%nat -> wordToNat (natToWord sz w) = w.
 Proof.
   intros.
   unfold wordToNat. unfold natToWord.
@@ -468,7 +424,7 @@ Proof.
   lia.
 Qed.
 
-Lemma wminus_def : forall sz (x y : word sz), x ^- y = x ^+ ^~ _ y.
+Lemma wminus_def : forall sz (x y : word sz), x ^- y = x ^+ ^~ y.
 Proof.
   intros.
   arithmetizeWord.
@@ -482,7 +438,7 @@ Proof.
 Qed.
 
 Lemma wneg_wnot:
-  forall sz (w : word sz), wnot _ w = wneg _ w ^- (ZToWord _ 1).
+  forall sz (w : word sz), wnot w = wneg w ^- (ZToWord _ 1).
 Proof.
   intros.
   arithmetizeWord.
@@ -512,6 +468,14 @@ Proof.
   arithmetizeWord; f_equal; lia.
 Qed.
 
+Lemma wminus_wplus_undo : forall sz (a b : word sz),
+    a ^- b ^+ b = a.
+Proof.
+  intros.
+  arithmetizeWord.
+  rewrite Zplus_mod_idemp_l, Z.mod_small; lia.
+Qed.
+  
 Lemma move_wplus_wminus : (forall sz (x y z : word sz), x ^+ y = z -> x = z ^- y).
 Proof.
   intros.
@@ -642,7 +606,7 @@ Proof.
   auto.
 Qed.
 
-Lemma wminus_inv : forall sz (x : word sz), x ^+ ^~ _ x = ZToWord sz 0.
+Lemma wminus_inv : forall sz (x : word sz), x ^+ ^~ x = ZToWord sz 0.
 Proof.
   intros.
   arithmetizeWord; autorewrite with distributeMod.
@@ -687,14 +651,14 @@ Proof.
   + rewrite H.
     rewrite wminus_def.
     rewrite <- wplus_assoc.
-    rewrite wplus_comm with (x:= ^~ _ b).
+    rewrite wplus_comm with (x:= ^~ b).
     rewrite wminus_inv.
     rewrite wadd_wzero_1.
     reflexivity.
 Qed.
 
 Lemma wneg_idempotent:
-  forall {sz} (w: word sz), ^~ _ (^~ _ w) = w.
+  forall {sz} (w: word sz), ^~ (^~ w) = w.
 Proof.
   intros.
   arithmetizeWord; autorewrite with distributeMod.
@@ -726,7 +690,7 @@ Proof.
   auto.
 Qed.
 
-Lemma wone_wmul : forall sz w, wmul _ (ZToWord sz 1) w = w.
+Lemma wone_wmul : forall sz w, wmul (ZToWord sz 1) w = w.
 Proof.
   intros.
   case (zerop sz) as [H_wz | H_wpos].
@@ -773,7 +737,7 @@ Qed.
 
 (* Moved from FpuProperties.v *)
 
-Lemma wordToNat_split2 : forall sz1 sz2 (w : word (sz1 + sz2)), wordToNat _ (@truncMsb sz2 _ w) = wordToNat _ w / (2 ^ sz1).
+Lemma wordToNat_split2 : forall sz1 sz2 (w : word (sz1 + sz2)), wordToNat (@truncMsb sz2 _ w) = wordToNat w / (2 ^ sz1).
 Proof.
   intros.
   unfold natToWord, truncMsb, wordToNat.
@@ -857,7 +821,7 @@ Proof.
     + apply (Z.gt_lt _ _ (Z_pow_2_gt_0 (Z.le_ge _ _ (Nat2Z.is_nonneg _)))).
 Qed.
 
-Lemma wneg_wplus_distr : forall sz (w1 w2 : word sz), ^~ _ (w1 ^+ w2) = ^~ _ w1 ^+ ^~ _ w2.
+Lemma wneg_wplus_distr : forall sz (w1 w2 : word sz), ^~ (w1 ^+ w2) = ^~ w1 ^+ ^~ w2.
 Proof.
   intros.
   arithmetizeWord.
@@ -878,7 +842,7 @@ Proof.
 Qed.
 
 Lemma wordToNat_split1 : forall sz1 sz2 (w : word (sz1 + sz2)),
-    wordToNat _ (@truncLsb sz1 _ w) = (wordToNat _ w) mod (2 ^ sz1).
+    wordToNat (@truncLsb sz1 _ w) = (wordToNat w) mod (2 ^ sz1).
 Proof.
   intros.
   unfold wordToNat.
@@ -891,7 +855,7 @@ Qed.
 
 Lemma wordToNat_wplus :
   forall sz (w1 w2 : word sz),
-    wordToNat _ (w1 ^+ w2) = (wordToNat _ w1 + wordToNat _ w2) mod (2 ^ sz).
+    wordToNat (w1 ^+ w2) = (wordToNat w1 + wordToNat w2) mod (2 ^ sz).
 Proof.
   intros.
   unfold wordToNat.
@@ -901,7 +865,7 @@ Proof.
 Qed.
 
 Lemma wordToNat_wnot :
-  forall sz (a : word sz), wordToNat _ (wnot _ a) = 2 ^ sz - wordToNat _ a - 1.
+  forall sz (a : word sz), wordToNat (wnot a) = 2 ^ sz - wordToNat a - 1.
 Proof.
   intros.
   unfold wordToNat.
@@ -915,7 +879,7 @@ Qed.
 
 Lemma countLeadingZerosWord_lt_len no ni :
   ni < 2 ^ no ->
-  forall w : word ni, w <> wzero ni -> (wltu _ (countLeadingZerosWord _ no w) (natToWord no ni) = true).
+  forall w : word ni, w <> wzero ni -> (wltu (countLeadingZerosWord _ no w) (natToWord no ni) = true).
 Proof.
   unfold wltu.
   setoid_rewrite <- Zlt_is_lt_bool.
@@ -1007,7 +971,7 @@ Proof.
 Qed.
 
 Lemma combine_wplus sz (w1 w2 : word sz) :
-  wordToNat _ w1 + wordToNat _ w2 < 2 ^ sz ->
+  wordToNat w1 + wordToNat w2 < 2 ^ sz ->
   forall sz' (w' : word sz'),
     @wconcat _ _ (sz + sz') w' (w1 ^+ w2) = wconcat w' w1 ^+ wconcat (natToWord sz' 0) w2.
 Proof.
@@ -1018,7 +982,7 @@ Proof.
   rewrite Z2Nat.inj_lt, <- Zpow_of_nat, Nat2Z.id; lia.
 Qed.
 
-Lemma pow2_wneg sz : wneg _ (natToWord (S sz) (2 ^ sz)) = natToWord (S sz) (2 ^ sz).
+Lemma pow2_wneg sz : wneg (natToWord (S sz) (2 ^ sz)) = natToWord (S sz) (2 ^ sz).
 Proof.
   arithmetizeWord.
   rewrite Zminus_mod_idemp_r.
@@ -1029,7 +993,7 @@ Proof.
 Qed.
 
 Lemma wmsb_true_split2_wones sz (w : word (sz + 1)) b :
-  wmsb _ w b = true -> wones 1 = @truncMsb 1 _ w.
+  wmsb _ w b = true -> wones _ = @truncMsb 1 _ w.
 Proof.
   unfold wmsb.
   assert (sth : sz + 1 <> 0) by lia.
@@ -1074,7 +1038,7 @@ Proof.
     exfalso; try rewrite Z.pow_pos_fold in *; lia.
 Qed.
 
-Lemma neq0_wneq0 sz (n : word sz) : wordToNat _ n <> 0 <-> n <> natToWord sz 0.
+Lemma neq0_wneq0 sz (n : word sz) : wordToNat n <> 0 <-> n <> natToWord sz 0.
 Proof.
   unfold wordToNat, natToWord.
   split; repeat intro.
@@ -1114,7 +1078,7 @@ Qed.
 
 Unset Implicit Arguments.
 
-Lemma natToWord_wordToNat sz (w : word sz) : natToWord sz (wordToNat _ w) = w.
+Lemma natToWord_wordToNat sz (w : word sz) : natToWord sz (wordToNat w) = w.
 Proof.
   unfold natToWord, wordToNat.
   rewrite Z2Nat.id; arithmetizeWord; intuition.
@@ -1122,7 +1086,7 @@ Qed.
 
 Set Implicit Arguments.
 
-Lemma wzero_wones : forall sz, sz >= 1 -> natToWord sz 0 <> wones sz.
+Lemma wzero_wones : forall sz, sz >= 1 -> natToWord sz 0 <> wones _.
 Proof.
   intros.
   unfold natToWord.
@@ -1175,7 +1139,7 @@ Proof.
   - rewrite Nat2Z.inj_add, Z.pow_add_r; simpl; try rewrite Z.pow_pos_fold; lia.
 Qed.
 
-Lemma wones_pow2_minus_one : forall sz, wordToNat _ (wones sz) = 2 ^ sz - 1.
+Lemma wones_pow2_minus_one : forall sz, wordToNat (wones sz) = 2 ^ sz - 1.
 Proof.
   intros.
   unfold wordToNat.
@@ -1208,7 +1172,7 @@ Qed.
 Lemma wordToNat_combine :
   forall sz1 (w1 : word sz1) sz2 (w2 : word sz2) outSz,
     outSz = sz1 + sz2 ->
-    wordToNat _ (@wconcat _ _ outSz w2 w1) = wordToNat _ w1 + 2 ^ sz1 * wordToNat _ w2.
+    wordToNat (@wconcat _ _ outSz w2 w1) = wordToNat w1 + 2 ^ sz1 * wordToNat w2.
 Proof.
   intros.
   unfold wordToNat.
@@ -1224,7 +1188,7 @@ Proof.
       rewrite <- Z.mul_le_mono_pos_l; lia.
 Qed.
 
-Lemma wordToNat_natToWord_idempotent' : forall sz n , n < 2 ^ sz -> wordToNat _ (natToWord sz n) = n.
+Lemma wordToNat_natToWord_idempotent' : forall sz n , n < 2 ^ sz -> wordToNat (natToWord sz n) = n.
 Proof.
   intros.
   unfold wordToNat, natToWord.
@@ -1275,7 +1239,7 @@ Proof.
   rewrite !Z.mod_0_l; auto; apply Z.pow_nonzero; lia.
 Qed.
 
-Lemma wordToNat_bound : forall sz (w : word sz), wordToNat _ w < 2 ^ sz.
+Lemma wordToNat_bound : forall sz (w : word sz), wordToNat w < 2 ^ sz.
 Proof.
   intros. unfold wordToNat.
   arithmetizeWord. 
@@ -1284,8 +1248,8 @@ Proof.
 Qed.
 
 Lemma wminus_minus :
-  forall sz (a b : word sz), (wltu _ b a = true) ->
-                             wordToNat _ (a ^- b) = wordToNat _ a - wordToNat _ b.
+  forall sz (a b : word sz), (wltu b a = true) ->
+                             wordToNat (a ^- b) = wordToNat a - wordToNat b.
 Proof.
   intros. unfold wordToNat, wltu in *.
   arithmetizeWord.
@@ -1309,7 +1273,7 @@ Qed.
 Lemma wordVal_pos : forall sz (w : word sz), (0 <= wordVal _ w)%Z.
 Proof. intros. arithmetizeWord. lia. Qed.
 
-Lemma wordToNat_lt1 sz (a b : word sz) : wltu _ a b = true -> wordToNat _ a < wordToNat _ b.
+Lemma wordToNat_lt1 sz (a b : word sz) : wltu a b = true -> wordToNat a < wordToNat b.
 Proof.
   unfold wltu, wordToNat.
   intros.
@@ -1319,7 +1283,7 @@ Proof.
   apply Z2Nat.inj_lt; lia.
 Qed.
 
-Lemma wordToNat_natToWord_eqn sz n : wordToNat _ (natToWord sz n) = n mod (2 ^ sz).
+Lemma wordToNat_natToWord_eqn sz n : wordToNat (natToWord sz n) = n mod (2 ^ sz).
 Proof.
   unfold wordToNat, natToWord.
   simpl.
@@ -1336,7 +1300,7 @@ Qed.
 
 
 Lemma wltu_wordToNat sz (w w' : word sz) :
-  wltu _ w w' = (wordToNat _ w <? wordToNat _ w').
+  wltu w w' = (wordToNat w <? wordToNat w').
 Proof.
   unfold wordToNat, wltu.
   case_eq (wordVal _ w <? wordVal _ w')%Z; intros; [apply Z.ltb_lt in H | apply Z.ltb_nlt in H]; symmetry.
@@ -1348,7 +1312,7 @@ Proof.
 Qed.
 
 Lemma wleu_wordToNat sz (w w' : word sz) :
-  wleu _ w w' = (wordToNat _ w <=? wordToNat _ w').
+  wleu w w' = (wordToNat w <=? wordToNat w').
 Proof.
   unfold wordToNat, wleu.
   case_eq (wordVal _ w <=? wordVal _ w')%Z; intros; [apply Z.leb_le in H | apply Z.leb_nle in H]; symmetry.
@@ -1421,8 +1385,8 @@ Qed.
 Unset Implicit Arguments.
 
 Lemma getBool_weq sz (w1 w2: word sz):
-  getBool (weq _ w1 w2) = true -> w1 = w2.
+  getBool (weq w1 w2) = true -> w1 = w2.
 Proof.
   intros.
-  destruct (weq _ w1 w2); [auto | discriminate].
+  destruct (weq w1 w2); [auto | discriminate].
 Qed.

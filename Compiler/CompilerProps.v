@@ -1397,7 +1397,7 @@ Proof.
                                                     (evalExpr
                                                        (fold_left
                                                           (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                                             (IF ReadArrayConst mask0 i then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <- ReadArrayConst val i] else newArr)%kami_expr)
+                                                             (IF ReadArrayConst mask0 i then newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i))) <- ReadArrayConst val i] else newArr)%kami_expr)
                                                           (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0))
                            (r,
                             (hd [] upds0 ++
@@ -1406,7 +1406,7 @@ Proof.
                                          (evalExpr
                                             (fold_left
                                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                                  (IF ReadArrayConst mask0 i then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <- ReadArrayConst val i] else newArr)%kami_expr)
+                                                  (IF ReadArrayConst mask0 i then newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i))) <- ReadArrayConst val i] else newArr)%kami_expr)
                                                (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
       specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P0 _ _ _ HSemCompActionT); dest; split; auto.
@@ -1415,7 +1415,7 @@ Proof.
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                   (IF ReadArrayConst mask0 i then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <- ReadArrayConst val i] else newArr)%kami_expr)
+                                   (IF ReadArrayConst mask0 i then newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i))) <- ReadArrayConst val i] else newArr)%kami_expr)
                                 (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regVal))))::x).
       repeat split; auto.
       * simpl in *.
@@ -1445,7 +1445,7 @@ Proof.
                                                     (evalExpr
                                                        (fold_left
                                                           (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                                             (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <- ReadArrayConst val i])%kami_expr) (getFins num)
+                                                             (newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i))) <- ReadArrayConst val i])%kami_expr) (getFins num)
                                                           (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0))
                            (r,
                             (hd [] upds0 ++
@@ -1454,7 +1454,7 @@ Proof.
                                          (evalExpr
                                             (fold_left
                                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                                  (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <- ReadArrayConst val i])%kami_expr) (getFins num)
+                                                  (newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i))) <- ReadArrayConst val i])%kami_expr) (getFins num)
                                                (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
       specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P0 _ _ _ HSemCompActionT); dest; split; auto.
@@ -1463,7 +1463,7 @@ Proof.
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                   (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <- ReadArrayConst val i])%kami_expr) (getFins num)
+                                   (newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i))) <- ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regVal))))::x).
       repeat split; auto.
       * simpl in *.
@@ -1534,7 +1534,7 @@ Proof.
                                                        (BuildArray
                                                           (fun i : Fin.t num =>
                                                              (Var type (SyntaxKind (Array idxNum Data)) regV @[
-                                                                    Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr))))])
+                                                                    Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i)))])%kami_expr))))])
                                          :: tl upds0))
                            (old0,
                             (hd [] upds0 ++
@@ -1544,7 +1544,7 @@ Proof.
                                             (BuildArray
                                                (fun i : Fin.t num =>
                                                   (Var type (SyntaxKind (Array idxNum Data)) regV @[
-                                                         Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr))))])
+                                                         Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i)))])%kami_expr))))])
                               :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
       specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P0 _ _ _ HSemCompActionT); dest; split; auto.
@@ -1553,7 +1553,8 @@ Proof.
                                       (BuildArray
                                          (fun i : Fin.t num =>
                                             (Var type (SyntaxKind (Array idxNum Data)) regV @[
-                                                   Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr))))::x).
+                                                   Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type (natToWord (Nat.log2_up idxNum)
+                                                (proj1_sig (to_nat i)))])%kami_expr))))::x).
       repeat split; auto.
       * simpl in *.
         clear - H3.
@@ -1618,7 +1619,7 @@ Proof.
     intro; rewrite in_map_iff in H; dest; destruct x; subst; simpl in *.
     eapply HDisjRegs; eauto.
   - inv H0; EqDep_subst; rewrite UpdOrMeths_RegsT_app, map_app, NoDup_app_iff;
-      repeat split; repeat intro; eauto; specialize (HDisjRegs a); firstorder fail.
+      repeat split; repeat intro; eauto; specialize (HDisjRegs a); tauto.
   - inv H; EqDep_subst; simpl; eauto.
   - inv H; EqDep_subst; simpl; constructor.
   - inv H0; EqDep_subst; simpl; eauto.
@@ -3032,7 +3033,7 @@ Proof.
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
                                    (IF ReadArrayConst mask0 i
-                                    then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                    then newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i))) <-
                                                                ReadArrayConst val i] else newArr)%kami_expr) 
                                 (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
       * econstructor; eauto; simpl.
@@ -3048,7 +3049,7 @@ Proof.
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                   (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                   (newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i))) <-
                                                           ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
       * econstructor; eauto; simpl.
@@ -3077,7 +3078,7 @@ Proof.
                                 (fun i : Fin.t num =>
                                    (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                           Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) +
-                                          Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr)))) :: x); split; auto.
+                                          Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i)))])%kami_expr)))) :: x); split; auto.
       * econstructor; simpl in *; auto.
         -- assumption.
       * econstructor 15; auto.
@@ -3201,7 +3202,7 @@ Proof.
                                            (fun (newArr : Expr type (SyntaxKind (Array rfIdxNum rfData))) (i : Fin.t rfNum) =>
                                               (IF ReadArrayConst (ReadStruct e (Fin.FS (Fin.FS Fin.F1))) i
                                                then newArr @[
-                                                             ReadStruct e Fin.F1 + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                                             ReadStruct e Fin.F1 + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                                          ReadArrayConst (ReadStruct e (Fin.FS Fin.F1)) i] else newArr)%kami_expr)
                                            (getFins rfNum) (Var type (SyntaxKind (Array rfIdxNum rfData)) regV))))) :: nil); simpl in *.
         intro k; simpl.
@@ -3237,7 +3238,7 @@ Proof.
                                      (evalExpr
                                         (fold_left
                                            (fun (newArr : Expr type (SyntaxKind (Array rfIdxNum rfData))) (i : Fin.t rfNum) =>
-                                              (newArr @[ ReadStruct e Fin.F1 + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                              (newArr @[ ReadStruct e Fin.F1 + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                                      ReadArrayConst (ReadStruct e (Fin.FS Fin.F1)) i])%kami_expr) 
                                            (getFins rfNum) (Var type (SyntaxKind (Array rfIdxNum rfData)) regV))))) :: nil); simpl in *.
         intro k; simpl.
@@ -3385,7 +3386,7 @@ Proof.
                                                                                                          (fun i : Fin.t rfNum =>
                                                                                                             (Var type (SyntaxKind (Array rfIdxNum rfData)) regV @[
                                                                                                                    Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) (evalExpr e) +
-                                                                                                                   Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr)))))::x0); split.
+                                                                                                                   Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))))::x0); split.
       * econstructor 5; auto.
         -- do 2 (econstructor; eauto).
         -- repeat intro; auto.
@@ -3538,7 +3539,7 @@ Proof.
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
                                    (IF ReadArrayConst mask0 i
-                                    then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                    then newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                ReadArrayConst val i] else newArr)%kami_expr) 
                                 (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regV))))::x0); split; auto.
       * econstructor; eauto; simpl.
@@ -3558,7 +3559,7 @@ Proof.
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                   (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                   (newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                           ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regV))))::x0); split; auto.
       * econstructor; eauto; simpl.
@@ -3595,7 +3596,7 @@ Proof.
                                 (fun i : Fin.t num =>
                                    (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                           Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) +
-                                          Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr)))) :: x0); split; auto.
+                                          Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))) :: x0); split; auto.
       * econstructor; eauto.
         simpl; assumption.
       * econstructor 15; auto.
@@ -3878,7 +3879,7 @@ Proof.
                                                      (fun i0 : Fin.t rfNum =>
                                                         (Var type (SyntaxKind (Array rfIdxNum rfData)) regV @[
                                                                Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) (evalExpr e) +
-                                                               Const type ($(proj1_sig (Fin.to_nat i0)))%word])%kami_expr))))))]); simpl; repeat intro; auto.
+                                                               Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i0))))])%kami_expr))))))]); simpl; repeat intro; auto.
              econstructor; eauto.
              ** instantiate (2 := nil).
                 intro; simpl; auto.
@@ -4043,7 +4044,7 @@ Proof.
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
                                    (IF ReadArrayConst mask0 i
-                                    then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                    then newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                ReadArrayConst val i] else newArr)%kami_expr) 
                                 (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
       * econstructor; eauto; simpl.
@@ -4063,7 +4064,7 @@ Proof.
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                   (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                   (newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                           ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
       * econstructor; eauto; simpl.
@@ -4100,7 +4101,7 @@ Proof.
                                 (fun i : Fin.t num =>
                                    (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                           Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) +
-                                          Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr)))) :: x); split; auto.
+                                          Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))) :: x); split; auto.
       * econstructor; eauto.
         simpl; assumption.
       * econstructor 15; auto.
@@ -4267,7 +4268,7 @@ Proof.
                                                    (fun i0 : Fin.t rfNum =>
                                                       (Var type (SyntaxKind (Array rfIdxNum rfData)) regV @[
                                                              Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) (evalExpr e) +
-                                                             Const type ($(proj1_sig (Fin.to_nat i0)))%word])%kami_expr))))))]).
+                                                             Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i0))))])%kami_expr))))))]).
            intro; simpl.
            destruct (string_dec readRegName k); subst; [right |left ]; intro.
            ++ rewrite in_map_iff in H0; dest; destruct x; subst.
@@ -4406,7 +4407,7 @@ Proof.
                                                                                (fun i : Fin.t rfNum =>
                                                                                   (Var type (SyntaxKind (Array rfIdxNum rfData)) regVal @[
                                                                                          Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) idx +
-                                                                                         Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr)))))::x); split.
+                                                                                         Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))))::x); split.
        -- econstructor 5; auto.
           ++ simpl; repeat econstructor; eauto.
           ++ intro; left; intro; auto.
@@ -4572,7 +4573,7 @@ Proof.
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
                                    (IF ReadArrayConst mask0 i
-                                    then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                    then newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                ReadArrayConst val i] else newArr)%kami_expr) 
                                 (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
       * econstructor; eauto; simpl.
@@ -4592,7 +4593,7 @@ Proof.
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                   (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                   (newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                           ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
       * econstructor; eauto; simpl.
@@ -4629,7 +4630,7 @@ Proof.
                                 (fun i : Fin.t num =>
                                    (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                           Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) +
-                                          Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr)))) :: x); split; auto.
+                                          Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))) :: x); split; auto.
       * econstructor; eauto.
         simpl; assumption.
       * econstructor 15; auto.
