@@ -1222,7 +1222,7 @@ Proof.
   induction ea; subst; intros; simpl in *.
   - inv H0; EqDep_subst;[|discriminate].
     specialize (H _ _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent WfMap _ _ _ HSemCompActionT); dest; split; auto.
-    exists (umMeth (meth, existT SignT s (evalExpr e, ret))::x); repeat split; simpl; subst; auto.
+    exists (UmMeth (meth, existT SignT s (evalExpr e, ret))::x); repeat split; simpl; subst; auto.
     econstructor; eauto.
   - inv H0; EqDep_subst.
     specialize (H _ _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent WfMap _ _ _ HSemCompActionT); dest; split; auto.
@@ -1277,7 +1277,7 @@ Proof.
     { split; auto. constructor. }
     specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent WfMap0 _ _ _ HSemCompActionT_cont);
       dest; simpl in *; split; auto.
-    exists ((umUpd (r, existT (fullType type) k (evalExpr e))):: x); repeat split; auto.
+    exists ((UmUpd (r, existT (fullType type) k (evalExpr e))):: x); repeat split; auto.
     + simpl; destruct (UpdOrMeths_RegsT x); simpl in *; auto.
       rewrite <- app_assoc in H3. rewrite <-app_comm_cons in H3.
       simpl in H3; auto.
@@ -1410,7 +1410,7 @@ Proof.
                                                (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
       specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P0 _ _ _ HSemCompActionT); dest; split; auto.
-      exists (umUpd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
@@ -1458,7 +1458,7 @@ Proof.
                                                (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
       specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P0 _ _ _ HSemCompActionT); dest; split; auto.
-      exists (umUpd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
@@ -1499,7 +1499,7 @@ Proof.
                               :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
       specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P0 _ _ _ HSemCompActionT); dest; split; auto.
-      exists (umUpd (readReg, existT (fullType type) (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr (Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx))))::x).
+      exists (UmUpd (readReg, existT (fullType type) (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr (Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx))))::x).
       repeat split; auto.
       * simpl in *.
         clear - H3.
@@ -1548,7 +1548,7 @@ Proof.
                               :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
       specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P0 _ _ _ HSemCompActionT); dest; split; auto.
-      exists (umUpd (readReg, existT (fullType type) (SyntaxKind (Array num Data))
+      exists (UmUpd (readReg, existT (fullType type) (SyntaxKind (Array num Data))
                                    (evalExpr
                                       (BuildArray
                                          (fun i : Fin.t num =>
@@ -2612,28 +2612,28 @@ Section ESemAction_meth_collector.
   Inductive ESemAction_meth_collector : UpdOrMeths -> UpdOrMeths -> Prop :=
   | NilUml : ESemAction_meth_collector nil nil
   | ConsUpd  um uml uml' newUml newUml' upd
-             (HUpd : um = umUpd upd)
+             (HUpd : um = UmUpd upd)
              (HDisjRegs : key_not_In (fst upd) (UpdOrMeths_RegsT newUml))
              (HUmlCons : uml' = um :: uml)
              (HnewUmlCons : newUml' = um :: newUml)
              (HCollector : ESemAction_meth_collector uml newUml):
       ESemAction_meth_collector uml' newUml'
   | ConsCallsNStr um uml uml' newUml newUml' meth
-                  (HMeth : um = umMeth meth)
+                  (HMeth : um = UmMeth meth)
                   (HIgnore : fst meth <> fst f)
                   (HUmlCons : uml' = um :: uml)
                   (HnewUmlCons : newUml' = um :: newUml)
                   (HCollector : ESemAction_meth_collector uml newUml):
       ESemAction_meth_collector uml' newUml'
   | ConsWrCallsNSgn um uml uml' newUml newUml' meth
-                    (HMeth : um = umMeth meth)
+                    (HMeth : um = UmMeth meth)
                     (HIgnore : projT1 (snd meth) <> projT1 (snd f))
                     (HUmlCons : uml' = um :: uml)
                     (HnewUmlCons : newUml' = um :: newUml)
                     (HCollector : ESemAction_meth_collector uml newUml):
       ESemAction_meth_collector uml' newUml'
   | ConsWrFCalls  um fUml uml uml' newUml newUml' argV retV
-                  (HMeth : um = umMeth (fst f, (existT _ (projT1 (snd f)) (argV, retV))))
+                  (HMeth : um = UmMeth (fst f, (existT _ (projT1 (snd f)) (argV, retV))))
                   (HESemAction : ESemAction o (Action_EAction (projT2 (snd f) type argV)) fUml retV)
                   (HDisjRegs : DisjKey (UpdOrMeths_RegsT fUml) (UpdOrMeths_RegsT newUml))
                   (HUmlCons : uml' = um :: uml)
@@ -2674,7 +2674,7 @@ Section ESemAction_meth_collector.
       + intro k; auto.
       + constructor.
     - inv H; inv HUmlCons;  specialize (IHuml1 _ _ HCollector); dest.
-      + exists (umUpd upd :: x), x0; subst; repeat split; auto.
+      + exists (UmUpd upd :: x), x0; subst; repeat split; auto.
         * rewrite UpdOrMeths_RegsT_app in HDisjRegs.
           apply key_not_In_app in HDisjRegs; dest.
           intro k; simpl.
@@ -2687,9 +2687,9 @@ Section ESemAction_meth_collector.
         * econstructor; auto.
           rewrite UpdOrMeths_RegsT_app in HDisjRegs.
           apply key_not_In_app in HDisjRegs; dest; auto.
-      + exists (umMeth meth :: x), x0; subst; repeat split; auto.
+      + exists (UmMeth meth :: x), x0; subst; repeat split; auto.
         econstructor 3; eauto.
-      + exists (umMeth meth :: x), x0; subst; repeat split; auto.
+      + exists (UmMeth meth :: x), x0; subst; repeat split; auto.
         econstructor 4; eauto.
       + exists (fUml ++ x), x0; subst; repeat split; eauto using app_assoc.
         * intro k; specialize (HDisjRegs k); specialize (H0 k).
@@ -2875,7 +2875,7 @@ Proof.
       inv HESemAction; simpl in *; EqDep_subst.
       * specialize (H _ _ _ _ _ HESemAction0); dest; inv H9.
         intro.
-        exists (umMeth (meth, existT SignT (WriteRqMask (Nat.log2_up rfIdxNum) rfNum rfData, Void) (evalExpr e, WO))::x); split.
+        exists (UmMeth (meth, existT SignT (WriteRqMask (Nat.log2_up rfIdxNum) rfNum rfData, Void) (evalExpr e, WO))::x); split.
         -- econstructor 5; auto.
            ++ econstructor; eauto.
               econstructor; simpl; auto.
@@ -2902,7 +2902,7 @@ Proof.
       * discriminate.
     + inv H0; simpl in *; EqDep_subst.
       * specialize (H _ _ _ _ _ HESemAction); dest.
-        exists (umMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
+        exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
         -- econstructor 4; simpl; eauto.
            intro; destruct s; simpl in *; auto.
         -- econstructor; eauto.
@@ -2911,7 +2911,7 @@ Proof.
       inv HESemAction; simpl in *; EqDep_subst; [discriminate|].
       * specialize (H _ _ _ _ _ HESemAction0); dest; inv H9.
         intro.
-        exists (umMeth (meth, existT SignT (WriteRq (Nat.log2_up rfIdxNum) (Array rfNum rfData), Void) (evalExpr e, WO))::x); split.
+        exists (UmMeth (meth, existT SignT (WriteRq (Nat.log2_up rfIdxNum) (Array rfNum rfData), Void) (evalExpr e, WO))::x); split.
         -- econstructor 5; auto.
            ++ econstructor; eauto.
               econstructor; simpl; auto.
@@ -2937,13 +2937,13 @@ Proof.
         -- econstructor; eauto.
     + inv H0; simpl in *; EqDep_subst.
       * specialize (H _ _ _ _ _ HESemAction); dest.
-        exists (umMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
+        exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
         -- econstructor 4; simpl; eauto.
            intro; destruct s; simpl in *; auto.
         -- econstructor; eauto.
     + inv H0; simpl in *; EqDep_subst.
       * specialize (H _ _ _ _ _ HESemAction); dest.
-        exists (umMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
+        exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
         -- econstructor 3; simpl; eauto.
            intro; destruct s; simpl in *; auto.
         -- econstructor; eauto.
@@ -2978,7 +2978,7 @@ Proof.
     econstructor; eauto.
   - inv H; EqDep_subst.
     specialize (IHea _ _ _ _ HESemAction); dest.
-    exists (umUpd (r, existT (fullType type) k (evalExpr e))::x); split; auto.
+    exists (UmUpd (r, existT (fullType type) k (evalExpr e))::x); split; auto.
     + econstructor; auto.
       * simpl; assumption.
     + econstructor; auto.
@@ -3027,7 +3027,7 @@ Proof.
     econstructor; eauto.
   - inv H; EqDep_subst.
     + specialize (IHea _ _ _ _ HESemAction); dest.
-      exists (umUpd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
@@ -3044,7 +3044,7 @@ Proof.
         specialize (ESemActionMC_Upds_SubList H) as P0.
         apply (P0 _ H1).
     + specialize (IHea _ _ _ _ HESemAction); dest.
-      exists (umUpd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
@@ -3061,7 +3061,7 @@ Proof.
         apply (P0 _ H1).
   - inv H; EqDep_subst.
     + specialize (IHea _ _ _ _ HESemAction); dest.
-      exists (umUpd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx)) :: x); split; auto.
       * econstructor; eauto.
         simpl; assumption.
@@ -3071,7 +3071,7 @@ Proof.
         specialize (ESemActionMC_Upds_SubList H) as P0.
         apply (P0 _ H1).
     + specialize (IHea _ _ _ _ HESemAction); dest.
-      exists (umUpd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Array num Data))
                           (evalExpr
                              (BuildArray
@@ -3194,7 +3194,7 @@ Proof.
       inv HESemAction; EqDep_subst; inv H9.
       econstructor; simpl; auto.
       * instantiate (1 := newUml).
-        instantiate (1 := (umUpd
+        instantiate (1 := (UmUpd
                              (rfDataArray,
                               existT (fullType type) (SyntaxKind (Array rfIdxNum rfData))
                                      (evalExpr
@@ -3232,7 +3232,7 @@ Proof.
       inv HESemAction; EqDep_subst; [discriminate |].
       econstructor; simpl; auto.
       * instantiate (1 := newUml).
-        instantiate (1 := (umUpd
+        instantiate (1 := (UmUpd
                              (rfDataArray,
                               existT (fullType type) (SyntaxKind (Array rfIdxNum rfData))
                                      (evalExpr
@@ -3381,7 +3381,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ P0 _ HIn _ _ _ HESemAction); dest.
-      exists (umMeth (x, existT SignT (Bit (Nat.log2_up rfIdxNum), Array rfNum rfData) (evalExpr e, (evalExpr
+      exists (UmMeth (x, existT SignT (Bit (Nat.log2_up rfIdxNum), Array rfNum rfData) (evalExpr e, (evalExpr
                                                                                                       (BuildArray
                                                                                                          (fun i : Fin.t rfNum =>
                                                                                                             (Var type (SyntaxKind (Array rfIdxNum rfData)) regV @[
@@ -3399,7 +3399,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ P0 _ HIn _ _ _ HESemAction); dest.
-      exists (umMeth (meth, existT SignT s (evalExpr e, mret))::x0); split.
+      exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x0); split.
       * econstructor 4; simpl; eauto.
         intro; destruct s; simpl in *; auto.
       * econstructor; eauto.
@@ -3409,7 +3409,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ P0 _ HIn _ _ _ HESemAction); dest.
-      exists (umMeth (meth, existT SignT s (evalExpr e, mret))::x0); split.
+      exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x0); split.
       * econstructor 3; simpl; eauto.
         intro; destruct s; simpl in *; subst; rewrite String.eqb_refl in *; discriminate.
       * econstructor; eauto.
@@ -3464,7 +3464,7 @@ Proof.
     { rewrite <- Heqrf'; reflexivity. }
     rewrite <- Heqrf' in *.
     specialize (IHea _ _ P0 _ HIn _ _ _ HESemAction); dest.
-    exists (umUpd (r, existT (fullType type) k (evalExpr e))::x0); split; auto.
+    exists (UmUpd (r, existT (fullType type) k (evalExpr e))::x0); split; auto.
     + econstructor; auto.
       * simpl; assumption.
     + econstructor; auto.
@@ -3533,7 +3533,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ P0 _ HIn _ _ _ HESemAction); dest.
-      exists (umUpd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
@@ -3554,7 +3554,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ P0 _ HIn _ _ _ HESemAction); dest.
-      exists (umUpd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
@@ -3575,7 +3575,7 @@ Proof.
        { rewrite <- Heqrf'; reflexivity. }
        rewrite <- Heqrf' in *.
        specialize (IHea _ _ P0 _ HIn _ _ _ HESemAction); dest.
-       exists (umUpd (readReg,
+       exists (UmUpd (readReg,
                     existT (fullType type) (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx)) :: x0); split; auto.
        * econstructor; eauto.
          simpl; assumption.
@@ -3589,7 +3589,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ P0 _ HIn _ _ _ HESemAction); dest.
-      exists (umUpd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Array num Data))
                           (evalExpr
                              (BuildArray
@@ -3847,7 +3847,7 @@ Proof.
        { rewrite <- Heqrf'; reflexivity. }
        rewrite <- Heqrf' in *.
        specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction0); dest.
-       exists (umMeth (meth, existT SignT (Bit (Nat.log2_up rfIdxNum), Void) (evalExpr e, WO))::x); split.
+       exists (UmMeth (meth, existT SignT (Bit (Nat.log2_up rfIdxNum), Void) (evalExpr e, WO))::x); split.
        -- econstructor 5; auto.
           ++ econstructor; auto.
              ** instantiate (1 := nil); simpl; repeat intro; auto.
@@ -3866,10 +3866,10 @@ Proof.
        { rewrite <- Heqrf'; reflexivity. }
        rewrite <- Heqrf' in *.
        specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction0); dest.
-       exists (umMeth (meth, existT SignT (Bit (Nat.log2_up rfIdxNum), Void) (evalExpr e, WO))::x); split.
+       exists (UmMeth (meth, existT SignT (Bit (Nat.log2_up rfIdxNum), Void) (evalExpr e, WO))::x); split.
        -- econstructor 5; auto.
-          ++  instantiate (1 :=
-                            [umUpd
+          ++ instantiate (1 :=
+                            [UmUpd
                                (readRegName,
                                 existT (fullType type) (SyntaxKind (Array rfNum rfData))
                                        (evalExpr
@@ -3904,7 +3904,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (umMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
+      exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
       * econstructor 4; simpl; eauto.
         unfold getSyncReq; destruct isAddr; simpl; auto.
       * econstructor; eauto.
@@ -3914,7 +3914,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (umMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
+      exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
       * econstructor 3; simpl; eauto.
         unfold getSyncReq; destruct isAddr; simpl; auto.
       * econstructor; eauto.
@@ -3969,7 +3969,7 @@ Proof.
     { rewrite <- Heqrf'; reflexivity. }
     rewrite <- Heqrf' in *.
     specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-    exists (umUpd (r, existT (fullType type) k (evalExpr e))::x); split; auto.
+    exists (UmUpd (r, existT (fullType type) k (evalExpr e))::x); split; auto.
     + econstructor; auto.
       * simpl; assumption.
     + econstructor; auto.
@@ -4038,7 +4038,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (umUpd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
@@ -4059,7 +4059,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (umUpd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
@@ -4080,7 +4080,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (umUpd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx)) :: x); split; auto.
       * econstructor; eauto.
         simpl; assumption.
@@ -4094,7 +4094,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (umUpd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Array num Data))
                           (evalExpr
                              (BuildArray
@@ -4236,7 +4236,7 @@ Proof.
       inv HESemAction; EqDep_subst; [ |discriminate].
       * econstructor; auto.
         -- instantiate (1 := newUml).
-           instantiate (1 := [umUpd
+           instantiate (1 := [UmUpd
                                 (readRegName,
                                  existT (fullType type) (SyntaxKind (Bit (Nat.log2_up rfIdxNum)))
                                         (evalExpr (Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) (evalExpr e))))]).
@@ -4258,7 +4258,7 @@ Proof.
       * econstructor; auto.
         -- instantiate (1 := newUml).
            instantiate (1 :=
-                          [umUpd
+                          [UmUpd
                              (readRegName,
                               existT (fullType type) (SyntaxKind (Array rfNum rfData))
                                      (evalExpr
@@ -4402,7 +4402,7 @@ Proof.
        { rewrite <- Heqrf'; reflexivity. }
        rewrite <- Heqrf' in *.
        specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-       exists (umMeth (meth, existT SignT (Void, Array rfNum rfData) (WO, (evalExpr
+       exists (UmMeth (meth, existT SignT (Void, Array rfNum rfData) (WO, (evalExpr
                                                                             (BuildArray
                                                                                (fun i : Fin.t rfNum =>
                                                                                   (Var type (SyntaxKind (Array rfIdxNum rfData)) regVal @[
@@ -4419,7 +4419,7 @@ Proof.
        { rewrite <- Heqrf'; reflexivity. }
        rewrite <- Heqrf' in *.
        specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-       exists (umMeth (meth, existT SignT (Void, Array rfNum rfData) (WO, regVal))::x); split.
+       exists (UmMeth (meth, existT SignT (Void, Array rfNum rfData) (WO, regVal))::x); split.
        -- econstructor 5; auto.
           ++ simpl; repeat econstructor; eauto.
           ++ intro; left; intro; auto.
@@ -4433,7 +4433,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (umMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
+      exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
       * econstructor 4; simpl; eauto.
         unfold getSyncRes; destruct isAddr; simpl; auto.
       * econstructor; eauto.
@@ -4443,7 +4443,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (umMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
+      exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
       * econstructor 3; simpl; eauto.
         unfold getSyncRes; destruct isAddr; simpl; auto.
       * econstructor; eauto.
@@ -4498,7 +4498,7 @@ Proof.
     { rewrite <- Heqrf'; reflexivity. }
     rewrite <- Heqrf' in *.
     specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-    exists (umUpd (r, existT (fullType type) k (evalExpr e))::x); split; auto.
+    exists (UmUpd (r, existT (fullType type) k (evalExpr e))::x); split; auto.
     + econstructor; auto.
       * simpl; assumption.
     + econstructor; auto.
@@ -4567,7 +4567,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (umUpd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
@@ -4588,7 +4588,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (umUpd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
@@ -4609,7 +4609,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (umUpd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx)) :: x); split; auto.
       * econstructor; eauto.
         simpl; assumption.
@@ -4623,7 +4623,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (umUpd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Array num Data))
                           (evalExpr
                              (BuildArray
