@@ -29,7 +29,7 @@ Ltac KRSimplifyTac e tp :=
                 | (KRTypeElem KRElemDefMethT) => KRExprDenote_DefMethT
                 | (KRTypeElem KRElemModuleElt) => KRExprDenote_ModuleElt
                 | (KRTypeList (KRTypeElem KRElemRegInitT)) => KRExprDenote_list_RegInitT
-                
+                | (KRTypeList (KRTypeElem KRElemRule)) => KRExprDenote_list_Rule
                 | (KRTypeList (KRTypeElem KRElemDefMethT)) => KRExprDenote_list_DefMethT
                 | (KRTypeList (KRTypeElem KRElemModuleElt)) => KRExprDenote_list_ModuleElt
                 | (KRTypeList (KRTypeList (KRTypeElem KRElemRegInitT))) => KRExprDenote_list_list_RegInitT
@@ -140,6 +140,40 @@ Goal forall a b c d e, Registers ([a;b]++[c;d])=e.
   | |- ?A = ?B => KRSimplifyTac A (KRTypeList (KRTypeElem KRElemModuleElt))
   end.
 Abort.
+Definition KRSimplifyTop_list_Rule2 (e : KRExpr_list_Rule) : KRExpr_list_Rule :=
+  match e with
+  | KRApp_list_Rule f c => match f with
+                    | KRCons_list_Rule ff rr => KRCons_list_Rule ff (KRApp_list_Rule rr c)
+                    | KRNil_list_Rule => c
+                    | x => match c with
+                           | KRNil_list_Rule => f
+                           | y => KRVar_list_Rule []
+                           end
+                    end
+   | KRgetAllRules (KRConcatMod a b) => KRApp_list_Rule (KRgetAllRules a) (KRgetAllRules b)
+   | KRgetAllRules (KRFold_right_Mod KRConcatMod_Func a b) => KRApp_list_Rule (KRConcat_Rule (KRMap_list_Mod_list_list_Rule KRgetAllRulesFunc b)) (KRgetAllRules a)
+   | KRMakeModule_rules x =>
+     match x with
+     | KRApp_list_ModuleElt a b =>
+       KRApp_list_Rule (KRMakeModule_rules a) (KRMakeModule_rules b)
+     | KRCons_list_ModuleElt aa b =>
+       match aa with
+       | KRMERegister a => KRMakeModule_rules b
+       | KRMEMeth a => KRVar_list_Rule [] (*KRMakeModule_rules b*)
+       | KRMERule a => KRVar_list_Rule [] (*KRCons_list_Rule a (KRMakeModule_rules b)*)
+       | _ => KRVar_list_Rule []
+       end
+     | KRRegisters r => KRNil_list_Rule
+     | KRNil_list_ModuleElt => KRNil_list_Rule
+     | _ => KRVar_list_Rule []
+     end
+   | e => KRVar_list_Rule []
+   end.
+
+Theorem KRSimplifyTopSound_list_Rule2:
+  forall x, KRExprDenote_list_Rule (KRSimplifyTop_list_Rule2 x)=KRExprDenote_list_Rule x.
+Admitted.
+
 Goal forall a b c d e, makeModule_regs [MERegister a;MERule b;MEMeth c;MERegister d]=e.
   intros.
   match goal with
@@ -149,66 +183,13 @@ Goal forall a b c d e, makeModule_regs [MERegister a;MERule b;MEMeth c;MERegiste
     KRSimplifyTac A (KRTypeList (KRTypeElem KRElemRegInitT))
   end.
 Abort.
-(*Goal forall a b c d e, makeModule_rules [MERegister a;MERule b;MEMeth c;MERegister d]=e.
+Goal forall a b c d e, makeModule_rules [MERegister a;MERule b;MEMeth c;MERegister d]=e.
   intros.
   match goal with
   | |- ?A = ?B =>
-      let x := (ltac:(KRExprReify A (KRTypeList (KRTypeElem KRElemRule)))) in change A with (KRExprDenote_list_Rule x);rewrite KRSimplifySound_list_Rule;
-  cbv [
-                sappend srev sdisjPrefix String.eqb Ascii.eqb Bool.eqb
-                KRSimplify_RegInitT KRSimplifyTop_RegInitT
-                KRSimplify_RegInitValT KRSimplifyTop_RegInitValT
-                KRSimplify_Rule KRSimplifyTop_Rule
-                KRSimplify_DefMethT KRSimplifyTop_DefMethT
-                KRSimplify_ModuleElt KRSimplifyTop_ModuleElt
-                KRSimplify_list_RegInitT KRSimplifyTop_list_RegInitT
-                KRSimplify_list_Rule KRSimplifyTop_list_Rule
-                KRSimplify_list_DefMethT KRSimplifyTop_list_DefMethT
-                KRSimplify_list_ModuleElt KRSimplifyTop_list_ModuleElt
-                KRSimplify_list_list_RegInitT KRSimplifyTop_list_list_RegInitT
-                KRSimplify_list_list_Rule KRSimplifyTop_list_list_Rule
-                KRSimplify_list_list_DefMethT KRSimplifyTop_list_list_DefMethT
-                KRSimplify_list_list_ModuleElt KRSimplifyTop_list_list_ModuleElt
-                KRSimplify_BaseModule KRSimplifyTop_BaseModule
-                KRSimplify_RegFileBase KRSimplifyTop_RegFileBase
-                KRSimplify_list_RegFileBase KRSimplifyTop_list_RegFileBase
-                KRSimplify_string KRSimplifyTop_string
-                KRSimplify_list_string KRSimplifyTop_list_string
-                KRSimplify_list_list_string KRSimplifyTop_list_list_string
-                KRSimplify_Mod KRSimplifyTop_Mod
-                KRSimplify_Mod KRSimplifyTop_list_Mod
-                KRSimplify_Prop KRSimplifyTop_Prop
-                                  ];
-  cbv [
-      sappend srev sdisjPrefix String.eqb Ascii.eqb Bool.eqb
-                KRExprDenote_RegInitT
-                KRExprDenote_RegInitValT
-                KRExprDenote_Rule
-                KRExprDenote_ActionVoid
-                KRExprDenote_DefMethT
-                KRExprDenote_MethodT
-                KRExprDenote_ModuleElt
-                KRExprDenote_list_RegInitT
-                KRExprDenote_list_Rule
-                KRExprDenote_list_DefMethT
-                KRExprDenote_list_ModuleElt
-                KRExprDenote_list_list_RegInitT
-                KRExprDenote_list_list_Rule
-                KRExprDenote_list_list_DefMethT
-                KRExprDenote_list_list_ModuleElt
-                KRExprDenote_BaseModule
-                KRExprDenote_Mod
-                KRExprDenote_list_Mod
-                KRExprDenote_RegFileBase
-                KRExprDenote_list_RegFileBase
-                KRExprDenote_string
-                KRExprDenote_list_string
-                KRExprDenote_list_list_string
-                KRExprDenote_Prop]
-  end.
       KRSimplifyTac A (KRTypeList (KRTypeElem KRElemRule))
   end.
-Abort.*)
+Abort.
 Goal forall a b c d e, makeModule_meths [MEMeth a;MERule b;MERegister c;MERegister d]=e.
   intros.
   match goal with
