@@ -234,10 +234,6 @@ Module Notations.
   Notation "WO~1" := (ZToWord 1 1) : word_scope.
   Notation WO := (ZToWord 0 0).
 
-  (* Start of deprecated notations ported from bbv *)
-  Notation pow2 := (Nat.pow 2).
-  
-  (* End of deprecated notations ported from bbv *)
   Delimit Scope word_scope with word.
 End Notations.
 Notation wzero sz := (ZToWord sz 0).
