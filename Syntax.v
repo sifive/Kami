@@ -1,7 +1,7 @@
 Require Export Bool Ascii String Fin List FunctionalExtensionality Psatz PeanoNat.
-Require Export bbv.Word Kami.Lib.VectorFacts Kami.Lib.EclecticLib.
+Require Export Kami.Lib.VectorFacts Kami.Lib.EclecticLib.
 
-Export Word.Notations.
+Require Export Kami.Lib.Word Kami.Lib.WordProperties.
 Export ListNotations.
 
 Require Import Permutation.
@@ -809,42 +809,15 @@ Section WfBaseMod.
   Proof.
     induction e; constructor; auto.
   Qed.
+
+  Lemma WfLetExprSyntax_new k m (e: LetExprSyntax type k): WfActionT_new (getRegisters m) (convertLetExprSyntax_ActionT e).
+  Proof.
+    induction e; simpl; repeat split; auto.
+  Qed.
+
 End WfBaseMod.
 
 Section WfBaseModProofs.
-
-(*
-Lemma change_rules : forall ty dms regs (rule : RuleT) rules rules', WfActionT (BaseMod regs rules dms) (snd rule ty) -> WfActionT (BaseMod regs rules' dms) (snd rule ty).
-Proof.
-  intros.
-  induction H.
-  - apply WfMCall; auto.
-  - apply WfLetExpr; auto.
-  - apply WfLetAction; auto.
-  - apply WfReadNondet; auto.
-  - apply WfReadReg; auto.
-  - apply WfWriteReg; auto.
-  - apply WfIfElse; auto.
-  - apply WfSys; auto.
-  - apply WfReturn; auto.
-Qed.
-
-Lemma change_meths : forall ty dms dms' rules regs (a : string * {x : Signature & MethodT x}), (forall v, WfActionT (BaseMod regs rules dms) (projT2 (snd a) ty v))
-  -> forall v, WfActionT (BaseMod regs rules dms') (projT2 (snd a) ty v).
-Proof.
-  intros.
-  induction (H v).
-  - apply WfMCall; auto.
-  - apply WfLetExpr; auto.
-  - apply WfLetAction; auto.
-  - apply WfReadNondet; auto.
-  - apply WfReadReg; auto.
-  - apply WfWriteReg; auto.
-  - apply WfIfElse; auto.
-  - apply WfSys; auto.
-  - apply WfReturn; auto.
-Qed.
-*)
 
 Lemma In_getKindAttr : forall r k (regs : list (string * {x : FullKind & RegInitValT x})), In (r,k) (getKindAttr regs) -> In r (map fst regs).
 Proof.
@@ -1032,9 +1005,7 @@ Proof.
 Qed.
  *)
 
-Check WfBaseModule.
-
-Lemma Wf_Wf_new_bm : forall bm, WfBaseModule bm -> WfBaseModule_new bm.
+Lemma WfBaseModule_WfBaseModule_new : forall bm, WfBaseModule bm -> WfBaseModule_new bm.
 Proof.
   intros bm [wf_actions [wf_meths [nodup_meths [nodup_regs nodup_rules]]]].
   unfold WfBaseModule_new.
@@ -1098,6 +1069,13 @@ Proof.
   - apply WfReturn.
 Qed.
 
+Lemma WfActionT_new_WfActionT_iff{ty lret} : forall (a : ActionT ty lret) m, NoDup (map fst m) -> WfActionT_new m a <-> WfActionT m a.
+Proof.
+  intros; split; intro.
+  - apply WfActionT_new_WfActionT; auto.
+  - apply WfActionT_WfActionT_new; auto.
+Qed.
+
 Lemma In_wf_rules : forall ty regs rules, NoDup (map fst regs) -> WfRules regs ty rules -> (forall rule : RuleT, In rule rules -> WfActionT regs (snd rule ty)).
 Proof.
   induction rules; intros.
@@ -1121,23 +1099,7 @@ Proof.
     + apply IHdms; auto.
 Qed.
 
-(*
-Lemma In_wf_meths_BaseRegFile : forall ty rfs ms, WfMeths (BaseRegFile rfs) ty ms ->
-  forall meth : string * {x : Signature & MethodT x}, In meth ms -> forall v : ty (fst (projT1 (snd meth))),
-  WfActionT (BaseRegFile rfs) (projT2 (snd meth) ty v).
-Proof.
-  induction ms; intros.
-  - destruct H0.
-  - simpl in H; destruct H.
-    destruct H0.
-    + eapply WfActionT_new_WfActionT.
-      rewrite H0 in H.
-      apply H.
-    + apply IHms; auto.
-Qed.
-*)
-
-Lemma Wf_new_Wf_bm : forall bm, WfBaseModule_new bm -> WfBaseModule bm.
+Lemma WfBaseModule_new_WfBaseModule : forall bm, WfBaseModule_new bm -> WfBaseModule bm.
 Proof.
   intros bm [wf_actions [wf_meths [nodup_meths [nodup_regs nodup_rules]]]].
   unfold WfBaseModule.
@@ -1151,27 +1113,82 @@ Proof.
   - auto.
 Qed.
 
+Lemma WfBaseModule_WfBaseModule_new_iff : forall bm, WfBaseModule bm <-> WfBaseModule_new bm.
+Proof.
+  intro bm; split; intro.
+  - apply WfBaseModule_WfBaseModule_new; auto.
+  - apply WfBaseModule_new_WfBaseModule; auto.
+Qed.
+
 End WfBaseModProofs.
 
-Inductive WfConcatActionT : forall lretT, ActionT type lretT -> Mod -> Prop :=
+Inductive WfConcatActionT{ty} : forall lretT, ActionT ty lretT -> Mod -> Prop :=
 | WfConcatMCall meth s e lretT c m' :(forall v, WfConcatActionT (c v) m') -> ~In meth (getHidden m') ->
-                                     @WfConcatActionT lretT (MCall meth s e c) m'
-| WfConcatLetExpr k (e : Expr type k) lretT c m' : (forall v, WfConcatActionT (c v) m') ->
-                                                   @WfConcatActionT lretT (LetExpr e c) m'
-| WfConcatLetAction k (a : ActionT type k) lretT c m' : WfConcatActionT a m' -> (forall v, WfConcatActionT (c v) m') ->
-                                                        @WfConcatActionT lretT (LetAction a c) m'
-| WfConcatReadNondet k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadNondet k c) m'
-| WfConcatReadReg r k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT lretT (ReadReg r k c) m'
-| WfConcatWriteReg r k (e: Expr type k) lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (WriteReg r e c) m'
-| WfConcatIfElse p k (atrue: ActionT type k) afalse lretT c m': (forall v, WfConcatActionT (c v) m') ->
+                                     @WfConcatActionT ty lretT (MCall meth s e c) m'
+| WfConcatLetExpr k (e : Expr ty k) lretT c m' : (forall v, WfConcatActionT (c v) m') ->
+                                                   @WfConcatActionT ty lretT (LetExpr e c) m'
+| WfConcatLetAction k (a : ActionT ty k) lretT c m' : WfConcatActionT a m' -> (forall v, WfConcatActionT (c v) m') ->
+                                                        @WfConcatActionT ty lretT (LetAction a c) m'
+| WfConcatReadNondet k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT ty lretT (ReadNondet k c) m'
+| WfConcatReadReg r k lretT c m': (forall v, WfConcatActionT (c v) m') -> @WfConcatActionT ty lretT (ReadReg r k c) m'
+| WfConcatWriteReg r k (e: Expr ty k) lretT c m': WfConcatActionT c m' -> @WfConcatActionT ty lretT (WriteReg r e c) m'
+| WfConcatIfElse p k (atrue: ActionT ty k) afalse lretT c m': (forall v, WfConcatActionT (c v) m') ->
                                                                 WfConcatActionT atrue m' -> WfConcatActionT afalse m' ->
-                                                                @WfConcatActionT lretT (IfElse p atrue afalse c) m'
-| WfConcatSys ls lretT c m': WfConcatActionT c m' -> @WfConcatActionT lretT (Sys ls c) m'
-| WfConcatReturn lretT e m': @WfConcatActionT lretT (Return e) m'.
+                                                                @WfConcatActionT ty lretT (IfElse p atrue afalse c) m'
+| WfConcatSys ls lretT c m': WfConcatActionT c m' -> @WfConcatActionT ty lretT (Sys ls c) m'
+| WfConcatReturn lretT e m': @WfConcatActionT ty lretT (Return e) m'.
+
+Fixpoint WfConcatActionT_new{ty lret}(a : ActionT ty lret)(m : Mod) : Prop :=
+  match a with
+  | MCall meth s e cont => (~In meth (getHidden m)) /\ forall x, WfConcatActionT_new (cont x) m
+  | LetExpr k e cont => forall x, WfConcatActionT_new (cont x) m
+  | LetAction k a cont => WfConcatActionT_new a m /\ forall x, WfConcatActionT_new (cont x) m
+  | ReadNondet k cont => forall x, WfConcatActionT_new (cont x) m
+  | ReadReg r k cont => forall x, WfConcatActionT_new (cont x) m
+  | WriteReg r k e a => WfConcatActionT_new a m
+  | IfElse e k a1 a2 cont => WfConcatActionT_new a1 m /\ WfConcatActionT_new a2 m /\ forall x, WfConcatActionT_new (cont x) m
+  | Sys _ a => WfConcatActionT_new a m
+  | Return _ => True
+  end.
+
+Lemma WfConcatActionT_WfConcatActionT_new : forall ty lret m (a : ActionT ty lret), WfConcatActionT a m -> WfConcatActionT_new a m.
+Proof.
+  intros ty lret m a wf_a.
+  induction a; inversion wf_a; simpl; EqDep_subst; auto.
+Qed.
+
+Lemma WfConcatActionT_new_WfConcatActionT : forall ty lret m (a : ActionT ty lret), WfConcatActionT_new a m -> WfConcatActionT a m.
+Proof.
+  intros ty lret m a wf_a.
+  induction a; simpl in wf_a; econstructor; auto; try tauto.
+  - intro; apply H; apply wf_a.
+  - intro; apply H; apply wf_a.
+  - intro; apply H; apply wf_a; auto.
+Qed.
+
+Lemma WfConcatActionT_WfConcatActionT_new_iff : forall ty lret m (a : ActionT ty lret), WfConcatActionT a m <-> WfConcatActionT_new a m.
+Proof.
+  intros ty lret m a; split; intro.
+  - apply WfConcatActionT_WfConcatActionT_new; auto.
+  - apply WfConcatActionT_new_WfConcatActionT; auto.
+Qed.
 
 Definition WfConcat m m' :=
   (forall rule, In rule (getAllRules m) -> WfConcatActionT (snd rule type) m') /\
   (forall meth, In meth (getAllMethods m) -> forall v, WfConcatActionT (projT2 (snd meth) type v) m').
+
+Definition WfConcat_new m m' :=
+  (forall rule, In rule (getAllRules m) -> WfConcatActionT_new (snd rule type) m') /\
+  (forall meth, In meth (getAllMethods m) -> forall v, WfConcatActionT_new (projT2 (snd meth) type v) m').
+
+Lemma WfConcat_WfConcat_new_iff : forall m m', WfConcat m m' <-> WfConcat_new m m'.
+Proof.
+  unfold WfConcat, WfConcat_new; intros; repeat split; intros; destruct H.
+  - rewrite <- WfConcatActionT_WfConcatActionT_new_iff; auto.
+  - rewrite <- WfConcatActionT_WfConcatActionT_new_iff; auto.
+  - rewrite WfConcatActionT_WfConcatActionT_new_iff; auto.
+  - rewrite WfConcatActionT_WfConcatActionT_new_iff; auto.
+Qed.
 
 Inductive WfMod: Mod -> Prop :=
 | BaseWf m (HWfBaseModule: WfBaseModule m): WfMod (Base m)
@@ -1182,19 +1199,67 @@ Inductive WfMod: Mod -> Prop :=
               (HWf1: WfMod m1) (HWf2: WfMod m2)(WfConcat1: WfConcat m1 m2)
               (WfConcat2 : WfConcat m2 m1): WfMod (ConcatMod m1 m2).
 
+Fixpoint WfMod_new(m : Mod) : Prop :=
+  match m with
+  | Base m => WfBaseModule_new m
+  | HideMeth m s => In s (map fst (getAllMethods m)) /\ WfMod_new m
+  | ConcatMod m1 m2 => DisjKey (getAllRegisters m1) (getAllRegisters m2) /\ DisjKey (getAllRules m1) (getAllRules m2) /\ DisjKey (getAllMethods m1) (getAllMethods m2) /\
+                         WfMod_new m1 /\ WfMod_new m2 /\ WfConcat_new m1 m2 /\ WfConcat_new m2 m1
+  end.
+
+Lemma WfMod_WfMod_new : forall m, WfMod m -> WfMod_new m.
+Proof.
+  intros m wf_m; induction m; inversion wf_m; simpl.
+  - rewrite <- WfBaseModule_WfBaseModule_new_iff; auto.
+  - auto.
+  - repeat rewrite <- WfConcat_WfConcat_new_iff; tauto.
+Qed.
+
+Lemma WfMod_new_WfMod : forall m, WfMod_new m -> WfMod m.
+Proof.
+  intros m wf_m; induction m; inversion wf_m; simpl.
+  - econstructor; auto; simpl in wf_m.
+    unfold WfBaseModule.
+    unfold WfBaseModule_new in wf_m; dest.
+    repeat split; try auto.
+    + intro; apply In_wf_rules; auto.
+    + intro; apply In_wf_meths; auto.
+  - econstructor; auto.
+  - repeat rewrite <- WfConcat_WfConcat_new_iff in H0; econstructor; try tauto.
+Qed.
+
+Lemma WfMod_new_WfMod_iff : forall m, WfMod_new m <-> WfMod m.
+Proof.
+  intro m; split; eauto using WfMod_new_WfMod, WfMod_WfMod_new.
+Qed.
+
 Record ModWf : Type := { module :> Mod;
                          wfMod : WfMod module }.
 
+Record ModWf_new : Type := { module_new :> Mod;
+  wfMod_new : WfMod_new module_new }.
+
 Record ModWfOrd := { modWf :> ModWf ;
                      modOrd : list string }.
+
+Record ModWfOrd_new := { modWf_new :> ModWf_new ;
+                     modOrd_new : list string }.
 
 Record BaseModuleWf :=
   { baseModule :> BaseModule ;
     wfBaseModule : WfBaseModule baseModule }.
 
+Record BaseModuleWf_new :=
+  { baseModule_new :> BaseModule ;
+    wfBaseModule_new : WfBaseModule_new baseModule_new }.
+
 Record BaseModuleWfOrd :=
   { baseModuleWf :> BaseModuleWf ;
     baseModuleOrd : list string }.
+
+Record BaseModuleWfOrd_new :=
+  { baseModuleWf_new :> BaseModuleWf_new ;
+    baseModuleOrd_new : list string }.
 
 Definition getModWf (m: BaseModuleWf) :=
   {| module := m;
@@ -1379,32 +1444,17 @@ Definition evalCABool (op: CABoolOp) (ws : list bool) : bool :=
     | Xor => fold_left xorb ws false
   end.
 
-Fixpoint fold_left_word (f: bool -> bool -> bool) sz (w: word sz) init: bool :=
-  match w with
-  | WO => init
-  | WS b _ rst => fold_left_word f rst (f init b)
-  end.
-
-Fixpoint fold_right_word (f: bool -> bool -> bool) init sz (w: word sz): bool :=
-  match w with
-  | WO => init
-  | WS b _ rst => f b (fold_right_word f init rst)
-  end.
-
 Definition evalUniBit n1 n2 (op: UniBitOp n1 n2): word n1 -> word n2 :=
   match op with
   | Inv n => (@wnot n)
-  | TruncLsb lsb msb => split1 lsb msb
-  | TruncMsb lsb msb => split2 lsb msb
-  | UAnd n => fun w => WS (fold_left_word andb w true) WO
-  | UOr n => fun w => WS (fold_left_word orb w false) WO
-  | UXor n => fun w => WS (fold_left_word xorb w false) WO
+  | TruncLsb lsb msb => truncLsb 
+  | TruncMsb lsb msb => truncMsb
+  | UAnd n =>  fun w => boolToWord 1 (@wuand n w)
+  | UOr n => fun w => boolToWord 1 (@wuor n w)
+  | UXor n => fun w => boolToWord 1 (@wuxor n w)
   end.
 
-Definition wdivN := wordBinN Nat.div.
-Definition wremN := wordBinN Nat.modulo.
-
-Definition wneg_simple sz (x: word sz) := wnot x ^+ $1.
+Definition wneg_simple sz (x: word sz) := wnot x ^+ (natToWord _ 1).
 
 Definition wminus_simple sz (x y: word sz) := x ^+ (wneg_simple y).
 
@@ -1417,7 +1467,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma wminus_simple_wminus sz: forall (x y: word sz), wminus_simple x y = wminus x y.
+Lemma wminus_simple_wminus sz: forall (x y: word sz), wminus_simple x y = wsub x y.
 Proof.
   unfold wminus_simple.
   intros.
@@ -1429,28 +1479,28 @@ Qed.
 Definition evalBinBit n1 n2 n3 (op: BinBitOp n1 n2 n3)
   : word n1 -> word n2 -> word n3 :=
   match op with
-    | Sub n => @wminus_simple n
-    | Div n => @wdivN n
-    | Rem n => @wremN n
-    | Sll n m => (fun x y => wlshift' x (wordToNat y))
-    | Srl n m => (fun x y => wrshift' x (wordToNat y))
-    | Sra n m => (fun x y => wrshifta' x (wordToNat y))
-    | Concat n1 n2 => fun x y => (Word.combine y x)
+    | Sub n => @wsub n
+    | Div n => @wdiv n
+    | Rem n => @wmod n
+    | Sll n m => (fun x y => wslu x (ZToWord _ (wordVal _ y)))
+    | Srl n m => (fun x y => wsru x (ZToWord _ (wordVal _ y)))
+    | Sra n m => wsra
+    | Concat n1 n2 => wconcat
   end.
 
 Definition evalCABit n (op: CABitOp) (ls: list (word n)): word n :=
   match op with
-    | Add => fold_left (@wplus n) ls (wzero n)
-    | Mul => fold_left (@wmult n) ls (natToWord n 1)
-    | Band => fold_left (@wand n) ls (wones n)
-    | Bor => fold_left (@wor n) ls (wzero n)
-    | Bxor => fold_left (@wxor n) ls (wzero n)
+    | Add => fold_left (@wadd n) ls (ZToWord n 0)
+    | Mul => fold_left (@wmul n) ls (ZToWord n 1)
+    | Band => fold_left (@wand n) ls  (ZToWord n ((2 ^ (Z.of_nat n)) - 1))
+    | Bor => fold_left (@wor n) ls (ZToWord n 0)
+    | Bxor => fold_left (@wxor n) ls (ZToWord n 0)
   end.
 
 Definition evalBinBitBool n1 n2 (op: BinBitBoolOp n1 n2)
   : word n1 -> word n2 -> bool :=
   match op with
-    | LessThan n => fun a b => getBool (@wlt_dec n a b)
+    | LessThan n => fun a b => @wltu n a b
   end.
 
 Fixpoint evalConstT k (e: ConstT k): type k :=
@@ -1497,7 +1547,7 @@ Section Semantics.
       | ReadStruct n fk fs e i => (@evalExpr _ e) i
       | BuildStruct n fk fs fv => fun i => @evalExpr _ (fv i)
       | ReadArray n m k fv i =>
-        match lt_dec (wordToNat (@evalExpr _ i)) n with
+        match lt_dec (Z.to_nat (wordVal _ (@evalExpr _ i))) n with
         | left pf => fun fv => fv (Fin.of_nat_lt pf)
         | right _ => fun _ => evalConstT (getDefaultConst k)
         end (@evalExpr _ fv)

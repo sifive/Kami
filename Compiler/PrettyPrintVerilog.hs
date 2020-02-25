@@ -67,12 +67,12 @@ padwith :: a -> Int -> [a] -> [a]
 padwith x n xs = let m = n - length xs in
   if m > 0 then replicate m x ++ xs else drop (-m) xs
 
-ppWord :: (Int,Integer) -> String
-ppWord (n,i) = padwith '0' n $ showIntAtBase 2 intToDigit i ""
+ppWord :: Int -> Integer -> String
+ppWord n i = padwith '0' n $ showIntAtBase 2 intToDigit i ""
 
 ppConst :: T.ConstT -> String
 ppConst (T.ConstBool b) = if b then "1'b1" else "1'b0"
-ppConst (T.ConstBit sz w) = show sz ++ "\'b" ++ ppWord w
+ppConst (T.ConstBit sz w) = show sz ++ "\'b" ++ ppWord sz w
 ppConst (T.ConstArray n k fv) = '{' : intercalate ", " (Data.List.map ppConst (Data.List.map fv (reverse $ T.getFins n))) ++ "}"
 ppConst (T.ConstStruct n fk fs fv) = '{' : intercalate ", " (snd (unzip (Data.List.filter (\(k,e) -> T.size k /= 0) (zip (Data.List.map fk (T.getFins n)) (Data.List.map ppConst (Data.List.map fv (T.getFins n))))))) ++ "}"
 

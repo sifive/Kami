@@ -1,6 +1,6 @@
 Require Import Kami.Syntax Kami.Lib.EclecticLib Kami.Tactics.
 Require Import RecordUpdate.RecordSet.
-Require Import Wf.
+Require Import Program.Wf.
 Require Import Wf_nat.
 Require Import BinNums.
 
@@ -99,8 +99,8 @@ Delimit Scope kami_struct_scope with kami_struct.
 (** Notations for expressions *)
 
 Notation "k @# ty" := (Expr ty (SyntaxKind k)) (no associativity, at level 98, only parsing).
-Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (only parsing) : kami_expr_scope.
-Notation "$ n" := (Const _ (natToWord _ n)): kami_expr_scope.
+Notation "# v" := (Var ltac:(assumption) (SyntaxKind _) v) (no associativity, at level 0, only parsing) : kami_expr_scope.
+Notation "$ n" := (Const _ (natToWord _ n)) (no associativity, at level 0): kami_expr_scope.
 Notation "$$ e" := (Const ltac:(assumption) e) (at level 8, only parsing) : kami_expr_scope.
 
 Notation "! v" := (UniBool Neg v) (at level 35): kami_expr_scope.
@@ -152,15 +152,15 @@ Notation "{< a , .. , b >}" :=
   ((BinBit (Concat _ _)) a .. (BinBit (Concat _ _) b (@Const _ (Bit 0) WO)) ..)
     (at level 100, a at level 99): kami_expr_scope.
 Notation "{< a , .. , b >}" :=
-  (Word.combine b .. (Word.combine a WO) ..)
+  (wcombine b .. (wcombine a WO) ..)
     (at level 100, a at level 99): word_scope.
 
 Infix "<" := (BinBitBool (LessThan _)) : kami_expr_scope.
 Notation "x > y" := (BinBitBool (LessThan _) y x) : kami_expr_scope.
 Notation "x >= y" := (UniBool Neg (BinBitBool (LessThan _) x y)) : kami_expr_scope.
 Notation "x <= y" := (UniBool Neg (BinBitBool (LessThan _) y x)) : kami_expr_scope.
-Infix "<s" := (Slt _) : kami_expr_scope.
-Notation "x >s y" := (Slt _ y x) : kami_expr_scope.
+Infix "<s" := (Slt _) (at level 70): kami_expr_scope.
+Notation "x >s y" := (Slt _ y x) (at level 70, y at next level): kami_expr_scope.
 Notation "x >=s y" := (UniBool Neg (Slt _ x y)) (at level 100) : kami_expr_scope.
 Notation "x <=s y" := (UniBool Neg (Slt _ y x)) (at level 100): kami_expr_scope.
 Infix "==" := Eq (at level 39, no associativity) : kami_expr_scope.
@@ -346,7 +346,7 @@ Definition callNames (ty: Kind -> Type) k names := map (fun r =>
 Definition writeNames (ty: Kind -> Type) k namesVals :=
   map (fun r => 
          (@WriteReg _ _ (fst r) (SyntaxKind k) (snd r)
-                    (Return (Const ty WO)))) namesVals.
+                    (Return (Const ty (ZToWord 0 0))))) namesVals.
 
 (* Complex list action notations *)
 Notation "'GatherActions' actionList 'as' val ; cont" :=
@@ -426,6 +426,18 @@ Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
      modOrd := getOrder ((app m1%kami .. (app mN%kami nil) ..)) |}
     (only parsing).
 
+Notation "'MODULE_WF_new' { m1 'with' .. 'with' mN }" :=
+  {| baseModuleWf_new := {| baseModule_new := (makeModule ((app m1%kami .. (app mN%kami nil) ..))) ;
+                        wfBaseModule_new := ltac:(discharge_wf_new) |} ;
+     baseModuleOrd_new := getOrder ((app m1%kami .. (app mN%kami nil) ..)) |}
+    (only parsing).
+
+Notation "'MOD_WF_new' { m1 'with' .. 'with' mN }" :=
+  {| modWf_new := {| module_new := Base (makeModule ((app m1%kami .. (app mN%kami nil) ..))) ;
+                 wfMod_new := ltac:(discharge_wf_new) |} ;
+     modOrd_new := getOrder ((app m1%kami .. (app mN%kami nil) ..)) |}
+    (only parsing).
+
 (* Notation "'RegisterVec' name 'using' nums : type <- init" := *)
 (*   (MERegAry ( *)
 (*        map (fun idx => *)
@@ -482,6 +494,24 @@ Section mod_test.
                                                         Write (^"x"): Bool <- #y;
                                                         Retv )
                            }.
+
+  Local Example test_new : ModWf_new := MOD_WF_new {
+                              (concat [Register (^"x") : Bool <- true; Register (^"z") : Bool <- false])
+                                with Register (^"y") : Bool <- false
+                                with Rule (^"r1") := ( Read y: Bool <- ^"y";
+                                                         Write (^"x"): Bool <- #y;
+                                                         Retv )
+                          }.
+
+  Local Example test1_new := MODULE_WF{
+                             (concat [Register (^"x") : Bool <- true; Register (^"w"): Bool <- true;
+                                        Register (^"t"): Bit 0 <- WO])
+                               with Register (^"y") : Bool <- false
+                               with Rule (^"r1") := ( Read y: Bool <- ^"y";
+                                                        Write (^"x"): Bool <- #y;
+                                                        Retv )
+                           }.
+
 End mod_test.
 
 Definition Registers := (map MERegister).

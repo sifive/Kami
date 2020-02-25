@@ -29,7 +29,7 @@ class Eval a b where
 
 instance Eval T.ConstT (IO Val) where
     eval (T.ConstBool b) = return $ BoolVal b
-    eval (T.ConstBit _ (n,v)) = return $ BVVal $ BV.bitVec n v
+    eval (T.ConstBit n v) = return $ BVVal $ BV.bitVec n v
     eval (T.ConstStruct n _ names fields) =
         liftM StructVal $ pair_sequence $ map (\i -> (names i, eval $ fields i)) $ T.getFins n
     eval (T.ConstArray n k vals) = do
