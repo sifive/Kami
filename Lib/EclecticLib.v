@@ -2641,7 +2641,7 @@ Proof.
       (Z.of_nat (Nat.pow 2 n) + Z.of_nat (Nat.pow 2 n))%Z by omega.
   simpl.
   repeat rewrite Nat2Z.inj_add.
-  ring.
+  lia.
 Qed.
 
 Lemma pow2_le:
