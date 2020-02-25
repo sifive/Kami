@@ -23,7 +23,6 @@ Section exampleModule.
     In Kami, all names should be globally unique, and therefore requires this to be done explicitly.
     Inside a module, any @^"newName" will be automatically converted into name ++ "_" ++ "newName".
     The next two lines are added because the Notations in Coq are broken. *)
-   
 
   Definition exampleModule :=
     MODULE {
@@ -211,8 +210,7 @@ Section exampleModule.
           
           nil);
         
-        
-        LET x100: Void <- $$ WO;
+        LET x100: Void <- $$ (ZToWord 0 0);
         (* Void is literally Bit 0, and WO is the only way to create a value of type Bit 0 *)       
                
         (* Finally, we end any action by a return statement *)
@@ -395,7 +393,7 @@ Section exampleModule.
               DispString _ "Bye\n" ::
               nil             
               );
-            RetE ($$ WO));
+            RetE ($$ (ZToWord 0 0)));
           
           IfE (#k2 == (#k3 + $1))
           then (
@@ -403,13 +401,13 @@ Section exampleModule.
               DispString _ "Bye\n" ::
               nil             
               ) ;
-            RetE ($$ WO))
+            RetE ($$ (ZToWord 0 0)))
           else (
             SystemE (
               DispString _ "Good Bye\n" ::
               nil             
               ) ;
-              RetE ($$ WO));
+              RetE ($$ (ZToWord 0 0)));
             
           RetE (#k2 + #k3)
           ) ;

@@ -1,7 +1,7 @@
 Require Export Bool Ascii String Fin List FunctionalExtensionality Psatz PeanoNat.
-Require Export bbv.Word Kami.Lib.VectorFacts Kami.Lib.EclecticLib.
+Require Export Kami.Lib.VectorFacts Kami.Lib.EclecticLib.
 
-Export Word.Notations.
+Require Export Kami.Lib.Word Kami.Lib.WordProperties.
 Export ListNotations.
 
 Require Import Permutation.
@@ -1444,32 +1444,17 @@ Definition evalCABool (op: CABoolOp) (ws : list bool) : bool :=
     | Xor => fold_left xorb ws false
   end.
 
-Fixpoint fold_left_word (f: bool -> bool -> bool) sz (w: word sz) init: bool :=
-  match w with
-  | WO => init
-  | WS b _ rst => fold_left_word f rst (f init b)
-  end.
-
-Fixpoint fold_right_word (f: bool -> bool -> bool) init sz (w: word sz): bool :=
-  match w with
-  | WO => init
-  | WS b _ rst => f b (fold_right_word f init rst)
-  end.
-
 Definition evalUniBit n1 n2 (op: UniBitOp n1 n2): word n1 -> word n2 :=
   match op with
   | Inv n => (@wnot n)
-  | TruncLsb lsb msb => split1 lsb msb
-  | TruncMsb lsb msb => split2 lsb msb
-  | UAnd n => fun w => WS (fold_left_word andb w true) WO
-  | UOr n => fun w => WS (fold_left_word orb w false) WO
-  | UXor n => fun w => WS (fold_left_word xorb w false) WO
+  | TruncLsb lsb msb => truncLsb 
+  | TruncMsb lsb msb => truncMsb
+  | UAnd n =>  fun w => boolToWord 1 (@wuand n w)
+  | UOr n => fun w => boolToWord 1 (@wuor n w)
+  | UXor n => fun w => boolToWord 1 (@wuxor n w)
   end.
 
-Definition wdivN := wordBinN Nat.div.
-Definition wremN := wordBinN Nat.modulo.
-
-Definition wneg_simple sz (x: word sz) := wnot x ^+ $1.
+Definition wneg_simple sz (x: word sz) := wnot x ^+ (natToWord _ 1).
 
 Definition wminus_simple sz (x y: word sz) := x ^+ (wneg_simple y).
 
@@ -1482,7 +1467,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma wminus_simple_wminus sz: forall (x y: word sz), wminus_simple x y = wminus x y.
+Lemma wminus_simple_wminus sz: forall (x y: word sz), wminus_simple x y = wsub x y.
 Proof.
   unfold wminus_simple.
   intros.
@@ -1494,28 +1479,28 @@ Qed.
 Definition evalBinBit n1 n2 n3 (op: BinBitOp n1 n2 n3)
   : word n1 -> word n2 -> word n3 :=
   match op with
-    | Sub n => @wminus_simple n
-    | Div n => @wdivN n
-    | Rem n => @wremN n
-    | Sll n m => (fun x y => wlshift' x (wordToNat y))
-    | Srl n m => (fun x y => wrshift' x (wordToNat y))
-    | Sra n m => (fun x y => wrshifta' x (wordToNat y))
-    | Concat n1 n2 => fun x y => (Word.combine y x)
+    | Sub n => @wsub n
+    | Div n => @wdiv n
+    | Rem n => @wmod n
+    | Sll n m => (fun x y => wslu x (ZToWord _ (wordVal _ y)))
+    | Srl n m => (fun x y => wsru x (ZToWord _ (wordVal _ y)))
+    | Sra n m => wsra
+    | Concat n1 n2 => wconcat
   end.
 
 Definition evalCABit n (op: CABitOp) (ls: list (word n)): word n :=
   match op with
-    | Add => fold_left (@wplus n) ls (wzero n)
-    | Mul => fold_left (@wmult n) ls (natToWord n 1)
-    | Band => fold_left (@wand n) ls (wones n)
-    | Bor => fold_left (@wor n) ls (wzero n)
-    | Bxor => fold_left (@wxor n) ls (wzero n)
+    | Add => fold_left (@wadd n) ls (ZToWord n 0)
+    | Mul => fold_left (@wmul n) ls (ZToWord n 1)
+    | Band => fold_left (@wand n) ls  (ZToWord n ((2 ^ (Z.of_nat n)) - 1))
+    | Bor => fold_left (@wor n) ls (ZToWord n 0)
+    | Bxor => fold_left (@wxor n) ls (ZToWord n 0)
   end.
 
 Definition evalBinBitBool n1 n2 (op: BinBitBoolOp n1 n2)
   : word n1 -> word n2 -> bool :=
   match op with
-    | LessThan n => fun a b => getBool (@wlt_dec n a b)
+    | LessThan n => fun a b => @wltu n a b
   end.
 
 Fixpoint evalConstT k (e: ConstT k): type k :=
@@ -1562,7 +1547,7 @@ Section Semantics.
       | ReadStruct n fk fs e i => (@evalExpr _ e) i
       | BuildStruct n fk fs fv => fun i => @evalExpr _ (fv i)
       | ReadArray n m k fv i =>
-        match lt_dec (wordToNat (@evalExpr _ i)) n with
+        match lt_dec (Z.to_nat (wordVal _ (@evalExpr _ i))) n with
         | left pf => fun fv => fv (Fin.of_nat_lt pf)
         | right _ => fun _ => evalConstT (getDefaultConst k)
         end (@evalExpr _ fv)
