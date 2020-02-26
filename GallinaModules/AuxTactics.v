@@ -35,22 +35,22 @@ Ltac finisher :=
 
 (* Finishes goals raised by application of lemmas relating to SubList.
    Shouldn't be called explicitly. *)
-Ltac sublist_finisher SubmodImplRegs :=
-  match goal with
-  | |- ~ In (?name,_) _ => assert (~ In name (map fst SubmodImplRegs)); intro
-  | [H: NoDup _ |- False] => inversion H; clear H; solve[intuition]
-  | [H: ~ In _ _ |- False] => eapply H
-  | [H: map (fun x : RegT => (let (x0, _) := x in x0, let (a, _) := let (_, y) := x in y in a)) _ = map (fun x : RegT => (let (x0, _) := x in x0, let (a, _) := let (_, y) := x in y in a)) _ |- _] => 
-    erewrite <-(getKindAttrEqImpFstEq _ _ H)
-  | |- In _ (map fst _) => eapply inImpInFst; solve[finisher]
-  | |- _  => solve[finisher]
-  end.
+(* Ltac sublist_finisher SubmodImplRegs := *)
+(*   match goal with *)
+(*   | |- ~ In (?name,_) _ => assert (~ In name (map fst SubmodImplRegs)); intro *)
+(*   | [H: NoDup _ |- False] => inversion H; clear H; solve[intuition] *)
+(*   | [H: ~ In _ _ |- False] => eapply H *)
+(*   | [H: map (fun x : RegT => (let (x0, _) := x in x0, let (a, _) := let (_, y) := x in y in a)) _ = map (fun x : RegT => (let (x0, _) := x in x0, let (a, _) := let (_, y) := x in y in a)) _ |- _] =>  *)
+(*     erewrite <-(getKindAttrEqImpFstEq _ _ H) *)
+(*   | |- In _ (map fst _) => eapply inImpInFst; solve[finisher] *)
+(*   | |- _  => solve[finisher] *)
+(*   end. *)
 
 (* Solves Sublist goals about "submodule" implementation registers *)
-Ltac discharge_SubList SubmodImplRegs :=
-  match goal with
-  | |- SubList _ SubmodImplRegs => solve[eapply SubList_transitive; repeat sublist_finisher SubmodImplRegs; eapply SubList_Strengthen; repeat sublist_finisher SubmodImplRegs]
-  end.
+(* Ltac discharge_SubList SubmodImplRegs := *)
+(*   match goal with *)
+(*   | |- SubList _ SubmodImplRegs => solve[eapply SubList_transitive; repeat sublist_finisher SubmodImplRegs; eapply SubList_Strengthen; repeat sublist_finisher SubmodImplRegs] *)
+(*   end. *)
 
 (* Solves some List.In goals by making use of List.NoDup
    hypotheses. Should not be called explicitly. *)
