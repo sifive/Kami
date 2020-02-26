@@ -181,3 +181,25 @@ Extract Constant Hrand_bool => "Prelude.return Prelude.False". (*FIXME*)
 Extract Constant Hrand_word => "Prelude.undefined". (*FIXME*)
 Extract Constant Hrand_vec => "Prelude.undefined". (*FIXME*)
 Extract Constant Hexit => "System.Exit.exitSuccess".
+
+(* Arrays *)
+
+Parameter HArray : Type -> Type.
+Parameter Hmake_arr : forall {X n}, (Fin.t n -> X) -> IO (HArray X).
+Parameter Harr_slice : forall {X} (i m : nat), HArray X -> IO (HVec m X).
+Parameter Harr_updates : forall {X}, HArray X -> list (nat * X) -> IO unit.
+Parameter Harr_map : forall {X Y}, (X -> Y) -> HArray X -> IO (HArray Y).
+
+Instance HArrayIsArray : IsArray HArray := {|
+  make_arr := @Hmake_arr;
+  arr_slice := @Harr_slice;
+  arr_updates := @Harr_updates;
+  arr_map := @Harr_map
+  |}.
+
+Extract Constant HArray "a" => "Data.Array.IO.IOArray Prelude.Int a".
+Extract Constant Hmake_arr => "(\n f -> Data.Array.MArray.newListArray (0,n Prelude.- 1) (coq_Fin_to_list n f))".
+Extract Constant Harr_slice => "(\i m a -> Control.Monad.liftM Data.Vector.fromList (Prelude.sequence (Prelude.map (\j -> Data.Array.MArray.readArray a (j Prelude.+ i)) [0..(m Prelude.- 1)])))".
+Extract Constant Harr_updates => "(\a ps -> Prelude.return ())".
+Extract Constant Harr_updates => "(\a ps -> Control.Monad.foldM (\_ (i,e) -> Data.Array.MArray.writeArray a i e) () ps)".
+Extract Constant Harr_map => "Data.Array.MArray.mapArray".

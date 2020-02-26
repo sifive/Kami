@@ -62,3 +62,10 @@ Class IOMonad{W V}`{IsWord W, IsVector V} (M : Type -> Type) := {
   }.
 
 Notation "'io_do' x <- y ; cont" := (bind y (fun x => cont)) (at level 20).
+
+Class IsArray{W V M}`{IsWord W, IsVector V, IOMonad W V M} (A : Type -> Type) := {
+  make_arr : forall {X n}, (Fin.t n -> X) -> M (A X);
+  arr_slice : forall {X} (i m : nat), A X -> M (V m X);
+  arr_updates : forall {X}, A X -> list (nat * X) -> M unit;
+  arr_map : forall {X Y}, (X -> Y) -> A X -> M (A Y)
+  }.

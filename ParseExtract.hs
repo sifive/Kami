@@ -8,10 +8,11 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Vector as V
 import qualified Data.Char as C
+import System.IO
 
+import Control.Monad
 import Simulator.Util
 import Unsafe.Coerce
-
 
 data Tok = Addr Integer | Value BV.BV deriving (Show)
 
@@ -34,5 +35,10 @@ getToks n text = toks_to_addr_vals $ concat $ map ((map $ readTok n) . (filter (
 parseFile :: Int -> Int -> String -> a
 parseFile size idxNum path = unsafeCoerce $ do
     text <- T.readFile path
-    let pairs = getToks size text
-    return $ (V.replicate idxNum 0) V.// (map (\(i,v) -> (fromIntegral i, v)) pairs)
+    hPutStrLn stderr "file read."
+    let pairs = map (\(i,v) -> (fromIntegral i,v)) $ getToks size $  text
+    init <- (M.newArray (0, idxNum-1) 0 :: IO (A.IOArray Int BV.BV))
+    hPutStrLn stderr "initialized"
+    foldM (\_ (i,x) -> M.writeArray init i x) () pairs
+    hPutStrLn stderr "returning"
+    return init

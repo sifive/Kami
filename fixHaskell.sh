@@ -114,3 +114,30 @@ do
     $SED -i -e '0,/^import/{s/^import/import qualified ParseExtract\nimport/}' $file
   fi
 done
+
+for file in $(grep -l "Data\.Array.IO" $1/*.hs)
+do
+  grep -q "import qualified Data\.Array.IO" $file
+  if [ $? -ne 0 ]
+  then
+    $SED -i -e '0,/^import/{s/^import/import qualified Data.Array.IO\nimport/}' $file
+  fi
+done
+
+for file in $(grep -l "Data\.Array\.MArray" $1/*.hs)
+do
+  grep -q "import qualified Data\.Array\.MArray" $file
+  if [ $? -ne 0 ]
+  then
+    $SED -i -e '0,/^import/{s/^import/import qualified Data.Array.MArray\nimport/}' $file
+  fi
+done
+
+for file in $(grep -l "Control\.Monad" $1/*.hs)
+do
+  grep -q "import qualified Control\.Monad" $file
+  if [ $? -ne 0 ]
+  then
+    $SED -i -e '0,/^import/{s/^import/import qualified Control.Monad\nimport/}' $file
+  fi
+done
