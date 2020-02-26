@@ -263,7 +263,7 @@ Proof.
   intro; apply H.
 Qed.
 
-Definition Fin_cast : forall {m n}, Fin.t m -> m = n -> Fin.t n :=
+Definition Fin_cast : forall m n, Fin.t m -> m = n -> Fin.t n :=
   fun m n i pf => match pf in _ = y return Fin.t y with
                   | eq_refl => i
                   end.
