@@ -590,6 +590,23 @@ Fixpoint getFins n :=
   | S m => Fin.F1 :: map Fin.FS (getFins m)
   end.
 
+Section Arr.
+  Variable A: Type.
+  Variable def: A.
+  Variable n: nat.
+  Variable arr: Fin.t n -> A.
+
+  Definition list_arr := map arr (getFins n).
+  
+  Definition list_arr_correct := forall (i: nat),
+      match lt_dec i n with
+      | left pf => arr (Fin.of_nat_lt pf)
+      | right _ => def
+      end = nth_default def list_arr i.
+
+  Definition list_arr_correct_simple := forall i, nth_error list_arr (proj1_sig (Fin.to_nat i)) = Some (arr i).
+End Arr.
+
 Fixpoint getFinsBound m n: list (Fin.t n) :=
   match m return (list (Fin.t n)) with
   | 0 => nil
