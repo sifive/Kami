@@ -263,15 +263,12 @@ Proof.
   intro; apply H.
 Qed.
 
-Definition Fin_cast : forall {m n}, Fin.t m -> m = n -> Fin.t n :=
+Definition Fin_cast : forall m n, Fin.t m -> m = n -> Fin.t n :=
   fun m n i pf => match pf in _ = y return Fin.t y with
                   | eq_refl => i
                   end.
 
 End Fin.
-
-
-
 
 Lemma inversionPair A B (a1 a2: A) (b1 b2: B):
   (a1, b1) = (a2, b2) ->
