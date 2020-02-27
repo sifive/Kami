@@ -668,9 +668,46 @@ Section Arr.
     unfold list_arr; apply map_nth_error.
     apply getFins_nth_error.
   Qed.
-  
-End Arr.
 
+  Fixpoint cutList (n : nat) (ls : list A) :=
+    match n with
+    | O => nil
+    | S m =>
+      match ls with
+      | nil => ls
+      | x :: ls' => x :: (cutList m ls')
+      end
+    end.
+
+  Fixpoint snoc (a : A) (ls : list A) :=
+    match ls with
+    | nil => a::nil
+    | x :: ls' => x :: (snoc a ls')
+    end.
+  
+  Fixpoint rotateList (n : nat) (ls : list A) :=
+    match n with
+    | O => ls
+    | S m => rotateList m (match ls with
+                           | nil => nil
+                           | x :: ls => snoc x ls
+                           end)
+    end.
+
+  Lemma snoc_rapp (a : A) (ls : list A) :
+    snoc a ls = ls ++ [a].
+  Proof.
+    induction ls; simpl; auto.
+    rewrite IHls; reflexivity.
+  Qed.
+
+  Lemma snoc_rev_cons (a : A) (ls : list A) :
+    snoc a ls = rev (cons a (rev ls)).
+  Proof.
+    simpl; rewrite rev_involutive, snoc_rapp; reflexivity.
+  Qed.
+
+End Arr.
 
 Lemma fold_left_or_init: forall A (f: A -> Prop) ls (P: Prop), P -> fold_left (fun a b => f b \/ a) ls P.
 Proof.
