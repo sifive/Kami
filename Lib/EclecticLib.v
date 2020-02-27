@@ -590,21 +590,6 @@ Fixpoint getFins n :=
   | S m => Fin.F1 :: map Fin.FS (getFins m)
   end.
 
-Section Arr.
-  Variable A: Type.
-  Variable def: A.
-
-  Definition list_arr n (arr: Fin.t n -> A) := map arr (getFins n).
-  
-  Definition list_arr_correct := forall n (arr: Fin.t n -> A) (i: nat),
-      match lt_dec i n with
-      | left pf => arr (Fin.of_nat_lt pf)
-      | right _ => def
-      end = nth_default def (list_arr arr) i.
-
-  Definition list_arr_correct_simple := forall n (arr: Fin.t n -> A) i, nth_error (list_arr arr) (proj1_sig (Fin.to_nat i)) = Some (arr i).
-End Arr.
-
 Fixpoint getFinsBound m n: list (Fin.t n) :=
   match m return (list (Fin.t n)) with
   | 0 => nil
@@ -644,6 +629,48 @@ Proof.
   apply nth_error_nth.
   apply getFins_nth_error.
 Qed.
+
+Section Arr.
+  Variable A: Type.
+  Variable def: A.
+
+  Definition list_arr n (arr : Fin.t n -> A):= map arr (getFins n).
+  
+  Lemma list_arr_correct :
+    forall n (arr : Fin.t n -> A)(i: nat),
+      match lt_dec i n with
+      | left pf => arr (Fin.of_nat_lt pf)
+      | right _ => def
+      end = nth_default def (list_arr arr) i.
+  Proof.
+    intros; destruct lt_dec; unfold list_arr, nth_default; destruct nth_error eqn:G; auto.
+    - erewrite map_nth_error in G; inversion G; subst.
+      + reflexivity.
+      + assert (i = proj1_sig (to_nat (of_nat_lt l))) as P0.
+        { rewrite to_nat_of_nat; simpl; reflexivity. }
+        specialize (getFins_nth_error (of_nat_lt l)) as P1.
+        cbv zeta in P1.
+        rewrite <- P0 in P1.
+        assumption.
+    - exfalso.
+      rewrite nth_error_None, map_length, getFins_length in G; lia.
+    - exfalso.
+      assert (nth_error (map arr (getFins n)) i <> None).
+      { congruence. }
+      rewrite nth_error_Some, map_length, getFins_length in H; contradiction.
+  Qed.
+      
+  Lemma list_arr_correct_simple :
+    forall n (arr : Fin.t n -> A) i,
+      nth_error (list_arr arr) (proj1_sig (Fin.to_nat i)) = Some (arr i).
+  Proof.
+    intros.
+    unfold list_arr; apply map_nth_error.
+    apply getFins_nth_error.
+  Qed.
+  
+End Arr.
+
 
 Lemma fold_left_or_init: forall A (f: A -> Prop) ls (P: Prop), P -> fold_left (fun a b => f b \/ a) ls P.
 Proof.
@@ -3049,4 +3076,10 @@ Proof.
   simpl.
   assert (0 < 2 ^ n) by apply zero_lt_pow2.
   lia.
+Qed.
+
+Lemma Natlog2_up_pow2 :
+  forall a, Nat.log2_up (2 ^ a) = a.
+Proof.
+  intros; apply Nat.log2_up_pow2; lia.
 Qed.
