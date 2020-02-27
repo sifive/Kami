@@ -3077,3 +3077,9 @@ Proof.
   assert (0 < 2 ^ n) by apply zero_lt_pow2.
   lia.
 Qed.
+
+Lemma Natlog2_up_pow2 :
+  forall a, Nat.log2_up (2 ^ a) = a.
+Proof.
+  intros; apply Nat.log2_up_pow2; lia.
+Qed.
