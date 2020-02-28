@@ -231,21 +231,23 @@ Fixpoint fold_right_m{A B}(f : B -> A -> IO A)(a : A)(bs : list B) : IO A :=
 
 Definition exec_file_updates := fold_right_m exec_file_update.
 
-Axiom parseFile : forall (size idxNum : nat)(filepath : string), IO (Arr (W size)).
+Axiom parseFile : forall (size idxNum : nat)(filepath : string), IO (list (nat * W size)).
 
 Definition initialize_file(args : list (string * string))(rfb : RegFileBase)(state : FileState) : IO FileState :=
 
   let array := match rfInit rfb with
-               | RFNonFile None => (make_arr (fun (_ : Fin.t (rfIdxNum rfb)) => default_val (rfData rfb)))
-               | RFNonFile (Some c) => (make_arr (fun _ : Fin.t (rfIdxNum rfb) => eval_ConstT c))
+               | RFNonFile None => arr_repl (rfIdxNum rfb) (default_val (rfData rfb))
+               | RFNonFile (Some c) => arr_repl (rfIdxNum rfb) (eval_ConstT c)
                | RFFile isAscii isArg file _ _ _ =>
                   let filepath := if isArg then match lookup String.eqb file args with
                                                | Some fp => ret fp
                                                | None => error ("File " ++ file ++ " not found!")
                                                end else ret file in
                   (io_do path <- filepath;
-                   io_do words <- parseFile (Syntax.size (rfData rfb)) (rfIdxNum rfb) path;
-                   (arr_map (@val_unpack W V _ _ _) words))
+                   io_do pairs <- parseFile (Syntax.size (rfData rfb)) (rfIdxNum rfb) path;
+                   io_do arr <- arr_repl (rfIdxNum rfb) (default_val (rfData rfb));
+                   io_do _ <- arr_updates arr (List.map (fun '(i,w) => (i,@val_unpack W V _ _ _ w)) pairs);
+                   ret arr)
                end in
 
   io_do new_arr <- array; 
@@ -268,7 +270,7 @@ Definition initialize_file(args : list (string * string))(rfb : RegFileBase)(sta
                end in
 
   let newmeths := (rfWrite rfb, (WriteFC, rfDataArray rfb)) :: reads in
-  
+
   let newvals := match rfRead rfb with
                  | Async _ => []
                  | Sync b rs => let k := if b then Bit (Nat.log2_up (rfIdxNum rfb)) else rfData rfb in

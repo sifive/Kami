@@ -185,21 +185,25 @@ Extract Constant Hexit => "System.Exit.exitSuccess".
 (* Arrays *)
 
 Parameter HArray : Type -> Type.
-Parameter Hmake_arr : forall {X n}, (Fin.t n -> X) -> IO (HArray X).
+Parameter Harr_repl : forall {X}, nat -> X -> IO (HArray X).
 Parameter Harr_slice : forall {X} (i m : nat), HArray X -> IO (HVec m X).
 Parameter Harr_updates : forall {X}, HArray X -> list (nat * X) -> IO unit.
-Parameter Harr_map : forall {X Y}, (X -> Y) -> HArray X -> IO (HArray Y).
+Parameter Harr_new : forall {X}, nat -> IO (HArray X).
 
 Instance HArrayIsArray : IsArray HArray := {|
-  make_arr := @Hmake_arr;
+  arr_repl := @Harr_repl;
   arr_slice := @Harr_slice;
-  arr_updates := @Harr_updates;
-  arr_map := @Harr_map
+  arr_updates := @Harr_updates
   |}.
 
-Extract Constant HArray "a" => "Data.Array.IO.IOArray Prelude.Int a".
-Extract Constant Hmake_arr => "(\n f -> Data.Array.MArray.newListArray (0,n Prelude.- 1) (coq_Fin_to_list n f))".
+(** does not work at the moment **)
+(*Extract Constant HArray "a" => "Data.Array.IO.IOArray Prelude.Int a".
+Extract Constant Harr_repl => "(\n x -> Data.Array.MArray.newArray (0, n Prelude.- 1) x)".
 Extract Constant Harr_slice => "(\i m a -> Control.Monad.liftM Data.Vector.fromList (Prelude.sequence (Prelude.map (\j -> Data.Array.MArray.readArray a (j Prelude.+ i)) [0..(m Prelude.- 1)])))".
-Extract Constant Harr_updates => "(\a ps -> Prelude.return ())".
-Extract Constant Harr_updates => "(\a ps -> Control.Monad.foldM (\_ (i,e) -> Data.Array.MArray.writeArray a i e) () ps)".
-Extract Constant Harr_map => "Data.Array.MArray.mapArray".
+Extract Constant Harr_updates => "(\a ps -> Control.Monad.foldM (\_ (i,e) -> Data.Array.MArray.writeArray a i e) () ps)".*)
+
+
+Extract Constant HArray "a" => "Data.Vector.Mutable.MVector (Control.Monad.Primitive.PrimState Prelude.IO) a".
+Extract Constant Harr_repl => "Data.Vector.Mutable.replicate".
+Extract Constant Harr_slice => "(\i m a -> Data.Vector.Generic.freeze (Data.Vector.Mutable.slice i m a))".
+Extract Constant Harr_updates => "(\a ps -> Control.Monad.foldM (\_ (i,x) -> Data.Vector.Mutable.write a i x) () ps)".
