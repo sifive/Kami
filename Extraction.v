@@ -46,6 +46,7 @@ Extract Constant Fin.cast => "(\_ x _ -> x)".
 Extract Constant Fin.of_nat_lt => "(\i n -> (n Prelude.- 1,i))".
 Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)".
 Extract Inlined Constant getBool => "Prelude.id".
+Extract Inlined  Constant String.append => "(Prelude.++)".
 
 Section Ty.
   Variable ty: Kind -> Type.

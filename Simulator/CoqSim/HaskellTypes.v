@@ -172,11 +172,11 @@ Instance IOPrintMonad : IOMonad IO := {|
   |}.
 
 Extract Constant IO "a" => "Prelude.IO a".
-Extract Constant Hret => "Prelude.return".
-Extract Constant Hbind => "(GHC.Base.>>=)".
-Extract Constant Herror => "Prelude.error".
+Extract Inlined Constant Hret => "Prelude.return".
+Extract Inlined Constant Hbind => "(GHC.Base.>>=)".
+Extract Inlined Constant Herror => "Prelude.error".
 (*Extract Constant Hprint => "(\str -> (GHC.Base.>>) (Prelude.putStrLn str) (System.IO.hFlush System.IO.stdout))". *)
-Extract Constant Hprint => "Prelude.putStr".
+Extract Inlined Constant Hprint => "Prelude.putStr".
 Extract Constant Hrand_bool => "Prelude.return Prelude.False". (*FIXME*)
 Extract Constant Hrand_word => "Prelude.undefined". (*FIXME*)
 Extract Constant Hrand_vec => "Prelude.undefined". (*FIXME*)
