@@ -59,6 +59,25 @@ Class IOMonad{W V}`{IsWord W, IsVector V} (M : Type -> Type) := {
   rand_word : forall n, M (W n);
   rand_vec : forall {X n}, M X -> M (V n X);
   exit : forall {X}, M X;
+
+(*   make_rf_array : forall {X n}, string -> Kind -> (Fin.t n -> X) -> M unit;
+
+  get_rf_slice : forall {X} (i m : nat), string -> Kind -> M (V m X);
+  
+  do_rf_updates : forall {X}, IOref X -> string -> Kind -> list (nat * X) -> M unit;
+  
+  make_int_array : forall {X n}, string -> Kind -> (Fin.t n -> X) -> M unit;
+
+  get_int : forall {X} m, string -> Kind -> M (V m X);
+  
+  do_int_updates : forall {X}, string -> Kind -> list (nat * X) -> M unit; *)
+
   }.
 
 Notation "'io_do' x <- y ; cont" := (bind y (fun x => cont)) (at level 20).
+
+Class IsArray{W V M}`{IsWord W, IsVector V, IOMonad W V M} (A : Type -> Type) := {
+  arr_repl : forall {X}, nat -> X -> M (A X);
+  arr_slice : forall {X} (i m : nat), A X -> M (V m X);
+  arr_updates : forall {X}, A X -> list (nat * X) -> M unit;
+  }.
