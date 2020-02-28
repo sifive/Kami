@@ -1,4 +1,4 @@
-Require Export List String Ascii.
+Require Export List String Ascii BinInt BinNat.
 Require Export Kami.Syntax Kami.Compiler.CompilerSimple Kami.Compiler.Compiler Kami.Compiler.Rtl Kami.LibStruct Kami.Compiler.UnverifiedIncompleteCompiler.
 
 Require Import Kami.Notations.
@@ -12,13 +12,10 @@ Extraction Language Haskell.
 Set Extraction Optimize.
 Set Extraction KeepSingleton.
 Unset Extraction AutoInline.
-
 Extract Inductive sigT => "(,)" ["(,)"].
-Extract Inductive word => "CustomExtract.EWord" ["CustomExtract.wordNil" "CustomExtract.wordCons"] "CustomExtract.wordRec".
+
 Extract Inductive Fin.t => "CustomExtract.EFin" ["CustomExtract.fin0" "CustomExtract.finS"] "CustomExtract.finRec".
-(* Extract Inductive Vector.t => "[]" ["[]" "(\x xs -> x : xs)"] "(\fnil fcons xs -> case xs of { [] -> fnil (); (x:xs) -> fcons x xs })".
-Extract Inductive Vector.t => "[]" ["[]" "(:)"].
- *)
+Extract Inductive N => "Prelude.Integer" ["0" "(\x -> x)"] "(\fn0 fnpos x -> if x Prelude.== 0 then fn0 () else fnpos x)".
 
 Extract Inlined Constant fst => "Prelude.fst".
 Extract Inlined Constant snd => "Prelude.snd".
@@ -35,8 +32,8 @@ Extract Constant Nat.div2 => "(`Prelude.div` 2)".
 Extract Constant Nat.log2 => "(\x -> Prelude.floor (Prelude.logBase 2 (Prelude.fromIntegral x)))".
 Extract Constant Nat.log2_up => "(\x -> Prelude.ceiling (Prelude.logBase 2 (Prelude.fromIntegral x)))".
 Extract Constant List.fold_left => "(\f bs a -> Data.List.foldl' f a bs)".
-Extract Constant natToWord => "(\sz n -> (sz, Prelude.toInteger n))".
-Extract Constant wordToNat => "(\_ (_,v) -> Prelude.fromIntegral v)".
+Extract Constant natToWord => "(\sz n -> Prelude.toInteger n)".
+Extract Constant wordToNat => "(\_ -> Prelude.fromIntegral)".
 Extract Constant sumSizes => "(\n f -> Prelude.sum (Prelude.map (\i -> f (n Prelude.-1,i)) [0..(n Prelude.-1)]))".
 Extract Constant nth_Fin => "(\xs (_,i) -> xs Prelude.!! i)".
 Extract Constant nth_Fin_map2 => "(\_ _ _ x -> x)".
@@ -47,6 +44,39 @@ Extract Constant Fin.of_nat_lt => "(\i n -> (n Prelude.- 1,i))".
 Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)".
 Extract Inlined Constant getBool => "Prelude.id".
 Extract Inlined  Constant String.append => "(Prelude.++)".
+Extract Constant ZToWord => "(\n x -> Prelude.mod x (2 Prelude.^ n))".
+Extract Inlined Constant NToWord => "(\_ x -> x)".
+Extract Constant wones => "(\n -> 2 Prelude.^ n Prelude.- 1)".
+Extract Constant wadd => "(\_ x y -> x Prelude.+ y)".
+Extract Constant wsub => "(\_ x y -> x Prelude.- y)".
+Extract Constant wor => "(\_ x y -> x Data.Bits..|. y)".
+Extract Constant wand => "(\_ x y -> x Data.Bits..&. y)".
+Extract Constant wxor => "(\_ -> Data.Bits.xor)".
+Extract Constant wnot => "(\_ -> Data.Bits.complement)".
+Extract Constant wuxor => "(\_ x -> Prelude.odd (Data.Bits.popCount x))".
+Extract Constant wmul => "(\_ x y -> x Prelude.* y)".
+Extract Constant wdiv => "(\_ -> Prelude.div)".
+Extract Constant wmod => "(\_ -> Prelude.mod)".
+Extract Constant wslu => "(\_ x n -> Data.Bits.shiftL x (Prelude.fromIntegral n))".
+Extract Constant wsru => "(\_ x n -> Data.Bits.shiftR x (Prelude.fromIntegral n))".
+Extract Constant weqb => "(\_ -> (Prelude.==))".
+Extract Constant wuand => "(\n x -> x Prelude.== 2 Prelude.^ n)".
+Extract Constant wuor => "(\_ x -> Prelude.not (x Prelude.== 0))".
+Extract Constant wltu => "(\_ -> (Prelude.<))".
+Extract Constant truncMsb => "(\msb _ x -> Data.Bits.shiftR x msb)".
+Extract Inlined Constant Z.pow => "(Prelude.^)".
+Extract Inlined Constant Z.of_nat => "Prelude.toInteger".
+Extract Inlined Constant Z.ltb => "(Prelude.<)".
+Extract Inlined Constant Z.opp => "Prelude.negate".
+Extract Inlined Constant Z.div => "Prelude.div".
+Extract Inlined Constant Z.modulo => "Prelude.mod".
+Extract Inlined Constant N.succ_pos => "(\x -> x Prelude.+ 1)".
+Extract Inlined Constant N.add => "(Prelude.+)".
+Extract Inlined Constant N.sub => "(Prelude.-)".
+Extract Inlined Constant N.mul => "(Prelude.*)".
+Extract Inlined Constant N.eqb => "(Prelude.==)".
+Extract Inlined Constant N.ltb => "(Prelude.<)".
+Extract Inlined Constant N.of_nat => "Prelude.toInteger".
 
 Section Ty.
   Variable ty: Kind -> Type.
@@ -123,35 +153,3 @@ Section Ty.
                  else ReadArrayConst resp i)).
   Local Close Scope kami_expr.
 End Ty.
-
-(*
-Extract Inlined Constant concat => "Prelude.concat".
-*)
-
-(*
-Extract Inlined Constant filter => "Prelude.filter".
-*)
-
-(*
-Extract Inlined Constant find => "Data.List.find".
-*)
-
-(*
-Extract Constant seq => "(\x y -> [x..(x Prelude.+ y Prelude.- 1)])".
-*)
-
-(*
-Extract Constant Nat.pow => "(\x y -> x Prelude.^ y)".
-
-*)
-
-
-(* Extraction Implicit Vector.cons [1].
-Extract Constant Vector.caseS => "(\f n xs -> f (Prelude.head xs) n (Prelude.tail xs))".
-Extraction Implicit Vector.map [4].
-Extract Constant Vector.map => "Prelude.map".
-Extraction Implicit Vector.nth [2].
-Extract Constant Vector.nth => "(\xs (_,i) -> xs Prelude.!! i)".
-Extraction Implicit Vector.to_list [2].
-Extract Constant Vector.to_list => "Prelude.id".
- *)

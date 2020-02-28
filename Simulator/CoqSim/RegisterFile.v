@@ -82,7 +82,6 @@ Proof.
   destruct (Kind_decb k (Bit (Nat.log2_up (size file)))) eqn:Keq.
   - rewrite Kind_decb_eq in Keq.
     rewrite Keq in v.
-    Check (arr_slice (word_to_nat v) (chunk_size file) (arr file)).
     exact (io_do x <- arr_slice (word_to_nat v) (chunk_size file) (arr file);
            ret (existT _ (Array (chunk_size file) (kind file)) x)).
   - exact (error "Kind mismatch").
@@ -139,8 +138,7 @@ Fixpoint Tup_lookup{n} : forall (i : Fin.t n)(ks : Fin.t n -> Kind), Tuple (fun 
   | 0 => fun i => case0 _ i
   | S m => fun i ks X => fin_case i _ (existT _ (ks F1) (fst X)) (fun j => (Tup_lookup  j _ (snd X)))
   end.
-Print FileState.
-Print RegFile.
+
 Definition rf_methcall(state : FileState)(methName : string)(val : {k : Kind & Val k}) : IO (option (option FileUpd * {k : Kind & Val k})). refine
   match map_lookup methName (methods state) with
   | None => ret None

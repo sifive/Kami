@@ -1,6 +1,5 @@
 Require Import Streams.
 
-Require Import Kami.AllNotations.
 
 Require Import Kami.Simulator.CoqSim.Misc.
 Require Import Kami.Simulator.CoqSim.TransparentProofs.
@@ -9,6 +8,7 @@ Require Import Kami.Simulator.CoqSim.HaskellTypes.
 Require Import Kami.Simulator.CoqSim.RegisterFile.
 Require Import Kami.Simulator.CoqSim.Eval.
 
+Require Import Kami.AllNotations.
 Section EvalAction.
 
 Variable Word : nat -> Type.
@@ -416,7 +416,7 @@ Proof.
   - unfold WfBaseModule_new in pf.
     destruct pf.
     refine (do state <- initialize_files args rfbs;
-    eval_Rules env state (timeout * length rules) meths _ (unwind_list (get_wf_rules _ _ (H12 _)) _) fs).
+    eval_Rules env state (timeout * (List.length rules)) meths _ (unwind_list (get_wf_rules _ _ (H12 _)) _) fs).
     + apply init_regs_kc.
     + simpl.
       destruct H12; discriminate.
@@ -446,6 +446,7 @@ Context `{IOMonad Word Vec M}.
 Context `{IsArray Word Vec IO Arr}.
 
 Definition eval_BaseMod_Wf{E}`{Environment _ _ _ _ _ E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule basemod) :=
-  curry _ (eval_Basemodule_rr env args rfbs timeout meths (Wf_Wf_new_bm wf)).
+  curry _ (eval_Basemodule_rr env args rfbs timeout meths (WfBaseModule_WfBaseModule_new wf)).
+
 
 End Eval_Wf.

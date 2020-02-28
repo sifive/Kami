@@ -1361,9 +1361,8 @@ Proof.
   - rewrite HUNewRegs in *.
     rewrite map_app, in_app_iff in *.
     destruct H1; firstorder fail.
-  - subst; rewrite HANewRegs in *;firstorder; simpl in *.
-    subst.
-    assumption.
+  - subst; rewrite HANewRegs in *.
+    destruct H0; subst; simpl; auto.
   - rewrite HUNewRegs in *.
     rewrite map_app, in_app_iff in *.
     destruct H1; intuition.
@@ -1563,13 +1562,14 @@ Proof.
       specialize (IHl0 HPStep); dest.
       split; [auto| split; [auto| intros]].
       rewrite createHide_Meths in *; simpl in *.
-      destruct H3; [subst |clear - H1 H2 H3; firstorder fail].
-      firstorder fail.
+      destruct H3; [subst |clear - H1 H2 H3; apply H1; auto].
+      apply HHidden; assumption.
   - induction (getHidden m); simpl; auto; dest.
     + constructor; auto.
-    + assert (sth: PStep (createHide (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) l0) o l) by firstorder fail.
-      assert (sth2: forall v, In (a, projT1 v) (getKindAttr (getAllMethods m)) -> (getListFullLabel_diff (a, v) l = 0%Z)).
-      {intros; apply H1; auto; left; reflexivity. }
+    + assert (sth: PStep (createHide (BaseMod (getAllRegisters m) (getAllRules m) (getAllMethods m)) l0) o l) by
+      (apply IHl0; repeat split; auto; intros; apply H1; simpl; auto).
+      assert (sth2: forall v, In (a, projT1 v) (getKindAttr (getAllMethods m)) -> (getListFullLabel_diff (a, v) l = 0%Z)) by
+      (intros; apply H1; auto; left; reflexivity).
       constructor; auto.
       rewrite createHide_Meths.
       auto.
@@ -2213,9 +2213,8 @@ Proof.
   - econstructor 8; inv H; inv H0; EqDep_subst; eapply IHa; eauto.
   - econstructor 9; inv H; inv H0; EqDep_subst; eapply IHa; eauto.
 Qed.
-    
 
-Theorem WfConcatAssoc1 m1 m2 m3 :
+Lemma WfConcatAssoc1 m1 m2 m3 :
   WfMod (ConcatMod m1 (ConcatMod m2 m3)) ->
   WfMod (ConcatMod (ConcatMod m1 m2) m3).
 Proof.
@@ -2260,8 +2259,15 @@ Proof.
       apply (H2 meth (in_or_app _ _ _ (or_intror _ H3)) v).
 Qed.
 
+Theorem WfConcatAssoc1_new m1 m2 m3 :
+  WfMod_new (ConcatMod m1 (ConcatMod m2 m3)) ->
+  WfMod_new (ConcatMod (ConcatMod m1 m2) m3).
+Proof.
+  repeat rewrite WfMod_new_WfMod_iff.
+  apply WfConcatAssoc1.
+Qed.
 
-Theorem WfConcatAssoc2 m1 m2 m3 :
+Lemma WfConcatAssoc2 m1 m2 m3 :
   WfMod (ConcatMod (ConcatMod m1 m2) m3) ->
   WfMod (ConcatMod m1 (ConcatMod m2 m3)).
 Proof.
@@ -2294,6 +2300,14 @@ Proof.
        apply (H0 meth (in_or_app _ _ _ (or_introl _ H3)) v).
   - econstructor; intros; simpl in *; rewrite in_app_iff in *; destruct H3; inv WfConcat0; inv WfConcat3;
       eauto; eapply (WfConcatSplits (m1 :=m1) (m2 := m2)); eauto.
+Qed.
+
+Theorem WfConcatAssoc2_new m1 m2 m3 :
+  WfMod_new (ConcatMod (ConcatMod m1 m2) m3) ->
+  WfMod_new (ConcatMod m1 (ConcatMod m2 m3)).
+Proof.
+  repeat rewrite WfMod_new_WfMod_iff.
+  apply WfConcatAssoc2.
 Qed.
 
 Lemma WfMod_createHideMod l : forall m, WfMod (createHideMod m l) <-> (SubList l (map fst (getAllMethods m)) /\ WfMod m).
@@ -2545,7 +2559,7 @@ Proof.
   - rewrite mergeSeparatedBaseMod_noHides; intro; contradiction.
 Qed.
 
-Theorem WfModBreakDownFile m :
+Lemma WfModBreakDownFile m :
   WfMod m ->
   WfMod (mergeSeparatedBaseFile (fst (snd (separateMod m)))).
 Proof.
@@ -2591,7 +2605,15 @@ Proof.
         unfold separateMod in H2; simpl in *; rewrite <- Heqsbm1 in H2; simpl in *; assumption.
 Qed.
 
-Theorem WfModBreakDownMod m :
+Theorem WfModBreakDownFile_new m :
+  WfMod_new m ->
+  WfMod_new (mergeSeparatedBaseFile (fst (snd (separateMod m)))).
+Proof.
+  repeat rewrite WfMod_new_WfMod_iff.
+  apply WfModBreakDownFile.
+Qed.
+
+Lemma WfModBreakDownMod m :
   WfMod m ->
   WfMod (mergeSeparatedBaseMod (snd (snd (separateMod m)))).
 Proof.
@@ -2635,6 +2657,14 @@ Proof.
         specialize (H2 _ (or_intror _ H3) v).
         apply WfActionBreakDownMod in H2.
         unfold separateMod in H2; simpl in *; rewrite <- Heqsbm1 in H2; simpl in *; assumption.
+Qed.
+
+Theorem WfModBreakDownMod_new m :
+  WfMod_new m ->
+  WfMod_new (mergeSeparatedBaseMod (snd (snd (separateMod m)))).
+Proof.
+  repeat rewrite WfMod_new_WfMod_iff.
+  apply WfModBreakDownMod.
 Qed.
 
 Lemma WfConcat_noHide m1 m2 :
@@ -2717,7 +2747,15 @@ Proof.
         apply mergeSeparatedBaseFile_noHides.
 Qed.
 
-Theorem WfMod_getFlat m:
+Theorem WfMod_merge_new m:
+  WfMod_new m ->
+  WfMod_new (mergeSeparatedMod (separateMod m)).
+Proof.
+  repeat rewrite WfMod_new_WfMod_iff.
+  apply WfMod_merge.
+Qed.
+
+Lemma WfMod_getFlat m:
   (WfMod m) ->
   (WfMod (Base (getFlat m))).
 Proof.
@@ -2730,11 +2768,22 @@ Proof.
   constructor; tauto.
 Qed.
 
+Theorem WfMod_getFlat_new m:
+  (WfMod_new m) ->
+  (WfMod_new (Base (getFlat m))).
+Proof.
+  repeat rewrite WfMod_new_WfMod_iff.
+  apply WfMod_getFlat.
+Qed.
+
 Definition WfGetFlatMod (m: ModWf) : ModWf :=
   (Build_ModWf (WfMod_getFlat (wfMod m))).
 
 Definition merge_ModWf (m : ModWf) :  ModWf :=
   (Build_ModWf (WfMod_merge (wfMod m))).
+
+Definition merge_ModWf_new (m : ModWf_new) :  ModWf_new :=
+  (Build_ModWf_new _ (WfMod_merge_new _ (wfMod_new m))).
 
 Lemma merged_perm_equality m :
   ModWf_perm m (merge_ModWf m).
@@ -2746,7 +2795,7 @@ Proof.
   - apply separateBaseModule_flatten_Hides.
 Qed.
 
-Theorem TraceInclusion_Merge_l (m : ModWf) :
+Lemma TraceInclusion_Merge_l (m : ModWf) :
   TraceInclusion m (merge_ModWf m).
 Proof.
   apply PTraceInclusion_TraceInclusion; try apply wfMod.
@@ -2758,7 +2807,15 @@ Proof.
   - apply WeakInclusionsRefl.
 Qed.
 
-Theorem TraceInclusion_Merge_r (m : ModWf) :
+Theorem TraceInclusion_Merge_l_new (m : ModWf_new) :
+  TraceInclusion m (merge_ModWf_new m).
+Proof.
+  destruct m.
+  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  eapply (TraceInclusion_Merge_l m').
+Qed.
+
+Lemma TraceInclusion_Merge_r (m : ModWf) :
   TraceInclusion (merge_ModWf m) m.
 Proof.
   apply PTraceInclusion_TraceInclusion; try apply wfMod.
@@ -2768,6 +2825,14 @@ Proof.
   split.
   - unfold PTraceList; exists o; eauto.
   - apply WeakInclusionsRefl.
+Qed.
+
+Theorem TraceInclusion_Merge_r_new (m : ModWf_new) :
+  TraceInclusion (merge_ModWf_new m) m.
+Proof.
+  destruct m.
+  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  eapply (TraceInclusion_Merge_r m').
 Qed.
 
 Section Comm.
@@ -2792,11 +2857,24 @@ Section Comm.
   Qed.
 End Comm.
 
+Section Comm_new.
+  Variable m1 m2: Mod.
+  Variable wfMod: WfMod_new (ConcatMod m1 m2).
+
+  Theorem ConcatMod_comm_new:
+    TraceInclusion (ConcatMod m1 m2) (ConcatMod m2 m1).
+  Proof.
+    rewrite WfMod_new_WfMod_iff in wfMod.
+    apply ConcatMod_comm; auto.
+  Qed.
+
+End Comm_new.
+
 Section Assoc.
   Variable m1 m2 m3: Mod.
   Variable wfMod: WfMod (ConcatMod (ConcatMod m1 m2) m3).
 
-  Theorem ConcatModAssoc1:
+  Lemma ConcatModAssoc1:
     TraceInclusion (ConcatMod m1 (ConcatMod m2 m3)) (ConcatMod (ConcatMod m1 m2) m3).
   Proof.
     apply PTraceInclusion_TraceInclusion; auto.
@@ -2813,7 +2891,7 @@ Section Assoc.
       + apply WeakInclusionsRefl.
   Qed.
 
-  Theorem ConcatModAssoc2:
+  Lemma ConcatModAssoc2:
     TraceInclusion (ConcatMod (ConcatMod m1 m2) m3) (ConcatMod m1 (ConcatMod m2 m3)).
   Proof.
     apply PTraceInclusion_TraceInclusion; auto.
@@ -2830,3 +2908,23 @@ Section Assoc.
       + apply WeakInclusionsRefl.
   Qed.
 End Assoc.
+
+Section Assoc_new.
+  Variable m1 m2 m3: Mod.
+  Variable wfMod: WfMod_new (ConcatMod (ConcatMod m1 m2) m3).
+
+  Theorem ConcatModAssoc1_new :
+    TraceInclusion (ConcatMod m1 (ConcatMod m2 m3)) (ConcatMod (ConcatMod m1 m2) m3).
+  Proof.
+    rewrite WfMod_new_WfMod_iff in wfMod.
+    apply ConcatModAssoc1; auto.
+  Qed.
+
+  Theorem ConcatModAssoc2_new :
+    TraceInclusion (ConcatMod (ConcatMod m1 m2) m3) (ConcatMod m1 (ConcatMod m2 m3)).
+  Proof.
+    rewrite WfMod_new_WfMod_iff in wfMod.
+    apply ConcatModAssoc2; auto.
+  Qed.
+
+End Assoc_new.

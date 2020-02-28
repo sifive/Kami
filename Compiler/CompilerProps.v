@@ -1222,7 +1222,7 @@ Proof.
   induction ea; subst; intros; simpl in *.
   - inv H0; EqDep_subst;[|discriminate].
     specialize (H _ _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent WfMap _ _ _ HSemCompActionT); dest; split; auto.
-    exists (Meth (meth, existT SignT s (evalExpr e, ret))::x); repeat split; simpl; subst; auto.
+    exists (UmMeth (meth, existT SignT s (evalExpr e, ret))::x); repeat split; simpl; subst; auto.
     econstructor; eauto.
   - inv H0; EqDep_subst.
     specialize (H _ _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent WfMap _ _ _ HSemCompActionT); dest; split; auto.
@@ -1277,7 +1277,7 @@ Proof.
     { split; auto. constructor. }
     specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent WfMap0 _ _ _ HSemCompActionT_cont);
       dest; simpl in *; split; auto.
-    exists ((Upd (r, existT (fullType type) k (evalExpr e))):: x); repeat split; auto.
+    exists ((UmUpd (r, existT (fullType type) k (evalExpr e))):: x); repeat split; auto.
     + simpl; destruct (UpdOrMeths_RegsT x); simpl in *; auto.
       rewrite <- app_assoc in H3. rewrite <-app_comm_cons in H3.
       simpl in H3; auto.
@@ -1397,7 +1397,7 @@ Proof.
                                                     (evalExpr
                                                        (fold_left
                                                           (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                                             (IF ReadArrayConst mask0 i then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <- ReadArrayConst val i] else newArr)%kami_expr)
+                                                             (IF ReadArrayConst mask0 i then newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i))) <- ReadArrayConst val i] else newArr)%kami_expr)
                                                           (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0))
                            (r,
                             (hd [] upds0 ++
@@ -1406,16 +1406,16 @@ Proof.
                                          (evalExpr
                                             (fold_left
                                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                                  (IF ReadArrayConst mask0 i then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <- ReadArrayConst val i] else newArr)%kami_expr)
+                                                  (IF ReadArrayConst mask0 i then newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i))) <- ReadArrayConst val i] else newArr)%kami_expr)
                                                (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
       specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P0 _ _ _ HSemCompActionT); dest; split; auto.
-      exists (Upd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                   (IF ReadArrayConst mask0 i then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <- ReadArrayConst val i] else newArr)%kami_expr)
+                                   (IF ReadArrayConst mask0 i then newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i))) <- ReadArrayConst val i] else newArr)%kami_expr)
                                 (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regVal))))::x).
       repeat split; auto.
       * simpl in *.
@@ -1445,7 +1445,7 @@ Proof.
                                                     (evalExpr
                                                        (fold_left
                                                           (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                                             (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <- ReadArrayConst val i])%kami_expr) (getFins num)
+                                                             (newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i))) <- ReadArrayConst val i])%kami_expr) (getFins num)
                                                           (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0))
                            (r,
                             (hd [] upds0 ++
@@ -1454,16 +1454,16 @@ Proof.
                                          (evalExpr
                                             (fold_left
                                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                                  (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <- ReadArrayConst val i])%kami_expr) (getFins num)
+                                                  (newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i))) <- ReadArrayConst val i])%kami_expr) (getFins num)
                                                (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
       specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P0 _ _ _ HSemCompActionT); dest; split; auto.
-      exists (Upd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                   (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <- ReadArrayConst val i])%kami_expr) (getFins num)
+                                   (newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i))) <- ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regVal))))::x).
       repeat split; auto.
       * simpl in *.
@@ -1499,7 +1499,7 @@ Proof.
                               :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
       specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P0 _ _ _ HSemCompActionT); dest; split; auto.
-      exists (Upd (readReg, existT (fullType type) (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr (Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx))))::x).
+      exists (UmUpd (readReg, existT (fullType type) (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr (Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx))))::x).
       repeat split; auto.
       * simpl in *.
         clear - H3.
@@ -1534,7 +1534,7 @@ Proof.
                                                        (BuildArray
                                                           (fun i : Fin.t num =>
                                                              (Var type (SyntaxKind (Array idxNum Data)) regV @[
-                                                                    Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr))))])
+                                                                    Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i)))])%kami_expr))))])
                                          :: tl upds0))
                            (old0,
                             (hd [] upds0 ++
@@ -1544,16 +1544,17 @@ Proof.
                                             (BuildArray
                                                (fun i : Fin.t num =>
                                                   (Var type (SyntaxKind (Array idxNum Data)) regV @[
-                                                         Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr))))])
+                                                         Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i)))])%kami_expr))))])
                               :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
       specialize (IHea _ _ _ _ _ _ HoInitNoDups HuInitNoDups HPriorityUpds HConsistent P0 _ _ _ HSemCompActionT); dest; split; auto.
-      exists (Upd (readReg, existT (fullType type) (SyntaxKind (Array num Data))
+      exists (UmUpd (readReg, existT (fullType type) (SyntaxKind (Array num Data))
                                    (evalExpr
                                       (BuildArray
                                          (fun i : Fin.t num =>
                                             (Var type (SyntaxKind (Array idxNum Data)) regV @[
-                                                   Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr))))::x).
+                                                   Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type (natToWord (Nat.log2_up idxNum)
+                                                (proj1_sig (to_nat i)))])%kami_expr))))::x).
       repeat split; auto.
       * simpl in *.
         clear - H3.
@@ -1618,7 +1619,7 @@ Proof.
     intro; rewrite in_map_iff in H; dest; destruct x; subst; simpl in *.
     eapply HDisjRegs; eauto.
   - inv H0; EqDep_subst; rewrite UpdOrMeths_RegsT_app, map_app, NoDup_app_iff;
-      repeat split; repeat intro; eauto; specialize (HDisjRegs a); firstorder fail.
+      repeat split; repeat intro; eauto; specialize (HDisjRegs a); tauto.
   - inv H; EqDep_subst; simpl; eauto.
   - inv H; EqDep_subst; simpl; constructor.
   - inv H0; EqDep_subst; simpl; eauto.
@@ -2611,28 +2612,28 @@ Section ESemAction_meth_collector.
   Inductive ESemAction_meth_collector : UpdOrMeths -> UpdOrMeths -> Prop :=
   | NilUml : ESemAction_meth_collector nil nil
   | ConsUpd  um uml uml' newUml newUml' upd
-             (HUpd : um = Upd upd)
+             (HUpd : um = UmUpd upd)
              (HDisjRegs : key_not_In (fst upd) (UpdOrMeths_RegsT newUml))
              (HUmlCons : uml' = um :: uml)
              (HnewUmlCons : newUml' = um :: newUml)
              (HCollector : ESemAction_meth_collector uml newUml):
       ESemAction_meth_collector uml' newUml'
   | ConsCallsNStr um uml uml' newUml newUml' meth
-                  (HMeth : um = Meth meth)
+                  (HMeth : um = UmMeth meth)
                   (HIgnore : fst meth <> fst f)
                   (HUmlCons : uml' = um :: uml)
                   (HnewUmlCons : newUml' = um :: newUml)
                   (HCollector : ESemAction_meth_collector uml newUml):
       ESemAction_meth_collector uml' newUml'
   | ConsWrCallsNSgn um uml uml' newUml newUml' meth
-                    (HMeth : um = Meth meth)
+                    (HMeth : um = UmMeth meth)
                     (HIgnore : projT1 (snd meth) <> projT1 (snd f))
                     (HUmlCons : uml' = um :: uml)
                     (HnewUmlCons : newUml' = um :: newUml)
                     (HCollector : ESemAction_meth_collector uml newUml):
       ESemAction_meth_collector uml' newUml'
   | ConsWrFCalls  um fUml uml uml' newUml newUml' argV retV
-                  (HMeth : um = Meth (fst f, (existT _ (projT1 (snd f)) (argV, retV))))
+                  (HMeth : um = UmMeth (fst f, (existT _ (projT1 (snd f)) (argV, retV))))
                   (HESemAction : ESemAction o (Action_EAction (projT2 (snd f) type argV)) fUml retV)
                   (HDisjRegs : DisjKey (UpdOrMeths_RegsT fUml) (UpdOrMeths_RegsT newUml))
                   (HUmlCons : uml' = um :: uml)
@@ -2673,7 +2674,7 @@ Section ESemAction_meth_collector.
       + intro k; auto.
       + constructor.
     - inv H; inv HUmlCons;  specialize (IHuml1 _ _ HCollector); dest.
-      + exists (Upd upd :: x), x0; subst; repeat split; auto.
+      + exists (UmUpd upd :: x), x0; subst; repeat split; auto.
         * rewrite UpdOrMeths_RegsT_app in HDisjRegs.
           apply key_not_In_app in HDisjRegs; dest.
           intro k; simpl.
@@ -2686,9 +2687,9 @@ Section ESemAction_meth_collector.
         * econstructor; auto.
           rewrite UpdOrMeths_RegsT_app in HDisjRegs.
           apply key_not_In_app in HDisjRegs; dest; auto.
-      + exists (Meth meth :: x), x0; subst; repeat split; auto.
+      + exists (UmMeth meth :: x), x0; subst; repeat split; auto.
         econstructor 3; eauto.
-      + exists (Meth meth :: x), x0; subst; repeat split; auto.
+      + exists (UmMeth meth :: x), x0; subst; repeat split; auto.
         econstructor 4; eauto.
       + exists (fUml ++ x), x0; subst; repeat split; eauto using app_assoc.
         * intro k; specialize (HDisjRegs k); specialize (H0 k).
@@ -2874,7 +2875,7 @@ Proof.
       inv HESemAction; simpl in *; EqDep_subst.
       * specialize (H _ _ _ _ _ HESemAction0); dest; inv H9.
         intro.
-        exists ( Meth (meth, existT SignT (WriteRqMask (Nat.log2_up rfIdxNum) rfNum rfData, Void) (evalExpr e, WO))::x); split.
+        exists (UmMeth (meth, existT SignT (WriteRqMask (Nat.log2_up rfIdxNum) rfNum rfData, Void) (evalExpr e, WO))::x); split.
         -- econstructor 5; auto.
            ++ econstructor; eauto.
               econstructor; simpl; auto.
@@ -2901,7 +2902,7 @@ Proof.
       * discriminate.
     + inv H0; simpl in *; EqDep_subst.
       * specialize (H _ _ _ _ _ HESemAction); dest.
-        exists (Meth (meth, existT SignT s (evalExpr e, mret))::x); split.
+        exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
         -- econstructor 4; simpl; eauto.
            intro; destruct s; simpl in *; auto.
         -- econstructor; eauto.
@@ -2910,7 +2911,7 @@ Proof.
       inv HESemAction; simpl in *; EqDep_subst; [discriminate|].
       * specialize (H _ _ _ _ _ HESemAction0); dest; inv H9.
         intro.
-        exists ( Meth (meth, existT SignT (WriteRq (Nat.log2_up rfIdxNum) (Array rfNum rfData), Void) (evalExpr e, WO))::x); split.
+        exists (UmMeth (meth, existT SignT (WriteRq (Nat.log2_up rfIdxNum) (Array rfNum rfData), Void) (evalExpr e, WO))::x); split.
         -- econstructor 5; auto.
            ++ econstructor; eauto.
               econstructor; simpl; auto.
@@ -2936,13 +2937,13 @@ Proof.
         -- econstructor; eauto.
     + inv H0; simpl in *; EqDep_subst.
       * specialize (H _ _ _ _ _ HESemAction); dest.
-        exists (Meth (meth, existT SignT s (evalExpr e, mret))::x); split.
+        exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
         -- econstructor 4; simpl; eauto.
            intro; destruct s; simpl in *; auto.
         -- econstructor; eauto.
     + inv H0; simpl in *; EqDep_subst.
       * specialize (H _ _ _ _ _ HESemAction); dest.
-        exists (Meth (meth, existT SignT s (evalExpr e, mret))::x); split.
+        exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
         -- econstructor 3; simpl; eauto.
            intro; destruct s; simpl in *; auto.
         -- econstructor; eauto.
@@ -2977,7 +2978,7 @@ Proof.
     econstructor; eauto.
   - inv H; EqDep_subst.
     specialize (IHea _ _ _ _ HESemAction); dest.
-    exists (Upd (r, existT (fullType type) k (evalExpr e))::x); split; auto.
+    exists (UmUpd (r, existT (fullType type) k (evalExpr e))::x); split; auto.
     + econstructor; auto.
       * simpl; assumption.
     + econstructor; auto.
@@ -3026,13 +3027,13 @@ Proof.
     econstructor; eauto.
   - inv H; EqDep_subst.
     + specialize (IHea _ _ _ _ HESemAction); dest.
-      exists (Upd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
                                    (IF ReadArrayConst mask0 i
-                                    then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                    then newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i))) <-
                                                                ReadArrayConst val i] else newArr)%kami_expr) 
                                 (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
       * econstructor; eauto; simpl.
@@ -3043,12 +3044,12 @@ Proof.
         specialize (ESemActionMC_Upds_SubList H) as P0.
         apply (P0 _ H1).
     + specialize (IHea _ _ _ _ HESemAction); dest.
-      exists (Upd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                   (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                   (newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i))) <-
                                                           ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
       * econstructor; eauto; simpl.
@@ -3060,7 +3061,7 @@ Proof.
         apply (P0 _ H1).
   - inv H; EqDep_subst.
     + specialize (IHea _ _ _ _ HESemAction); dest.
-      exists (Upd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx)) :: x); split; auto.
       * econstructor; eauto.
         simpl; assumption.
@@ -3070,14 +3071,14 @@ Proof.
         specialize (ESemActionMC_Upds_SubList H) as P0.
         apply (P0 _ H1).
     + specialize (IHea _ _ _ _ HESemAction); dest.
-      exists (Upd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Array num Data))
                           (evalExpr
                              (BuildArray
                                 (fun i : Fin.t num =>
                                    (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                           Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) +
-                                          Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr)))) :: x); split; auto.
+                                          Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i)))])%kami_expr)))) :: x); split; auto.
       * econstructor; simpl in *; auto.
         -- assumption.
       * econstructor 15; auto.
@@ -3193,7 +3194,7 @@ Proof.
       inv HESemAction; EqDep_subst; inv H9.
       econstructor; simpl; auto.
       * instantiate (1 := newUml).
-        instantiate (1 := (Upd
+        instantiate (1 := (UmUpd
                              (rfDataArray,
                               existT (fullType type) (SyntaxKind (Array rfIdxNum rfData))
                                      (evalExpr
@@ -3201,7 +3202,7 @@ Proof.
                                            (fun (newArr : Expr type (SyntaxKind (Array rfIdxNum rfData))) (i : Fin.t rfNum) =>
                                               (IF ReadArrayConst (ReadStruct e (Fin.FS (Fin.FS Fin.F1))) i
                                                then newArr @[
-                                                             ReadStruct e Fin.F1 + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                                             ReadStruct e Fin.F1 + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                                          ReadArrayConst (ReadStruct e (Fin.FS Fin.F1)) i] else newArr)%kami_expr)
                                            (getFins rfNum) (Var type (SyntaxKind (Array rfIdxNum rfData)) regV))))) :: nil); simpl in *.
         intro k; simpl.
@@ -3231,13 +3232,13 @@ Proof.
       inv HESemAction; EqDep_subst; [discriminate |].
       econstructor; simpl; auto.
       * instantiate (1 := newUml).
-        instantiate (1 := (Upd
+        instantiate (1 := (UmUpd
                              (rfDataArray,
                               existT (fullType type) (SyntaxKind (Array rfIdxNum rfData))
                                      (evalExpr
                                         (fold_left
                                            (fun (newArr : Expr type (SyntaxKind (Array rfIdxNum rfData))) (i : Fin.t rfNum) =>
-                                              (newArr @[ ReadStruct e Fin.F1 + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                              (newArr @[ ReadStruct e Fin.F1 + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                                      ReadArrayConst (ReadStruct e (Fin.FS Fin.F1)) i])%kami_expr) 
                                            (getFins rfNum) (Var type (SyntaxKind (Array rfIdxNum rfData)) regV))))) :: nil); simpl in *.
         intro k; simpl.
@@ -3380,12 +3381,12 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ P0 _ HIn _ _ _ HESemAction); dest.
-      exists ( Meth (x, existT SignT (Bit (Nat.log2_up rfIdxNum), Array rfNum rfData) (evalExpr e, (evalExpr
+      exists (UmMeth (x, existT SignT (Bit (Nat.log2_up rfIdxNum), Array rfNum rfData) (evalExpr e, (evalExpr
                                                                                                       (BuildArray
                                                                                                          (fun i : Fin.t rfNum =>
                                                                                                             (Var type (SyntaxKind (Array rfIdxNum rfData)) regV @[
                                                                                                                    Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) (evalExpr e) +
-                                                                                                                   Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr)))))::x0); split.
+                                                                                                                   Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))))::x0); split.
       * econstructor 5; auto.
         -- do 2 (econstructor; eauto).
         -- repeat intro; auto.
@@ -3398,7 +3399,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ P0 _ HIn _ _ _ HESemAction); dest.
-      exists (Meth (meth, existT SignT s (evalExpr e, mret))::x0); split.
+      exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x0); split.
       * econstructor 4; simpl; eauto.
         intro; destruct s; simpl in *; auto.
       * econstructor; eauto.
@@ -3408,7 +3409,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ P0 _ HIn _ _ _ HESemAction); dest.
-      exists (Meth (meth, existT SignT s (evalExpr e, mret))::x0); split.
+      exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x0); split.
       * econstructor 3; simpl; eauto.
         intro; destruct s; simpl in *; subst; rewrite String.eqb_refl in *; discriminate.
       * econstructor; eauto.
@@ -3463,7 +3464,7 @@ Proof.
     { rewrite <- Heqrf'; reflexivity. }
     rewrite <- Heqrf' in *.
     specialize (IHea _ _ P0 _ HIn _ _ _ HESemAction); dest.
-    exists (Upd (r, existT (fullType type) k (evalExpr e))::x0); split; auto.
+    exists (UmUpd (r, existT (fullType type) k (evalExpr e))::x0); split; auto.
     + econstructor; auto.
       * simpl; assumption.
     + econstructor; auto.
@@ -3532,13 +3533,13 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ P0 _ HIn _ _ _ HESemAction); dest.
-      exists (Upd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
                                    (IF ReadArrayConst mask0 i
-                                    then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                    then newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                ReadArrayConst val i] else newArr)%kami_expr) 
                                 (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regV))))::x0); split; auto.
       * econstructor; eauto; simpl.
@@ -3553,12 +3554,12 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ P0 _ HIn _ _ _ HESemAction); dest.
-      exists (Upd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                   (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                   (newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                           ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regV))))::x0); split; auto.
       * econstructor; eauto; simpl.
@@ -3574,7 +3575,7 @@ Proof.
        { rewrite <- Heqrf'; reflexivity. }
        rewrite <- Heqrf' in *.
        specialize (IHea _ _ P0 _ HIn _ _ _ HESemAction); dest.
-       exists (Upd (readReg,
+       exists (UmUpd (readReg,
                     existT (fullType type) (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx)) :: x0); split; auto.
        * econstructor; eauto.
          simpl; assumption.
@@ -3588,14 +3589,14 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ P0 _ HIn _ _ _ HESemAction); dest.
-      exists (Upd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Array num Data))
                           (evalExpr
                              (BuildArray
                                 (fun i : Fin.t num =>
                                    (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                           Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) +
-                                          Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr)))) :: x0); split; auto.
+                                          Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))) :: x0); split; auto.
       * econstructor; eauto.
         simpl; assumption.
       * econstructor 15; auto.
@@ -3846,7 +3847,7 @@ Proof.
        { rewrite <- Heqrf'; reflexivity. }
        rewrite <- Heqrf' in *.
        specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction0); dest.
-       exists ( Meth (meth, existT SignT (Bit (Nat.log2_up rfIdxNum), Void) (evalExpr e, WO))::x); split.
+       exists (UmMeth (meth, existT SignT (Bit (Nat.log2_up rfIdxNum), Void) (evalExpr e, WO))::x); split.
        -- econstructor 5; auto.
           ++ econstructor; auto.
              ** instantiate (1 := nil); simpl; repeat intro; auto.
@@ -3865,10 +3866,10 @@ Proof.
        { rewrite <- Heqrf'; reflexivity. }
        rewrite <- Heqrf' in *.
        specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction0); dest.
-       exists (Meth (meth, existT SignT (Bit (Nat.log2_up rfIdxNum), Void) (evalExpr e, WO))::x); split.
+       exists (UmMeth (meth, existT SignT (Bit (Nat.log2_up rfIdxNum), Void) (evalExpr e, WO))::x); split.
        -- econstructor 5; auto.
           ++ instantiate (1 :=
-                            [Upd
+                            [UmUpd
                                (readRegName,
                                 existT (fullType type) (SyntaxKind (Array rfNum rfData))
                                        (evalExpr
@@ -3878,7 +3879,7 @@ Proof.
                                                      (fun i0 : Fin.t rfNum =>
                                                         (Var type (SyntaxKind (Array rfIdxNum rfData)) regV @[
                                                                Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) (evalExpr e) +
-                                                               Const type ($(proj1_sig (Fin.to_nat i0)))%word])%kami_expr))))))]); simpl; repeat intro; auto.
+                                                               Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i0))))])%kami_expr))))))]); simpl; repeat intro; auto.
              econstructor; eauto.
              ** instantiate (2 := nil).
                 intro; simpl; auto.
@@ -3903,7 +3904,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (Meth (meth, existT SignT s (evalExpr e, mret))::x); split.
+      exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
       * econstructor 4; simpl; eauto.
         unfold getSyncReq; destruct isAddr; simpl; auto.
       * econstructor; eauto.
@@ -3913,7 +3914,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (Meth (meth, existT SignT s (evalExpr e, mret))::x); split.
+      exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
       * econstructor 3; simpl; eauto.
         unfold getSyncReq; destruct isAddr; simpl; auto.
       * econstructor; eauto.
@@ -3968,7 +3969,7 @@ Proof.
     { rewrite <- Heqrf'; reflexivity. }
     rewrite <- Heqrf' in *.
     specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-    exists (Upd (r, existT (fullType type) k (evalExpr e))::x); split; auto.
+    exists (UmUpd (r, existT (fullType type) k (evalExpr e))::x); split; auto.
     + econstructor; auto.
       * simpl; assumption.
     + econstructor; auto.
@@ -4037,13 +4038,13 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (Upd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
                                    (IF ReadArrayConst mask0 i
-                                    then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                    then newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                ReadArrayConst val i] else newArr)%kami_expr) 
                                 (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
       * econstructor; eauto; simpl.
@@ -4058,12 +4059,12 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (Upd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                   (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                   (newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                           ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
       * econstructor; eauto; simpl.
@@ -4079,7 +4080,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (Upd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx)) :: x); split; auto.
       * econstructor; eauto.
         simpl; assumption.
@@ -4093,14 +4094,14 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (Upd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Array num Data))
                           (evalExpr
                              (BuildArray
                                 (fun i : Fin.t num =>
                                    (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                           Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) +
-                                          Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr)))) :: x); split; auto.
+                                          Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))) :: x); split; auto.
       * econstructor; eauto.
         simpl; assumption.
       * econstructor 15; auto.
@@ -4235,7 +4236,7 @@ Proof.
       inv HESemAction; EqDep_subst; [ |discriminate].
       * econstructor; auto.
         -- instantiate (1 := newUml).
-           instantiate (1 := [Upd
+           instantiate (1 := [UmUpd
                                 (readRegName,
                                  existT (fullType type) (SyntaxKind (Bit (Nat.log2_up rfIdxNum)))
                                         (evalExpr (Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) (evalExpr e))))]).
@@ -4257,7 +4258,7 @@ Proof.
       * econstructor; auto.
         -- instantiate (1 := newUml).
            instantiate (1 :=
-                          [Upd
+                          [UmUpd
                              (readRegName,
                               existT (fullType type) (SyntaxKind (Array rfNum rfData))
                                      (evalExpr
@@ -4267,7 +4268,7 @@ Proof.
                                                    (fun i0 : Fin.t rfNum =>
                                                       (Var type (SyntaxKind (Array rfIdxNum rfData)) regV @[
                                                              Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) (evalExpr e) +
-                                                             Const type ($(proj1_sig (Fin.to_nat i0)))%word])%kami_expr))))))]).
+                                                             Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i0))))])%kami_expr))))))]).
            intro; simpl.
            destruct (string_dec readRegName k); subst; [right |left ]; intro.
            ++ rewrite in_map_iff in H0; dest; destruct x; subst.
@@ -4401,12 +4402,12 @@ Proof.
        { rewrite <- Heqrf'; reflexivity. }
        rewrite <- Heqrf' in *.
        specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-       exists ( Meth (meth, existT SignT (Void, Array rfNum rfData) (WO, (evalExpr
+       exists (UmMeth (meth, existT SignT (Void, Array rfNum rfData) (WO, (evalExpr
                                                                             (BuildArray
                                                                                (fun i : Fin.t rfNum =>
                                                                                   (Var type (SyntaxKind (Array rfIdxNum rfData)) regVal @[
                                                                                          Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) idx +
-                                                                                         Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr)))))::x); split.
+                                                                                         Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))))::x); split.
        -- econstructor 5; auto.
           ++ simpl; repeat econstructor; eauto.
           ++ intro; left; intro; auto.
@@ -4418,7 +4419,7 @@ Proof.
        { rewrite <- Heqrf'; reflexivity. }
        rewrite <- Heqrf' in *.
        specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-       exists (Meth (meth, existT SignT (Void, Array rfNum rfData) (WO, regVal))::x); split.
+       exists (UmMeth (meth, existT SignT (Void, Array rfNum rfData) (WO, regVal))::x); split.
        -- econstructor 5; auto.
           ++ simpl; repeat econstructor; eauto.
           ++ intro; left; intro; auto.
@@ -4432,7 +4433,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (Meth (meth, existT SignT s (evalExpr e, mret))::x); split.
+      exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
       * econstructor 4; simpl; eauto.
         unfold getSyncRes; destruct isAddr; simpl; auto.
       * econstructor; eauto.
@@ -4442,7 +4443,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (Meth (meth, existT SignT s (evalExpr e, mret))::x); split.
+      exists (UmMeth (meth, existT SignT s (evalExpr e, mret))::x); split.
       * econstructor 3; simpl; eauto.
         unfold getSyncRes; destruct isAddr; simpl; auto.
       * econstructor; eauto.
@@ -4497,7 +4498,7 @@ Proof.
     { rewrite <- Heqrf'; reflexivity. }
     rewrite <- Heqrf' in *.
     specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-    exists (Upd (r, existT (fullType type) k (evalExpr e))::x); split; auto.
+    exists (UmUpd (r, existT (fullType type) k (evalExpr e))::x); split; auto.
     + econstructor; auto.
       * simpl; assumption.
     + econstructor; auto.
@@ -4566,13 +4567,13 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (Upd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
                                    (IF ReadArrayConst mask0 i
-                                    then newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                    then newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                ReadArrayConst val i] else newArr)%kami_expr) 
                                 (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
       * econstructor; eauto; simpl.
@@ -4587,12 +4588,12 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (Upd (dataArray,
+      exists (UmUpd (dataArray,
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
                                 (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
-                                   (newArr @[ idx + Const type ($(proj1_sig (Fin.to_nat i)))%word <-
+                                   (newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                           ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
       * econstructor; eauto; simpl.
@@ -4608,7 +4609,7 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (Upd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx)) :: x); split; auto.
       * econstructor; eauto.
         simpl; assumption.
@@ -4622,14 +4623,14 @@ Proof.
       { rewrite <- Heqrf'; reflexivity. }
       rewrite <- Heqrf' in *.
       specialize (IHea _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
-      exists (Upd (readReg,
+      exists (UmUpd (readReg,
                    existT (fullType type) (SyntaxKind (Array num Data))
                           (evalExpr
                              (BuildArray
                                 (fun i : Fin.t num =>
                                    (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                           Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) +
-                                          Const type ($(proj1_sig (Fin.to_nat i)))%word])%kami_expr)))) :: x); split; auto.
+                                          Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))) :: x); split; auto.
       * econstructor; eauto.
         simpl; assumption.
       * econstructor 15; auto.
