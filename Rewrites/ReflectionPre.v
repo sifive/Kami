@@ -241,48 +241,155 @@ with KRExpr_Prop: Type :=
 
 
 
+
+
+
+(******************************************************************************************)
+
+
+Fixpoint KRExprDenote_RegInitValT(e: KRExpr_RegInitValT) : sigT RegInitValT :=
+  match e with
+  | KRVar_RegInitValT x => x
+  end.
+
+Fixpoint KRExprDenote_ActionVoid (e: KRExpr_ActionVoid) : Action Void :=
+  match e with
+  | KRVar_ActionVoid v => v
+  end.
+         
+Fixpoint KRExprDenote_MethodT (e: KRExpr_MethodT) : sigT MethodT :=
+  match e with
+  | KRVar_MethodT v => v
+  end.
+
+(******************************************************************************************)
+
+Fixpoint KRExprDenote_RegFileBase_Mod_Func(f: KRExpr_RegFileBase_Mod_Func) :=
+  match f with
+  | KRCastFunc => (fun m : RegFileBase => Base (BaseRegFile m))
+  | KRVar_RegFileBase_Mod_Func f => f
+  end.
+
+Fixpoint KRExprDenote_RegInitT_string_Func(f: KRExpr_RegInitT_string_Func) : (RegInitT -> string) :=
+  match f with
+  | KRVar_RegInitT_string_Func v => v
+  | KRfst_RegInitT_string_Func => fst
+  end.
+
+Fixpoint KRExprDenote_DefMethT_string_Func(f: KRExpr_DefMethT_string_Func) : (DefMethT -> string) :=
+  match f with
+  | KRVar_DefMethT_string_Func v => v
+  | KRfst_DefMethT_string_Func => fst
+  end.
+
+Fixpoint KRExprDenote_RegFileBase_list_RegInitT_Func (f: KRExpr_RegFileBase_list_RegInitT_Func) :=
+  match f with
+  | KRVar_RegFileBase_list_RegInitT_Func f => f
+  | KRgetRegFileRegistersFunc => getRegFileRegisters
+  end.
+
+Fixpoint KRExprDenote_Mod_list_RegInitT_Func (f: KRExpr_Mod_list_RegInitT_Func) :=
+  match f with
+  | KRVar_Mod_list_RegInitT_Func f => f
+  | KRgetAllRegistersFunc => getAllRegisters
+  end.
+
+Fixpoint KRExprDenote_Mod_list_Rule_Func(f: KRExpr_Mod_list_Rule_Func) :=
+  match f with
+  | KRVar_Mod_list_Rule_Func f' => f'
+  | KRgetAllRulesFunc => getAllRules
+  end.
+
+Fixpoint KRExprDenote_Mod_list_DefMethT_Func(f: KRExpr_Mod_list_DefMethT_Func) : (Mod -> list DefMethT) :=
+  match f with
+  | KRVar_Mod_list_DefMethT_Func f => f
+  | KRgetAllMethodsFunc => getAllMethods
+  end.
+
+Fixpoint KRExprDenote_RegFileBase_list_DefMethT_Func(f: KRExpr_RegFileBase_list_DefMethT_Func) :=
+  match f with
+  | KRVar_RegFileBase_list_DefMethT_Func f => f
+  | KRgetRegFileMethodsFunc => getRegFileMethods
+  end.
+
+Fixpoint KRExprDenote_Mod_list_string_Func(f: KRExpr_Mod_list_string_Func) : (Mod -> (list string)) :=
+  match f with
+  | KRVar_Mod_list_string_Func f => f
+  | KRgetCallsPerModFunc => getCallsPerMod
+  end.
+
+Fixpoint KRExprDenote_Mod_Mod_PairFunc(f: KRExpr_Mod_Mod_PairFunc) :=
+  match f with
+  | KRVar_Mod_Mod_PairFunc f => f
+  | KRConcatMod_Func => ConcatMod
+  end.
+
+Fixpoint KRExprDenote_Rule_string_Func(f: KRExpr_Rule_string_Func) : (Attribute (Action Void) -> string) :=
+  match f with
+  | KRVar_Rule_string_Func v => v
+  | KRfst_Rule_string_Func => fst
+  end.
+
+(******************************************************************************************)
+
 Fixpoint KRExprDenote_RegInitT (e:KRExpr_RegInitT) : RegInitT :=
   match e with
   | KRVar_RegInitT v => v
   | KRPair_RegInitT s v => (KRExprDenote_string s, KRExprDenote_RegInitValT v)
   end
 
-with KRExprDenote_RegInitValT(e: KRExpr_RegInitValT) : sigT RegInitValT :=
-  match e with
-  | KRVar_RegInitValT x => x
-  end
-
-with KRExprDenote_Rule (e:KRExpr_Rule) : Attribute (Action Void) :=
-  match e with
-  | KRVar_Rule v => v
-  | KRPair_Rule s v => (KRExprDenote_string s, KRExprDenote_ActionVoid v)
-  end
-
-with KRExprDenote_ActionVoid (e: KRExpr_ActionVoid) : Action Void :=
-  match e with
-  | KRVar_ActionVoid v => v
-  end
-         
-with KRExprDenote_MethodT (e: KRExpr_MethodT) : sigT MethodT :=
-  match e with
-  | KRVar_MethodT v => v
-  end
-                             
 with KRExprDenote_DefMethT (e:KRExpr_DefMethT) : DefMethT :=
   match e with
   | KRVar_DefMethT v => v
   | KRPair_DefMethT s v => (KRExprDenote_string s,KRExprDenote_MethodT v)
 end
     
-with KRExprDenote_ModuleElt (e:KRExpr_ModuleElt) : ModuleElt :=
+with KRExprDenote_string(s:KRExpr_string) :=
+  match s with
+  | KRVar_string s => s
+  | KRConst_string s => s
+  | KRstring_append a b => ((KRExprDenote_string a)++(KRExprDenote_string b))%string
+  | KRfst_RegInitT_string r => fst (KRExprDenote_RegInitT r)
+  | KRfst_DefMethT_string r => fst (KRExprDenote_DefMethT r)
+  | KRfst_Rule_string r => fst (KRExprDenote_Rule r)
+  end
+
+with KRExprDenote_Rule (e:KRExpr_Rule) : Attribute (Action Void) :=
+  match e with
+  | KRVar_Rule v => v
+  | KRPair_Rule s v => (KRExprDenote_string s, KRExprDenote_ActionVoid v)
+  end.
+
+(******************************************************************************************)
+
+Fixpoint KRExprDenote_ModuleElt (e:KRExpr_ModuleElt) : ModuleElt :=
   match e with
   | KRVar_ModuleElt v => v
   | KRMERegister r => MERegister (KRExprDenote_RegInitT r)
   | KRMERule r => MERule (KRExprDenote_Rule r)
   | KRMEMeth m => MEMeth (KRExprDenote_DefMethT m)
-  end
+  end.
 
-with KRExprDenote_list_RegInitT (e:KRExpr_list_RegInitT) : list RegInitT :=
+(******************************************************************************************)
+
+Fixpoint KRExprDenote_RegFileBase(m: KRExpr_RegFileBase) :=
+  match m with
+  | KRVar_RegFileBase m => m
+  end.
+
+(******************************************************************************************)
+
+Fixpoint KRExprDenote_list_RegFileBase(l: KRExpr_list_RegFileBase) :=
+  match l with
+  | KRVar_list_RegFileBase l => l
+  | KRNil_list_RegFileBase => nil
+  | KRCons_list_RegFileBase f r => cons (KRExprDenote_RegFileBase f) (KRExprDenote_list_RegFileBase r)
+  | KRApp_list_RegFileBase a b => app (KRExprDenote_list_RegFileBase a) (KRExprDenote_list_RegFileBase b)
+  end.
+
+(******************************************************************************************)
+
+Fixpoint KRExprDenote_list_RegInitT (e:KRExpr_list_RegInitT) : list RegInitT :=
   match e with
   | KRVar_list_RegInitT v => v
   | KRNil_list_RegInitT => nil
@@ -293,7 +400,34 @@ with KRExprDenote_list_RegInitT (e:KRExpr_list_RegInitT) : list RegInitT :=
   | KRMakeModule_regs r => makeModule_regs (KRExprDenote_list_ModuleElt r)
   | KRConcat_RegInitT r => concat (KRExprDenote_list_list_RegInitT r)
   end
+
+with KRExprDenote_BaseModule (e:KRExpr_BaseModule) : BaseModule :=
+  match e with
+  | KRVar_BaseModule v => v
+  | KRMakeModule e => makeModule (KRExprDenote_list_ModuleElt e)
+  | KRBaseMod regs rules meths => BaseMod (KRExprDenote_list_RegInitT regs) (KRExprDenote_list_Rule rules) (KRExprDenote_list_DefMethT meths)
+  | KRBaseRegFile b => BaseRegFile (KRExprDenote_RegFileBase b)
+  end
+
+with KRExprDenote_Mod (e:KRExpr_Mod) : Mod :=
+  match e with
+  | KRVar_Mod v => v
+  | KRBase b => Base (KRExprDenote_BaseModule b)
+  | KRConcatMod a b => ConcatMod (KRExprDenote_Mod a) (KRExprDenote_Mod b)
+  | KRFold_right_Mod f a b => fold_right (KRExprDenote_Mod_Mod_PairFunc f) (KRExprDenote_Mod a) (KRExprDenote_list_Mod b)
+  end
     
+with KRExprDenote_list_ModuleElt (e:KRExpr_list_ModuleElt) : list ModuleElt :=
+  match e with
+  | KRVar_list_ModuleElt v => v
+  | KRNil_list_ModuleElt => nil
+  | KRCons_list_ModuleElt f r => cons (KRExprDenote_ModuleElt f) (KRExprDenote_list_ModuleElt r)
+  | KRApp_list_ModuleElt f r => app (KRExprDenote_list_ModuleElt f) (KRExprDenote_list_ModuleElt r)
+  | KRRegisters r => Registers (KRExprDenote_list_RegInitT r)
+  | KRRules r => Rules (KRExprDenote_list_Rule r)
+  | KRMethods m => Methods (KRExprDenote_list_DefMethT m)
+  end
+
 with KRExprDenote_list_list_RegInitT (e:KRExpr_list_list_RegInitT) : list (list RegInitT) :=
   match e with
   | KRVar_list_list_RegInitT v => v
@@ -302,45 +436,6 @@ with KRExprDenote_list_list_RegInitT (e:KRExpr_list_list_RegInitT) : list (list 
   | KRApp_list_list_RegInitT f r => app (KRExprDenote_list_list_RegInitT f) (KRExprDenote_list_list_RegInitT r)
   | KRMap_list_Mod_list_list_RegInitT f l => map (KRExprDenote_Mod_list_RegInitT_Func f) (KRExprDenote_list_Mod l)
   | KRMap_list_RegFileBase_list_list_RegInitT f l => map (KRExprDenote_RegFileBase_list_RegInitT_Func f) (KRExprDenote_list_RegFileBase l)
-  end
-
-with KRExprDenote_RegFileBase_list_RegInitT_Func (f: KRExpr_RegFileBase_list_RegInitT_Func) :=
-  match f with
-  | KRVar_RegFileBase_list_RegInitT_Func f => f
-  | KRgetRegFileRegistersFunc => getRegFileRegisters
-  end
-
-with KRExprDenote_Mod_list_RegInitT_Func (f: KRExpr_Mod_list_RegInitT_Func) :=
-  match f with
-  | KRVar_Mod_list_RegInitT_Func f => f
-  | KRgetAllRegistersFunc => getAllRegisters
-  end
-
-with KRExprDenote_list_Rule (e:KRExpr_list_Rule) : list (Attribute (Action Void)) :=
-  match e with
-  | KRVar_list_Rule v => v
-  | KRNil_list_Rule => nil
-  | KRCons_list_Rule f r => cons (KRExprDenote_Rule f) (KRExprDenote_list_Rule r)
-  | KRApp_list_Rule f r => app (KRExprDenote_list_Rule f) (KRExprDenote_list_Rule r)
-  | KRgetRules m => getRules (KRExprDenote_BaseModule m)
-  | KRgetAllRules m => getAllRules (KRExprDenote_Mod m)
-  | KRMakeModule_rules r => makeModule_rules (KRExprDenote_list_ModuleElt r)
-  | KRConcat_Rule r => concat (KRExprDenote_list_list_Rule r)
-  end
-    
-with KRExprDenote_list_list_Rule (e:KRExpr_list_list_Rule) : list (list (Attribute (Action Void))) :=
-  match e with
-  | KRVar_list_list_Rule v => v
-  | KRNil_list_list_Rule => nil
-  | KRCons_list_list_Rule f r => cons (KRExprDenote_list_Rule f) (KRExprDenote_list_list_Rule r)
-  | KRApp_list_list_Rule f r => app (KRExprDenote_list_list_Rule f) (KRExprDenote_list_list_Rule r)
-  | KRMap_list_Mod_list_list_Rule f l => map (KRExprDenote_Mod_list_Rule_Func f) (KRExprDenote_list_Mod l)
-  end
-
-with KRExprDenote_Mod_list_Rule_Func(f: KRExpr_Mod_list_Rule_Func) :=
-  match f with
-  | KRVar_Mod_list_Rule_Func f' => f'
-  | KRgetAllRulesFunc => getAllRules
   end
 
 with KRExprDenote_list_DefMethT (e:KRExpr_list_DefMethT) : list DefMethT :=
@@ -355,6 +450,26 @@ with KRExprDenote_list_DefMethT (e:KRExpr_list_DefMethT) : list DefMethT :=
   | KRMakeModule_meths r => makeModule_meths (KRExprDenote_list_ModuleElt r)
   end
 
+with KRExprDenote_list_Rule (e:KRExpr_list_Rule) : list (Attribute (Action Void)) :=
+  match e with
+  | KRVar_list_Rule v => v
+  | KRNil_list_Rule => nil
+  | KRCons_list_Rule f r => cons (KRExprDenote_Rule f) (KRExprDenote_list_Rule r)
+  | KRApp_list_Rule f r => app (KRExprDenote_list_Rule f) (KRExprDenote_list_Rule r)
+  | KRgetRules m => getRules (KRExprDenote_BaseModule m)
+  | KRgetAllRules m => getAllRules (KRExprDenote_Mod m)
+  | KRMakeModule_rules r => makeModule_rules (KRExprDenote_list_ModuleElt r)
+  | KRConcat_Rule r => concat (KRExprDenote_list_list_Rule r)
+  end
+
+with KRExprDenote_list_Mod(m: KRExpr_list_Mod) : list Mod :=
+  match m with
+  | KRVar_list_Mod v => v
+  | KRNil_list_Mod => nil
+  | KRCons_list_Mod f r => cons (KRExprDenote_Mod f) (KRExprDenote_list_Mod r)
+  | KRApp_list_Mod f r => app (KRExprDenote_list_Mod f) (KRExprDenote_list_Mod r)
+  end
+
 with KRExprDenote_list_list_DefMethT (e:KRExpr_list_list_DefMethT) : list (list DefMethT) :=
   match e with
   | KRVar_list_list_DefMethT v => v
@@ -364,25 +479,26 @@ with KRExprDenote_list_list_DefMethT (e:KRExpr_list_list_DefMethT) : list (list 
   | KRMap_list_Mod_list_list_DefMethT f l => map (KRExprDenote_Mod_list_DefMethT_Func f) (KRExprDenote_list_Mod l)
   | KRMap_list_RegFileBase_list_list_DefMethT f l => map (KRExprDenote_RegFileBase_list_DefMethT_Func f) (KRExprDenote_list_RegFileBase l)
   end
-    
-with KRExprDenote_Mod_list_DefMethT_Func(f: KRExpr_Mod_list_DefMethT_Func) : (Mod -> list DefMethT) :=
-  match f with
-  | KRVar_Mod_list_DefMethT_Func f => f
-  | KRgetAllMethodsFunc => getAllMethods
-  end
 
-with KRExprDenote_RegFileBase_list_DefMethT_Func(f: KRExpr_RegFileBase_list_DefMethT_Func) :=
-  match f with
-  | KRVar_RegFileBase_list_DefMethT_Func f => f
-  | KRgetRegFileMethodsFunc => getRegFileMethods
-  end
+with KRExprDenote_list_list_Rule (e:KRExpr_list_list_Rule) : list (list (Attribute (Action Void))) :=
+  match e with
+  | KRVar_list_list_Rule v => v
+  | KRNil_list_list_Rule => nil
+  | KRCons_list_list_Rule f r => cons (KRExprDenote_list_Rule f) (KRExprDenote_list_list_Rule r)
+  | KRApp_list_list_Rule f r => app (KRExprDenote_list_list_Rule f) (KRExprDenote_list_list_Rule r)
+  | KRMap_list_Mod_list_list_Rule f l => map (KRExprDenote_Mod_list_Rule_Func f) (KRExprDenote_list_Mod l)
+  end.
 
-with KRExprDenote_CallWithSign(c: KRExpr_CallWithSign) :=
+(******************************************************************************************)
+
+Fixpoint KRExprDenote_CallWithSign(c: KRExpr_CallWithSign) :=
   match c with
   | KRVar_CallWithSign v => v
-  end
+  end.
     
-with KRExprDenote_list_CallWithSign(c: KRExpr_list_CallWithSign) :=
+(******************************************************************************************)
+
+Fixpoint KRExprDenote_list_CallWithSign(c: KRExpr_list_CallWithSign) :=
   match c with
   | KRVar_list_CallWithSign c => c
   | KRNil_list_CallWithSign => nil
@@ -398,119 +514,31 @@ with KRExprDenote_list_list_CallWithSign(c:  KRExpr_list_list_CallWithSign) :=
   | KRCons_list_list_CallWithSign f r => cons (KRExprDenote_list_CallWithSign f) (KRExprDenote_list_list_CallWithSign r)
   | KRApp_list_list_CallWithSign f r => app (KRExprDenote_list_list_CallWithSign f) (KRExprDenote_list_list_CallWithSign r)
   (*| KRMap_list_Mod_list_list_CallWithSign f l =>  (KRExprDenote_Mod_list_CallWithSign_Func f) (KRExprDenote_list_Mod l)*)
-  end
-
-with KRExprDenote_Mod_list_string_Func(f: KRExpr_Mod_list_string_Func) : (Mod -> (list string)) :=
-  match f with
-  | KRVar_Mod_list_string_Func f => f
-  | KRgetCallsPerModFunc => getCallsPerMod
-  end
+  end.
     
-with KRExprDenote_list_ModuleElt (e:KRExpr_list_ModuleElt) : list ModuleElt :=
-  match e with
-  | KRVar_list_ModuleElt v => v
-  | KRNil_list_ModuleElt => nil
-  | KRCons_list_ModuleElt f r => cons (KRExprDenote_ModuleElt f) (KRExprDenote_list_ModuleElt r)
-  | KRApp_list_ModuleElt f r => app (KRExprDenote_list_ModuleElt f) (KRExprDenote_list_ModuleElt r)
-  | KRRegisters r => Registers (KRExprDenote_list_RegInitT r)
-  | KRRules r => Rules (KRExprDenote_list_Rule r)
-  | KRMethods m => Methods (KRExprDenote_list_DefMethT m)
-  end
+(******************************************************************************************)
 
-with KRExprDenote_list_list_ModuleElt (e:KRExpr_list_list_ModuleElt) : list (list ModuleElt) :=
+Fixpoint KRExprDenote_list_list_ModuleElt (e:KRExpr_list_list_ModuleElt) : list (list ModuleElt) :=
   match e with
   | KRVar_list_list_ModuleElt v => v
   | KRNil_list_list_ModuleElt => nil
   | KRCons_list_list_ModuleElt f r => cons (KRExprDenote_list_ModuleElt f) (KRExprDenote_list_list_ModuleElt r)
   | KRApp_list_list_ModuleElt f r => app (KRExprDenote_list_list_ModuleElt f) (KRExprDenote_list_list_ModuleElt r)
-  end
+  end.
 
-with KRExprDenote_BaseModule (e:KRExpr_BaseModule) : BaseModule :=
-  match e with
-  | KRVar_BaseModule v => v
-  | KRMakeModule e => makeModule (KRExprDenote_list_ModuleElt e)
-  | KRBaseMod regs rules meths => BaseMod (KRExprDenote_list_RegInitT regs) (KRExprDenote_list_Rule rules) (KRExprDenote_list_DefMethT meths)
-  | KRBaseRegFile b => BaseRegFile (KRExprDenote_RegFileBase b)
-  end
+(******************************************************************************************)
 
-with KRExprDenote_list_BaseModule(e:KRExpr_list_BaseModule): list BaseModule :=
+Fixpoint KRExprDenote_list_BaseModule(e:KRExpr_list_BaseModule): list BaseModule :=
   match e with
   | KRVar_list_BaseModule v => v
   | KRNil_list_BaseModule => nil
   | KRCons_list_BaseModule f r => cons (KRExprDenote_BaseModule f) (KRExprDenote_list_BaseModule r)
   | KRApp_list_BaseModule f r => app (KRExprDenote_list_BaseModule f) (KRExprDenote_list_BaseModule r)
-  end
+  end.
 
-with KRExprDenote_RegFileBase(m: KRExpr_RegFileBase) :=
-  match m with
-  | KRVar_RegFileBase m => m
-  end
-    
-with KRExprDenote_list_RegFileBase(l: KRExpr_list_RegFileBase) :=
-  match l with
-  | KRVar_list_RegFileBase l => l
-  | KRNil_list_RegFileBase => nil
-  | KRCons_list_RegFileBase f r => cons (KRExprDenote_RegFileBase f) (KRExprDenote_list_RegFileBase r)
-  | KRApp_list_RegFileBase a b => app (KRExprDenote_list_RegFileBase a) (KRExprDenote_list_RegFileBase b)
-  end
+(******************************************************************************************)
 
-with KRExprDenote_Mod (e:KRExpr_Mod) : Mod :=
-  match e with
-  | KRVar_Mod v => v
-  | KRBase b => Base (KRExprDenote_BaseModule b)
-  | KRConcatMod a b => ConcatMod (KRExprDenote_Mod a) (KRExprDenote_Mod b)
-  | KRFold_right_Mod f a b => fold_right (KRExprDenote_Mod_Mod_PairFunc f) (KRExprDenote_Mod a) (KRExprDenote_list_Mod b)
-  end
-
-with KRExprDenote_Mod_Mod_PairFunc(f: KRExpr_Mod_Mod_PairFunc) :=
-  match f with
-  | KRVar_Mod_Mod_PairFunc f => f
-  | KRConcatMod_Func => ConcatMod
-  end
-
-with KRExprDenote_list_Mod(m: KRExpr_list_Mod) : list Mod :=
-  match m with
-  | KRVar_list_Mod v => v
-  | KRNil_list_Mod => nil
-  | KRCons_list_Mod f r => cons (KRExprDenote_Mod f) (KRExprDenote_list_Mod r)
-  | KRApp_list_Mod f r => app (KRExprDenote_list_Mod f) (KRExprDenote_list_Mod r)
-  end
-
-with KRExprDenote_RegFileBase_Mod_Func(f: KRExpr_RegFileBase_Mod_Func) :=
-  match f with
-  | KRCastFunc => (fun m : RegFileBase => Base (BaseRegFile m))
-  | KRVar_RegFileBase_Mod_Func f => f
-  end
-
-with KRExprDenote_RegInitT_string_Func(f: KRExpr_RegInitT_string_Func) : (RegInitT -> string) :=
-  match f with
-  | KRVar_RegInitT_string_Func v => v
-  | KRfst_RegInitT_string_Func => fst
-  end
-
-with KRExprDenote_DefMethT_string_Func(f: KRExpr_DefMethT_string_Func) : (DefMethT -> string) :=
-  match f with
-  | KRVar_DefMethT_string_Func v => v
-  | KRfst_DefMethT_string_Func => fst
-  end
-
-with KRExprDenote_Rule_string_Func(f: KRExpr_Rule_string_Func) : (Attribute (Action Void) -> string) :=
-  match f with
-  | KRVar_Rule_string_Func v => v
-  | KRfst_Rule_string_Func => fst
-  end
-    
-with KRExprDenote_string(s:KRExpr_string) :=
-  match s with
-  | KRVar_string s => s
-  | KRConst_string s => s
-  | KRstring_append a b => ((KRExprDenote_string a)++(KRExprDenote_string b))%string
-  | KRfst_RegInitT_string r => fst (KRExprDenote_RegInitT r)
-  | KRfst_DefMethT_string r => fst (KRExprDenote_DefMethT r)
-  | KRfst_Rule_string r => fst (KRExprDenote_Rule r)
-  end
-
-with KRExprDenote_list_string(l: KRExpr_list_string) : list string :=
+Fixpoint KRExprDenote_list_string(l: KRExpr_list_string) : list string :=
   match l with
   | KRVar_list_string v => v
   | KRNil_list_string => nil
@@ -529,9 +557,9 @@ with KRExprDenote_list_list_string(l : KRExpr_list_list_string) : list (list str
   | KRNil_list_list_string => nil
   | KRCons_list_list_string a b => cons (KRExprDenote_list_string a) (KRExprDenote_list_list_string b)
   | KRApp_list_list_string a b => app (KRExprDenote_list_list_string a) (KRExprDenote_list_list_string b)
-  end
+  end.
 
-with KRExprDenote_Prop(p: KRExpr_Prop) :=
+Fixpoint KRExprDenote_Prop(p: KRExpr_Prop) :=
   match p with           
   | KRVar_Prop p => p
   | KRTrue_Prop => True
@@ -552,8 +580,7 @@ with KRExprDenote_Prop(p: KRExpr_Prop) :=
   | KRDisjKey_Rule a b => DisjKey (KRExprDenote_list_Rule a) (KRExprDenote_list_Rule b)
   end.
 
-
-
+(******************************************************************************************)
 
 
 
@@ -1119,6 +1146,238 @@ Fixpoint srev (s : string) : string :=
   | EmptyString => EmptyString
   | (String f r) => sappend (srev r) (String f EmptyString)
   end.
+
+Theorem sappendEmpty: forall s, sappend s ""=s.
+Proof.
+  intros.
+  induction s.
+  - reflexivity.
+  - simpl.
+    rewrite IHs.
+    reflexivity.
+Qed.
+
+Theorem sappendNotEmpty: forall s c s', sappend s (String c s')<>"".
+Proof.
+  intros.
+  induction s.
+  - simpl.
+    intro X.
+    inversion X.
+  - simpl.
+    intro X.
+    inversion X.
+Qed.
+
+Theorem sappendNotEmpty': forall s c s', sappend s (String c s') =? ""=false.
+Proof.
+  intros.
+  induction s.
+  - simpl.
+    reflexivity.
+  - simpl.
+    reflexivity.
+Qed.
+
+Theorem sappend_String_assoc: forall s c s', sappend s (String c s')=sappend (sappend s (String c "")) s'.
+Proof.
+  intro s.
+  induction s.
+  - simpl.
+    reflexivity.
+  - intros.
+    simpl.
+    f_equal.
+    rewrite IHs.
+    reflexivity.
+Qed.
+
+(*Theorem sappend_eq: forall a s b, ((sappend a s) =? (sappend b s))= (a =? b).
+Proof.
+  intro a.
+  induction a.
+  - intros.
+    destruct b.
+    + simpl.
+      rewrite String.eqb_refl.
+      reflexivity.
+    +
+    intros.
+    rewrite ?sappendEmpty.
+    reflexivity.
+  - intros.
+    destruct b.
+    + simpl.
+      rewrite sappend_String_assoc.
+      rewrite IHs.
+      rewrite String.eqb_refl.
+      reflexivity.
+    +
+  -*)
+
+Theorem sappend_empty_eq: forall a s, (sappend s a  =? a) = (s =? "").
+Proof.
+  intro a.
+  induction a.
+  - simpl.
+    intros.
+    rewrite sappendEmpty.
+    reflexivity.
+  - intros. rewrite sappend_String_assoc.
+    destruct s.
+    + simpl.
+      rewrite ?String.eqb_refl.
+      rewrite Ascii.eqb_refl.
+      reflexivity.
+    + simpl.
+      remember (a1 =? a)%char.
+      destruct b.
+      * rewrite IHa.
+        simpl.
+        destruct s.
+        -- reflexivity.
+        -- reflexivity.
+      * reflexivity.
+Qed.
+
+Theorem sappend_assoc: forall a b c, sappend a (sappend b c)=sappend (sappend a b) c.
+Proof.
+  intro a.
+  induction a.
+  - simpl.
+    reflexivity.
+  - intros.
+    simpl.
+    rewrite IHa.
+    reflexivity.
+Qed.
+
+Theorem sappend_eq_reduce: forall a s b, (sappend a s =? sappend b s)=(a =? b).
+Proof.
+  intro a.
+  induction a.
+  - intros.
+    simpl.
+    destruct b.
+    + simpl.
+      rewrite String.eqb_refl.
+      reflexivity.
+    + rewrite String.eqb_sym.
+      rewrite sappend_empty_eq.
+      simpl.
+      reflexivity.
+  - intros.
+    destruct b.
+    + simpl.
+      destruct s.
+      * reflexivity.
+      * remember (a =? a1)%char.
+        destruct b.
+        -- rewrite sappend_String_assoc.
+           rewrite sappend_empty_eq.
+           destruct a0.
+           ** reflexivity.
+           ** reflexivity.
+        -- reflexivity.
+    + simpl.
+      remember (a =? a1)%char.
+      destruct b0.
+      * rewrite IHa.
+        reflexivity.
+      * reflexivity.
+Qed.
+
+Theorem sappend_tail_diff: forall s1 a b s2, ((a =? b)%char = false) -> ((sappend s1 (String a "") =? sappend s2 (String b ""))=false).
+Proof.
+  intro s1.
+  induction s1.
+  - intros.
+    simpl.
+    destruct s2.
+    + simpl.
+      rewrite H.
+      reflexivity.
+    + simpl.
+      destruct (a =? a0)%char.
+      * destruct s2.
+        -- reflexivity.
+        -- reflexivity.
+      * reflexivity.
+  - intros.
+    destruct s2.
+    + simpl.
+      remember (a =? b)%char.
+      destruct b0.
+      * destruct s1.
+        ++ reflexivity.
+        ++ reflexivity.
+      * reflexivity.
+    + simpl.
+      remember (a =? a1)%char.
+      destruct b0.
+      * apply IHs1.
+        apply H.
+      * reflexivity.
+Qed.
+
+Theorem srev_eqb_gen: forall s1 s2 a,
+    String.eqb (sappend s1 a) (sappend s2 a)=String.eqb (sappend (srev s1) a) (sappend (srev s2) a).
+Proof.
+  intros s1.
+  induction s1.
+  - intros.
+    simpl.
+    rewrite String.eqb_sym.
+    rewrite sappend_empty_eq.
+    assert (forall a b c, (a =? sappend b c)=(sappend b c =? a)).
+    intros. rewrite String.eqb_sym. reflexivity.
+    rewrite H.
+    rewrite sappend_empty_eq.
+    destruct s2.
+    + reflexivity.
+    + simpl.
+      destruct (srev s2).
+      * simpl.
+        reflexivity.
+      * simpl. reflexivity.
+  - intros.
+    destruct s2.
+    + simpl.
+      destruct a0.
+      * simpl.
+        rewrite sappendEmpty.
+        rewrite sappendNotEmpty'.
+        reflexivity.
+      * remember (a=?a0)%char.
+        destruct b.
+        ++ rewrite sappend_empty_eq.
+           rewrite sappend_String_assoc.
+           rewrite sappend_empty_eq.
+           rewrite ?sappendNotEmpty'.
+           reflexivity.
+        ++ rewrite sappend_empty_eq.
+           rewrite sappendNotEmpty'.
+           reflexivity.
+    + simpl.
+      remember (a=?a1)%char.
+      destruct b.
+      * rewrite <- sappend_assoc.
+        rewrite <- sappend_assoc.
+        remember (a=?a1)%char.
+        destruct b.
+        ++ symmetry in Heqb0.
+           rewrite Ascii.eqb_eq in Heqb0.
+           subst.
+           rewrite <- IHs1.
+           rewrite ?sappend_eq_reduce.
+           reflexivity.
+        ++ inversion Heqb.
+      * rewrite sappend_eq_reduce.
+        symmetry.
+        apply sappend_tail_diff.
+        rewrite <- Heqb.
+        reflexivity.
+Qed.
 
 Theorem srev_eqb : forall s1 s2, String.eqb s1 s2=String.eqb (srev s1) (srev s2).
 Proof.
