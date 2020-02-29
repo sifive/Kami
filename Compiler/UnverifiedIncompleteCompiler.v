@@ -373,4 +373,4 @@ Definition getRtlSafe
 Definition rtlGet m :=
   getRtl (getHidden m, (fst (separateBaseMod m), inlineAll_All_mod (mergeSeparatedBaseMod (snd (separateBaseMod m))))).
 
-Definition makeRtl (m: ModWfOrd) := rtlGet m.
+Definition makeRtl (m: ModWfOrd rtl_ty) := rtlGet m.

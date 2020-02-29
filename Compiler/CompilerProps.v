@@ -72,11 +72,11 @@ Definition mergeSeparatedSingle (b : BaseModule) (lrf : list RegFileBase) : Mod 
 (* begin misc properties *)
 
 
-Lemma WfBaseMod_inlineSingle_map (m : BaseModule) (HWfMod : WfBaseModule m) k (a : ActionT type k) (n : nat):
+Lemma WfBaseMod_inlineSingle_map ty (m : BaseModule) (HWfMod : WfBaseModule ty m) k (a : ActionT ty k) (n : nat):
   forall  (lf : list DefMethT),
     SubList lf (getMethods m) ->
     WfActionT (getRegisters m) a ->
-    WfActionT (getRegisters m) (apply_nth (map (fun f a' => @inlineSingle type k a' f) lf) a n).
+    WfActionT (getRegisters m) (apply_nth (map (fun f a' => @inlineSingle ty k a' f) lf) a n).
 Proof.
   intros.
   unfold apply_nth; remember (nth_error _ _) as err0; symmetry in Heqerr0; destruct err0; auto.
@@ -85,11 +85,11 @@ Proof.
   apply WfBaseMod_inlineSingle; auto.
 Qed.
 
-Lemma WfBaseMod_inlineSome_map (m : BaseModule) (HWfMod : WfBaseModule m) xs:
-  forall  (lf : list DefMethT) k (a : ActionT type k),
+Lemma WfBaseMod_inlineSome_map ty (m : BaseModule) (HWfMod : WfBaseModule ty m) xs:
+  forall  (lf : list DefMethT) k (a : ActionT ty k),
     SubList lf (getMethods m) ->
     WfActionT (getRegisters m) a ->
-    WfActionT (getRegisters m) (fold_left (apply_nth (map (fun f a' => @inlineSingle type k a' f) lf)) xs a).
+    WfActionT (getRegisters m) (fold_left (apply_nth (map (fun f a' => @inlineSingle ty k a' f) lf)) xs a).
 Proof.
   induction xs; simpl; intros; eauto.
   apply IHxs; auto.
@@ -5313,7 +5313,7 @@ Lemma CompileRules_Congruence rules  (b : BaseModule) (lrf : list RegFileBase) :
           (HConsist : getKindAttr o = getKindAttr (getRegisters m))
           (HSubList1 : SubList (listRfMethods lrf) (getMethods m))
           (HSubList2 : SubList rules (getRules b))
-          (HWfMod : WfMod (mergeSeparatedSingle b lrf)),
+          (HWfMod : WfMod type (mergeSeparatedSingle b lrf)),
     SemCompActionT (compileRulesRf type (o, []) (rev rules) lrf) (o, upds) calls retl ->
     SemCompActionT
       (compileRules type (o, []) (map (inline_Rules (getAllMethods (mergeSeparatedBaseFile lrf))
@@ -5376,7 +5376,7 @@ Proof.
       unfold flatten_inline_everything in P2; rewrite WfMod_createHide in P2; dest; simpl in *; inv H6; assumption.
     +unfold mergeSeparatedSingle in H2; inv H2; inv HWf1.
      unfold WfBaseModule in *; dest.
-     specialize (H2 type _ (H1 _ (or_introl eq_refl))); simpl in H2.
+     specialize (H2 _ (H1 _ (or_introl eq_refl))); simpl in H2.
      eapply WfExpand; eauto.
      unfold inlineAll_All_mod; simpl; apply SubList_app_r, SubList_refl.
   - apply inlineEeach_Somelist_inlineEach.
@@ -5401,7 +5401,7 @@ Qed.
 Lemma EEquivLoop (b : BaseModule) (lrf : list RegFileBase) o :
   let m := inlineAll_All_mod (mergeSeparatedSingle b lrf) in
   forall rules upds calls retl ls
-         (HWfMod : WfMod (mergeSeparatedSingle b lrf))
+         (HWfMod : WfMod type (mergeSeparatedSingle b lrf))
          (HTrace : Trace m o ls)
          (HNoSelfCalls : NoSelfCallBaseModule m)
          (HNoSelfCallsBase : NoSelfCallBaseModule b),
@@ -5547,7 +5547,7 @@ Qed.
 Lemma EEquivLoop' (b : BaseModule) (lrf : list RegFileBase) o :
   let m := inlineAll_All_mod (mergeSeparatedSingle b lrf) in
   forall rules upds calls retl ls
-         (HWfMod : WfMod (mergeSeparatedSingle b lrf))
+         (HWfMod : WfMod type (mergeSeparatedSingle b lrf))
          (HTrace : Trace m o ls)
          (HNoSelfCallsBase : NoSelfCallBaseModule b),
     SubList rules (getRules b) ->
@@ -5589,7 +5589,7 @@ Lemma CompTraceEquiv (b : BaseModule) (lrf : list RegFileBase) o :
   let m := inlineAll_All_mod (mergeSeparatedSingle b lrf) in
   let regInits := (getRegisters b) ++ (concat (map getRegFileRegisters lrf)) in
   forall rules lupds lcalls
-         (HWfMod : WfMod (mergeSeparatedSingle b lrf))
+         (HWfMod : WfMod type (mergeSeparatedSingle b lrf))
          (HNoSelfCallsBase : NoSelfCallBaseModule b),
     SubList rules (getRules b) ->
     SemCompTrace regInits (fun s => compileRulesRf type (s, nil) rules lrf) o lupds lcalls ->

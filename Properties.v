@@ -2584,8 +2584,8 @@ Proof.
   auto.
 Qed.
 
-Lemma WfMod_Hidden m:
-  WfMod m ->
+Lemma WfMod_Hidden ty m:
+  WfMod ty m ->
   forall s, In s (getHidden m) -> In s (map fst (getAllMethods m)).
 Proof.
   induction 1; simpl; auto; intros.
@@ -2782,8 +2782,8 @@ Lemma flatten_Substeps m o l:
   - econstructor 3; eauto.
 Qed.
 
-Lemma Step_substitute' m o l:
-  Step m o l -> forall (HWfMod: WfMod m), StepSubstitute m o l.
+Lemma Step_substitute' ty m o l:
+  Step m o l -> forall (HWfMod: WfMod ty m), StepSubstitute m o l.
 Proof.
   unfold StepSubstitute.
   induction 1; auto; simpl; intros; dest; unfold MatchingExecCalls_Base in *; simpl in *.
@@ -2856,7 +2856,7 @@ Proof.
         destruct (HMatching1 _ n H7); contradiction.
 Qed.
 
-Lemma StepSubstitute_flatten m o l (HWfMod: WfMod m):
+Lemma StepSubstitute_flatten m o l:
   Step (flatten m) o l <-> StepSubstitute m o l.
 Proof.
   unfold flatten, getFlat, StepSubstitute.
@@ -2883,11 +2883,11 @@ Proof.
       rewrite createHide_Meths; auto.
 Qed.
     
-Lemma Step_substitute m o l (HWfMod: WfMod m):
+Lemma Step_substitute ty m o l (HWfMod: WfMod ty m):
   Step m o l -> Step (flatten m) o l.
 Proof.
   intros Stp.
-  apply (@Step_substitute') in Stp; auto.
+  apply (@Step_substitute' ty) in Stp; auto.
   rewrite (@StepSubstitute_flatten) in *; auto.
 Qed.
 
@@ -3342,8 +3342,8 @@ Section SplitSubsteps.
   Variable DisjRules: DisjKey (getRules m1) (getRules m2).
   Variable DisjMeths: DisjKey (getMethods m1) (getMethods m2).
 
-  Variable WfMod1: WfBaseModule m1.
-  Variable WfMod2: WfBaseModule m2.
+  Variable WfMod1: WfBaseModule type m1.
+  Variable WfMod2: WfBaseModule type m2.
   
   Lemma filter_perm o l :
     Substeps (concatFlat m1 m2) o l ->
@@ -3426,10 +3426,10 @@ Section SplitSubsteps.
       + subst; dest; exists x, x0;split;[|split;[|split;[|split]]];auto.
         rewrite (InRules_Filter _ _ _ _ _ _ HInRules).
         destruct (WfMod1) as [WfMod_Rle1 WfMod_Meth1];destruct (WfMod2) as [WfMod_Rle2 WfMod_Meth2].
-        specialize (WfActionT_ReadsWellDefined _ (WfMod_Rle1 _ _ HInRules) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined _ (WfMod_Rle1 _ _ HInRules) HAction) as Writes_sublist.
+        specialize (WfActionT_ReadsWellDefined _ (@WfMod_Rle1 _ HInRules) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined _ (WfMod_Rle1 _ HInRules) HAction) as Writes_sublist.
         constructor 2 with (rn:= rn)(rb:=rb)(reads:=reads)(u:=u)(cs:=cs)(ls:=(ModuleFilterLabels m1 ls)); auto.
         * specialize (app_sublist_l _ _ H6) as SL_o_x.
-          specialize (WfMod_Rle1 type (rn, rb) HInRules); specialize (WfActionT_SemAction _ WfMod_Rle1 H2 HAction SL_o_x H4).
+          specialize (WfMod_Rle1 (rn, rb) HInRules); specialize (WfActionT_SemAction _ WfMod_Rle1 H2 HAction SL_o_x H4).
           simpl; auto.
         * unfold ModuleFilterLabels;intros;apply HDisjRegs;
             destruct (filter_In (BaseModuleFilter m1) x1 ls) as [L R];
@@ -3441,10 +3441,10 @@ Section SplitSubsteps.
       + subst; dest; exists x, x0; split;[|split;[|split;[|split]]];auto.
         rewrite (NotInRules_Filter _ _ _ _ _ H3); assumption.
         rewrite (InRules_Filter _ _ _ _ _ _ HInRules).
-        destruct (WfMod1) as [WfMod_Rle1 WfMod_Meth1];destruct (WfMod2) as [WfMod_Rle2 WfMod_Meth2]; specialize (WfActionT_ReadsWellDefined _ (WfMod_Rle2 _ _ HInRules) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined _ (WfMod_Rle2 _ _ HInRules) HAction) as Writes_sublist.
+        destruct (WfMod1) as [WfMod_Rle1 WfMod_Meth1];destruct (WfMod2) as [WfMod_Rle2 WfMod_Meth2]; specialize (WfActionT_ReadsWellDefined _ (WfMod_Rle2 _ HInRules) HAction) as Reads_sublist; specialize (WfActionT_WritesWellDefined _ (WfMod_Rle2 _ HInRules) HAction) as Writes_sublist.
         constructor 2 with (rn:= rn)(rb:=rb)(reads:=reads)(u:=u)(cs:=cs)(ls:=(ModuleFilterLabels m2 ls)); auto.
         * specialize (app_sublist_r _ _ H6) as SL_o_x.
-          specialize (WfMod_Rle2 type (rn, rb) HInRules); specialize (WfActionT_SemAction _ WfMod_Rle2 H2 HAction SL_o_x H5).
+          specialize (WfMod_Rle2 (rn, rb) HInRules); specialize (WfActionT_SemAction _ WfMod_Rle2 H2 HAction SL_o_x H5).
           simpl; auto.
         * unfold ModuleFilterLabels;intros;apply HDisjRegs;
             destruct (filter_In (BaseModuleFilter m2) x1 ls) as [L R];
@@ -3458,11 +3458,11 @@ Section SplitSubsteps.
       + subst; dest; exists x, x0;split;[|split;[|split;[|split]]];auto.
         * rewrite (InMethods_Filter _ _ _ _ _ _ _ _ HInMeths).
           destruct (WfMod1) as [WfMod_Rle1 [WfMod_Meth1 _]];destruct (WfMod2) as [WfMod_Rle2 [WfMod_Meth2 _]].
-          specialize (WfActionT_ReadsWellDefined _ (WfMod_Meth1 _ (fn, fb) HInMeths argV) HAction) as Reads_sublist.
-          specialize (WfActionT_WritesWellDefined _ (WfMod_Meth1 _ (fn, fb) HInMeths argV) HAction) as Writes_sublist.
+          specialize (WfActionT_ReadsWellDefined _ (WfMod_Meth1 (fn, fb) HInMeths argV) HAction) as Reads_sublist.
+          specialize (WfActionT_WritesWellDefined _ (WfMod_Meth1 (fn, fb) HInMeths argV) HAction) as Writes_sublist.
           constructor 3 with (fn:=fn)(fb:=fb)(reads:=reads)(u:=u)(cs:=cs)(argV:=argV)(retV:=retV)(ls:=(ModuleFilterLabels m1 ls)); auto.
           -- specialize (app_sublist_l _ _ H7) as SL_o_x.
-             specialize (WfMod_Meth1 _ (fn, fb) HInMeths argV); specialize (WfActionT_SemAction _ WfMod_Meth1 H2 HAction SL_o_x H5).
+             specialize (WfMod_Meth1 (fn, fb) HInMeths argV); specialize (WfActionT_SemAction _ WfMod_Meth1 H2 HAction SL_o_x H5).
              simpl; auto.
           -- intros; apply HDisjRegs;
                destruct (filter_In (BaseModuleFilter m1) x1 ls) as [L R];
@@ -3472,11 +3472,11 @@ Section SplitSubsteps.
         * rewrite (NotInMethods_Filter _ _ _ _ _ _ _ _ H3); assumption.
         * rewrite (InMethods_Filter _ _ _ _ _ _ _ _ HInMeths).
           destruct (WfMod1) as [WfMod_Rle1 [WfMod_Meth1 _]];destruct (WfMod2) as [WfMod_Rle2 [WfMod_Meth2 _]].
-          specialize (WfActionT_ReadsWellDefined _ (WfMod_Meth2 _ (fn, fb) HInMeths argV) HAction) as Reads_sublist.
-          specialize (WfActionT_WritesWellDefined _ (WfMod_Meth2 _(fn, fb) HInMeths argV) HAction) as Writes_sublist.
+          specialize (WfActionT_ReadsWellDefined _ (WfMod_Meth2 (fn, fb) HInMeths argV) HAction) as Reads_sublist.
+          specialize (WfActionT_WritesWellDefined _ (WfMod_Meth2 (fn, fb) HInMeths argV) HAction) as Writes_sublist.
           constructor 3 with (fn:=fn)(fb:=fb)(reads:=reads)(u:=u)(cs:=cs)(argV:=argV)(retV:=retV)(ls:=(ModuleFilterLabels m2 ls)); auto.
           -- specialize (app_sublist_r _ _ H7) as SL_o_x.
-             specialize (WfMod_Meth2 _ (fn, fb) HInMeths argV); specialize (WfActionT_SemAction _ WfMod_Meth2 H2 HAction SL_o_x H6).
+             specialize (WfMod_Meth2 (fn, fb) HInMeths argV); specialize (WfActionT_SemAction _ WfMod_Meth2 H2 HAction SL_o_x H6).
              simpl; auto.
           -- intros; apply HDisjRegs;
                destruct (filter_In (BaseModuleFilter m2) x1 ls) as [L R];
@@ -3608,7 +3608,7 @@ Lemma WeakEqualitySym : forall l1 l2, WeakEquality l1 l2 -> WeakEquality l2 l1.
   destruct H; split; auto.
 Qed.
 
-Lemma WfNoDups m (HWfMod : WfMod m) :
+Lemma WfNoDups ty m (HWfMod : WfMod ty m) :
     NoDup (map fst (getAllRegisters m)) /\
     NoDup (map fst (getAllMethods m))   /\
     NoDup (map fst (getAllRules m)).
@@ -3663,14 +3663,14 @@ Proof.
         -- inversion_clear ND_Rles1; assumption.
 Qed.
 
-Lemma WfMod_WfBaseMod_flat m (HWfMod : WfMod m):
-  WfBaseModule (getFlat m).
+Lemma WfMod_WfBaseMod_flat ty m (HWfMod : WfMod ty m):
+  WfBaseModule ty (getFlat m).
 Proof.
   specialize (HWfMod).
   unfold getFlat;induction m.
   - simpl; inversion HWfMod; subst; destruct HWfBaseModule.
     unfold WfBaseModule in *; split; intros.
-    + specialize (H ty rule H1).
+    + specialize (H rule H1).
       induction H; econstructor; eauto.
     + dest; intros.
       repeat split; auto; intros.
@@ -3682,13 +3682,13 @@ Proof.
     specialize (IHm2 HWf2).
     simpl in *.
     constructor;simpl; repeat split; auto; intros; try destruct (in_app_or _ _ _ H) as [In1 | In1].
-    + destruct IHm1 as [Rle Meth]; clear Meth; specialize (Rle ty _ In1).
+    + destruct IHm1 as [Rle Meth]; clear Meth; specialize (Rle _ In1).
       induction Rle; econstructor; eauto; setoid_rewrite map_app; apply in_or_app;left; assumption.
-    + destruct IHm2 as [Rle Meth]; clear Meth; specialize (Rle ty _ In1).
+    + destruct IHm2 as [Rle Meth]; clear Meth; specialize (Rle _ In1).
       induction Rle; econstructor; eauto; setoid_rewrite map_app; apply in_or_app;right; assumption.
-    + destruct IHm1 as [Rle [Meth _]]; clear Rle; specialize (Meth ty _ In1 v).
+    + destruct IHm1 as [Rle [Meth _]]; clear Rle; specialize (Meth _ In1 v).
       induction Meth; econstructor; eauto; setoid_rewrite map_app; apply in_or_app;left; assumption.
-    + destruct IHm2 as [Rle [Meth _]]; clear Rle; specialize (Meth ty _ In1 v).
+    + destruct IHm2 as [Rle [Meth _]]; clear Rle; specialize (Meth _ In1 v).
       induction Meth; econstructor; eauto; setoid_rewrite map_app; apply in_or_app;right;assumption.
     + inv IHm1; inv IHm2; dest; apply NoDup_DisjKey; auto.
     + inv IHm1; inv IHm2; dest; apply NoDup_DisjKey; auto.
@@ -3728,7 +3728,7 @@ Proof.
 Qed.
 
 Lemma WfConcats : forall (m1 m2 : Mod) (o : RegsT)(l : list FullLabel),
-    (WfConcat m2 m1) ->
+    (WfConcat type m2 m1) ->
     Substeps (getFlat m2) o l ->
     (forall (s: string)(v : {x : Kind*Kind & SignT x}), In s (getHidden m1) -> (getNumCalls (s, v) l = 0%Z)).
 Proof.
@@ -3748,7 +3748,7 @@ Proof.
 Qed.
 
 Lemma WfConcats_Substeps : forall (m1 : Mod) m2 (o : RegsT)(l : list FullLabel),
-    (WfConcat (Base m2) m1) ->
+    (WfConcat type (Base m2) m1) ->
     Substeps m2 o l ->
     forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z).
 Proof.
@@ -3770,7 +3770,7 @@ Qed.
 
 
 Lemma WfConcats_Step : forall (m1 m2 : Mod) (o : RegsT) (l : list FullLabel),
-    (WfConcat m2 m1) ->
+    (WfConcat type m2 m1) ->
     Step m2 o l ->
     (forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z)).
 Proof.
@@ -3794,7 +3794,7 @@ Qed.
 
 Lemma WfConcats_Trace : forall (m1 m2 : Mod) (o : RegsT) ls (l : list FullLabel),
     Trace m2 o ls ->
-    (WfConcat m2 m1) ->
+    (WfConcat type m2 m1) ->
     forall i,
       nth_error ls i = Some l ->
       (forall f, In (fst f) (getHidden m1) -> (getNumCalls f l = 0%Z)).
@@ -3808,7 +3808,7 @@ Proof.
 Qed.
     
 
-Lemma substitute_Step' m (HWfMod: WfMod m):
+Lemma substitute_Step' m (HWfMod: WfMod type m):
   forall o l,
     StepSubstitute m o l ->
     exists l', Permutation l l' /\
@@ -3826,8 +3826,8 @@ Proof.
       intros.
       unfold getListFullLabel_diff in *;rewrite <-H2.
       apply H1; auto.
-  - assert (HWf1: WfMod m1) by (intros; specialize (HWfMod); inv HWfMod; auto).
-    assert (HWf2: WfMod m2) by (intros; specialize (HWfMod); inv HWfMod; auto).
+  - assert (HWf1: WfMod type m1) by (intros; specialize (HWfMod); inv HWfMod; auto).
+    assert (HWf2: WfMod type m2) by (intros; specialize (HWfMod); inv HWfMod; auto).
     specialize (IHm1 HWf1).
     specialize (IHm2 HWf2).
     destruct (WfNoDups HWf1) as [ND_Regs1 [ND_Meths1 ND_Rules1]].
@@ -3835,8 +3835,8 @@ Proof.
     specialize (WfMod_WfBaseMod_flat HWf1) as WfBaseMod1.
     specialize (WfMod_WfBaseMod_flat HWf2) as WfBaseMod2.
     pose proof (HWfMod) as hwfmod2.
-    assert (WfConcat1: WfConcat m1 m2 ) by (intros; specialize (HWfMod); inv HWfMod; auto).
-    assert (WfConcat2: WfConcat m2 m1 ) by (intros; specialize (HWfMod); inv HWfMod; auto).
+    assert (WfConcat1: WfConcat type m1 m2 ) by (intros; specialize (HWfMod); inv HWfMod; auto).
+    assert (WfConcat2: WfConcat type m2 m1 ) by (intros; specialize (HWfMod); inv HWfMod; auto).
     inv hwfmod2.
     pose proof (@split_Substeps1 (getFlat m1) (getFlat m2) HDisjRegs HDisjRules HDisjMeths WfBaseMod1 WfBaseMod2 _ _  ND_Regs1 ND_Regs2 H);dest.
     assert (Substeps (BaseMod (getAllRegisters m1) (getAllRules m1) (getAllMethods m1)) x (ModuleFilterLabels (getFlat m1) l) /\
@@ -4040,7 +4040,7 @@ Proof.
   intros;unfold WeakEquality; split;[apply PermutationWI|apply PermutationWI;apply Permutation_sym];assumption.
 Qed.
 
-Lemma substitute_Step m o l (HWfMod: WfMod m):
+Lemma substitute_Step m o l (HWfMod: WfMod type m):
   Step (flatten m) o l ->
   exists l',
     Permutation l l' /\
@@ -4091,7 +4091,7 @@ Proof.
     repeat split; tauto.
 Qed.
 
-Lemma WfMod_createHide l: forall m, WfMod (createHide m l) <-> (SubList l (map fst (getMethods m)) /\ WfMod (Base m)).
+Lemma WfMod_createHide l: forall ty m, WfMod ty (createHide m l) <-> (SubList l (map fst (getMethods m)) /\ WfMod ty (Base m)).
 Proof.
   split.
   - induction l; simpl; intros; split; unfold SubList; simpl; intros; try tauto.
@@ -4105,7 +4105,7 @@ Proof.
     + apply IHl; intros; split;auto.
 Qed.
 
-Lemma WfMod_createHideMod l: forall m, WfMod (createHideMod m l) <-> (SubList l (map fst (getAllMethods m)) /\ WfMod m).
+Lemma WfMod_createHideMod l: forall ty m, WfMod ty (createHideMod m l) <-> (SubList l (map fst (getAllMethods m)) /\ WfMod ty m).
 Proof.
   split.
   - induction l; simpl; intros; split; unfold SubList; simpl; intros; try tauto.
@@ -4126,7 +4126,7 @@ Proof.
   intro; split; induction 1; econstructor; eauto.
 Qed.
 
-Theorem flatten_WfMod m: WfMod m -> WfMod (flatten m).
+Theorem flatten_WfMod ty m: WfMod ty m -> WfMod ty (flatten m).
 Proof.
   unfold flatten.
   induction 1; simpl; auto; intros.
@@ -4146,35 +4146,32 @@ Proof.
     + constructor;inversion H4; inversion H2; inversion HWfBaseModule; inversion HWfBaseModule0; subst.
       * split; intros.
         -- destruct (in_app_or _ _ _ H6).
-           ++ specialize (H5 ty _ H7).
+           ++ specialize (H5 _ H7).
               induction H5; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; left; assumption.
-           ++ specialize (H9 ty _ H7).
+           ++ specialize (H9 _ H7).
               induction H9; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; right; assumption.
-        -- repeat split; simpl; intros; dest.
+        -- repeat split; simpl; intros; dest; try (eapply NoDup_DisjKey; eauto).
            ++ destruct (in_app_or _ _ _ H6).
-              ** specialize (H8 ty _ H16 v).
+              ** specialize (H8 _ H16 v).
                  induction H8; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; left; assumption.
-              ** specialize (H7 ty _ H16 v).
+              ** specialize (H7 _ H16 v).
                  induction H7; econstructor; eauto; simpl; rewrite map_app; apply in_or_app; right; assumption.
-           ++ eapply NoDup_DisjKey; eauto.
-           ++ eapply NoDup_DisjKey; eauto.
-           ++ eapply NoDup_DisjKey; eauto.
 Qed.
 
-Theorem flatten_WfMod_new m : WfMod_new m -> WfMod_new (flatten m).
+Theorem flatten_WfMod_new ty m : WfMod_new ty m -> WfMod_new ty (flatten m).
 Proof.
   repeat rewrite WfMod_new_WfMod_iff.
   apply flatten_WfMod.
 Qed.
 
-Definition flatten_ModWf m: ModWf :=
+Definition flatten_ModWf ty m: ModWf ty :=
   (Build_ModWf (flatten_WfMod (wfMod m))).
 
-Definition flatten_ModWf_new m: ModWf_new :=
-  (Build_ModWf_new _ (flatten_WfMod_new _ (wfMod_new m))).
+Definition flatten_ModWf_new ty m: ModWf_new ty :=
+  (Build_ModWf_new _ _ (flatten_WfMod_new _ _ (wfMod_new m))).
 
 Section TraceSubstitute.
-  Variable m: ModWf.
+  Variable m: ModWf type.
 
   Lemma Trace_flatten_same1: forall o l,  Trace m o l -> Trace (flatten m) o l.
   Proof.
@@ -4183,7 +4180,7 @@ Section TraceSubstitute.
       unfold flatten.
       rewrite createHide_Regs.
       auto.
-    - apply (@Step_substitute) in HStep; auto.
+    - apply (@Step_substitute type) in HStep; auto.
       + econstructor 2; eauto.
       + destruct m; auto.
   Qed.
@@ -4206,7 +4203,7 @@ Section TraceSubstitute.
   Proof.
     unfold TraceInclusion; intros.
     exists o1, ls1.
-    repeat split; auto; intros; unfold nthProp2; intros; try destruct (nth_error ls1 i); auto; repeat split; intros; try firstorder.
+    repeat split; auto; intros; unfold nthProp2; intros; try destruct (nth_error ls1 i); auto; repeat split; intros; try tauto.
     apply Trace_flatten_same1; auto.
   Qed.
 
@@ -4222,10 +4219,11 @@ Section TraceSubstitute.
     - apply PermutationEquivLists_WeakInclusions.
       assumption.
   Qed.
+  
 End TraceSubstitute.
 
 Section TraceSubstitute_new.
-  Variable m: ModWf_new.
+  Variable m: ModWf_new type.
 
   Lemma Trace_flatten_same1_new: forall o l,  Trace m o l -> Trace (flatten m) o l.
   Proof.
@@ -4234,7 +4232,7 @@ Section TraceSubstitute_new.
       unfold flatten.
       rewrite createHide_Regs.
       auto.
-    - apply (@Step_substitute) in HStep; auto.
+    - apply (@Step_substitute type) in HStep; auto.
       + econstructor 2; eauto.
       + destruct m; apply WfMod_new_WfMod; auto.
   Qed.
@@ -4273,6 +4271,7 @@ Section TraceSubstitute_new.
     - apply PermutationEquivLists_WeakInclusions.
       assumption.
   Qed.
+  
 End TraceSubstitute_new.
 
 Section test.
@@ -4527,17 +4526,17 @@ Section ModularSubstitution.
       (In (fst x, projT1 (snd x)) (getKindAttr (getAllMethods b')) /\
        ~ In (fst x) (getHidden b')).
 
-  Variable wfAConcatB: WfMod (ConcatMod a b).
-  Variable wfA'ConcatB': WfMod (ConcatMod a' b').
+  Variable wfAConcatB: WfMod type (ConcatMod a b).
+  Variable wfA'ConcatB': WfMod type (ConcatMod a' b').
 
   Theorem ModularSubstitution: TraceInclusion a a' ->
                              TraceInclusion b b' ->
                              TraceInclusion (ConcatMod a b) (ConcatMod a' b').
   Proof.
-    assert (WfConcat1: WfConcat a b) by (intros; specialize (wfAConcatB); inv wfAConcatB; auto).
-    assert (WfConcat2: WfConcat b a) by (intros; specialize (wfAConcatB); inv wfAConcatB; auto).
-    assert (WfConcat0: WfConcat a' b') by (intros; specialize (wfA'ConcatB'); inv wfA'ConcatB'; auto).
-    assert (WfConcat3: WfConcat b' a') by (intros; specialize (wfA'ConcatB'); inv wfA'ConcatB'; auto).
+    assert (WfConcat1: WfConcat type a b) by (intros; specialize (wfAConcatB); inv wfAConcatB; auto).
+    assert (WfConcat2: WfConcat type b a) by (intros; specialize (wfAConcatB); inv wfAConcatB; auto).
+    assert (WfConcat0: WfConcat type a' b') by (intros; specialize (wfA'ConcatB'); inv wfA'ConcatB'; auto).
+    assert (WfConcat3: WfConcat type b' a') by (intros; specialize (wfA'ConcatB'); inv wfA'ConcatB'; auto).
     pose proof (wfAConcatB) as wfAConcatB_dup.
     pose proof (wfA'ConcatB') as wfA'ConcatB'_dup.
     inv wfAConcatB_dup.
@@ -4702,8 +4701,8 @@ Section ModularSubstitution_new.
       (In (fst x, projT1 (snd x)) (getKindAttr (getAllMethods b')) /\
        ~ In (fst x) (getHidden b')).
 
-  Variable wfAConcatB: WfMod_new (ConcatMod a b).
-  Variable wfA'ConcatB': WfMod_new (ConcatMod a' b').
+  Variable wfAConcatB: WfMod_new type (ConcatMod a b).
+  Variable wfA'ConcatB': WfMod_new type (ConcatMod a' b').
 
   Theorem ModularSubstitution_new : TraceInclusion a a' ->
                              TraceInclusion b b' ->
@@ -4825,7 +4824,7 @@ Section Fold.
 End Fold.
 
 Section SimulationZeroAct.
-  Variable imp spec: BaseModuleWf.
+  Variable imp spec: BaseModuleWf type.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
   Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
@@ -4869,8 +4868,8 @@ Section SimulationZeroAct.
       dest.
       exists x2, x, x3.
       split.
-      + pose proof (WfActionT_ReadsWellDefined _ (H1 _ _ H12) H13) as sth1.
-        pose proof (WfActionT_WritesWellDefined _ (H1 _ _ H12) H13) as sth2.
+      + pose proof (WfActionT_ReadsWellDefined _ (H1 _ H12) H13) as sth1.
+        pose proof (WfActionT_WritesWellDefined _ (H1 _ H12) H13) as sth2.
         repeat econstructor; eauto.
       + split; assumption.
   Qed.
@@ -4878,7 +4877,7 @@ Section SimulationZeroAct.
 End SimulationZeroAct.
 
 Section SimulationZeroAct_new.
-  Variable imp spec: BaseModuleWf_new.
+  Variable imp spec: BaseModuleWf_new type.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec -> getKindAttr oSpec = getKindAttr (getRegisters spec).
   Variable initRel: forall rimp, Forall2 regInit rimp (getRegisters imp) ->
@@ -5000,7 +4999,7 @@ Section LemmaNoSelfCall.
 End LemmaNoSelfCall.
 
 Section SimulationGen.
-  Variable imp spec: BaseModuleWf.
+  Variable imp spec: BaseModuleWf type.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
   Variable simRel: RegsT -> RegsT -> Prop.
@@ -5212,7 +5211,7 @@ Section SimulationGen.
 End SimulationGen.    
 
 Section SimulationGen_new.
-  Variable imp spec: BaseModuleWf_new.
+  Variable imp spec: BaseModuleWf_new type.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
   Variable simRel: RegsT -> RegsT -> Prop.
@@ -5682,7 +5681,7 @@ Proof.
 Qed.
 
 Section SimulationGeneralEx.
-  Variable imp spec: BaseModuleWf.
+  Variable imp spec: BaseModuleWf type.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
   Variable simRel: RegsT -> RegsT -> Prop.
@@ -5769,7 +5768,7 @@ Section SimulationGeneralEx.
 End SimulationGeneralEx.
 
 Section SimulationGeneralEx_new.
-  Variable imp spec: BaseModuleWf_new.
+  Variable imp spec: BaseModuleWf_new type.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
   Variable simRel: RegsT -> RegsT -> Prop.
@@ -5839,7 +5838,7 @@ End SimulationGeneralEx_new.
 
 
 Section SimulationZeroA.
-  Variable imp spec: BaseModuleWf.
+  Variable imp spec: BaseModuleWf type.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec ->
                                           getKindAttr oSpec = getKindAttr (getRegisters spec).
@@ -5887,7 +5886,7 @@ Section SimulationZeroA.
 End SimulationZeroA.
 
 Section SimulationZeroA_new.
-  Variable imp spec: BaseModuleWf_new.
+  Variable imp spec: BaseModuleWf_new type.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec ->
                                           getKindAttr oSpec = getKindAttr (getRegisters spec).
@@ -5926,7 +5925,7 @@ Section SimulationZeroA_new.
 End SimulationZeroA_new.
 
 Section SimulationGeneral.
-  Variable imp spec: BaseModuleWf.
+  Variable imp spec: BaseModuleWf type.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
   Variable simRel: RegsT -> RegsT -> Prop.
@@ -6022,7 +6021,7 @@ Section SimulationGeneral.
 End SimulationGeneral.
 
 Section SimulationGeneral_new.
-  Variable imp spec: BaseModuleWf_new.
+  Variable imp spec: BaseModuleWf_new type.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
   Variable simRel: RegsT -> RegsT -> Prop.
@@ -6086,7 +6085,7 @@ End SimulationGeneral_new.
 
 
 Section SimulationZeroAction.
-  Variable imp spec: BaseModuleWf.
+  Variable imp spec: BaseModuleWf type.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec ->
                                           getKindAttr oSpec = getKindAttr (getRegisters spec).
@@ -6139,7 +6138,7 @@ Section SimulationZeroAction.
 End SimulationZeroAction.
 
 Section SimulationZeroAction_new.
-  Variable imp spec: BaseModuleWf_new.
+  Variable imp spec: BaseModuleWf_new type.
   Variable simRel: RegsT -> RegsT -> Prop.
   Variable simRelGood: forall oImp oSpec, simRel oImp oSpec ->
                                           getKindAttr oSpec = getKindAttr (getRegisters spec).
@@ -6243,8 +6242,8 @@ Qed.
 
 Section Simulation.
   Variable imp spec: BaseModule.
-  Variable impWf: WfBaseModule imp.
-  Variable specWf: WfBaseModule spec.
+  Variable impWf: WfBaseModule type imp.
+  Variable specWf: WfBaseModule type spec.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
   Variable simRel: RegsT -> RegsT -> Prop.
@@ -6311,8 +6310,8 @@ End Simulation.
 
 Section Simulation_new.
   Variable imp spec: BaseModule.
-  Variable impWf: WfBaseModule_new imp.
-  Variable specWf: WfBaseModule_new spec.
+  Variable impWf: WfBaseModule_new type imp.
+  Variable specWf: WfBaseModule_new type spec.
   Variable NoSelfCalls: NoSelfCallBaseModule spec.
   
   Variable simRel: RegsT -> RegsT -> Prop.

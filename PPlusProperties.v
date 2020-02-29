@@ -611,7 +611,7 @@ Section PPlusTraceInclusion.
       apply (WeakInclusions_flat_PermutationEquivLists_r _ _ H1 H2 H3 H4).
   Qed.
 
-  Lemma PPlusTraceInclusion_TraceInclusion (m m' : BaseModule) (Wfm: WfMod (Base m)) (Wfm': WfMod (Base m')):
+  Lemma PPlusTraceInclusion_TraceInclusion (m m' : BaseModule) (Wfm: WfMod type (Base m)) (Wfm': WfMod type (Base m')):
     PPlusTraceInclusion m m' ->
     TraceInclusion (Base m) (Base m').
   Proof.
@@ -2159,35 +2159,31 @@ Proof.
   simpl; destruct String.eqb, a; simpl;rewrite IHl; reflexivity.
 Qed.
 
-Lemma WfMod_Rule_inlined m f rn :
-  WfMod (Base m) ->
+Lemma WfMod_Rule_inlined ty m f rn :
+  WfMod ty (Base m) ->
   In f (getMethods m) ->
-  WfMod (Base (inlineSingle_Rule_BaseModule f rn m)).
+  WfMod ty (Base (inlineSingle_Rule_BaseModule f rn m)).
 Proof.
   intros; inv H; econstructor; eauto.
   - inv HWfBaseModule. 
-    split; intros; simpl in *; dest; try inv HWfBaseModule; eauto; repeat split; intros. pose proof (H1 ty _ H0); auto.
+    split; intros; simpl in *; dest; try inv HWfBaseModule; eauto; repeat split; intros. pose proof (H1 _ H0); auto.
     + destruct (inlineSingle_Rule_BaseModule_dec ty _ _ _ _ H2).
-      * specialize (H ty _ H7). eapply WfActionT_inline_Rule; auto.
+      * specialize (H _ H7). eapply WfActionT_inline_Rule; auto.
       * dest.
-        specialize (H ty _ H7).
+        specialize (H _ H7).
         rewrite <- H9.
         eapply WfActionT_inline_Rule_inline_action; auto.
     + eapply WfActionT_inline_Rule; auto.
     + auto.
     + auto.
     + rewrite <- inlineSingle_Rule_preserves_names; auto.
-    Unshelve.
-    exact rn.
-    exact f.
-    exact rn.
-    exact rn.
-    exact f.
-Qed.    
+      Unshelve.
+      all : auto.
+Qed.
 
 Lemma PPlusStrongTraceInclusion_inlining_Rules_r m f rn :
   In f (getMethods m) ->
-  (WfMod (Base m)) ->
+  (WfMod type (Base m)) ->
   StrongPPlusTraceInclusion m (inlineSingle_Rule_BaseModule f rn m).
 Proof.
   unfold StrongPPlusTraceInclusion; induction 3; subst.
@@ -2231,7 +2227,7 @@ Qed.
 
 Lemma TraceInclusion_inlining_Rules_r m f rn :
   In f (getMethods m) ->
-  (WfMod (Base m)) ->
+  (WfMod type (Base m)) ->
   TraceInclusion (Base m) (Base (inlineSingle_Rule_BaseModule f rn m)).
 Proof.
   intros.
@@ -2244,35 +2240,35 @@ Qed.
 
 Theorem TraceInclusion_inlining_Rules_r_new m f rn :
   In f (getMethods m) ->
-  (WfMod_new (Base m)) ->
+  (WfMod_new type (Base m)) ->
   TraceInclusion (Base m) (Base (inlineSingle_Rule_BaseModule f rn m)).
 Proof.
   rewrite WfMod_new_WfMod_iff; apply TraceInclusion_inlining_Rules_r.
 Qed.
 
-Lemma WfBaseMod_Rule_inlined m f rn:
-  WfBaseModule m ->
+Lemma WfBaseMod_Rule_inlined ty m f rn:
+  WfBaseModule ty m ->
   In f (getMethods m) ->
-  WfBaseModule (inlineSingle_Rule_BaseModule f rn m).
+  WfBaseModule ty (inlineSingle_Rule_BaseModule f rn m).
 Proof.
   intros.
-  specialize (WfMod_Rule_inlined (m:=m) f rn); intros.
-  assert (WfMod m) as TMP;[constructor; auto|specialize (H1 TMP H0); clear TMP].
+  specialize (WfMod_Rule_inlined (ty := ty) (m:=m) f rn); intros.
+  assert (WfMod ty m) as TMP;[constructor; auto|specialize (H1 TMP H0); clear TMP].
   inversion H1; auto.
 Qed.
 
-Lemma WfBaseMod_Rule_inlined_new m f rn:
-  WfBaseModule_new m ->
+Lemma WfBaseMod_Rule_inlined_new ty m f rn:
+  WfBaseModule_new ty m ->
   In f (getMethods m) ->
-  WfBaseModule_new (inlineSingle_Rule_BaseModule f rn m).
+  WfBaseModule_new ty (inlineSingle_Rule_BaseModule f rn m).
 Proof.
   repeat rewrite <- WfBaseModule_WfBaseModule_new_iff; apply WfBaseMod_Rule_inlined.
 Qed.
 
-Definition inlineSingle_Rule_BaseModuleWf {f} rn {m: BaseModuleWf} (inMeths: In f (getMethods m)):=
+Definition inlineSingle_Rule_BaseModuleWf {f} {ty} rn {m: BaseModuleWf ty} (inMeths: In f (getMethods m)):=
   Build_BaseModuleWf (WfBaseMod_Rule_inlined f rn (wfBaseModule m) inMeths).
 
-Lemma TraceInclusion_inlining_Rules_Wf_r {f} {m : BaseModuleWf} rn
+Lemma TraceInclusion_inlining_Rules_Wf_r {f} {m : BaseModuleWf type} rn
         (inMeths: In f (getMethods m)):
   TraceInclusion m (inlineSingle_Rule_BaseModuleWf rn inMeths).
 Proof.
@@ -2280,10 +2276,10 @@ Proof.
   constructor; apply wfBaseModule.
 Qed.
 
-Definition inlineSingle_Rule_BaseModuleWf_new {f} rn {m: BaseModuleWf_new} (inMeths: In f (getMethods m)):=
+Definition inlineSingle_Rule_BaseModuleWf_new {f} {ty} rn {m: BaseModuleWf_new ty} (inMeths: In f (getMethods m)):=
   Build_BaseModuleWf_new (WfBaseMod_Rule_inlined_new f rn (wfBaseModule_new m) inMeths).
 
-Theorem TraceInclusion_inlining_Rules_Wf_r_new {f} {m : BaseModuleWf_new} rn
+Theorem TraceInclusion_inlining_Rules_Wf_r_new {f} {m : BaseModuleWf_new type} rn
         (inMeths: In f (getMethods m)):
   TraceInclusion m (inlineSingle_Rule_BaseModuleWf_new rn inMeths).
 Proof.
@@ -3009,10 +3005,10 @@ Proof.
       right; exists x; split; auto.
 Qed.
 
-Lemma WfMod_Meth_inlined m f gn :
-  (WfMod (Base m)) ->
+Lemma WfMod_Meth_inlined ty m f gn :
+  (WfMod ty (Base m)) ->
   In f (getMethods m) ->
-  (WfMod (Base (inlineSingle_Meth_BaseModule f gn m))).
+  (WfMod ty (Base (inlineSingle_Meth_BaseModule f gn m))).
 Proof.
   intros.
   pose proof H as sth.
@@ -3022,29 +3018,23 @@ Proof.
     + eapply WfActionT_inline_Meth; auto.
     + repeat split; dest; intros; try rewrite SameKeys_inline_Meth; auto.
       * destruct (inlineSingle_Meth_BaseModule_dec _ _ _ _ H5).
-        -- specialize (H1 _ _ H6 v); eapply WfActionT_inline_Meth; auto.
+        -- specialize (H1 _ H6 v); eapply WfActionT_inline_Meth; auto.
         -- dest.
            destruct x, s0, meth, s1; simpl in *.
            inv H7; destruct String.eqb.
            ++ inv H10; EqDep_subst; simpl in *.
-              specialize (H1 _ _ H6 v); simpl in *; eapply WfActionT_inline_Meth; assumption.
+              specialize (H1 _ H6 v); simpl in *; eapply WfActionT_inline_Meth; assumption.
            ++ inv H10; EqDep_subst.
               eapply WfActionT_inline_Meth_inline_action; auto.
-              specialize (H1 _ _ H6 v); simpl in *; assumption.
-  Unshelve.
-  exact gn.
-  exact f.
-  exact gn.
-  exact f.
-  exact gn.
-  exact f.
-  exact gn.
+              specialize (H1 _ H6 v); simpl in *; assumption.
+              Unshelve.
+              all : auto.
 Qed.
 
-Lemma WfMod_Meth_inlined_new m f gn :
-  (WfMod_new (Base m)) ->
+Lemma WfMod_Meth_inlined_new ty m f gn :
+  (WfMod_new ty (Base m)) ->
   In f (getMethods m) ->
-  (WfMod_new (Base (inlineSingle_Meth_BaseModule f gn m))).
+  (WfMod_new ty (Base (inlineSingle_Meth_BaseModule f gn m))).
 Proof.
    repeat rewrite WfMod_new_WfMod_iff.
    apply WfMod_Meth_inlined.
@@ -3052,7 +3042,7 @@ Qed.
 
 Lemma PPlusStrongTraceInclusion_inlining_Meth_r m f gn :
   In f (getMethods m) ->
-  (WfMod (Base m)) ->
+  (WfMod type (Base m)) ->
   StrongPPlusTraceInclusion m (inlineSingle_Meth_BaseModule f gn m).
 Proof.
   unfold StrongPPlusTraceInclusion; induction 3; subst.
@@ -3086,7 +3076,7 @@ Qed.
 
 Lemma TraceInclusion_inlining_Meth_r m f gn :
   In f (getMethods m) ->
-  (WfMod (Base m)) ->
+  (WfMod type (Base m)) ->
   TraceInclusion (Base m) (Base (inlineSingle_Meth_BaseModule f gn m)).
 Proof.
   intros.
@@ -3097,41 +3087,41 @@ Qed.
 
 Theorem TraceInclusion_inlining_Meth_r_new m f gn :
   In f (getMethods m) ->
-  (WfMod_new (Base m)) ->
+  (WfMod_new type (Base m)) ->
   TraceInclusion (Base m) (Base (inlineSingle_Meth_BaseModule f gn m)).
 Proof.
   rewrite WfMod_new_WfMod_iff.
   apply TraceInclusion_inlining_Meth_r.
 Qed.
 
-Lemma WfBaseMod_Meth_inlined m f gn :
-  (WfBaseModule m) ->
+Lemma WfBaseMod_Meth_inlined ty m f gn :
+  (WfBaseModule ty m) ->
   In f (getMethods m) ->
-  (WfBaseModule (inlineSingle_Meth_BaseModule f gn m)).
+  (WfBaseModule ty (inlineSingle_Meth_BaseModule f gn m)).
 Proof.
   intros.
-  specialize (WfMod_Meth_inlined (m:=m) f gn); intro.
-  assert (WfMod m) as TMP;[constructor; auto|specialize (H1 TMP H0); clear TMP].
+  specialize (WfMod_Meth_inlined (ty := ty) (m:=m) f gn); intro.
+  assert (WfMod ty m) as TMP;[constructor; auto|specialize (H1 TMP H0); clear TMP].
   inv H1; auto.
 Qed.
 
-Lemma WfBaseMod_Meth_inlined_new m f gn :
-  (WfBaseModule_new m) ->
+Lemma WfBaseMod_Meth_inlined_new ty m f gn :
+  (WfBaseModule_new ty m) ->
   In f (getMethods m) ->
-  (WfBaseModule_new (inlineSingle_Meth_BaseModule f gn m)).
+  (WfBaseModule_new ty (inlineSingle_Meth_BaseModule f gn m)).
 Proof.
   intros.
-  specialize (@WfMod_Meth_inlined_new m f gn); intro.
-  assert (WfMod_new (inlineSingle_Meth_BaseModule f gn m)); auto.
+  specialize (@WfMod_Meth_inlined_new ty m f gn); intro.
+  assert (WfMod_new ty (inlineSingle_Meth_BaseModule f gn m)); auto.
 Qed.
 
-Definition inlineSingle_Meth_BaseModuleWf {f} {m: BaseModuleWf} gn (inMeths: In f (getMethods m)):=
+Definition inlineSingle_Meth_BaseModuleWf {f} {ty} {m: BaseModuleWf ty} gn (inMeths: In f (getMethods m)):=
   Build_BaseModuleWf (WfBaseMod_Meth_inlined f gn (wfBaseModule m) inMeths).
 
-Definition inlineSingle_Meth_BaseModuleWf_new {f} {m: BaseModuleWf_new} gn (inMeths: In f (getMethods m)):=
+Definition inlineSingle_Meth_BaseModuleWf_new {f} {ty} {m: BaseModuleWf_new ty} gn (inMeths: In f (getMethods m)):=
   Build_BaseModuleWf_new (WfBaseMod_Meth_inlined_new f gn (wfBaseModule_new m) inMeths).
 
-Lemma TraceInclusion_inlining_Meth_Wf_r {f} {m : BaseModuleWf} rn
+Lemma TraceInclusion_inlining_Meth_Wf_r {f} {m : BaseModuleWf type} rn
         (inMeths: In f (getMethods m)):
   TraceInclusion m (inlineSingle_Meth_BaseModuleWf rn inMeths).
 Proof.
@@ -3139,7 +3129,7 @@ Proof.
   constructor; apply wfBaseModule.
 Qed.
 
-Theorem TraceInclusion_inlining_Meth_Wf_r_new {f} {m : BaseModuleWf_new} rn
+Theorem TraceInclusion_inlining_Meth_Wf_r_new {f} {m : BaseModuleWf_new type} rn
         (inMeths: In f (getMethods m)):
   TraceInclusion m (inlineSingle_Meth_BaseModuleWf_new rn inMeths).
 Proof.
@@ -3325,10 +3315,10 @@ Proof.
   apply inline_Meth_not_transformed; assumption.
 Qed.
 
-Lemma WfMod_inline_all_Meth regs rules meths f xs:
+Lemma WfMod_inline_all_Meth ty regs rules meths f xs:
   In f meths ->
-  (WfMod (Base (BaseMod regs rules meths))) ->
-  (WfMod (Base (BaseMod regs rules (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs)))).
+  (WfMod ty (Base (BaseMod regs rules meths))) ->
+  (WfMod ty (Base (BaseMod regs rules (fold_right (transform_nth_right (inlineSingle_Meth f)) meths xs)))).
 Proof.
   induction xs; auto.
   simpl.
@@ -3353,10 +3343,10 @@ Proof.
     rewrite inlineSingle_transform_gt; auto.
 Qed.
 
-Lemma WfMod_inline_all_Rule regs rules meths f xs:
+Lemma WfMod_inline_all_Rule ty regs rules meths f xs:
   In f meths ->
-  (WfMod (Base (BaseMod regs rules meths))) ->
-  (WfMod (Base (BaseMod regs (fold_right (transform_nth_right (inlineSingle_Rule f)) rules xs) meths))).
+  (WfMod ty (Base (BaseMod regs rules meths))) ->
+  (WfMod ty (Base (BaseMod regs (fold_right (transform_nth_right (inlineSingle_Rule f)) rules xs) meths))).
 Proof.
   induction xs; auto.
   simpl.
@@ -3379,7 +3369,7 @@ Proof.
 Qed.
 
 Lemma inline_meth_transform f regs rules meths:
-  (WfMod (Base (BaseMod regs rules meths))) ->
+  (WfMod type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   forall i,
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (transform_nth_right (inlineSingle_Meth f) i meths))).
@@ -3400,7 +3390,7 @@ Proof.
 Qed.
 
 Theorem inline_meth_transform_new f regs rules meths:
-  (WfMod_new (Base (BaseMod regs rules meths))) ->
+  (WfMod_new type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   forall i,
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (transform_nth_right (inlineSingle_Meth f) i meths))).
@@ -3408,10 +3398,10 @@ Proof.
   rewrite WfMod_new_WfMod_iff; apply inline_meth_transform.
 Qed.
 
-Lemma WfBaseMod_inline_nth_Meth m f i:
+Lemma WfBaseMod_inline_nth_Meth ty m f i:
   In f (getMethods m) ->
-  (WfBaseModule m) ->
-  (WfBaseModule (BaseMod (getRegisters m) (getRules m) (transform_nth_right (inlineSingle_Meth f) i (getMethods m)))).
+  (WfBaseModule ty m) ->
+  (WfBaseModule ty (BaseMod (getRegisters m) (getRules m) (transform_nth_right (inlineSingle_Meth f) i (getMethods m)))).
 Proof.
   intros.
   destruct (lt_dec i (length (getMethods m))).
@@ -3422,7 +3412,7 @@ Proof.
     rewrite H3.
     assert (In f (transform_nth_right (inlineSingle_Meth f) i (getMethods m)));
       [apply inline_Meth_not_transformed; auto|].
-    assert (WfMod m) as P1; [constructor; auto|].
+    assert (WfMod ty m) as P1; [constructor; auto|].
     specialize (WfMod_Meth_inlined _ (fst x) P1 H) as P2.
     unfold inlineSingle_Meth_BaseModule in P2; simpl in *.
     inv P2; eauto.
@@ -3430,10 +3420,10 @@ Proof.
     rewrite inlineSingle_transform_gt; auto.
 Qed.
 
-Lemma WfBaseMod_inline_nth_Meth_new m f i:
+Lemma WfBaseMod_inline_nth_Meth_new ty m f i:
   In f (getMethods m) ->
-  (WfBaseModule_new m) ->
-  (WfBaseModule_new (BaseMod (getRegisters m) (getRules m) (transform_nth_right (inlineSingle_Meth f) i (getMethods m)))).
+  (WfBaseModule_new ty m) ->
+  (WfBaseModule_new ty (BaseMod (getRegisters m) (getRules m) (transform_nth_right (inlineSingle_Meth f) i (getMethods m)))).
 Proof.
   intros.
   destruct (lt_dec i (length (getMethods m))).
@@ -3444,7 +3434,7 @@ Proof.
     rewrite H3.
     assert (In f (transform_nth_right (inlineSingle_Meth f) i (getMethods m)));
       [apply inline_Meth_not_transformed; auto|].
-    assert (WfMod_new m) as P1; [constructor; auto|].
+    assert (WfMod_new ty m) as P1; [constructor; auto|].
     specialize (WfMod_Meth_inlined_new _ (fst x) P1 H) as P2.
     unfold inlineSingle_Meth_BaseModule in P2; simpl in *.
     exact P2.
@@ -3452,15 +3442,15 @@ Proof.
     rewrite inlineSingle_transform_gt; auto.
 Qed.
 
-Definition inline_nth_Meth_BaseModuleWf {f} {m : BaseModuleWf} i
+Definition inline_nth_Meth_BaseModuleWf {f} {ty} {m : BaseModuleWf ty} i
            (inMeths : In f (getMethods m)):=
   (Build_BaseModuleWf (WfBaseMod_inline_nth_Meth f i inMeths (wfBaseModule m))).
 
-Definition inline_nth_Meth_BaseModuleWf_new {f} {m : BaseModuleWf_new} i
+Definition inline_nth_Meth_BaseModuleWf_new {f} {ty} {m : BaseModuleWf_new ty} i
            (inMeths : In f (getMethods m)):=
   (Build_BaseModuleWf_new (WfBaseMod_inline_nth_Meth_new f i inMeths (wfBaseModule_new m))).
 
-Lemma inline_meth_transform_Wf {f} {m : BaseModuleWf} i (inMeths : In f (getMethods m)):
+Lemma inline_meth_transform_Wf {f} {m : BaseModuleWf type} i (inMeths : In f (getMethods m)):
     TraceInclusion m (inline_nth_Meth_BaseModuleWf i inMeths).
 Proof.
   intros; simpl.
@@ -3471,7 +3461,7 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inline_meth_transform_Wf_new {f} {m : BaseModuleWf_new} i (inMeths : In f (getMethods m)):
+Theorem inline_meth_transform_Wf_new {f} {m : BaseModuleWf_new type} i (inMeths : In f (getMethods m)):
     TraceInclusion m (inline_nth_Meth_BaseModuleWf_new i inMeths).
 Proof.
   destruct m.
@@ -3481,72 +3471,72 @@ Proof.
   exact inMeths.
 Qed.
 
-Lemma WfBaseMod_inline_all_Meth m f xs:
+Lemma WfBaseMod_inline_all_Meth ty m f xs:
   In f (getMethods m) ->
-  (WfBaseModule m) ->
-  (WfBaseModule (BaseMod (getRegisters m) (getRules m) (fold_right (transform_nth_right (inlineSingle_Meth f)) (getMethods m) xs))).
+  (WfBaseModule ty m) ->
+  (WfBaseModule ty (BaseMod (getRegisters m) (getRules m) (fold_right (transform_nth_right (inlineSingle_Meth f)) (getMethods m) xs))).
 Proof.
   intros.
-  assert (WfMod (Base m)) as P1;[constructor; auto|].
+  assert (WfMod ty (Base m)) as P1;[constructor; auto|].
   specialize (WfMod_WfBaseMod_flat P1) as P2.
   unfold getFlat in P2; simpl in *.
-  assert (WfMod (Base (BaseMod (getRegisters m) (getRules m) (getMethods m)))) as P3;
+  assert (WfMod ty (Base (BaseMod (getRegisters m) (getRules m) (getMethods m)))) as P3;
     [constructor; auto|].
   specialize (WfMod_inline_all_Meth f xs H P3) as P4.
   inv P4; auto.
 Qed.
 
-Lemma WfBaseMod_inline_all_Meth_new m f xs:
+Lemma WfBaseMod_inline_all_Meth_new ty m f xs:
   In f (getMethods m) ->
-  (WfBaseModule_new m) ->
-  (WfBaseModule_new (BaseMod (getRegisters m) (getRules m) (fold_right (transform_nth_right (inlineSingle_Meth f)) (getMethods m) xs))).
+  (WfBaseModule_new ty m) ->
+  (WfBaseModule_new ty (BaseMod (getRegisters m) (getRules m) (fold_right (transform_nth_right (inlineSingle_Meth f)) (getMethods m) xs))).
 Proof.
   repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
   apply WfBaseMod_inline_all_Meth.
 Qed.
 
-Definition inline_all_Meth_BaseModuleWf {f} {m : BaseModuleWf} xs
+Definition inline_all_Meth_BaseModuleWf {f} {ty} {m : BaseModuleWf ty} xs
            (inMeths : In f (getMethods m)):=
   (Build_BaseModuleWf (WfBaseMod_inline_all_Meth f xs inMeths (wfBaseModule m))).
 
-Definition inline_all_Meth_BaseModuleWf_new {f} {m : BaseModuleWf_new} xs
+Definition inline_all_Meth_BaseModuleWf_new {f} {ty} {m : BaseModuleWf_new ty} xs
            (inMeths : In f (getMethods m)):=
   (Build_BaseModuleWf_new (WfBaseMod_inline_all_Meth_new f xs inMeths (wfBaseModule_new m))).
 
-Lemma WfBaseMod_inline_all_Rule m f xs:
+Lemma WfBaseMod_inline_all_Rule ty m f xs:
   In f (getMethods m) ->
-  (WfBaseModule m) ->
-  (WfBaseModule (BaseMod (getRegisters m) (fold_right (transform_nth_right (inlineSingle_Rule f)) (getRules m) xs) (getMethods m))).
+  (WfBaseModule ty m) ->
+  (WfBaseModule ty (BaseMod (getRegisters m) (fold_right (transform_nth_right (inlineSingle_Rule f)) (getRules m) xs) (getMethods m))).
 Proof.
   intros.
-  assert (WfMod (Base m)) as P1;[constructor; auto|].
+  assert (WfMod ty (Base m)) as P1;[constructor; auto|].
   specialize (WfMod_WfBaseMod_flat P1) as P2.
   unfold getFlat in P2; simpl in *.
-  assert (WfMod (Base (BaseMod (getRegisters m) (getRules m) (getMethods m)))) as P3;
+  assert (WfMod ty (Base (BaseMod (getRegisters m) (getRules m) (getMethods m)))) as P3;
     [constructor; auto|].
   specialize (WfMod_inline_all_Rule f xs H P3) as P4.
   inv P4; auto.
 Qed.
 
-Lemma WfBaseMod_inline_all_Rule_new m f xs:
+Lemma WfBaseMod_inline_all_Rule_new ty m f xs:
   In f (getMethods m) ->
-  (WfBaseModule_new m) ->
-  (WfBaseModule_new (BaseMod (getRegisters m) (fold_right (transform_nth_right (inlineSingle_Rule f)) (getRules m) xs) (getMethods m))).
+  (WfBaseModule_new ty m) ->
+  (WfBaseModule_new ty (BaseMod (getRegisters m) (fold_right (transform_nth_right (inlineSingle_Rule f)) (getRules m) xs) (getMethods m))).
 Proof.
   repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
   apply WfBaseMod_inline_all_Rule.
 Qed.
 
-Definition inline_all_Rule_BaseModuleWf {f} {m : BaseModuleWf} xs
+Definition inline_all_Rule_BaseModuleWf {f} {ty} {m : BaseModuleWf ty} xs
            (inMeths : In f (getMethods m)):=
   (Build_BaseModuleWf (WfBaseMod_inline_all_Rule f xs inMeths (wfBaseModule m))).
 
-Definition inline_all_Rule_BaseModuleWf_new {f} {m : BaseModuleWf_new} xs
+Definition inline_all_Rule_BaseModuleWf_new {f} {ty} {m : BaseModuleWf_new ty} xs
            (inMeths : In f (getMethods m)):=
   (Build_BaseModuleWf_new (WfBaseMod_inline_all_Rule_new f xs inMeths (wfBaseModule_new m))).
 
 Lemma inline_rule_transform f regs rules meths:
-  (WfMod (Base (BaseMod regs rules meths))) ->
+  (WfMod type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   forall i,
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (transform_nth_right (inlineSingle_Rule f) i rules) meths)).
@@ -3567,7 +3557,7 @@ Proof.
 Qed.
 
 Theorem inline_rule_transform_new f regs rules meths:
-  (WfMod_new (Base (BaseMod regs rules meths))) ->
+  (WfMod_new type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   forall i,
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (transform_nth_right (inlineSingle_Rule f) i rules) meths)).
@@ -3575,10 +3565,10 @@ Proof.
   rewrite WfMod_new_WfMod_iff; apply inline_rule_transform.
 Qed.
 
-Lemma WfBaseMod_inline_nth_Rule m f i:
+Lemma WfBaseMod_inline_nth_Rule ty m f i:
   In f (getMethods m) ->
-  (WfBaseModule m) ->
-  (WfBaseModule (BaseMod (getRegisters m) (transform_nth_right (inlineSingle_Rule f) i (getRules m)) (getMethods m))).
+  (WfBaseModule ty m) ->
+  (WfBaseModule ty (BaseMod (getRegisters m) (transform_nth_right (inlineSingle_Rule f) i (getRules m)) (getMethods m))).
 Proof.
   intros.
   destruct (lt_dec i (length (getRules m))).
@@ -3586,7 +3576,7 @@ Proof.
     destruct H0 as [? [? [NoDupMeths [NoDupRegisters NoDupRle]]]].
     specialize (inlineSingle_Rule_transform_nth f _ NoDupRle l) as TMP; dest.
     rewrite H3.
-    assert (WfMod m) as P1; [constructor; auto|].
+    assert (WfMod ty m) as P1; [constructor; auto|].
     specialize (WfMod_Rule_inlined _ (fst x) P1 H) as P2.
     unfold inlineSingle_Rule_BaseModule in P2; simpl in *.
     inv P2; eauto.
@@ -3594,24 +3584,24 @@ Proof.
     rewrite inlineSingle_transform_gt; auto.
 Qed.
 
-Lemma WfBaseMod_inline_nth_Rule_new m f i:
+Lemma WfBaseMod_inline_nth_Rule_new ty m f i:
   In f (getMethods m) ->
-  (WfBaseModule_new m) ->
-  (WfBaseModule_new (BaseMod (getRegisters m) (transform_nth_right (inlineSingle_Rule f) i (getRules m)) (getMethods m))).
+  (WfBaseModule_new ty m) ->
+  (WfBaseModule_new ty (BaseMod (getRegisters m) (transform_nth_right (inlineSingle_Rule f) i (getRules m)) (getMethods m))).
 Proof.
   repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
   apply WfBaseMod_inline_nth_Rule.
 Qed.
 
-Definition inline_nth_Rule_BaseModuleWf {f} {m : BaseModuleWf} i
+Definition inline_nth_Rule_BaseModuleWf {f} {ty} {m : BaseModuleWf ty} i
            (inMeths : In f (getMethods m)):=
   (Build_BaseModuleWf (WfBaseMod_inline_nth_Rule f i inMeths (wfBaseModule m))).
 
-Definition inline_nth_Rule_BaseModuleWf_new {f} {m : BaseModuleWf_new} i
+Definition inline_nth_Rule_BaseModuleWf_new {f} {ty} {m : BaseModuleWf_new ty} i
            (inMeths : In f (getMethods m)):=
   (Build_BaseModuleWf_new (WfBaseMod_inline_nth_Rule_new f i inMeths (wfBaseModule_new m))).
 
-Lemma inline_rule_transform_Wf {f} {m : BaseModuleWf} i (inMeths : In f (getMethods m)):
+Lemma inline_rule_transform_Wf {f} {m : BaseModuleWf type} i (inMeths : In f (getMethods m)):
     TraceInclusion m (inline_nth_Rule_BaseModuleWf i inMeths).
 Proof.
   intros; simpl.
@@ -3622,7 +3612,7 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inline_rule_transform_Wf_new {f} {m : BaseModuleWf_new} i (inMeths : In f (getMethods m)):
+Theorem inline_rule_transform_Wf_new {f} {m : BaseModuleWf_new type} i (inMeths : In f (getMethods m)):
     TraceInclusion m (inline_nth_Rule_BaseModuleWf_new i inMeths).
 Proof.
   destruct m.
@@ -3635,7 +3625,7 @@ Qed.
 Section inlineSingle_nth.
   Variable (f : DefMethT).
   Variable (regs: list RegInitT) (rules: list RuleT) (meths: list DefMethT).
-  Variable (Wf : WfMod (Base (BaseMod regs rules meths))).
+  Variable (Wf : WfMod type (Base (BaseMod regs rules meths))).
 
   Lemma inline_meth_fold_right xs:
     In f meths ->
@@ -3668,7 +3658,7 @@ End inlineSingle_nth.
 Section inlineSingle_nth_new.
   Variable (f : DefMethT).
   Variable (regs: list RegInitT) (rules: list RuleT) (meths: list DefMethT).
-  Variable (Wf : WfMod_new (Base (BaseMod regs rules meths))).
+  Variable (Wf : WfMod_new type (Base (BaseMod regs rules meths))).
 
   Theorem inline_meth_fold_right_new xs:
     In f meths ->
@@ -3688,12 +3678,12 @@ Section inlineSingle_nth_new.
 
 End inlineSingle_nth_new.
 
-Lemma inline_meth_fold_right_Wf {f} {m : BaseModuleWf} xs (inMeth : In f (getMethods m)):
+Lemma inline_meth_fold_right_Wf {f} {m : BaseModuleWf type} xs (inMeth : In f (getMethods m)):
   TraceInclusion m (inline_all_Meth_BaseModuleWf xs inMeth).
 Proof.
   specialize (TraceInclusion_flatten_r m) as P1.
   simpl in *; unfold flatten, getFlat in P1; simpl in *.
-  assert (WfMod m) as TMP. {
+  assert (WfMod type m) as TMP. {
     constructor; apply wfBaseModule.
   }
   specialize (WfMod_getFlat TMP) as P2; clear TMP.
@@ -3701,7 +3691,7 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inline_meth_fold_right_Wf_new {f} {m : BaseModuleWf_new} xs (inMeth : In f (getMethods m)):
+Theorem inline_meth_fold_right_Wf_new {f} {m : BaseModuleWf_new type} xs (inMeth : In f (getMethods m)):
   TraceInclusion m (inline_all_Meth_BaseModuleWf_new xs inMeth).
 Proof.
   destruct m.
@@ -3711,12 +3701,12 @@ Proof.
   exact inMeth.
 Qed.
 
-Lemma inline_rule_fold_right_Wf {f} {m : BaseModuleWf} xs (inMeth : In f (getMethods m)):
+Lemma inline_rule_fold_right_Wf {f} {m : BaseModuleWf type} xs (inMeth : In f (getMethods m)):
   TraceInclusion m (inline_all_Rule_BaseModuleWf xs inMeth).
 Proof.
   specialize (TraceInclusion_flatten_r m) as P1.
   simpl in *; unfold flatten, getFlat in P1; simpl in *.
-  assert (WfMod m) as TMP.
+  assert (WfMod type m) as TMP.
   { constructor; apply wfBaseModule.
   }
   specialize (WfMod_getFlat TMP) as P2; clear TMP.
@@ -3724,7 +3714,7 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inline_rule_fold_right_Wf_new {f} {m : BaseModuleWf_new} xs (inMeth : In f (getMethods m)):
+Theorem inline_rule_fold_right_Wf_new {f} {m : BaseModuleWf_new type} xs (inMeth : In f (getMethods m)):
   TraceInclusion m (inline_all_Rule_BaseModuleWf_new xs inMeth).
 Proof.
   destruct m.
@@ -3735,7 +3725,7 @@ Proof.
 Qed.
 
 Lemma TraceInclusion_inline_BaseModule_rules regs rules meths f:
-  (WfMod (Base (BaseMod regs rules meths))) ->
+  (WfMod type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (map (inlineSingle_Rule f) rules) meths)).
 Proof.
@@ -3747,55 +3737,55 @@ Proof.
 Qed.
 
 Theorem TraceInclusion_inline_BaseModule_rules_new regs rules meths f:
-  (WfMod_new (Base (BaseMod regs rules meths))) ->
+  (WfMod_new type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (map (inlineSingle_Rule f) rules) meths)).
 Proof.
   rewrite WfMod_new_WfMod_iff; apply TraceInclusion_inline_BaseModule_rules.
 Qed.
 
-Lemma WfBaseMod_inline_BaseModule_Rules m f:
+Lemma WfBaseMod_inline_BaseModule_Rules ty m f:
   In f (getMethods m) ->
-  WfBaseModule m ->
-  WfBaseModule (BaseMod (getRegisters m) (map (inlineSingle_Rule f) (getRules m)) (getMethods m)).
+  WfBaseModule ty m ->
+  WfBaseModule ty (BaseMod (getRegisters m) (map (inlineSingle_Rule f) (getRules m)) (getMethods m)).
 Proof.
   intros.
-  assert (WfMod m) as TMP;[constructor; auto|specialize (WfMod_getFlat TMP) as P1; clear TMP].
+  assert (WfMod ty m) as TMP;[constructor; auto|specialize (WfMod_getFlat TMP) as P1; clear TMP].
   specialize (WfMod_inline_all_Rule _ (seq 0 (length (getRules m))) H P1) as P2.
   repeat rewrite map_fold_right_eq in *; simpl in *.
   inv P2; auto.
 Qed.
 
-Lemma WfBaseMod_inline_BaseModule_Rules_new m f:
+Lemma WfBaseMod_inline_BaseModule_Rules_new ty m f:
   In f (getMethods m) ->
-  WfBaseModule_new m ->
-  WfBaseModule_new (BaseMod (getRegisters m) (map (inlineSingle_Rule f) (getRules m)) (getMethods m)).
+  WfBaseModule_new ty m ->
+  WfBaseModule_new ty (BaseMod (getRegisters m) (map (inlineSingle_Rule f) (getRules m)) (getMethods m)).
 Proof.
   repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
   apply WfBaseMod_inline_BaseModule_Rules.
 Qed.
 
-Definition inline_BaseModule_rules_BaseModuleWf {f} {m : BaseModuleWf}
+Definition inline_BaseModule_rules_BaseModuleWf {f} {ty} {m : BaseModuleWf ty}
            (inMeth : In f (getMethods m)) :=
   Build_BaseModuleWf (WfBaseMod_inline_BaseModule_Rules _ inMeth (wfBaseModule m)).
 
-Definition inline_BaseModule_rules_BaseModuleWf_new {f} {m : BaseModuleWf_new}
+Definition inline_BaseModule_rules_BaseModuleWf_new {f} {ty} {m : BaseModuleWf_new ty}
            (inMeth : In f (getMethods m)) :=
   Build_BaseModuleWf_new (WfBaseMod_inline_BaseModule_Rules_new _ inMeth (wfBaseModule_new m)).
 
-Lemma TraceInclusion_inline_BaseModule_rules_Wf {f} {m : BaseModuleWf}
+Lemma TraceInclusion_inline_BaseModule_rules_Wf {f} {m : BaseModuleWf type}
         (inMeth : In f (getMethods m)):
   TraceInclusion m (inline_BaseModule_rules_BaseModuleWf inMeth).
 Proof.
   specialize (TraceInclusion_flatten_r m) as P1.
   simpl in *; unfold flatten, getFlat in P1; simpl in *.
-  assert (WfMod m) as TMP;[constructor; apply wfBaseModule
+  assert (WfMod type m) as TMP;[constructor; apply wfBaseModule
                           |specialize (WfMod_getFlat TMP) as P2; clear TMP].
   specialize (TraceInclusion_inline_BaseModule_rules f P2 inMeth) as P3.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem TraceInclusion_inline_BaseModule_rules_Wf_new {f} {m : BaseModuleWf_new}
+Theorem TraceInclusion_inline_BaseModule_rules_Wf_new {f} {m : BaseModuleWf_new type}
         (inMeth : In f (getMethods m)):
   TraceInclusion m (inline_BaseModule_rules_BaseModuleWf_new inMeth).
 Proof.
@@ -3807,7 +3797,7 @@ Proof.
 Qed.
 
 Lemma TraceInclusion_inline_BaseModule_meths regs rules meths f:
-  (WfMod (Base (BaseMod regs rules meths))) ->
+  (WfMod type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (map (inlineSingle_Meth f) meths))).
 Proof.
@@ -3819,7 +3809,7 @@ Proof.
 Qed.
 
 Theorem TraceInclusion_inline_BaseModule_meths_new regs rules meths f:
-  (WfMod_new (Base (BaseMod regs rules meths))) ->
+  (WfMod_new type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (map (inlineSingle_Meth f) meths))).
 Proof.
@@ -3827,48 +3817,48 @@ Proof.
   apply TraceInclusion_inline_BaseModule_meths.
 Qed.
 
-Lemma WfBaseMod_inline_BaseModule_Meths m f:
+Lemma WfBaseMod_inline_BaseModule_Meths ty m f:
   In f (getMethods m) ->
-  WfBaseModule m ->
-  WfBaseModule (BaseMod (getRegisters m) (getRules m) (map (inlineSingle_Meth f) (getMethods m))).
+  WfBaseModule ty m ->
+  WfBaseModule ty (BaseMod (getRegisters m) (getRules m) (map (inlineSingle_Meth f) (getMethods m))).
 Proof.
   intros.
-  assert (WfMod m) as TMP;[constructor; auto|specialize (WfMod_getFlat TMP) as P1; clear TMP].
+  assert (WfMod ty m) as TMP;[constructor; auto|specialize (WfMod_getFlat TMP) as P1; clear TMP].
   specialize (WfMod_inline_all_Meth _ (seq 0 (length (getMethods m))) H P1) as P2.
   repeat rewrite map_fold_right_eq in *; simpl in *.
   inv P2; auto.
 Qed.
 
-Lemma WfBaseMod_inline_BaseModule_Meths_new m f:
+Lemma WfBaseMod_inline_BaseModule_Meths_new ty m f:
   In f (getMethods m) ->
-  WfBaseModule_new m ->
-  WfBaseModule_new (BaseMod (getRegisters m) (getRules m) (map (inlineSingle_Meth f) (getMethods m))).
+  WfBaseModule_new ty m ->
+  WfBaseModule_new ty (BaseMod (getRegisters m) (getRules m) (map (inlineSingle_Meth f) (getMethods m))).
 Proof.
   repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
   apply WfBaseMod_inline_BaseModule_Meths.
 Qed.
 
-Definition inline_BaseModule_meths_BaseModuleWf {f} {m : BaseModuleWf}
+Definition inline_BaseModule_meths_BaseModuleWf {f} {ty} {m : BaseModuleWf ty}
            (inMeth : In f (getMethods m)) :=
   Build_BaseModuleWf (WfBaseMod_inline_BaseModule_Meths _ inMeth (wfBaseModule m)).
 
-Definition inline_BaseModule_meths_BaseModuleWf_new {f} {m : BaseModuleWf_new}
+Definition inline_BaseModule_meths_BaseModuleWf_new {f} {ty} {m : BaseModuleWf_new ty}
            (inMeth : In f (getMethods m)) :=
   Build_BaseModuleWf_new (WfBaseMod_inline_BaseModule_Meths_new _ inMeth (wfBaseModule_new m)).
 
-Lemma TraceInclusion_inline_BaseModule_meths_Wf {f} {m : BaseModuleWf}
+Lemma TraceInclusion_inline_BaseModule_meths_Wf {f} {m : BaseModuleWf type}
         (inMeth : In f (getMethods m)):
   TraceInclusion m (inline_BaseModule_meths_BaseModuleWf inMeth).
 Proof.
   specialize (TraceInclusion_flatten_r m) as P1.
   simpl in *; unfold flatten, getFlat in P1; simpl in *.
-  assert (WfMod m) as TMP;[constructor; apply wfBaseModule
+  assert (WfMod type m) as TMP;[constructor; apply wfBaseModule
                           |specialize (WfMod_getFlat TMP) as P2; clear TMP].
   specialize (TraceInclusion_inline_BaseModule_meths f P2 inMeth) as P3.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem TraceInclusion_inline_BaseModule_meths_Wf_new {f} {m : BaseModuleWf_new}
+Theorem TraceInclusion_inline_BaseModule_meths_Wf_new {f} {m : BaseModuleWf_new type}
         (inMeth : In f (getMethods m)):
   TraceInclusion m (inline_BaseModule_meths_BaseModuleWf_new inMeth).
 Proof.
@@ -3880,7 +3870,7 @@ Proof.
 Qed.
 
 Lemma TraceInclusion_inline_BaseModule_all regs rules meths f:
-  (WfMod (Base (BaseMod regs rules meths))) ->
+  (WfMod type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs rules meths)) (Base (inlineSingle_BaseModule f regs rules meths)).
 Proof.
@@ -3894,7 +3884,7 @@ Proof.
 Qed.
 
 Theorem TraceInclusion_inline_BaseModule_all_new regs rules meths f:
-  (WfMod_new (Base (BaseMod regs rules meths))) ->
+  (WfMod_new type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs rules meths)) (Base (inlineSingle_BaseModule f regs rules meths)).
 Proof.
@@ -3902,10 +3892,10 @@ Proof.
   apply TraceInclusion_inline_BaseModule_all.
 Qed.
 
-Lemma WfBaseMod_inlineSingle_BaseModule m f:
+Lemma WfBaseMod_inlineSingle_BaseModule ty m f:
   In f (getMethods m) ->
-  WfBaseModule m ->
-  WfBaseModule (inlineSingle_BaseModule f (getRegisters m) (getRules m) (getMethods m)).
+  WfBaseModule ty m ->
+  WfBaseModule ty (inlineSingle_BaseModule f (getRegisters m) (getRules m) (getMethods m)).
 Proof.
   intros.
   unfold inlineSingle_BaseModule.
@@ -3914,22 +3904,22 @@ Proof.
   apply (WfBaseMod_inline_BaseModule_Meths f P2 P1).
 Qed.
 
-Lemma WfBaseMod_inlineSingle_BaseModule_new m f:
+Lemma WfBaseMod_inlineSingle_BaseModule_new ty m f:
   In f (getMethods m) ->
-  WfBaseModule_new m ->
-  WfBaseModule_new (inlineSingle_BaseModule f (getRegisters m) (getRules m) (getMethods m)).
+  WfBaseModule_new ty m ->
+  WfBaseModule_new ty (inlineSingle_BaseModule f (getRegisters m) (getRules m) (getMethods m)).
 Proof.
   repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
   apply WfBaseMod_inlineSingle_BaseModule.
 Qed.
 
-Definition inlineSingle_BaseModuleWf {f} {m : BaseModuleWf} (inMeth : In f (getMethods m)):=
+Definition inlineSingle_BaseModuleWf {f} {ty} {m : BaseModuleWf ty} (inMeth : In f (getMethods m)):=
   Build_BaseModuleWf (WfBaseMod_inlineSingle_BaseModule _ inMeth (wfBaseModule m)).
 
-Definition inlineSingle_BaseModuleWf_new {f} {m : BaseModuleWf_new} (inMeth : In f (getMethods m)):=
+Definition inlineSingle_BaseModuleWf_new {f} {ty} {m : BaseModuleWf_new ty} (inMeth : In f (getMethods m)):=
   Build_BaseModuleWf_new (WfBaseMod_inlineSingle_BaseModule_new _ inMeth (wfBaseModule_new m)).
 
-Lemma TraceInclusion_inline_BaseModule_all_Wf {f} {m : BaseModuleWf}
+Lemma TraceInclusion_inline_BaseModule_all_Wf {f} {m : BaseModuleWf type}
         (inMeth : In f (getMethods m)):
   TraceInclusion m (inlineSingle_BaseModuleWf inMeth).
 Proof.
@@ -3940,7 +3930,7 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem TraceInclusion_inline_BaseModule_all_Wf_new {f} {m : BaseModuleWf_new}
+Theorem TraceInclusion_inline_BaseModule_all_Wf_new {f} {m : BaseModuleWf_new type}
         (inMeth : In f (getMethods m)):
   TraceInclusion m (inlineSingle_BaseModuleWf_new inMeth).
 Proof.
@@ -3953,9 +3943,9 @@ Qed.
 
 Section inline_all_all.
   Lemma TraceInclusion_inlineSingle_pos_Rules regs rules meths:
-    (WfMod (Base (BaseMod regs rules meths))) ->
+    (WfMod type (Base (BaseMod regs rules meths))) ->
     forall n,
-      (WfMod (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths))) /\
+      (WfMod type (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths))) /\
       TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths)).
   Proof.
     intros WfH n.
@@ -3971,9 +3961,9 @@ Section inline_all_all.
   Qed.
 
   Theorem TraceInclusion_inlineSingle_pos_Rules_new regs rules meths:
-    (WfMod_new (Base (BaseMod regs rules meths))) ->
+    (WfMod_new type (Base (BaseMod regs rules meths))) ->
     forall n,
-      (WfMod_new (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths))) /\
+      (WfMod_new type (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths))) /\
       TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths)).
   Proof.
     intros.
@@ -3981,32 +3971,37 @@ Section inline_all_all.
     apply TraceInclusion_inlineSingle_pos_Rules; auto.
   Qed.
 
-  Lemma WfBaseMod_inlineSingle_Rules_pos m n:
-    WfBaseModule m ->
-    WfBaseModule (BaseMod (getRegisters m) (inlineSingle_Rules_pos (getMethods m) n (getRules m)) (getMethods m)).
+  Lemma WfBaseMod_inlineSingle_Rules_pos ty m n:
+    WfBaseModule ty m ->
+    WfBaseModule ty (BaseMod (getRegisters m) (inlineSingle_Rules_pos (getMethods m) n (getRules m)) (getMethods m)).
   Proof.
     intros.
-    assert (WfMod m) as P1;[constructor; auto|apply WfMod_getFlat in P1].
+    assert (WfMod ty m) as P1;[constructor; auto|apply WfMod_getFlat in P1].
     unfold getFlat in P1; simpl in *.
-    specialize (TraceInclusion_inlineSingle_pos_Rules P1 n) as TMP; dest.
-    inversion H0; auto.
+    unfold inlineSingle_Rules_pos.
+    destruct (nth_error) eqn:G; auto.
+    apply nth_error_In in G.
+    pose proof (WfMod_inline_all_Rule d (seq 0 (length (getRules m))) G P1).
+    repeat rewrite map_fold_right_eq in *.
+    inv H0.
+    assumption.
   Qed.
 
-  Lemma WfBaseMod_inlineSingle_Rules_pos_new m n:
-    WfBaseModule_new m ->
-    WfBaseModule_new (BaseMod (getRegisters m) (inlineSingle_Rules_pos (getMethods m) n (getRules m)) (getMethods m)).
+  Lemma WfBaseMod_inlineSingle_Rules_pos_new ty m n:
+    WfBaseModule_new ty m ->
+    WfBaseModule_new ty (BaseMod (getRegisters m) (inlineSingle_Rules_pos (getMethods m) n (getRules m)) (getMethods m)).
   Proof.
     repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
     apply WfBaseMod_inlineSingle_Rules_pos.
   Qed.
 
-  Definition inlineSingle_Rules_pos_BaseModuleWf (m : BaseModuleWf) n :=
+  Definition inlineSingle_Rules_pos_BaseModuleWf {ty} (m : BaseModuleWf ty) n :=
     Build_BaseModuleWf (WfBaseMod_inlineSingle_Rules_pos n (wfBaseModule m)).
 
-  Definition inlineSingle_Rules_pos_BaseModuleWf_new (m : BaseModuleWf_new) n :=
+  Definition inlineSingle_Rules_pos_BaseModuleWf_new {ty} (m : BaseModuleWf_new ty) n :=
     Build_BaseModuleWf_new (WfBaseMod_inlineSingle_Rules_pos_new n (wfBaseModule_new m)).
 
-  Lemma TraceInclusion_inlineSingle_pos_Rules_Wf (m : BaseModuleWf) n :
+  Lemma TraceInclusion_inlineSingle_pos_Rules_Wf (m : BaseModuleWf type) n :
     TraceInclusion m (inlineSingle_Rules_pos_BaseModuleWf m n).
   Proof.
     specialize (TraceInclusion_flatten_r m) as P1.
@@ -4016,7 +4011,7 @@ Section inline_all_all.
     eauto using TraceInclusion_trans.
   Qed.
 
-  Theorem TraceInclusion_inlineSingle_pos_Rules_Wf_new (m : BaseModuleWf_new) n :
+  Theorem TraceInclusion_inlineSingle_pos_Rules_Wf_new (m : BaseModuleWf_new type) n :
     TraceInclusion m (inlineSingle_Rules_pos_BaseModuleWf_new m n).
   Proof.
     destruct m.
@@ -4025,8 +4020,8 @@ Section inline_all_all.
   Qed.
 
   Lemma TraceInclusion_inlineAll_pos_Rules regs rules meths:
-    (WfMod (Base (BaseMod regs rules meths))) ->
-    (WfMod (Base (BaseMod regs (inlineAll_Rules meths rules) meths))) /\
+    (WfMod type (Base (BaseMod regs rules meths))) ->
+    (WfMod type (Base (BaseMod regs (inlineAll_Rules meths rules) meths))) /\
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (inlineAll_Rules meths rules) meths)).
   Proof.
     intros WfH.
@@ -4042,40 +4037,46 @@ Section inline_all_all.
   Qed.
 
   Theorem TraceInclusion_inlineAll_pos_Rules_new regs rules meths:
-    (WfMod_new (Base (BaseMod regs rules meths))) ->
-    (WfMod_new (Base (BaseMod regs (inlineAll_Rules meths rules) meths))) /\
+    (WfMod_new type (Base (BaseMod regs rules meths))) ->
+    (WfMod_new type (Base (BaseMod regs (inlineAll_Rules meths rules) meths))) /\
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs (inlineAll_Rules meths rules) meths)).
   Proof.
     repeat rewrite WfMod_new_WfMod_iff.
     apply TraceInclusion_inlineAll_pos_Rules.
   Qed.
 
-  Lemma WfBaseMod_inlineAll_Rules m :
-    WfBaseModule m ->
-    WfBaseModule (BaseMod (getRegisters m) (inlineAll_Rules (getMethods m) (getRules m)) (getMethods m)).
+  Lemma WfBaseMod_inlineAll_Rules ty m :
+    WfBaseModule ty m ->
+    WfBaseModule ty (BaseMod (getRegisters m) (inlineAll_Rules (getMethods m) (getRules m)) (getMethods m)).
   Proof.
     intros.
-    assert (WfMod m) as P1;[constructor; auto|apply WfMod_getFlat in P1].
+    assert (WfMod ty m) as P1;[constructor; auto|apply WfMod_getFlat in P1].
     unfold getFlat in P1; simpl in *.
-    specialize (TraceInclusion_inlineAll_pos_Rules P1) as TMP; dest.
-    inversion H0; auto.
+    unfold inlineAll_Rules.
+    remember (Datatypes.length (getMethods m)) as n1.
+    setoid_rewrite <- Heqn1.
+    clear Heqn1.
+    induction n1; auto.
+    rewrite seq_eq.
+    rewrite fold_left_app; simpl in *.
+    pose proof (WfBaseMod_inlineSingle_Rules_pos n1 IHn1); simpl in *; auto.
   Qed.
 
-  Lemma WfBaseMod_inlineAll_Rules_new m :
-    WfBaseModule_new m ->
-    WfBaseModule_new (BaseMod (getRegisters m) (inlineAll_Rules (getMethods m) (getRules m)) (getMethods m)).
+  Lemma WfBaseMod_inlineAll_Rules_new ty m :
+    WfBaseModule_new ty m ->
+    WfBaseModule_new ty (BaseMod (getRegisters m) (inlineAll_Rules (getMethods m) (getRules m)) (getMethods m)).
   Proof.
     repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
     apply WfBaseMod_inlineAll_Rules.
   Qed.
 
-  Definition inlineAll_Rules_BaseModuleWf (m : BaseModuleWf) :=
+  Definition inlineAll_Rules_BaseModuleWf {ty} (m : BaseModuleWf ty) :=
     Build_BaseModuleWf (WfBaseMod_inlineAll_Rules (wfBaseModule m)).
 
-  Definition inlineAll_Rules_BaseModuleWf_new (m : BaseModuleWf_new) :=
+  Definition inlineAll_Rules_BaseModuleWf_new {ty} (m : BaseModuleWf_new ty) :=
     Build_BaseModuleWf_new (WfBaseMod_inlineAll_Rules_new (wfBaseModule_new m)).
 
-  Lemma TraceInclusion_inlineAll_pos_Rules_Wf (m : BaseModuleWf) :
+  Lemma TraceInclusion_inlineAll_pos_Rules_Wf (m : BaseModuleWf type) :
     TraceInclusion m (inlineAll_Rules_BaseModuleWf m).
   Proof.
     specialize (TraceInclusion_flatten_r m) as P1.
@@ -4085,7 +4086,7 @@ Section inline_all_all.
     eauto using TraceInclusion_trans.
   Qed.
 
-  Theorem TraceInclusion_inlineAll_pos_Rules_Wf_new (m : BaseModuleWf_new) :
+  Theorem TraceInclusion_inlineAll_pos_Rules_Wf_new (m : BaseModuleWf_new type) :
     TraceInclusion m (inlineAll_Rules_BaseModuleWf_new m).
   Proof.
     destruct m.
@@ -4094,9 +4095,9 @@ Section inline_all_all.
   Qed.
 
   Lemma TraceInclusion_inlineSingle_pos_Meths regs rules meths:
-    (WfMod (Base (BaseMod regs rules meths))) ->
+    (WfMod type (Base (BaseMod regs rules meths))) ->
     forall n,
-      (WfMod (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n)))) /\
+      (WfMod type (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n)))) /\
       TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n))).
   Proof.
     intros WfH n.
@@ -4112,9 +4113,9 @@ Section inline_all_all.
   Qed.
 
   Theorem TraceInclusion_inlineSingle_pos_Meths_new regs rules meths:
-    (WfMod_new (Base (BaseMod regs rules meths))) ->
+    (WfMod_new type (Base (BaseMod regs rules meths))) ->
     forall n,
-      (WfMod_new (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n)))) /\
+      (WfMod_new type (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n)))) /\
       TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n))).
   Proof.
     intros.
@@ -4122,32 +4123,35 @@ Section inline_all_all.
     apply TraceInclusion_inlineSingle_pos_Meths; auto.
   Qed.
 
-  Lemma WfBaseMod_inlineSingle_Meths_pos m n:
-    WfBaseModule m ->
-    WfBaseModule (BaseMod (getRegisters m) (getRules m) (inlineSingle_Meths_pos (getMethods m) n)).
+  Lemma WfBaseMod_inlineSingle_Meths_pos ty m n:
+    WfBaseModule ty m ->
+    WfBaseModule ty (BaseMod (getRegisters m) (getRules m) (inlineSingle_Meths_pos (getMethods m) n)).
   Proof.
     intros.
-    assert (WfMod m) as P1;[constructor; auto|apply WfMod_getFlat in P1].
+    assert (WfMod ty m) as P1;[constructor; auto|apply WfMod_getFlat in P1].
     unfold getFlat in P1; simpl in *.
-    specialize (TraceInclusion_inlineSingle_pos_Meths P1 n) as TMP; dest.
-    inversion H0; auto.
+    unfold inlineSingle_Meths_pos; destruct nth_error eqn:G; auto.
+    apply nth_error_In in G.
+    pose proof (WfMod_inline_all_Meth d (seq 0 (length (getMethods m))) G P1).
+    repeat rewrite map_fold_right_eq in *.
+    inv H0; assumption.
   Qed.
 
-  Lemma WfBaseMod_inlineSingle_Meths_pos_new m n:
-    WfBaseModule_new m ->
-    WfBaseModule_new (BaseMod (getRegisters m) (getRules m) (inlineSingle_Meths_pos (getMethods m) n)).
+  Lemma WfBaseMod_inlineSingle_Meths_pos_new ty m n:
+    WfBaseModule_new ty m ->
+    WfBaseModule_new ty (BaseMod (getRegisters m) (getRules m) (inlineSingle_Meths_pos (getMethods m) n)).
   Proof.
     repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
     apply WfBaseMod_inlineSingle_Meths_pos.
   Qed.
 
-  Definition inlineSingle_Meths_pos_BaseModuleWf (m : BaseModuleWf) n :=
+  Definition inlineSingle_Meths_pos_BaseModuleWf {ty} (m : BaseModuleWf ty) n :=
     Build_BaseModuleWf (WfBaseMod_inlineSingle_Meths_pos n (wfBaseModule m)).
 
-  Definition inlineSingle_Meths_pos_BaseModuleWf_new (m : BaseModuleWf_new) n :=
+  Definition inlineSingle_Meths_pos_BaseModuleWf_new {ty} (m : BaseModuleWf_new ty) n :=
     Build_BaseModuleWf_new (WfBaseMod_inlineSingle_Meths_pos_new n (wfBaseModule_new m)).
 
-  Lemma TraceInclusion_inlineSingle_pos_Meths_Wf (m : BaseModuleWf) n :
+  Lemma TraceInclusion_inlineSingle_pos_Meths_Wf (m : BaseModuleWf type) n :
     TraceInclusion m (inlineSingle_Meths_pos_BaseModuleWf m n).
   Proof.
     specialize (TraceInclusion_flatten_r m) as P1.
@@ -4157,7 +4161,7 @@ Section inline_all_all.
     eauto using TraceInclusion_trans.
   Qed.
 
-  Theorem TraceInclusion_inlineSingle_pos_Meths_Wf_new (m : BaseModuleWf_new) n :
+  Theorem TraceInclusion_inlineSingle_pos_Meths_Wf_new (m : BaseModuleWf_new type) n :
     TraceInclusion m (inlineSingle_Meths_pos_BaseModuleWf_new m n).
   Proof.
     destruct m.
@@ -4166,8 +4170,8 @@ Section inline_all_all.
   Qed.
 
   Lemma TraceInclusion_inlineAll_pos_Meths regs rules meths:
-    (WfMod (Base (BaseMod regs rules meths))) ->
-    (WfMod (Base (BaseMod regs rules (inlineAll_Meths meths)))) /\
+    (WfMod type (Base (BaseMod regs rules meths))) ->
+    (WfMod type (Base (BaseMod regs rules (inlineAll_Meths meths)))) /\
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (inlineAll_Meths meths))).
   Proof.
     intros WfH.
@@ -4183,40 +4187,46 @@ Section inline_all_all.
   Qed.
 
   Theorem TraceInclusion_inlineAll_pos_Meths_new regs rules meths:
-    (WfMod_new (Base (BaseMod regs rules meths))) ->
-    (WfMod_new (Base (BaseMod regs rules (inlineAll_Meths meths)))) /\
+    (WfMod_new type (Base (BaseMod regs rules meths))) ->
+    (WfMod_new type (Base (BaseMod regs rules (inlineAll_Meths meths)))) /\
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (BaseMod regs rules (inlineAll_Meths meths))).
   Proof.
     repeat rewrite WfMod_new_WfMod_iff.
     apply TraceInclusion_inlineAll_pos_Meths.
   Qed.
 
-  Lemma WfBaseMod_inlineAll_Meths m :
-    WfBaseModule m ->
-    WfBaseModule (BaseMod (getRegisters m) (getRules m) (inlineAll_Meths (getMethods m))).
+  Lemma WfBaseMod_inlineAll_Meths ty m :
+    WfBaseModule ty m ->
+    WfBaseModule ty (BaseMod (getRegisters m) (getRules m) (inlineAll_Meths (getMethods m))).
   Proof.
     intros.
-    assert (WfMod m) as P1;[constructor; auto|apply WfMod_getFlat in P1].
+    assert (WfMod ty m) as P1;[constructor; auto|apply WfMod_getFlat in P1].
     unfold getFlat in P1; simpl in *.
-    specialize (TraceInclusion_inlineAll_pos_Meths P1) as TMP; dest.
-    inversion H0; auto.
+    unfold inlineAll_Meths.
+    remember (Datatypes.length (getMethods m)) as n1.
+    setoid_rewrite <- Heqn1.
+    clear Heqn1.
+    induction n1; auto.
+    rewrite seq_eq.
+    rewrite fold_left_app; simpl in *.
+    pose proof (WfBaseMod_inlineSingle_Meths_pos n1 IHn1); simpl in *; auto.
   Qed.
 
-  Lemma WfBaseMod_inlineAll_Meths_new m :
-    WfBaseModule_new m ->
-    WfBaseModule_new (BaseMod (getRegisters m) (getRules m) (inlineAll_Meths (getMethods m))).
+  Lemma WfBaseMod_inlineAll_Meths_new ty m :
+    WfBaseModule_new ty m ->
+    WfBaseModule_new ty (BaseMod (getRegisters m) (getRules m) (inlineAll_Meths (getMethods m))).
   Proof.
     repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
     apply WfBaseMod_inlineAll_Meths.
   Qed.
 
-  Definition inlineAll_Meths_BaseModuleWf (m : BaseModuleWf) :=
+  Definition inlineAll_Meths_BaseModuleWf {ty} (m : BaseModuleWf ty) :=
     Build_BaseModuleWf (WfBaseMod_inlineAll_Meths (wfBaseModule m)).
 
-  Definition inlineAll_Meths_BaseModuleWf_new (m : BaseModuleWf_new) :=
+  Definition inlineAll_Meths_BaseModuleWf_new {ty} (m : BaseModuleWf_new ty) :=
     Build_BaseModuleWf_new (WfBaseMod_inlineAll_Meths_new (wfBaseModule_new m)).
 
-  Lemma TraceInclusion_inlineAll_pos_Meths_Wf (m : BaseModuleWf) :
+  Lemma TraceInclusion_inlineAll_pos_Meths_Wf (m : BaseModuleWf type) :
     TraceInclusion m (inlineAll_Meths_BaseModuleWf m).
   Proof.
     specialize (TraceInclusion_flatten_r m) as P1.
@@ -4226,7 +4236,7 @@ Section inline_all_all.
     eauto using TraceInclusion_trans.
   Qed.
 
-  Theorem TraceInclusion_inlineAll_pos_Meths_Wf_new (m : BaseModuleWf_new) :
+  Theorem TraceInclusion_inlineAll_pos_Meths_Wf_new (m : BaseModuleWf_new type) :
     TraceInclusion m (inlineAll_Meths_BaseModuleWf_new m).
   Proof.
     destruct m.
@@ -4235,8 +4245,8 @@ Section inline_all_all.
   Qed.
 
   Lemma TraceInclusion_inlineAll_pos regs rules meths:
-    (WfMod (Base (BaseMod regs rules meths))) ->
-    (WfMod (Base (inlineAll_All regs rules meths))) /\
+    (WfMod type (Base (BaseMod regs rules meths))) ->
+    (WfMod type (Base (inlineAll_All regs rules meths))) /\
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (inlineAll_All regs rules meths)).
   Proof.
     unfold inlineAll_All in *.
@@ -4248,40 +4258,42 @@ Section inline_all_all.
   Qed.
 
   Theorem TraceInclusion_inlineAll_pos_new regs rules meths:
-    (WfMod_new (Base (BaseMod regs rules meths))) ->
-    (WfMod_new (Base (inlineAll_All regs rules meths))) /\
+    (WfMod_new type (Base (BaseMod regs rules meths))) ->
+    (WfMod_new type (Base (inlineAll_All regs rules meths))) /\
     TraceInclusion (Base (BaseMod regs rules meths)) (Base (inlineAll_All regs rules meths)).
   Proof.
     repeat rewrite WfMod_new_WfMod_iff.
     apply TraceInclusion_inlineAll_pos.
   Qed.
 
-  Lemma WfBaseMod_inlineAll_All m :
-    WfBaseModule m ->
-    WfBaseModule (inlineAll_All (getRegisters m) (getRules m) (getMethods m)).
+  Lemma WfBaseMod_inlineAll_All ty m :
+    WfBaseModule ty m ->
+    WfBaseModule ty (inlineAll_All (getRegisters m) (getRules m) (getMethods m)).
   Proof.
     intros.
-    assert (WfMod m) as P1;[constructor; auto|apply WfMod_getFlat in P1].
+    assert (WfMod ty m) as P1;[constructor; auto|apply WfMod_getFlat in P1].
     unfold getFlat in P1; simpl in *.
-    specialize (TraceInclusion_inlineAll_pos P1) as TMP; dest.
-    inversion H0; auto.
+    unfold inlineAll_All in *.
+    inv P1.
+    pose proof (WfBaseMod_inlineAll_Meths HWfBaseModule) as P2.
+    pose proof (WfBaseMod_inlineAll_Rules P2) as P3; simpl in *; auto.
   Qed.
 
-  Lemma WfBaseMod_inlineAll_All_new m :
-    WfBaseModule_new m ->
-    WfBaseModule_new (inlineAll_All (getRegisters m) (getRules m) (getMethods m)).
+  Lemma WfBaseMod_inlineAll_All_new ty m :
+    WfBaseModule_new ty m ->
+    WfBaseModule_new ty (inlineAll_All (getRegisters m) (getRules m) (getMethods m)).
   Proof.
     repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
     apply WfBaseMod_inlineAll_All.
   Qed.
 
-  Definition inlineAll_All_BaseModuleWf (m : BaseModuleWf) :=
+  Definition inlineAll_All_BaseModuleWf {ty} (m : BaseModuleWf ty) :=
     Build_BaseModuleWf (WfBaseMod_inlineAll_All (wfBaseModule m)).
 
-  Definition inlineAll_All_BaseModuleWf_new (m : BaseModuleWf_new) :=
+  Definition inlineAll_All_BaseModuleWf_new {ty} (m : BaseModuleWf_new ty) :=
     Build_BaseModuleWf_new (WfBaseMod_inlineAll_All_new (wfBaseModule_new m)).
 
-  Lemma TraceInclusion_inlineAll_pos_Wf (m : BaseModuleWf) :
+  Lemma TraceInclusion_inlineAll_pos_Wf (m : BaseModuleWf type) :
     TraceInclusion m (inlineAll_All_BaseModuleWf m).
   Proof.
     specialize (TraceInclusion_flatten_r m) as P1.
@@ -4291,7 +4303,7 @@ Section inline_all_all.
     eauto using TraceInclusion_trans.
   Qed.
 
-  Theorem TraceInclusion_inlineAll_pos_Wf_new (m : BaseModuleWf_new) :
+  Theorem TraceInclusion_inlineAll_pos_Wf_new (m : BaseModuleWf_new type) :
     TraceInclusion m (inlineAll_All_BaseModuleWf_new m).
   Proof.
     destruct m.
@@ -4444,8 +4456,8 @@ Section flatten_and_inline_all.
     apply SameKeys_inlineSome_Rules.
   Qed.
   
-  Lemma flatten_inline_everything_Wf (m : ModWf) :
-    WfMod (flatten_inline_everything m).
+  Lemma flatten_inline_everything_Wf ty (m : ModWf ty) :
+    WfMod ty (flatten_inline_everything m).
   Proof.
     unfold flatten_inline_everything, inlineAll_All_mod.
     pose proof (flatten_WfMod (wfMod m)) as HWfm'.
@@ -4455,24 +4467,24 @@ Section flatten_and_inline_all.
     rewrite WfMod_createHide in *; dest.
     split; simpl in *.
     - repeat intro; specialize (H _ H3); rewrite <-SameKeys_inlineAll_Meths; assumption.
-    - apply TraceInclusion_inlineAll_pos in H2; dest.
-      unfold inlineAll_All in *; auto.
+    - inv H2.
+      specialize (WfBaseMod_inlineAll_All HWfBaseModule) as P1; simpl in P1; constructor; assumption.
   Qed.
 
-  Theorem flatten_inline_everything_Wf_new (m : ModWf_new) :
-    WfMod_new (flatten_inline_everything m).
+  Theorem flatten_inline_everything_Wf_new ty (m : ModWf_new ty) :
+    WfMod_new ty (flatten_inline_everything m).
   Proof.
     destruct m.
-    pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+    pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
     rewrite WfMod_new_WfMod_iff.
     apply (flatten_inline_everything_Wf m').
   Qed.
 
-  Definition flatten_inline_everything_ModWf (m : ModWf) : ModWf :=
+  Definition flatten_inline_everything_ModWf {ty} (m : ModWf ty) : ModWf ty :=
     (Build_ModWf (flatten_inline_everything_Wf m)).
 
-  Definition flatten_inline_everything_ModWf_new (m : ModWf_new) : ModWf_new :=
-    (Build_ModWf_new _ (flatten_inline_everything_Wf_new m)).
+  Definition flatten_inline_everything_ModWf_new {ty} (m : ModWf_new ty) : ModWf_new ty :=
+    (Build_ModWf_new _ _ (flatten_inline_everything_Wf_new m)).
 
   Lemma TraceHide_Trace m o s ls:
     Trace (HideMeth m s) o ls -> Trace m o ls.
@@ -4642,9 +4654,9 @@ Section flatten_and_inline_all.
     apply TraceInclusion_TraceInclusion'; apply TraceInclusion'_TraceInclusion in H; auto.
   Qed.
 
-  Lemma WfMod_WfBase_getFlat m:
-    (WfMod m) ->
-    (WfMod (Base (getFlat m))).
+  Lemma WfMod_WfBase_getFlat ty m:
+    (WfMod ty m) ->
+    (WfMod ty (Base (getFlat m))).
   Proof.
     intro.
     induction m; simpl in *.
@@ -4656,13 +4668,13 @@ Section flatten_and_inline_all.
       specialize (H).
       inv H; auto.
     - intros.
-      assert (HWf1: WfMod m1) by (specialize (H);
+      assert (HWf1: WfMod ty m1) by (specialize (H);
                                   inv H; auto).
-      assert (HWf2: WfMod m2) by (specialize (H);
+      assert (HWf2: WfMod ty m2) by (specialize (H);
                                   inv H; auto).
-      assert (WfConcat1: WfConcat m1 m2) by
+      assert (WfConcat1: WfConcat ty m1 m2) by
           (specialize (H); inv H; auto).
-      assert (WfConcat2: WfConcat m2 m1) by
+      assert (WfConcat2: WfConcat ty m2 m1) by
           (specialize (H); inv H; auto).
       specialize (H).
       inv H.
@@ -4675,14 +4687,14 @@ Section flatten_and_inline_all.
              simpl in *; apply NoDupKey_Expand; auto)).
   Qed.
 
-  Lemma TraceInclusion_flatten_inline_everything_r (m : ModWf) :
+  Lemma TraceInclusion_flatten_inline_everything_r (m : ModWf type) :
     TraceInclusion m (flatten_inline_everything_ModWf m).
   Proof.
     specialize (wfMod (flatten_inline_everything_ModWf m)) as Wf1.
     simpl.
     specialize (TraceInclusion_flatten_r m) as P1.
     unfold flatten, getFlat in *.
-    assert (WfMod (Base (getFlat m))). {
+    assert (WfMod type (Base (getFlat m))). {
       intros.
       apply (WfMod_WfBase_getFlat (wfMod m)).
     }
@@ -4693,51 +4705,51 @@ Section flatten_and_inline_all.
     eauto using TraceInclusion_trans.
   Qed.
 
-  Theorem TraceInclusion_flatten_inline_everything_r_new (m : ModWf_new) :
+  Theorem TraceInclusion_flatten_inline_everything_r_new (m : ModWf_new type) :
     TraceInclusion m (flatten_inline_everything_ModWf_new m).
   Proof.
     destruct m.
-    pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+    pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
     apply (TraceInclusion_flatten_inline_everything_r m').
   Qed.
 
 End flatten_and_inline_all.
 
-Lemma inlineSingle_Rule_map_Wf {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)):
-  WfMod (createHide (inlineSingle_Rule_map_BaseModule f (getFlat m)) (getHidden m)).
+Lemma inlineSingle_Rule_map_Wf {ty} {m : ModWf ty} {f : DefMethT} (inMeths : In f (getAllMethods m)):
+  WfMod ty (createHide (inlineSingle_Rule_map_BaseModule f (getFlat m)) (getHidden m)).
 Proof.
   intros.
   unfold inlineSingle_Rule_map_BaseModule.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
-  specialize (WfMod_inline_all_Rule (regs:= (getAllRegisters m)) (rules:= (getAllRules m)) (meths:= (getAllMethods m)) f (seq 0 (length (getAllRules m))) inMeths) as P2.
+  specialize (WfMod_inline_all_Rule (ty:=ty ) (regs:= (getAllRegisters m)) (rules:= (getAllRules m)) (meths:= (getAllMethods m)) f (seq 0 (length (getAllRules m))) inMeths) as P2.
   repeat rewrite map_fold_right_eq in *.
   unfold getFlat in *; simpl in *.
   rewrite WfMod_createHide in *; dest; simpl in *; split; eauto.
 Qed.
 
-Theorem inlineSingle_Rule_map_Wf_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)):
-  WfMod_new (createHide (inlineSingle_Rule_map_BaseModule f (getFlat m)) (getHidden m)).
+Theorem inlineSingle_Rule_map_Wf_new {ty} {m : ModWf_new ty} {f : DefMethT} (inMeths : In f (getAllMethods m)):
+  WfMod_new ty (createHide (inlineSingle_Rule_map_BaseModule f (getFlat m)) (getHidden m)).
 Proof.
   rewrite WfMod_new_WfMod_iff.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
-  apply (@inlineSingle_Rule_map_Wf m').
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
+  apply (@inlineSingle_Rule_map_Wf _ m').
   exact inMeths.
 Qed.
 
-Definition inlineSingle_Rule_map_ModWf {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) :=
+Definition inlineSingle_Rule_map_ModWf {ty} {m : ModWf ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) :=
   (Build_ModWf (inlineSingle_Rule_map_Wf inMeths)).
 
-Definition inlineSingle_Rule_map_ModWf_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) :=
-  (Build_ModWf_new _ (inlineSingle_Rule_map_Wf_new inMeths)).
+Definition inlineSingle_Rule_map_ModWf_new {ty} {m : ModWf_new ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) :=
+  (Build_ModWf_new _ _ (inlineSingle_Rule_map_Wf_new inMeths)).
 
-Lemma inlineSingle_Meth_map_Wf {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
-  WfMod (createHide (inlineSingle_Meth_map_BaseModule f (getFlat m)) (getHidden m)).
+Lemma inlineSingle_Meth_map_Wf {ty} {m : ModWf ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
+  WfMod ty (createHide (inlineSingle_Meth_map_BaseModule f (getFlat m)) (getHidden m)).
 Proof.
   intros.
   unfold inlineSingle_Meth_map_BaseModule.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
-  specialize (WfMod_inline_all_Meth (regs:= (getAllRegisters m)) (rules:= (getAllRules m)) (meths:= (getAllMethods m)) f (seq 0 (length (getAllMethods m))) inMeths) as P2.
+  specialize (WfMod_inline_all_Meth (ty:=ty) (regs:= (getAllRegisters m)) (rules:= (getAllRules m)) (meths:= (getAllMethods m)) f (seq 0 (length (getAllMethods m))) inMeths) as P2.
   repeat rewrite map_fold_right_eq in *.
   unfold getFlat in *; simpl in *.
   rewrite WfMod_createHide in *; dest; simpl in *; split; eauto.
@@ -4745,23 +4757,23 @@ Proof.
   assumption.
 Qed.
 
-Theorem inlineSingle_Meth_map_Wf_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
-  WfMod_new (createHide (inlineSingle_Meth_map_BaseModule f (getFlat m)) (getHidden m)).
+Theorem inlineSingle_Meth_map_Wf_new {ty} {m : ModWf_new ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
+  WfMod_new ty (createHide (inlineSingle_Meth_map_BaseModule f (getFlat m)) (getHidden m)).
 Proof.
   rewrite WfMod_new_WfMod_iff.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
-  apply (@inlineSingle_Meth_map_Wf m').
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
+  apply (@inlineSingle_Meth_map_Wf _ m').
   exact inMeths.
 Qed.
 
-Definition inlineSingle_Meth_map_ModWf {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) :=
+Definition inlineSingle_Meth_map_ModWf {ty} {m : ModWf ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) :=
   (Build_ModWf (inlineSingle_Meth_map_Wf inMeths)).
 
-Definition inlineSingle_Meth_map_ModWf_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) :=
-  (Build_ModWf_new _ (inlineSingle_Meth_map_Wf_new inMeths)).
+Definition inlineSingle_Meth_map_ModWf_new {ty} {m : ModWf_new ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) :=
+  (Build_ModWf_new _ _ (inlineSingle_Meth_map_Wf_new inMeths)).
 
-Lemma inlineSingle_Rule_map_TraceInclusion {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)):
+Lemma inlineSingle_Rule_map_TraceInclusion {m : ModWf type} {f : DefMethT} (inMeths : In f (getAllMethods m)):
   TraceInclusion m (inlineSingle_Rule_map_ModWf inMeths).
 Proof.
   intros.
@@ -4772,17 +4784,17 @@ Proof.
   apply (TraceInclusion_trans TI_flatten P2).
 Qed.
 
-Theorem inlineSingle_Rule_map_TraceInclusion_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)):
+Theorem inlineSingle_Rule_map_TraceInclusion_new {m : ModWf_new type} {f : DefMethT} (inMeths : In f (getAllMethods m)):
   TraceInclusion m (inlineSingle_Rule_map_ModWf_new inMeths).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@inlineSingle_Rule_map_TraceInclusion m').
   Unshelve.
   exact inMeths.
 Qed.
 
-Lemma inlineSingle_Meth_map_TraceInclusion {m : ModWf}  {f : DefMethT} (inMeths : In f (getAllMethods m)) :
+Lemma inlineSingle_Meth_map_TraceInclusion {m : ModWf type} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
   TraceInclusion m (inlineSingle_Meth_map_ModWf inMeths).
 Proof.
   intros.
@@ -4793,11 +4805,11 @@ Proof.
   apply (TraceInclusion_trans TI_flatten P2).
 Qed.
 
-Theorem inlineSingle_Meth_map_TraceInclusion_new {m : ModWf_new}  {f : DefMethT} (inMeths : In f (getAllMethods m)) :
+Theorem inlineSingle_Meth_map_TraceInclusion_new {m : ModWf_new type} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
   TraceInclusion m (inlineSingle_Meth_map_ModWf_new inMeths).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@inlineSingle_Meth_map_TraceInclusion m').
   Unshelve.
   exact inMeths.
@@ -4806,8 +4818,8 @@ Qed.
 Definition inlineSingle_Module (f : DefMethT) (m : Mod) :=
   createHide (inlineSingle_BaseModule f (getAllRegisters m) (getAllRules m) (getAllMethods m)) (getHidden m).
 
-Lemma inlineSingle_Module_Wf {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
-  WfMod (inlineSingle_Module f m).
+Lemma inlineSingle_Module_Wf {ty} {m : ModWf ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
+  WfMod ty (inlineSingle_Module f m).
 Proof.
   unfold inlineSingle_Module, inlineSingle_BaseModule; simpl.
   specialize (inlineSingle_Rule_map_Wf inMeths) as P1; unfold inlineSingle_Rule, inlineSingle_Rule_map_BaseModule, getFlat in P1; simpl in *.
@@ -4821,26 +4833,26 @@ Proof.
     assumption.
 Qed.
 
-Theorem inlineSingle_Module_Wf_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
-  WfMod_new (inlineSingle_Module f m).
+Theorem inlineSingle_Module_Wf_new {ty} {m : ModWf_new ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
+  WfMod_new ty (inlineSingle_Module f m).
 Proof.
   apply WfMod_WfMod_new.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
-  apply (@inlineSingle_Module_Wf m').
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
+  apply (@inlineSingle_Module_Wf _ m').
   exact inMeths.
 Qed.
 
-Definition inlineSingle_Module_ModWf {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) :=
+Definition inlineSingle_Module_ModWf {ty} {m : ModWf ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) :=
   (Build_ModWf (inlineSingle_Module_Wf inMeths)).
 
-Definition inlineSingle_Module_ModWf_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) :=
-  (Build_ModWf_new _ (inlineSingle_Module_Wf_new inMeths)).
+Definition inlineSingle_Module_ModWf_new {ty} {m : ModWf_new ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) :=
+  (Build_ModWf_new _ _ (inlineSingle_Module_Wf_new inMeths)).
 
-Lemma inlineSingle_BaseModule_TraceInclusion {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
+Lemma inlineSingle_BaseModule_TraceInclusion {m : ModWf type} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
   TraceInclusion m (inlineSingle_Module_ModWf inMeths).
 Proof.
-  specialize (TraceInclusion_flatten_r  m) as TI_flatten; simpl in *.
+  specialize (TraceInclusion_flatten_r m) as TI_flatten; simpl in *.
   unfold flatten, getFlat in *; simpl in *.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
   rewrite WfMod_createHide in P1; dest.
@@ -4849,18 +4861,19 @@ Proof.
   apply (TraceInclusion_trans TI_flatten P3).
 Qed.
 
-Theorem inlineSingle_BaseModule_TraceInclusion_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
+Theorem inlineSingle_BaseModule_TraceInclusion_new {m : ModWf_new type} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
   TraceInclusion m (inlineSingle_Module_ModWf_new inMeths).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@inlineSingle_BaseModule_TraceInclusion m').
   Unshelve.
   exact inMeths.
 Qed.
+    
 
-Lemma inlineSingle_BaseModule_nth_Meth_Wf {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
-  WfMod (createHide (inlineSingle_BaseModule_nth_Meth f (getAllRegisters m) (getAllRules m) (getAllMethods m) xs) (getHidden m)).
+Lemma inlineSingle_BaseModule_nth_Meth_Wf {ty} {m : ModWf ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
+  WfMod ty (createHide (inlineSingle_BaseModule_nth_Meth f (getAllRegisters m) (getAllRules m) (getAllMethods m) xs) (getHidden m)).
 Proof.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
   rewrite WfMod_createHide in *; dest.
@@ -4869,23 +4882,23 @@ Proof.
   rewrite <- SameKeys_Meth_fold_right; assumption.
 Qed.
 
-Theorem inlineSingle_BaseModule_nth_Meth_Wf_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
-  WfMod_new (createHide (inlineSingle_BaseModule_nth_Meth f (getAllRegisters m) (getAllRules m) (getAllMethods m) xs) (getHidden m)).
+Theorem inlineSingle_BaseModule_nth_Meth_Wf_new {ty} {m : ModWf_new ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
+  WfMod_new ty (createHide (inlineSingle_BaseModule_nth_Meth f (getAllRegisters m) (getAllRules m) (getAllMethods m) xs) (getHidden m)).
 Proof.
   apply WfMod_WfMod_new.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
-  apply (@inlineSingle_BaseModule_nth_Meth_Wf m').
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
+  apply (@inlineSingle_BaseModule_nth_Meth_Wf _ m').
   exact inMeths.
 Qed.
 
-Definition inlineSingle_BaseModule_nth_Meth_ModWf {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :=
+Definition inlineSingle_BaseModule_nth_Meth_ModWf {ty} {m : ModWf ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :=
   (Build_ModWf (inlineSingle_BaseModule_nth_Meth_Wf inMeths xs)).
 
-Definition inlineSingle_BaseModule_nth_Meth_ModWf_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :=
-  (Build_ModWf_new _ (inlineSingle_BaseModule_nth_Meth_Wf_new inMeths xs)).
+Definition inlineSingle_BaseModule_nth_Meth_ModWf_new {ty} {m : ModWf_new ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :=
+  (Build_ModWf_new _ _ (inlineSingle_BaseModule_nth_Meth_Wf_new inMeths xs)).
 
-Lemma inlineSingle_BaseModule_nth_Meth_TraceInclusion {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
+Lemma inlineSingle_BaseModule_nth_Meth_TraceInclusion {m : ModWf type} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
   TraceInclusion m (inlineSingle_BaseModule_nth_Meth_ModWf inMeths xs).
 Proof.
   specialize (TraceInclusion_flatten_r m) as TI_flatten; simpl in *.
@@ -4897,41 +4910,41 @@ Proof.
   apply (TraceInclusion_trans TI_flatten P3).
 Qed.
 
-Theorem inlineSingle_BaseModule_nth_Meth_TraceInclusion_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
+Theorem inlineSingle_BaseModule_nth_Meth_TraceInclusion_new {m : ModWf_new type} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
   TraceInclusion m (inlineSingle_BaseModule_nth_Meth_ModWf_new inMeths xs).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@inlineSingle_BaseModule_nth_Meth_TraceInclusion m').
   Unshelve.
   exact inMeths.
 Qed.
 
-Lemma inlineSingle_BaseModule_nth_Rule_Wf {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
-  WfMod (createHide (inlineSingle_BaseModule_nth_Rule f (getAllRegisters m) (getAllRules m) (getAllMethods m) xs) (getHidden m)).
+Lemma inlineSingle_BaseModule_nth_Rule_Wf {ty} {m : ModWf ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
+  WfMod ty (createHide (inlineSingle_BaseModule_nth_Rule f (getAllRegisters m) (getAllRules m) (getAllMethods m) xs) (getHidden m)).
 Proof.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
   rewrite WfMod_createHide in *; dest; split; auto.
   apply (WfMod_inline_all_Rule f xs inMeths H0).
 Qed.
 
-Theorem inlineSingle_BaseModule_nth_Rule_Wf_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
-  WfMod_new (createHide (inlineSingle_BaseModule_nth_Rule f (getAllRegisters m) (getAllRules m) (getAllMethods m) xs) (getHidden m)).
+Theorem inlineSingle_BaseModule_nth_Rule_Wf_new {ty} {m : ModWf_new ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
+  WfMod_new ty (createHide (inlineSingle_BaseModule_nth_Rule f (getAllRegisters m) (getAllRules m) (getAllMethods m) xs) (getHidden m)).
 Proof.
   apply WfMod_WfMod_new.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
-  apply (@inlineSingle_BaseModule_nth_Rule_Wf m').
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
+  apply (@inlineSingle_BaseModule_nth_Rule_Wf _ m').
   exact inMeths.
 Qed.
 
-Definition inlineSingle_BaseModule_nth_Rule_ModWf {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :=
+Definition inlineSingle_BaseModule_nth_Rule_ModWf {ty} {m : ModWf ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :=
   (Build_ModWf (inlineSingle_BaseModule_nth_Rule_Wf inMeths xs)).
 
-Definition inlineSingle_BaseModule_nth_Rule_ModWf_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :=
-  (Build_ModWf_new _ (inlineSingle_BaseModule_nth_Rule_Wf_new inMeths xs)).
+Definition inlineSingle_BaseModule_nth_Rule_ModWf_new {ty} {m : ModWf_new ty} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :=
+  (Build_ModWf_new _ _ (inlineSingle_BaseModule_nth_Rule_Wf_new inMeths xs)).
 
-Lemma inlineSingle_BaseModule_nth_Rule_TraceInclusion {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
+Lemma inlineSingle_BaseModule_nth_Rule_TraceInclusion {m : ModWf type} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
   TraceInclusion m (inlineSingle_BaseModule_nth_Rule_ModWf inMeths xs).
 Proof.
   specialize (TraceInclusion_flatten_r m) as TI_flatten; simpl in *.
@@ -4943,11 +4956,11 @@ Proof.
   apply (TraceInclusion_trans TI_flatten P3).
 Qed.
 
-Theorem inlineSingle_BaseModule_nth_Rule_TraceInclusion_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
+Theorem inlineSingle_BaseModule_nth_Rule_TraceInclusion_new {m : ModWf_new type} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
   TraceInclusion m (inlineSingle_BaseModule_nth_Rule_ModWf_new inMeths xs).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@inlineSingle_BaseModule_nth_Rule_TraceInclusion m').
   Unshelve.
   exact inMeths.
@@ -4956,30 +4969,31 @@ Qed.
 Definition inlineAll_Rules_Mod (m : Mod) :=
   (createHide (inlineAll_Rules_mod (getFlat m)) (getHidden m)).
 
-Lemma inlineAll_Rules_Wf (m : ModWf):
-  WfMod (inlineAll_Rules_Mod m).
+Lemma inlineAll_Rules_Wf ty (m : ModWf ty):
+  WfMod ty (inlineAll_Rules_Mod m).
 Proof.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
   unfold inlineAll_Rules_Mod; rewrite WfMod_createHide in *; dest; split; auto.
-  apply (TraceInclusion_inlineAll_pos_Rules H0).
+  inv H0; constructor.
+  apply (WfBaseMod_inlineAll_Rules HWfBaseModule).
 Qed.
 
-Theorem inlineAll_Rules_Wf_new (m : ModWf_new):
-  WfMod_new (inlineAll_Rules_Mod m).
+Theorem inlineAll_Rules_Wf_new ty (m : ModWf_new ty):
+  WfMod_new ty (inlineAll_Rules_Mod m).
 Proof.
   apply WfMod_WfMod_new.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   apply (inlineAll_Rules_Wf m').
 Qed.
 
-Definition inlineAll_Rules_ModWf (m : ModWf) :=
+Definition inlineAll_Rules_ModWf {ty} (m : ModWf ty) :=
   (Build_ModWf (inlineAll_Rules_Wf m)).
 
-Definition inlineAll_Rules_ModWf_new (m : ModWf_new) :=
-  (Build_ModWf_new _ (inlineAll_Rules_Wf_new m)).
+Definition inlineAll_Rules_ModWf_new {ty} (m : ModWf_new ty) :=
+  (Build_ModWf_new _ _ (inlineAll_Rules_Wf_new m)).
 
-Lemma inlineAll_Rules_TraceInclusion (m : ModWf) :
+Lemma inlineAll_Rules_TraceInclusion (m : ModWf type) :
   TraceInclusion m (inlineAll_Rules_ModWf m).
 Proof.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
@@ -4991,42 +5005,43 @@ Proof.
   apply (TraceInclusion_trans TI_flatten P1).
 Qed.
 
-Theorem inlineAll_Rules_TraceInclusion_new (m : ModWf_new) :
+Theorem inlineAll_Rules_TraceInclusion_new (m : ModWf_new type) :
   TraceInclusion m (inlineAll_Rules_ModWf_new m).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   apply (inlineAll_Rules_TraceInclusion m').
 Qed.
 
 Definition inlineAll_Meths_Mod (m : Mod) :=
   (createHide (inlineAll_Meths_mod (getFlat m)) (getHidden m)).
 
-Lemma inlineAll_Meths_Wf (m : ModWf) :
-  WfMod (inlineAll_Meths_Mod m).
+Lemma inlineAll_Meths_Wf ty (m : ModWf ty) :
+  WfMod ty (inlineAll_Meths_Mod m).
 Proof.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
   unfold inlineAll_Meths_Mod, inlineAll_Meths_Mod, inlineAll_Meths_mod, inlineAll_Meths; rewrite WfMod_createHide in *; dest; split; simpl in *.
   - rewrite <- SameKeys_inlineSome_Meths; assumption.
-  - apply (TraceInclusion_inlineAll_pos_Meths H0).
+  - inv H0; constructor.
+    apply (WfBaseMod_inlineAll_Meths HWfBaseModule).
 Qed.
 
-Lemma inlineAll_Meths_Wf_new (m : ModWf_new) :
-  WfMod_new (inlineAll_Meths_Mod m).
+Lemma inlineAll_Meths_Wf_new ty (m : ModWf_new ty) :
+  WfMod_new ty (inlineAll_Meths_Mod m).
 Proof.
   apply WfMod_WfMod_new.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   apply (inlineAll_Meths_Wf m').
 Qed.
 
-Definition inlineAll_Meths_ModWf (m : ModWf) :=
+Definition inlineAll_Meths_ModWf {ty} (m : ModWf ty) :=
   (Build_ModWf (inlineAll_Meths_Wf m)).
 
-Definition inlineAll_Meths_ModWf_new (m : ModWf_new) :=
-  (Build_ModWf_new _ (inlineAll_Meths_Wf_new m)).
+Definition inlineAll_Meths_ModWf_new {ty} (m : ModWf_new ty) :=
+  (Build_ModWf_new _ _ (inlineAll_Meths_Wf_new m)).
 
-Lemma inlineAll_Meths_TraceInclusion (m : ModWf) :
+Lemma inlineAll_Meths_TraceInclusion (m : ModWf type) :
   TraceInclusion m (inlineAll_Meths_ModWf m).
 Proof.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
@@ -5038,50 +5053,51 @@ Proof.
   apply (TraceInclusion_trans TI_flatten P1).
 Qed.
 
-Theorem inlineAll_Meths_TraceInclusion_new (m : ModWf_new) :
+Theorem inlineAll_Meths_TraceInclusion_new (m : ModWf_new type) :
   TraceInclusion m (inlineAll_Meths_ModWf_new m).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   apply (inlineAll_Meths_TraceInclusion m').
 Qed.
 
-Lemma flatten_inline_remove_Wf (m : ModWf) :
-  WfMod (flatten_inline_remove m).
+Lemma flatten_inline_remove_Wf ty (m : ModWf ty) :
+  WfMod ty (flatten_inline_remove m).
 Proof.
   unfold flatten_inline_remove.
-  specialize (TraceInclusion_inlineAll_pos (WfMod_WfBase_getFlat (wfMod m))) as P1; dest.
-  inv H; unfold WfBaseModule in *; dest.
+  specialize (WfMod_WfBase_getFlat (wfMod m)) as P1; inv P1.
+  specialize (WfBaseMod_inlineAll_All HWfBaseModule) as P1.
+  unfold WfBaseModule in *; dest.
   econstructor; repeat split; unfold removeHides; simpl in *; intros; eauto.
-  - rewrite filter_In in H5; dest.
-    specialize (H1 ty _ H5 v).
-    induction H1; econstructor; eauto.
-  - clear - H2.
+  - rewrite filter_In in H9; dest.
+    specialize (H0 _ H9 v).
+    induction H0; econstructor; eauto.
+  - clear - H1.
     induction (inlineAll_Meths (getAllMethods m)); simpl; auto.
     destruct negb.
-    + simpl in *; econstructor; inv H2; auto.
-      intro P1; apply H1.
+    + simpl in *; econstructor; inv H1; auto.
+      intro P1; apply H2.
       rewrite in_map_iff in P1; dest.
       rewrite <- H.
       rewrite filter_In in H0; dest.
       rewrite in_map_iff; exists x; auto.
-    + inv H2; auto.
+    + inv H1; auto.
 Qed.
 
-Theorem flatten_inline_remove_Wf_new (m : ModWf_new) :
-  WfMod_new (flatten_inline_remove m).
+Theorem flatten_inline_remove_Wf_new ty (m : ModWf_new ty) :
+  WfMod_new ty (flatten_inline_remove m).
 Proof.
   apply WfMod_WfMod_new.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   apply (flatten_inline_remove_Wf m').
 Qed.
 
-Definition flatten_inline_remove_ModWf (m : ModWf) :=
+Definition flatten_inline_remove_ModWf {ty} (m : ModWf ty) :=
   (Build_ModWf (flatten_inline_remove_Wf m)).
 
-Definition flatten_inline_remove_ModWf_new (m : ModWf_new) :=
-  (Build_ModWf_new _ (flatten_inline_remove_Wf_new m)).
+Definition flatten_inline_remove_ModWf_new {ty} (m : ModWf_new ty) :=
+  (Build_ModWf_new _ _ (flatten_inline_remove_Wf_new m)).
 
 Definition removeMeth (m : BaseModule) (s : string) :=
   (BaseMod (getRegisters m) (getRules m) ((filter (fun df => (negb (String.eqb s (fst df))))) (getMethods m))).
@@ -5187,7 +5203,7 @@ Proof.
     rewrite (NotInDef_ZeroExecs_Substeps (fst x, v) H1 HSubsteps); simpl; reflexivity.
 Qed.
 
-Lemma Step_HideMeth_removeMeth_noCalls (f : string) (m : BaseModule) (o : RegsT) (l : list FullLabel) (wfMod : WfMod m):
+Lemma Step_HideMeth_removeMeth_noCalls (f : string) (m : BaseModule) (o : RegsT) (l : list FullLabel) (wfMod : WfMod type m):
   Step (HideMeth m f) o l ->
   (forall v, In (f, projT1 v) (getKindAttr (getMethods m)) -> getNumCalls (f, v) l = 0%Z) ->
   Step (removeMeth m f) o l.
@@ -5204,7 +5220,7 @@ Proof.
     assumption.
 Qed.
 
-Lemma Trace_HideMeth_removeMeth_noCalls (f : string) (m : BaseModule) (o : RegsT) (ls : list (list FullLabel)) (wfMod : WfMod m) :
+Lemma Trace_HideMeth_removeMeth_noCalls (f : string) (m : BaseModule) (o : RegsT) (ls : list (list FullLabel)) (wfMod : WfMod type m) :
   Trace (HideMeth m f) o ls ->
   (forall l, In l ls -> forall v, In (f, projT1 v) (getKindAttr (getMethods m)) -> getNumCalls (f, v) l = 0%Z) ->
   Trace (removeMeth m f) o ls.
@@ -5218,7 +5234,7 @@ Proof.
       eapply H0; auto; left; reflexivity.
 Qed.
 
-Lemma Trace_removeMeth_HideMeth_noCalls (f : string) (m : BaseModule) (o : RegsT) (ls : list (list FullLabel)) (wfMod : WfMod m) :
+Lemma Trace_removeMeth_HideMeth_noCalls (f : string) (m : BaseModule) (o : RegsT) (ls : list (list FullLabel)) (wfMod : WfMod type m) :
   Trace (removeMeth m f) o ls ->
   (forall l, In l ls -> forall v, In (f, projT1 v) (getKindAttr (getMethods m)) -> getNumCalls (f, v) l = 0%Z) ->
   Trace (HideMeth m f) o ls.
@@ -5272,7 +5288,7 @@ Proof.
     + eapply IHTrace; eauto.
 Qed.
 
-Lemma NoSelfCallBaseModule_TraceHide f (m : BaseModuleWf) o ls :
+Lemma NoSelfCallBaseModule_TraceHide f (m : BaseModuleWf type) o ls :
   NoSelfCallBaseModule m ->
   Trace (HideMeth m f) o ls ->
   Trace (removeMeth m f) o ls.
@@ -5438,32 +5454,32 @@ Proof.
   eauto.
 Qed.
 
-Lemma removeHidesWf (m : BaseModule) (l : list string):
-  WfBaseModule m ->
-  WfBaseModule (removeHides m l).
+Lemma removeHidesWf ty (m : BaseModule) (l : list string):
+  WfBaseModule ty m ->
+  WfBaseModule ty (removeHides m l).
 Proof.
   intros.
   inv H; inv H1; inv H2; inv H3.
   repeat split; intros; auto.
   - simpl in H3.
     rewrite (filter_In) in H3; inv H3.
-    specialize (H ty _ H5 v).
+    specialize (H _ H5 v).
     apply removeHidesWfActionT; auto.
   - simpl.
     apply NoDup_filtered_keys; auto.
 Qed.
 
-Lemma removeHidesWf_new (m : BaseModule) (l : list string):
-  WfBaseModule_new m ->
-  WfBaseModule_new (removeHides m l).
+Lemma removeHidesWf_new ty (m : BaseModule) (l : list string):
+  WfBaseModule_new ty m ->
+  WfBaseModule_new ty (removeHides m l).
 Proof.
   repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
   apply removeHidesWf.
 Qed.
 
-Lemma removeMethWf (m : BaseModule) (f : string) :
-  WfBaseModule m ->
-  WfBaseModule (removeMeth m f).
+Lemma removeMethWf ty (m : BaseModule) (f : string) :
+  WfBaseModule ty m ->
+  WfBaseModule ty (removeMeth m f).
 Proof.
   intros.
   specialize (WfMod_WfBaseMod_flat (BaseWf (removeHidesWf [f] H))) as P1.
@@ -5474,29 +5490,29 @@ Proof.
   unfold removeMeth; simpl in P1; assumption.
 Qed.
 
-Lemma removeMethWf_new (m : BaseModule) (f : string) :
-  WfBaseModule_new m ->
-  WfBaseModule_new (removeMeth m f).
+Lemma removeMethWf_new ty (m : BaseModule) (f : string) :
+  WfBaseModule_new ty m ->
+  WfBaseModule_new ty (removeMeth m f).
 Proof.
   repeat rewrite <- WfBaseModule_WfBaseModule_new_iff.
   apply removeMethWf.
 Qed.
 
-Definition removeHides_ModWf (m : BaseModuleWf) (l : list string) :=
+Definition removeHides_ModWf {ty} (m : BaseModuleWf ty) (l : list string) :=
   Build_BaseModuleWf (removeHidesWf l (wfBaseModule m)).
 
-Definition removeHides_ModWf_new (m : BaseModuleWf_new) (l : list string) :=
+Definition removeHides_ModWf_new {ty} (m : BaseModuleWf_new ty) (l : list string) :=
   Build_BaseModuleWf_new (removeHidesWf_new l (wfBaseModule_new m)).
 
-Lemma WfMod_createHide1 (m : BaseModuleWf) (l : list string) (subList : SubList l (map fst (getMethods m))):
-  WfMod (createHide m l).
+Lemma WfMod_createHide1 ty (m : BaseModuleWf ty) (l : list string) (subList : SubList l (map fst (getMethods m))):
+  WfMod ty (createHide m l).
 Proof.
   rewrite WfMod_createHide; split; auto.
   apply (BaseWf (wfBaseModule m)).
 Qed.
 
-Lemma WfMod_createHide1_new (m : BaseModuleWf_new) (l : list string) (subList : SubList l (map fst (getMethods m))):
-  WfMod_new (createHide m l).
+Lemma WfMod_createHide1_new ty (m : BaseModuleWf_new ty) (l : list string) (subList : SubList l (map fst (getMethods m))):
+  WfMod_new ty (createHide m l).
 Proof.
   apply WfMod_WfMod_new.
   destruct m.
@@ -5504,11 +5520,11 @@ Proof.
   apply (WfMod_createHide1 m'); auto.
 Qed.
 
-Definition createHide_ModWf (m : BaseModuleWf) (l : list string) (subList : SubList l (map fst (getMethods m))) := (Build_ModWf (WfMod_createHide1 m subList)).
+Definition createHide_ModWf {ty} (m : BaseModuleWf ty) (l : list string) (subList : SubList l (map fst (getMethods m))) := (Build_ModWf (WfMod_createHide1 m subList)).
 
-Definition createHide_ModWf_new (m : BaseModuleWf_new) (l : list string) (subList : SubList l (map fst (getMethods m))) := (Build_ModWf_new _ (WfMod_createHide1_new m subList)).
+Definition createHide_ModWf_new {ty} (m : BaseModuleWf_new ty) (l : list string) (subList : SubList l (map fst (getMethods m))) := (Build_ModWf_new _ _ (WfMod_createHide1_new m subList)).
 
-Lemma HideMeth_removeMeth_TraceInclusion (m : BaseModuleWf) (f : string):
+Lemma HideMeth_removeMeth_TraceInclusion (m : BaseModuleWf type) (f : string):
   NoSelfCallBaseModule m ->
   TraceInclusion (HideMeth m f) (removeMeth m f).
 Proof.
@@ -5518,7 +5534,7 @@ Proof.
   apply (WeakInclusions_WeakInclusion (WeakInclusionsRefl ls1)).
 Qed.
 
-Lemma removeMeth_HideMeth_TraceInclusion (m : BaseModuleWf) (f : string):
+Lemma removeMeth_HideMeth_TraceInclusion (m : BaseModuleWf type) (f : string):
   NoSelfCallBaseModule m ->
   In f (map fst (getMethods m)) ->
   TraceInclusion (removeMeth m f) (HideMeth m f).
@@ -5578,7 +5594,7 @@ Proof.
 Qed.
 
 Lemma removeHides_removeMeth_TraceInclusion m l a :
-  TraceInclusion (removeMeth (removeHides_ModWf m l) a) (removeHides_ModWf m (a::l)).
+  TraceInclusion (removeMeth (@removeHides_ModWf type m l) a) (removeHides_ModWf m (a::l)).
 Proof.
   specialize (TraceInclusion_flatten_r (Build_ModWf (BaseWf (removeMethWf a (wfBaseModule (removeHides_ModWf m l)))))) as P1.
   simpl in *; unfold flatten, getFlat in *; simpl in *.
@@ -5589,7 +5605,7 @@ Proof.
 Qed.
 
 Lemma removeMeth_removeHides_TraceInclusion m l a :
-  TraceInclusion (removeHides_ModWf m (a::l)) (removeMeth (removeHides_ModWf m l) a).
+  TraceInclusion (@removeHides_ModWf type m (a::l)) (removeMeth (removeHides_ModWf m l) a).
 Proof.
   specialize (TraceInclusion_flatten_l (Build_ModWf (BaseWf (removeMethWf a (wfBaseModule (removeHides_ModWf m l)))))) as P1.
   simpl in *; unfold flatten, getFlat in *; simpl in *.
@@ -5642,7 +5658,7 @@ Proof.
     rewrite IHl0 at 1; reflexivity.
 Qed.
 
-Lemma removeMeth_idempotent (m : BaseModuleWf) l a :
+Lemma removeMeth_idempotent ty (m : BaseModuleWf ty) l a :
   In a l ->
   (removeHides m l) = (removeMeth (removeHides m l) a).
 Proof.
@@ -5652,7 +5668,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma removeHides_createHide_TraceInclusion (m : BaseModuleWf) (l : list string) (subList : SubList l (map fst (getMethods m))):
+Lemma removeHides_createHide_TraceInclusion (m : BaseModuleWf type) (l : list string) (subList : SubList l (map fst (getMethods m))):
   NoSelfCallBaseModule m ->
   TraceInclusion (removeHides_ModWf m l) (createHide_ModWf m subList).
 Proof.
@@ -5686,7 +5702,7 @@ Proof.
       eauto using TraceInclusion_trans.
 Qed.
 
-Theorem removeHides_createHide_TraceInclusion_new (m : BaseModuleWf_new) (l : list string) (subList : SubList l (map fst (getMethods m))):
+Theorem removeHides_createHide_TraceInclusion_new (m : BaseModuleWf_new type) (l : list string) (subList : SubList l (map fst (getMethods m))):
   NoSelfCallBaseModule m ->
   TraceInclusion (removeHides_ModWf_new m l) (createHide_ModWf_new m subList).
 Proof.
@@ -5697,7 +5713,7 @@ Proof.
   auto.
 Qed.
 
-Lemma createHide_removeHides_TraceInclusion (m : BaseModuleWf) (l : list string) (subList : SubList l (map fst (getMethods m))):
+Lemma createHide_removeHides_TraceInclusion (m : BaseModuleWf type) (l : list string) (subList : SubList l (map fst (getMethods m))):
   NoSelfCallBaseModule m ->
   TraceInclusion (createHide_ModWf m subList) (removeHides_ModWf m l).
 Proof.
@@ -5715,7 +5731,7 @@ Proof.
     eauto using TraceInclusion_trans.
 Qed.
 
-Theorem createHide_removeHides_TraceInclusion_new (m : BaseModuleWf_new) (l : list string) (subList : SubList l (map fst (getMethods m))):
+Theorem createHide_removeHides_TraceInclusion_new (m : BaseModuleWf_new type) (l : list string) (subList : SubList l (map fst (getMethods m))):
   NoSelfCallBaseModule m ->
   TraceInclusion (createHide_ModWf_new m subList) (removeHides_ModWf_new m l).
 Proof.
@@ -5726,7 +5742,7 @@ Proof.
   auto.
 Qed.
 
-Lemma flatten_inline_remove_TraceInclusion_r_lemma (m : ModWf) :
+Lemma flatten_inline_remove_TraceInclusion_r_lemma (m : ModWf type) :
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_everything m) (flatten_inline_remove_ModWf m).
 Proof.
@@ -5742,12 +5758,12 @@ Proof.
   apply (P3 P2); eauto.
 Qed.
 
-Theorem flatten_inline_remove_TraceInclusion_r_lemma_new (m : ModWf_new) :
+Theorem flatten_inline_remove_TraceInclusion_r_lemma_new (m : ModWf_new type) :
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_everything m) (flatten_inline_remove_ModWf_new m).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   apply (@flatten_inline_remove_TraceInclusion_r_lemma m').
 Qed.
 
@@ -6257,7 +6273,7 @@ Qed.
 
 Lemma PPlusStrongTraceInclusion_inlining_Rules_l m f rn :
   In f (getMethods m) ->
-  (WfMod (Base m)) ->
+  (WfMod type (Base m)) ->
   StrongPPlusTraceInclusion (inlineSingle_Rule_BaseModule f rn m) m.
 Proof.
   unfold StrongPPlusTraceInclusion; induction 3; subst.
@@ -6303,7 +6319,7 @@ Qed.
 
 Lemma TraceInclusion_inlining_Rules_l m f rn:
   In f (getMethods m) ->
-  WfMod m ->
+  WfMod type m ->
   TraceInclusion (inlineSingle_Rule_BaseModule f rn m) m.
 Proof.
   intros.
@@ -6315,14 +6331,14 @@ Qed.
 
 Theorem TraceInclusion_inlining_Rules_l_new m f rn:
   In f (getMethods m) ->
-  WfMod_new m ->
+  WfMod_new type m ->
   TraceInclusion (inlineSingle_Rule_BaseModule f rn m) m.
 Proof.
   rewrite WfMod_new_WfMod_iff.
   apply TraceInclusion_inlining_Rules_l.
 Qed.
 
-Lemma TraceInclusion_inlining_Rules_Wf_l {f} {m : BaseModuleWf} rn
+Lemma TraceInclusion_inlining_Rules_Wf_l {f} {m : BaseModuleWf type} rn
         (inMeths: In f (getMethods m)):
   TraceInclusion (inlineSingle_Rule_BaseModuleWf rn inMeths) m.
 Proof.
@@ -6330,7 +6346,7 @@ Proof.
   constructor; apply wfBaseModule.
 Qed.
 
-Theorem TraceInclusion_inlining_Rules_Wf_l_new {f} {m : BaseModuleWf_new} rn
+Theorem TraceInclusion_inlining_Rules_Wf_l_new {f} {m : BaseModuleWf_new type} rn
         (inMeths: In f (getMethods m)):
   TraceInclusion (inlineSingle_Rule_BaseModuleWf_new rn inMeths) m.
 Proof.
@@ -6801,7 +6817,7 @@ Qed.
 
 Lemma PPlusStrongTraceInclusion_inlining_Meths_l m f rn :
   In f (getMethods m) ->
-  (WfMod (Base m)) ->
+  (WfMod type (Base m)) ->
   StrongPPlusTraceInclusion (inlineSingle_Meth_BaseModule f rn m) m.
 Proof.
   unfold StrongPPlusTraceInclusion; induction 3; subst.
@@ -6824,7 +6840,7 @@ Qed.
 
 Lemma TraceInclusion_inlining_Meths_l m f rn:
   In f (getMethods m) ->
-  WfMod m ->
+  WfMod type m ->
   TraceInclusion (inlineSingle_Meth_BaseModule f rn m) m.
 Proof.
   intros.
@@ -6836,14 +6852,14 @@ Qed.
 
 Theorem TraceInclusion_inlining_Meths_l_new m f rn:
   In f (getMethods m) ->
-  WfMod_new m ->
+  WfMod_new type m ->
   TraceInclusion (inlineSingle_Meth_BaseModule f rn m) m.
 Proof.
   rewrite WfMod_new_WfMod_iff.
   apply TraceInclusion_inlining_Meths_l.
 Qed.
 
-Lemma TraceInclusion_inlining_Meths_Wf_l {f} {m : BaseModuleWf} rn
+Lemma TraceInclusion_inlining_Meths_Wf_l {f} {m : BaseModuleWf type} rn
         (inMeths: In f (getMethods m)):
   TraceInclusion (inlineSingle_Meth_BaseModuleWf rn inMeths) m.
 Proof.
@@ -6851,7 +6867,7 @@ Proof.
   constructor; apply wfBaseModule.
 Qed.
 
-Theorem TraceInclusion_inlining_Meths_Wf_l_new {f} {m : BaseModuleWf_new} rn
+Theorem TraceInclusion_inlining_Meths_Wf_l_new {f} {m : BaseModuleWf_new type} rn
         (inMeths: In f (getMethods m)):
   TraceInclusion (inlineSingle_Meth_BaseModuleWf_new rn inMeths) m.
 Proof.
@@ -6863,7 +6879,7 @@ Proof.
 Qed.
 
 Lemma inline_meth_transform_l f regs rules meths:
-  (WfMod (Base (BaseMod regs rules meths))) ->
+  (WfMod type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   forall i,
     TraceInclusion (Base (BaseMod regs rules (transform_nth_right (inlineSingle_Meth f) i meths))) (Base (BaseMod regs rules meths)).
@@ -6884,7 +6900,7 @@ Proof.
 Qed.
 
 Theorem inline_meth_transform_l_new f regs rules meths:
-  (WfMod_new (Base (BaseMod regs rules meths))) ->
+  (WfMod_new type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   forall i,
     TraceInclusion (Base (BaseMod regs rules (transform_nth_right (inlineSingle_Meth f) i meths))) (Base (BaseMod regs rules meths)).
@@ -6893,7 +6909,7 @@ Proof.
   apply inline_meth_transform_l.
 Qed.
 
-Lemma inline_meth_transform_Wf_l {f} {m : BaseModuleWf} i (inMeths : In f (getMethods m)):
+Lemma inline_meth_transform_Wf_l {f} {m : BaseModuleWf type} i (inMeths : In f (getMethods m)):
     TraceInclusion (inline_nth_Meth_BaseModuleWf i inMeths) m.
 Proof.
   intros; simpl.
@@ -6904,7 +6920,7 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inline_meth_transform_Wf_l_new {f} {m : BaseModuleWf_new} i (inMeths : In f (getMethods m)):
+Theorem inline_meth_transform_Wf_l_new {f} {m : BaseModuleWf_new type} i (inMeths : In f (getMethods m)):
     TraceInclusion (inline_nth_Meth_BaseModuleWf_new i inMeths) m.
 Proof.
   destruct m.
@@ -6915,7 +6931,7 @@ Proof.
 Qed.
 
 Lemma inline_rule_transform_l f regs rules meths:
-  (WfMod (Base (BaseMod regs rules meths))) ->
+  (WfMod type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   forall i,
     TraceInclusion (Base (BaseMod regs (transform_nth_right (inlineSingle_Rule f) i rules) meths)) (Base (BaseMod regs rules meths)).
@@ -6936,7 +6952,7 @@ Proof.
 Qed.
 
 Theorem inline_rule_transform_l_new f regs rules meths:
-  (WfMod_new (Base (BaseMod regs rules meths))) ->
+  (WfMod_new type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   forall i,
     TraceInclusion (Base (BaseMod regs (transform_nth_right (inlineSingle_Rule f) i rules) meths)) (Base (BaseMod regs rules meths)).
@@ -6945,7 +6961,7 @@ Proof.
   apply inline_rule_transform_l.
 Qed.
 
-Lemma inline_rule_transform_Wf_l {f} {m : BaseModuleWf} i (inMeths : In f (getMethods m)):
+Lemma inline_rule_transform_Wf_l {f} {m : BaseModuleWf type} i (inMeths : In f (getMethods m)):
     TraceInclusion (inline_nth_Rule_BaseModuleWf i inMeths) m.
 Proof.
   intros; simpl.
@@ -6956,7 +6972,7 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inline_rule_transform_Wf_l_new {f} {m : BaseModuleWf_new} i (inMeths : In f (getMethods m)):
+Theorem inline_rule_transform_Wf_l_new {f} {m : BaseModuleWf_new type} i (inMeths : In f (getMethods m)):
     TraceInclusion (inline_nth_Rule_BaseModuleWf_new i inMeths) m.
 Proof.
   destruct m.
@@ -6969,7 +6985,7 @@ Qed.
 Section inlineSingle_nth_l.
   Variable (f : DefMethT).
   Variable (regs: list RegInitT) (rules: list RuleT) (meths: list DefMethT).
-  Variable (Wf : WfMod (Base (BaseMod regs rules meths))).
+  Variable (Wf : WfMod type (Base (BaseMod regs rules meths))).
 
   Lemma inline_meth_fold_right_l xs:
     In f meths ->
@@ -7002,7 +7018,7 @@ End inlineSingle_nth_l.
 Section inlineSingle_nth_l_new.
   Variable (f : DefMethT).
   Variable (regs: list RegInitT) (rules: list RuleT) (meths: list DefMethT).
-  Variable (Wf : WfMod_new (Base (BaseMod regs rules meths))).
+  Variable (Wf : WfMod_new type (Base (BaseMod regs rules meths))).
 
   Theorem inline_meth_fold_right_l_new xs:
     In f meths ->
@@ -7022,18 +7038,18 @@ Section inlineSingle_nth_l_new.
 
 End inlineSingle_nth_l_new.
 
-Lemma inline_meth_fold_right_Wf_l {f} {m : BaseModuleWf} xs (inMeth : In f (getMethods m)):
+Lemma inline_meth_fold_right_Wf_l {f} {m : BaseModuleWf type} xs (inMeth : In f (getMethods m)):
   TraceInclusion (inline_all_Meth_BaseModuleWf xs inMeth) m.
 Proof.
   specialize (TraceInclusion_flatten_l m) as P1.
   simpl in *; unfold flatten, getFlat in P1; simpl in *.
-  assert (WfMod m) as TMP;[constructor; apply wfBaseModule
+  assert (WfMod type m) as TMP;[constructor; apply wfBaseModule
                           |specialize (WfMod_getFlat TMP) as P2; clear TMP].
   specialize (inline_meth_fold_right_l f P2 xs inMeth) as P3.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inline_meth_fold_right_Wf_l_new {f} {m : BaseModuleWf_new} xs (inMeth : In f (getMethods m)):
+Theorem inline_meth_fold_right_Wf_l_new {f} {m : BaseModuleWf_new type} xs (inMeth : In f (getMethods m)):
   TraceInclusion (inline_all_Meth_BaseModuleWf_new xs inMeth) m.
 Proof.
   destruct m.
@@ -7043,18 +7059,18 @@ Proof.
   auto.
 Qed.
 
-Lemma inline_rule_fold_right_Wf_l {f} {m : BaseModuleWf} xs (inMeth : In f (getMethods m)):
+Lemma inline_rule_fold_right_Wf_l {f} {m : BaseModuleWf type} xs (inMeth : In f (getMethods m)):
   TraceInclusion (inline_all_Rule_BaseModuleWf xs inMeth) m.
 Proof.
   specialize (TraceInclusion_flatten_l m) as P1.
   simpl in *; unfold flatten, getFlat in P1; simpl in *.
-  assert (WfMod m) as TMP;[constructor; apply wfBaseModule
+  assert (WfMod type m) as TMP;[constructor; apply wfBaseModule
                           |specialize (WfMod_getFlat TMP) as P2; clear TMP].
   specialize (inline_rule_fold_right_l f P2 xs inMeth) as P3.
   eauto using TraceInclusion_trans.
 Qed.
 
-Lemma inline_rule_fold_right_Wf_l_new {f} {m : BaseModuleWf_new} xs (inMeth : In f (getMethods m)):
+Lemma inline_rule_fold_right_Wf_l_new {f} {m : BaseModuleWf_new type} xs (inMeth : In f (getMethods m)):
   TraceInclusion (inline_all_Rule_BaseModuleWf_new xs inMeth) m.
 Proof.
   destruct m.
@@ -7065,7 +7081,7 @@ Proof.
 Qed.
 
 Lemma TraceInclusion_inline_BaseModule_rules_l regs rules meths f:
-  (WfMod (Base (BaseMod regs rules meths))) ->
+  (WfMod type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs (map (inlineSingle_Rule f) rules) meths)) (Base (BaseMod regs rules meths)).
 Proof.
@@ -7078,7 +7094,7 @@ Proof.
 Qed.
 
 Theorem TraceInclusion_inline_BaseModule_rules_l_new regs rules meths f:
-  (WfMod_new (Base (BaseMod regs rules meths))) ->
+  (WfMod_new type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs (map (inlineSingle_Rule f) rules) meths)) (Base (BaseMod regs rules meths)).
 Proof.
@@ -7086,19 +7102,19 @@ Proof.
   apply TraceInclusion_inline_BaseModule_rules_l.
 Qed.
 
-Lemma TraceInclusion_inline_BaseModule_rules_Wf_l {f} {m : BaseModuleWf}
+Lemma TraceInclusion_inline_BaseModule_rules_Wf_l {f} {m : BaseModuleWf type}
         (inMeth : In f (getMethods m)):
   TraceInclusion (inline_BaseModule_rules_BaseModuleWf inMeth) m.
 Proof.
   specialize (TraceInclusion_flatten_l m) as P1.
   simpl in *; unfold flatten, getFlat in P1; simpl in *.
-  assert (WfMod m) as TMP;[constructor; apply wfBaseModule
+  assert (WfMod type m) as TMP;[constructor; apply wfBaseModule
                           |specialize (WfMod_getFlat TMP) as P2; clear TMP].
   specialize (TraceInclusion_inline_BaseModule_rules_l f P2 inMeth) as P3.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem TraceInclusion_inline_BaseModule_rules_Wf_l_new {f} {m : BaseModuleWf_new}
+Theorem TraceInclusion_inline_BaseModule_rules_Wf_l_new {f} {m : BaseModuleWf_new type}
         (inMeth : In f (getMethods m)):
   TraceInclusion (inline_BaseModule_rules_BaseModuleWf_new inMeth) m.
 Proof.
@@ -7110,7 +7126,7 @@ Proof.
 Qed.
 
 Lemma TraceInclusion_inline_BaseModule_meths_l regs rules meths f:
-  (WfMod (Base (BaseMod regs rules meths))) ->
+  (WfMod type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs rules (map (inlineSingle_Meth f) meths))) (Base (BaseMod regs rules meths)).
 Proof.
@@ -7122,7 +7138,7 @@ Proof.
 Qed.
 
 Theorem TraceInclusion_inline_BaseModule_meths_l_new regs rules meths f:
-  (WfMod_new (Base (BaseMod regs rules meths))) ->
+  (WfMod_new type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (BaseMod regs rules (map (inlineSingle_Meth f) meths))) (Base (BaseMod regs rules meths)).
 Proof.
@@ -7130,19 +7146,19 @@ Proof.
   apply TraceInclusion_inline_BaseModule_meths_l.
 Qed.
 
-Lemma TraceInclusion_inline_BaseModule_meths_Wf_l {f} {m : BaseModuleWf}
+Lemma TraceInclusion_inline_BaseModule_meths_Wf_l {f} {m : BaseModuleWf type}
         (inMeth : In f (getMethods m)):
   TraceInclusion (inline_BaseModule_meths_BaseModuleWf inMeth) m.
 Proof.
   specialize (TraceInclusion_flatten_l m) as P1.
   simpl in *; unfold flatten, getFlat in P1; simpl in *.
-  assert (WfMod m) as TMP;[constructor; apply wfBaseModule
+  assert (WfMod type m) as TMP;[constructor; apply wfBaseModule
                           |specialize (WfMod_getFlat TMP) as P2; clear TMP].
   specialize (TraceInclusion_inline_BaseModule_meths_l f P2 inMeth) as P3.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem TraceInclusion_inline_BaseModule_meths_Wf_l_new {f} {m : BaseModuleWf_new}
+Theorem TraceInclusion_inline_BaseModule_meths_Wf_l_new {f} {m : BaseModuleWf_new type}
         (inMeth : In f (getMethods m)):
   TraceInclusion (inline_BaseModule_meths_BaseModuleWf_new inMeth) m.
 Proof.
@@ -7154,7 +7170,7 @@ Proof.
 Qed.
 
 Lemma TraceInclusion_inline_BaseModule_all_l regs rules meths f:
-  (WfMod (Base (BaseMod regs rules meths))) ->
+  (WfMod type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (inlineSingle_BaseModule f regs rules meths)) (Base (BaseMod regs rules meths)).
 Proof.
@@ -7168,7 +7184,7 @@ Proof.
 Qed.
 
 Theorem TraceInclusion_inline_BaseModule_all_l_new regs rules meths f:
-  (WfMod_new (Base (BaseMod regs rules meths))) ->
+  (WfMod_new type (Base (BaseMod regs rules meths))) ->
   In f meths ->
   TraceInclusion (Base (inlineSingle_BaseModule f regs rules meths)) (Base (BaseMod regs rules meths)).
 Proof.
@@ -7176,7 +7192,7 @@ Proof.
   apply TraceInclusion_inline_BaseModule_all_l.
 Qed.
 
-Lemma TraceInclusion_inline_BaseModule_all_Wf_l {f} {m : BaseModuleWf}
+Lemma TraceInclusion_inline_BaseModule_all_Wf_l {f} {m : BaseModuleWf type}
         (inMeth : In f (getMethods m)):
   TraceInclusion (inlineSingle_BaseModuleWf inMeth) m.
 Proof.
@@ -7187,7 +7203,7 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem TraceInclusion_inline_BaseModule_all_Wf_l_new {f} {m : BaseModuleWf_new}
+Theorem TraceInclusion_inline_BaseModule_all_Wf_l_new {f} {m : BaseModuleWf_new type}
         (inMeth : In f (getMethods m)):
   TraceInclusion (inlineSingle_BaseModuleWf_new inMeth) m.
 Proof.
@@ -7200,9 +7216,9 @@ Qed.
 
 Section inline_all_all_l.
   Lemma TraceInclusion_inlineSingle_pos_Rules_l regs rules meths:
-    (WfMod (Base (BaseMod regs rules meths))) ->
+    (WfMod type (Base (BaseMod regs rules meths))) ->
     forall n,
-      (WfMod (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths))) /\
+      (WfMod type (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths))) /\
       TraceInclusion (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths)) (Base (BaseMod regs rules meths)).
   Proof.
     intros WfH n.
@@ -7218,9 +7234,9 @@ Section inline_all_all_l.
   Qed.
 
   Theorem TraceInclusion_inlineSingle_pos_Rules_l_new regs rules meths:
-    (WfMod_new (Base (BaseMod regs rules meths))) ->
+    (WfMod_new type (Base (BaseMod regs rules meths))) ->
     forall n,
-      (WfMod_new (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths))) /\
+      (WfMod_new type (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths))) /\
       TraceInclusion (Base (BaseMod regs (inlineSingle_Rules_pos meths n rules) meths)) (Base (BaseMod regs rules meths)).
   Proof.
     intros.
@@ -7228,7 +7244,7 @@ Section inline_all_all_l.
     apply TraceInclusion_inlineSingle_pos_Rules_l; auto.
   Qed.
 
-  Lemma TraceInclusion_inlineSingle_pos_Rules_Wf_l (m : BaseModuleWf) n :
+  Lemma TraceInclusion_inlineSingle_pos_Rules_Wf_l (m : BaseModuleWf type) n :
     TraceInclusion (inlineSingle_Rules_pos_BaseModuleWf m n) m.
   Proof.
     specialize (TraceInclusion_flatten_l m) as P1.
@@ -7238,7 +7254,7 @@ Section inline_all_all_l.
     eauto using TraceInclusion_trans.
   Qed.
 
-  Theorem TraceInclusion_inlineSingle_pos_Rules_Wf_l_new (m : BaseModuleWf_new) n :
+  Theorem TraceInclusion_inlineSingle_pos_Rules_Wf_l_new (m : BaseModuleWf_new type) n :
     TraceInclusion (inlineSingle_Rules_pos_BaseModuleWf_new m n) m.
   Proof.
     destruct m.
@@ -7247,8 +7263,8 @@ Section inline_all_all_l.
   Qed.
 
   Lemma TraceInclusion_inlineAll_pos_Rules_l regs rules meths:
-    (WfMod (Base (BaseMod regs rules meths))) ->
-    (WfMod (Base (BaseMod regs (inlineAll_Rules meths rules) meths))) /\
+    (WfMod type (Base (BaseMod regs rules meths))) ->
+    (WfMod type (Base (BaseMod regs (inlineAll_Rules meths rules) meths))) /\
     TraceInclusion (Base (BaseMod regs (inlineAll_Rules meths rules) meths))  (Base (BaseMod regs rules meths)).
   Proof.
     intros WfH.
@@ -7264,15 +7280,15 @@ Section inline_all_all_l.
   Qed.
 
   Theorem TraceInclusion_inlineAll_pos_Rules_l_new regs rules meths:
-    (WfMod_new (Base (BaseMod regs rules meths))) ->
-    (WfMod_new (Base (BaseMod regs (inlineAll_Rules meths rules) meths))) /\
+    (WfMod_new type (Base (BaseMod regs rules meths))) ->
+    (WfMod_new type (Base (BaseMod regs (inlineAll_Rules meths rules) meths))) /\
     TraceInclusion (Base (BaseMod regs (inlineAll_Rules meths rules) meths))  (Base (BaseMod regs rules meths)).
   Proof.
     repeat rewrite WfMod_new_WfMod_iff.
     apply TraceInclusion_inlineAll_pos_Rules_l.
   Qed.
 
-  Lemma TraceInclusion_inlineAll_pos_Rules_Wf_l (m : BaseModuleWf) :
+  Lemma TraceInclusion_inlineAll_pos_Rules_Wf_l (m : BaseModuleWf type) :
     TraceInclusion (inlineAll_Rules_BaseModuleWf m) m.
   Proof.
     specialize (TraceInclusion_flatten_l m) as P1.
@@ -7282,7 +7298,7 @@ Section inline_all_all_l.
     eauto using TraceInclusion_trans.
   Qed.
 
-  Theorem TraceInclusion_inlineAll_pos_Rules_Wf_l_new (m : BaseModuleWf_new) :
+  Theorem TraceInclusion_inlineAll_pos_Rules_Wf_l_new (m : BaseModuleWf_new type) :
     TraceInclusion (inlineAll_Rules_BaseModuleWf_new m) m.
   Proof.
     destruct m.
@@ -7291,9 +7307,9 @@ Section inline_all_all_l.
   Qed.
 
   Lemma TraceInclusion_inlineSingle_pos_Meths_l regs rules meths:
-    (WfMod (Base (BaseMod regs rules meths))) ->
+    (WfMod type (Base (BaseMod regs rules meths))) ->
     forall n,
-      (WfMod (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n)))) /\
+      (WfMod type (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n)))) /\
       TraceInclusion (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n))) (Base (BaseMod regs rules meths)).
   Proof.
     intros WfH n.
@@ -7309,9 +7325,9 @@ Section inline_all_all_l.
   Qed.
 
   Theorem TraceInclusion_inlineSingle_pos_Meths_l_new regs rules meths:
-    (WfMod_new (Base (BaseMod regs rules meths))) ->
+    (WfMod_new type (Base (BaseMod regs rules meths))) ->
     forall n,
-      (WfMod_new (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n)))) /\
+      (WfMod_new type (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n)))) /\
       TraceInclusion (Base (BaseMod regs rules (inlineSingle_Meths_pos meths n))) (Base (BaseMod regs rules meths)).
   Proof.
     intros.
@@ -7319,7 +7335,7 @@ Section inline_all_all_l.
     apply TraceInclusion_inlineSingle_pos_Meths_l; auto.
   Qed.
 
-  Lemma TraceInclusion_inlineSingle_pos_Meths_Wf_l (m : BaseModuleWf) n :
+  Lemma TraceInclusion_inlineSingle_pos_Meths_Wf_l (m : BaseModuleWf type) n :
     TraceInclusion (inlineSingle_Meths_pos_BaseModuleWf m n) m.
   Proof.
     specialize (TraceInclusion_flatten_l m) as P1.
@@ -7329,7 +7345,7 @@ Section inline_all_all_l.
     eauto using TraceInclusion_trans.
   Qed.
 
-  Theorem TraceInclusion_inlineSingle_pos_Meths_Wf_l_new (m : BaseModuleWf_new) n :
+  Theorem TraceInclusion_inlineSingle_pos_Meths_Wf_l_new (m : BaseModuleWf_new type) n :
     TraceInclusion (inlineSingle_Meths_pos_BaseModuleWf_new m n) m.
   Proof.
     destruct m.
@@ -7338,8 +7354,8 @@ Section inline_all_all_l.
   Qed.
 
   Lemma TraceInclusion_inlineAll_pos_Meths_l regs rules meths:
-    (WfMod (Base (BaseMod regs rules meths))) ->
-    (WfMod (Base (BaseMod regs rules (inlineAll_Meths meths)))) /\
+    (WfMod type (Base (BaseMod regs rules meths))) ->
+    (WfMod type (Base (BaseMod regs rules (inlineAll_Meths meths)))) /\
     TraceInclusion (Base (BaseMod regs rules (inlineAll_Meths meths))) (Base (BaseMod regs rules meths)).
   Proof.
     intros WfH.
@@ -7355,15 +7371,15 @@ Section inline_all_all_l.
   Qed.
 
   Theorem TraceInclusion_inlineAll_pos_Meths_l_new regs rules meths:
-    (WfMod_new (Base (BaseMod regs rules meths))) ->
-    (WfMod_new (Base (BaseMod regs rules (inlineAll_Meths meths)))) /\
+    (WfMod_new type (Base (BaseMod regs rules meths))) ->
+    (WfMod_new type (Base (BaseMod regs rules (inlineAll_Meths meths)))) /\
     TraceInclusion (Base (BaseMod regs rules (inlineAll_Meths meths))) (Base (BaseMod regs rules meths)).
   Proof.
     repeat rewrite WfMod_new_WfMod_iff.
     apply TraceInclusion_inlineAll_pos_Meths_l.
   Qed.
 
-  Lemma TraceInclusion_inlineAll_pos_Meths_Wf_l (m : BaseModuleWf) :
+  Lemma TraceInclusion_inlineAll_pos_Meths_Wf_l (m : BaseModuleWf type) :
     TraceInclusion (inlineAll_Meths_BaseModuleWf m) m.
   Proof.
     specialize (TraceInclusion_flatten_l m) as P1.
@@ -7373,7 +7389,7 @@ Section inline_all_all_l.
     eauto using TraceInclusion_trans.
   Qed.
 
-  Theorem TraceInclusion_inlineAll_pos_Meths_Wf_l_new (m : BaseModuleWf_new) :
+  Theorem TraceInclusion_inlineAll_pos_Meths_Wf_l_new (m : BaseModuleWf_new type) :
     TraceInclusion (inlineAll_Meths_BaseModuleWf_new m) m.
   Proof.
     destruct m.
@@ -7382,8 +7398,8 @@ Section inline_all_all_l.
   Qed.
 
   Lemma TraceInclusion_inlineAll_pos_l regs rules meths:
-    (WfMod (Base (BaseMod regs rules meths))) ->
-    (WfMod (Base (inlineAll_All regs rules meths))) /\
+    (WfMod type (Base (BaseMod regs rules meths))) ->
+    (WfMod type (Base (inlineAll_All regs rules meths))) /\
     TraceInclusion (Base (inlineAll_All regs rules meths)) (Base (BaseMod regs rules meths)).
   Proof.
     unfold inlineAll_All in *.
@@ -7395,15 +7411,15 @@ Section inline_all_all_l.
   Qed.
 
   Theorem TraceInclusion_inlineAll_pos_l_new regs rules meths:
-    (WfMod_new (Base (BaseMod regs rules meths))) ->
-    (WfMod_new (Base (inlineAll_All regs rules meths))) /\
+    (WfMod_new type (Base (BaseMod regs rules meths))) ->
+    (WfMod_new type (Base (inlineAll_All regs rules meths))) /\
     TraceInclusion (Base (inlineAll_All regs rules meths)) (Base (BaseMod regs rules meths)).
   Proof.
     repeat rewrite WfMod_new_WfMod_iff.
     apply TraceInclusion_inlineAll_pos_l.
   Qed.
 
-  Lemma TraceInclusion_inlineAll_pos_Wf_l (m : BaseModuleWf) :
+  Lemma TraceInclusion_inlineAll_pos_Wf_l (m : BaseModuleWf type) :
     TraceInclusion (inlineAll_All_BaseModuleWf m) m.
   Proof.
     specialize (TraceInclusion_flatten_l m) as P1.
@@ -7413,7 +7429,7 @@ Section inline_all_all_l.
     eauto using TraceInclusion_trans.
   Qed.
 
-  Theorem TraceInclusion_inlineAll_pos_Wf_l_new (m : BaseModuleWf_new) :
+  Theorem TraceInclusion_inlineAll_pos_Wf_l_new (m : BaseModuleWf_new type) :
     TraceInclusion (inlineAll_All_BaseModuleWf_new m) m.
   Proof.
     destruct m.
@@ -7423,14 +7439,14 @@ Section inline_all_all_l.
 
 End inline_all_all_l.
 
-Lemma TraceInclusion_flatten_inline_everything_l (m : ModWf) :
+Lemma TraceInclusion_flatten_inline_everything_l (m : ModWf type) :
   TraceInclusion (flatten_inline_everything_ModWf m) m.
 Proof.
   specialize (wfMod (flatten_inline_everything_ModWf m)) as Wf1.
   simpl.
   specialize (TraceInclusion_flatten_l m) as P1.
   unfold flatten, getFlat in *.
-  assert (WfMod (Base (getFlat m))). {
+  assert (WfMod type (Base (getFlat m))). {
     intros.
     apply (WfMod_WfBase_getFlat (wfMod m)).
   }
@@ -7441,15 +7457,15 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem TraceInclusion_flatten_inline_everything_l_new (m : ModWf_new) :
+Theorem TraceInclusion_flatten_inline_everything_l_new (m : ModWf_new type) :
   TraceInclusion (flatten_inline_everything_ModWf_new m) m.
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   apply (@TraceInclusion_flatten_inline_everything_l m').
 Qed.
 
-Lemma inlineSingle_Rule_map_TraceInclusion_l {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)):
+Lemma inlineSingle_Rule_map_TraceInclusion_l {m : ModWf type} {f : DefMethT} (inMeths : In f (getAllMethods m)):
   TraceInclusion (inlineSingle_Rule_map_ModWf inMeths) m.
 Proof.
   intros.
@@ -7460,17 +7476,17 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inlineSingle_Rule_map_TraceInclusion_l_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)):
+Theorem inlineSingle_Rule_map_TraceInclusion_l_new {m : ModWf_new type} {f : DefMethT} (inMeths : In f (getAllMethods m)):
   TraceInclusion (inlineSingle_Rule_map_ModWf_new inMeths) m.
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@inlineSingle_Rule_map_TraceInclusion_l m').
   Unshelve.
   auto.
 Qed.
 
-Lemma inlineSingle_Meth_map_TraceInclusion_l {m : ModWf}  {f : DefMethT} (inMeths : In f (getAllMethods m)) :
+Lemma inlineSingle_Meth_map_TraceInclusion_l {m : ModWf type}  {f : DefMethT} (inMeths : In f (getAllMethods m)) :
   TraceInclusion (inlineSingle_Meth_map_ModWf inMeths) m.
 Proof.
   intros.
@@ -7481,17 +7497,17 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inlineSingle_Meth_map_TraceInclusion_l_new {m : ModWf_new}  {f : DefMethT} (inMeths : In f (getAllMethods m)) :
+Theorem inlineSingle_Meth_map_TraceInclusion_l_new {m : ModWf_new type}  {f : DefMethT} (inMeths : In f (getAllMethods m)) :
   TraceInclusion (inlineSingle_Meth_map_ModWf_new inMeths) m.
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@inlineSingle_Meth_map_TraceInclusion_l m').
   Unshelve.
   auto.
 Qed.
 
-Lemma inlineSingle_BaseModule_TraceInclusion_l {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
+Lemma inlineSingle_BaseModule_TraceInclusion_l {m : ModWf type} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
   TraceInclusion (inlineSingle_Module_ModWf inMeths) m.
 Proof.
   specialize (TraceInclusion_flatten_l  m) as TI_flatten; simpl in *.
@@ -7503,17 +7519,17 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inlineSingle_BaseModule_TraceInclusion_l_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
+Theorem inlineSingle_BaseModule_TraceInclusion_l_new {m : ModWf_new type} {f : DefMethT} (inMeths : In f (getAllMethods m)) :
   TraceInclusion (inlineSingle_Module_ModWf_new inMeths) m.
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@inlineSingle_BaseModule_TraceInclusion_l m').
   Unshelve.
   auto.
 Qed.
 
-Lemma inlineSingle_BaseModule_nth_Meth_TraceInclusion_l {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
+Lemma inlineSingle_BaseModule_nth_Meth_TraceInclusion_l {m : ModWf type} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
   TraceInclusion (inlineSingle_BaseModule_nth_Meth_ModWf inMeths xs) m.
 Proof.
   specialize (TraceInclusion_flatten_l m) as TI_flatten; simpl in *.
@@ -7525,17 +7541,17 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inlineSingle_BaseModule_nth_Meth_TraceInclusion_l_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
+Theorem inlineSingle_BaseModule_nth_Meth_TraceInclusion_l_new {m : ModWf_new type} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
   TraceInclusion (inlineSingle_BaseModule_nth_Meth_ModWf_new inMeths xs) m.
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@inlineSingle_BaseModule_nth_Meth_TraceInclusion_l m').
   Unshelve.
   auto.
 Qed.
 
-Lemma inlineSingle_BaseModule_nth_Rule_TraceInclusion_l {m : ModWf} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
+Lemma inlineSingle_BaseModule_nth_Rule_TraceInclusion_l {m : ModWf type} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
   TraceInclusion (inlineSingle_BaseModule_nth_Rule_ModWf inMeths xs) m.
 Proof.
   specialize (TraceInclusion_flatten_l m) as TI_flatten; simpl in *.
@@ -7547,17 +7563,17 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inlineSingle_BaseModule_nth_Rule_TraceInclusion_l_new {m : ModWf_new} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
+Theorem inlineSingle_BaseModule_nth_Rule_TraceInclusion_l_new {m : ModWf_new type} {f : DefMethT} (inMeths : In f (getAllMethods m)) (xs : list nat) :
   TraceInclusion (inlineSingle_BaseModule_nth_Rule_ModWf_new inMeths xs) m.
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@inlineSingle_BaseModule_nth_Rule_TraceInclusion_l m').
   Unshelve.
   auto.
 Qed.
 
-Lemma inlineAll_Rules_TraceInclusion_l (m : ModWf) :
+Lemma inlineAll_Rules_TraceInclusion_l (m : ModWf type) :
   TraceInclusion (inlineAll_Rules_ModWf m) m.
 Proof.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
@@ -7569,15 +7585,15 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inlineAll_Rules_TraceInclusion_l_new (m : ModWf_new) :
+Theorem inlineAll_Rules_TraceInclusion_l_new (m : ModWf_new type) :
   TraceInclusion (inlineAll_Rules_ModWf_new m) m.
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@inlineAll_Rules_TraceInclusion_l m').
 Qed.
 
-Lemma inlineAll_Meths_TraceInclusion_l (m : ModWf) :
+Lemma inlineAll_Meths_TraceInclusion_l (m : ModWf type) :
   TraceInclusion (inlineAll_Meths_ModWf m) m.
 Proof.
   specialize (flatten_WfMod (wfMod m)) as P1; unfold flatten, getFlat in P1; simpl in P1.
@@ -7589,15 +7605,15 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem inlineAll_Meths_TraceInclusion_l_new (m : ModWf_new) :
+Theorem inlineAll_Meths_TraceInclusion_l_new (m : ModWf_new type) :
   TraceInclusion (inlineAll_Meths_ModWf_new m) m.
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@inlineAll_Meths_TraceInclusion_l m').
 Qed.
 
-Lemma flatten_inline_remove_TraceInclusion_l_lemma (m : ModWf) :
+Lemma flatten_inline_remove_TraceInclusion_l_lemma (m : ModWf type) :
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_remove_ModWf m) (flatten_inline_everything m).
 Proof.
@@ -7612,16 +7628,16 @@ Proof.
   apply (removeHides_createHide_TraceInclusion P2 H).
 Qed.
 
-Theorem flatten_inline_remove_TraceInclusion_l_lemma_new (m : ModWf_new) :
+Theorem flatten_inline_remove_TraceInclusion_l_lemma_new (m : ModWf_new type) :
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_remove_ModWf_new m) (flatten_inline_everything m).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@flatten_inline_remove_TraceInclusion_l_lemma m').
 Qed.
 
-Lemma TraceInclusion_flatten_inline_remove_ModWf_l_lemma (m : ModWf):
+Lemma TraceInclusion_flatten_inline_remove_ModWf_l_lemma (m : ModWf type):
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_remove_ModWf m) (flatten_inline_everything_ModWf m).
 Proof.
@@ -7630,16 +7646,16 @@ Proof.
   eauto using flatten_inline_remove_TraceInclusion_l_lemma.
 Qed.
 
-Theorem TraceInclusion_flatten_inline_remove_ModWf_l_lemma_new (m : ModWf_new):
+Theorem TraceInclusion_flatten_inline_remove_ModWf_l_lemma_new (m : ModWf_new type):
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_remove_ModWf_new m) (flatten_inline_everything_ModWf_new m).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@TraceInclusion_flatten_inline_remove_ModWf_l_lemma m').
 Qed.
 
-Lemma TraceInclusion_flatten_inline_remove_ModWf_r_lemma (m : ModWf):
+Lemma TraceInclusion_flatten_inline_remove_ModWf_r_lemma (m : ModWf type):
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_everything_ModWf m) (flatten_inline_remove_ModWf m).
 Proof.
@@ -7648,16 +7664,16 @@ Proof.
   eauto using flatten_inline_remove_TraceInclusion_r_lemma.
 Qed.
 
-Theorem TraceInclusion_flatten_inline_remove_ModWf_r_lemma_new (m : ModWf_new):
+Theorem TraceInclusion_flatten_inline_remove_ModWf_r_lemma_new (m : ModWf_new type):
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_everything_ModWf_new m) (flatten_inline_remove_ModWf_new m).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@TraceInclusion_flatten_inline_remove_ModWf_r_lemma m').
 Qed.
 
-Lemma flatten_inline_remove_TraceInclusion_l (m : ModWf) :
+Lemma flatten_inline_remove_TraceInclusion_l (m : ModWf type) :
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_remove_ModWf m) m.
 Proof.
@@ -7667,16 +7683,16 @@ Proof.
   - eapply TraceInclusion_flatten_inline_everything_l.
 Qed.
 
-Theorem flatten_inline_remove_TraceInclusion_l_new (m : ModWf_new) :
+Theorem flatten_inline_remove_TraceInclusion_l_new (m : ModWf_new type) :
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_remove_ModWf_new m) m.
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@flatten_inline_remove_TraceInclusion_l m').
 Qed.
 
-Lemma flatten_inline_remove_TraceInclusion_r (m : ModWf) :
+Lemma flatten_inline_remove_TraceInclusion_r (m : ModWf type) :
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion m (flatten_inline_remove_ModWf m).
 Proof.
@@ -7686,16 +7702,16 @@ Proof.
   - eapply TraceInclusion_flatten_inline_remove_ModWf_r_lemma; eauto.
 Qed.
 
-Theorem flatten_inline_remove_TraceInclusion_r_new (m : ModWf_new) :
+Theorem flatten_inline_remove_TraceInclusion_r_new (m : ModWf_new type) :
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion m (flatten_inline_remove_ModWf_new m).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@flatten_inline_remove_TraceInclusion_r m').
 Qed.
 
-Lemma TraceInclusion_flatten_inline_remove_ModWf_l (m : ModWf):
+Lemma TraceInclusion_flatten_inline_remove_ModWf_l (m : ModWf type):
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_remove_ModWf m) m.
 Proof.
@@ -7704,16 +7720,16 @@ Proof.
   eauto using flatten_inline_remove_TraceInclusion_l.
 Qed.
 
-Theorem TraceInclusion_flatten_inline_remove_ModWf_l_new (m : ModWf_new):
+Theorem TraceInclusion_flatten_inline_remove_ModWf_l_new (m : ModWf_new type):
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion (flatten_inline_remove_ModWf_new m) m.
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@TraceInclusion_flatten_inline_remove_ModWf_l m').
 Qed.
 
-Lemma TraceInclusion_flatten_inline_remove_ModWf_r (m : ModWf):
+Lemma TraceInclusion_flatten_inline_remove_ModWf_r (m : ModWf type):
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion m (flatten_inline_remove_ModWf m).
 Proof.
@@ -7722,16 +7738,16 @@ Proof.
   eauto using flatten_inline_remove_TraceInclusion_r.
 Qed.
 
-Theorem TraceInclusion_flatten_inline_remove_ModWf_r_new (m : ModWf_new):
+Theorem TraceInclusion_flatten_inline_remove_ModWf_r_new (m : ModWf_new type):
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceInclusion m (flatten_inline_remove_ModWf_new m).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@TraceInclusion_flatten_inline_remove_ModWf_r m').
 Qed.
 
-Lemma TraceEquiv_flatten_inline_remove_ModWf (m: ModWf):
+Lemma TraceEquiv_flatten_inline_remove_ModWf (m: ModWf type):
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceEquiv m (flatten_inline_remove_ModWf m).
 Proof.
@@ -7742,19 +7758,19 @@ Proof.
   - eapply TraceInclusion_flatten_inline_remove_ModWf_l; auto.
 Qed.
 
-Theorem TraceEquiv_flatten_inline_remove_ModWf_new (m: ModWf_new):
+Theorem TraceEquiv_flatten_inline_remove_ModWf_new (m: ModWf_new type):
   NoSelfCallBaseModule (inlineAll_All_mod m) ->
   TraceEquiv m (flatten_inline_remove_ModWf_new m).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@TraceEquiv_flatten_inline_remove_ModWf m').
 Qed.
 
-Lemma distributeHideWf (m1 m2 : Mod) (h : string) (HNeverCall : NeverCallMod m1):
-  WfMod (HideMeth (ConcatMod m1 m2) h) ->
+Lemma distributeHideWf ty (m1 m2 : Mod) (h : string) (HNeverCall : NeverCallMod m1):
+  WfMod ty (HideMeth (ConcatMod m1 m2) h) ->
   ~ In h (map fst (getAllMethods m1)) ->
-  WfMod (ConcatMod m1 (HideMeth m2 h)).
+  WfMod ty (ConcatMod m1 (HideMeth m2 h)).
 Proof.
   intros; inv H.
   inv HWf.
@@ -7767,7 +7783,7 @@ Proof.
     + specialize (H _ H2).
       induction HNeverCall.
       -- inv HNCBaseModule.
-         specialize (H3 _ type H2).
+         specialize (H3 _ ty H2).
          induction H; inv H3; EqDep_subst; econstructor; eauto.
          tauto.
       -- eapply IHHNeverCall; eauto.
@@ -7861,7 +7877,7 @@ Proof.
     + specialize (H1 _ H2 v).
       induction HNeverCall.
       -- inv HNCBaseModule.
-         specialize (H4 _ type H2 v).
+         specialize (H4 _ ty H2 v).
          induction H1; inv H4; EqDep_subst; econstructor; eauto.
          tauto.
       -- eapply IHHNeverCall; eauto.
@@ -7954,11 +7970,11 @@ Proof.
                rewrite in_app_iff; right; assumption.
 Qed.
 
-Lemma distributeHidesWf (m1 m2 : Mod) (hl1 hl2 : list string)
+Lemma distributeHidesWf ty (m1 m2 : Mod) (hl1 hl2 : list string)
       (HNeverCall : NeverCallMod m1):
-  WfMod (createHideMod (ConcatMod m1 m2) (hl1++hl2)) ->
+  WfMod ty (createHideMod (ConcatMod m1 m2) (hl1++hl2)) ->
   (forall h, In h hl1 -> ~ In h (map fst (getAllMethods m1))) ->
-  WfMod (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2).
+  WfMod ty (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2).
 Proof.
   induction hl1; simpl; intros; auto.
   rewrite WfMod_createHideMod; split.
@@ -7980,10 +7996,10 @@ Proof.
       rewrite WfMod_createHideMod in IHhl1; dest; assumption.
 Qed.
 
-Lemma WfMod_perm (m : Mod) (hl1 hl2: list string):
+Lemma WfMod_perm ty (m : Mod) (hl1 hl2: list string):
   hl1 [=] hl2 ->
-  WfMod (createHideMod m hl1) ->
-  WfMod (createHideMod m hl2).
+  WfMod ty (createHideMod m hl1) ->
+  WfMod ty (createHideMod m hl2).
 Proof.
   intros.
   rewrite WfMod_createHideMod in *; dest; split; auto.
@@ -8156,9 +8172,9 @@ Proof.
     eauto using TraceInclusion_trans.
 Qed.
 
-Lemma factorHideWf (m1 m2 : Mod) (h : string) (HNeverCall : NeverCallMod m1):
-  WfMod (ConcatMod m1 (HideMeth m2 h)) ->
-  WfMod (HideMeth (ConcatMod m1 m2) h) /\
+Lemma factorHideWf ty (m1 m2 : Mod) (h : string) (HNeverCall : NeverCallMod m1):
+  WfMod ty (ConcatMod m1 (HideMeth m2 h)) ->
+  WfMod ty (HideMeth (ConcatMod m1 m2) h) /\
   ~ In h (map fst (getAllMethods m1)).
 Proof.
   intros.
@@ -8173,7 +8189,7 @@ Proof.
       * induction HNeverCall; simpl in *; eauto.
         -- inv HNCBaseModule.
            specialize (H _ H1).
-           specialize (H2 _ type H1).
+           specialize (H2 _ ty H1).
            clear - H H2.
            induction H; inv H2; EqDep_subst; econstructor; eauto.
            tauto.
@@ -8186,7 +8202,7 @@ Proof.
       * induction HNeverCall; simpl in *; eauto.
         -- inv HNCBaseModule.
            specialize (H0 _ H1 v).
-           specialize (H3 _ type H1 v).
+           specialize (H3 _ ty H1 v).
            clear - H0 H3.
            induction H0; inv H3; EqDep_subst; econstructor; eauto.
            tauto.
@@ -8203,10 +8219,10 @@ Proof.
     specialize (HDisjMeths h); tauto.
 Qed.
 
-Lemma factorHidesWf (m1 m2 : Mod) (hl1 hl2: list string)
+Lemma factorHidesWf ty (m1 m2 : Mod) (hl1 hl2: list string)
       (HNeverCall : NeverCallMod m1):
-  WfMod (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2) ->
-  WfMod (createHideMod (ConcatMod m1 m2) (hl1++hl2)) /\
+  WfMod ty (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2) ->
+  WfMod ty (createHideMod (ConcatMod m1 m2) (hl1++hl2)) /\
   (forall h, In h hl1 -> ~ In h (map fst (getAllMethods m1))).
 Proof.
   induction hl1; simpl in *; auto.
@@ -8380,7 +8396,7 @@ Qed.
 
 Lemma Concat_removeHide (m1 : Mod) {m2 : BaseModule} (hl1 hl2 : list string)
       (NoSelfCall : NoSelfCallBaseModule m2):
-  WfMod (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2) ->
+  WfMod type (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2) ->
   TraceInclusion (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2)
                  (createHideMod (ConcatMod m1 (removeHides m2 hl1)) hl2).
 Proof.
@@ -8468,7 +8484,7 @@ Qed.
 
 Lemma Concat_createHide (m1 : Mod) {m2 : BaseModule} (hl1 hl2 : list string)
       (NoSelfCall : NoSelfCallBaseModule m2):
-  WfMod (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2) ->
+  WfMod type (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2) ->
   TraceInclusion (createHideMod (ConcatMod m1 (removeHides m2 hl1)) hl2)
                  (createHideMod (ConcatMod m1 (createHideMod m2 hl1)) hl2).
 Proof.
@@ -8573,8 +8589,8 @@ Proof.
     apply RegFileBase_noCalls.
 Qed.
 
-Lemma WfConcatActionT_inlineSingle_Meth {k : Kind} (f: DefMethT) (a : ActionT type k) m:
-  (forall v, WfConcatActionT (projT2 (snd f) type v) m) ->
+Lemma WfConcatActionT_inlineSingle_Meth {ty} {k : Kind} (f: DefMethT) (a : ActionT ty k) m:
+  (forall v, WfConcatActionT (projT2 (snd f) ty v) m) ->
   WfConcatActionT a m ->
   WfConcatActionT (inlineSingle a f) m.
 Proof.
@@ -8584,12 +8600,12 @@ Proof.
   econstructor; eauto.
 Qed.
 
-Lemma WfConcatActionT_inlineSingle_Rule_map rule (f : DefMethT) rules m:
-  (forall v, WfConcatActionT (projT2 (snd f) type v) m) ->
+Lemma WfConcatActionT_inlineSingle_Rule_map ty rule (f : DefMethT) rules m:
+  (forall v, WfConcatActionT (projT2 (snd f) ty v) m) ->
   In rule (map (inlineSingle_Rule f) rules) ->
   (forall rule', In rule' rules ->
-                 WfConcatActionT (snd rule' type) m) ->
-  WfConcatActionT (snd rule type) m.
+                 WfConcatActionT (snd rule' ty) m) ->
+  WfConcatActionT (snd rule ty) m.
 Proof.
   intros.
   induction rules; simpl in *;[tauto|].
@@ -8599,12 +8615,12 @@ Proof.
   eapply WfConcatActionT_inlineSingle_Meth; eauto.
 Qed.
 
-Lemma WfConcatActionT_inlineSingle_Meth_map meth (f : DefMethT) meths m:
-  (forall v, WfConcatActionT (projT2 (snd f) type v) m) ->
+Lemma WfConcatActionT_inlineSingle_Meth_map ty meth (f : DefMethT) meths m:
+  (forall v, WfConcatActionT (projT2 (snd f) ty v) m) ->
   In meth (map (inlineSingle_Meth f) meths) ->
   (forall meth', In meth' meths ->
-                 (forall v', WfConcatActionT (projT2 (snd meth') type v') m)) ->
-  (forall v, WfConcatActionT (projT2 (snd meth) type v) m).
+                 (forall v', WfConcatActionT (projT2 (snd meth') ty v') m)) ->
+  (forall v, WfConcatActionT (projT2 (snd meth) ty v) m).
 Proof.
   intros.
   induction meths; simpl in *;[tauto|].
@@ -8615,16 +8631,16 @@ Proof.
   eapply WfConcatActionT_inlineSingle_Meth; eauto.
 Qed.
 
-Lemma WfConcatActionT_inlineSingle_Rule_pos rule meths m xs:
+Lemma WfConcatActionT_inlineSingle_Rule_pos ty rule meths m xs:
     (forall (f : DefMethT), In f meths ->
-                            (forall v, WfConcatActionT (projT2 (snd f) type v) m)) ->
+                            (forall v, WfConcatActionT (projT2 (snd f) ty v) m)) ->
     forall (rules : list RuleT),
       (forall rule', In rule' rules ->
-                     WfConcatActionT (snd rule' type) m) ->
+                     WfConcatActionT (snd rule' ty) m) ->
       In rule (fold_left
                  (fun (newRules : list RuleT) (n : nat) =>
                     inlineSingle_Rules_pos meths n newRules) xs rules) ->
-      WfConcatActionT (snd rule type) m.
+      WfConcatActionT (snd rule ty) m.
 Proof.
   induction xs; simpl; intros; simpl in *; auto.
   eapply IHxs;[ | | apply H1]; eauto.
@@ -8636,12 +8652,12 @@ Proof.
   apply (nth_error_In _ _ H2).
 Qed.
 
-Lemma WfConcatActionT_inlineSingle_Meth_pos meth m xs:
+Lemma WfConcatActionT_inlineSingle_Meth_pos ty meth m xs:
   forall meths,
     (forall (f : DefMethT), In f meths ->
-                            (forall v, WfConcatActionT (projT2 (snd f) type v) m)) ->
+                            (forall v, WfConcatActionT (projT2 (snd f) ty v) m)) ->
     In meth (fold_left inlineSingle_Meths_pos xs meths) ->
-    (forall v, WfConcatActionT (projT2 (snd meth) type v) m).
+    (forall v, WfConcatActionT (projT2 (snd meth) ty v) m).
 Proof.
   induction xs; simpl; intros; simpl in *; auto.
   eapply IHxs;[|apply H0].
@@ -8656,31 +8672,31 @@ Proof.
     apply H; auto.
 Qed.
 
-Corollary WfConcatActionT_inlineAll_Meths meth meths m:
+Corollary WfConcatActionT_inlineAll_Meths ty meth meths m:
     (forall (f : DefMethT), In f meths ->
-                            (forall v, WfConcatActionT (projT2 (snd f) type v) m)) ->
+                            (forall v, WfConcatActionT (projT2 (snd f) ty v) m)) ->
     In meth (inlineAll_Meths meths) ->
-    (forall v, WfConcatActionT (projT2 (snd meth) type v) m).
+    (forall v, WfConcatActionT (projT2 (snd meth) ty v) m).
 Proof.
   unfold inlineAll_Meths.
   eauto using WfConcatActionT_inlineSingle_Meth_pos.
 Qed.
 
-Corollary WfConcatActionT_inlineAll_Rules rule (rules : list RuleT) meths m:
+Corollary WfConcatActionT_inlineAll_Rules ty rule (rules : list RuleT) meths m:
     (forall (f : DefMethT), In f meths ->
-                            (forall v, WfConcatActionT (projT2 (snd f) type v) m)) ->
+                            (forall v, WfConcatActionT (projT2 (snd f) ty v) m)) ->
     (forall rule', In rule' rules ->
-                   WfConcatActionT (snd rule' type) m) ->
+                   WfConcatActionT (snd rule' ty) m) ->
     In rule (inlineAll_Rules meths rules) ->
-    WfConcatActionT (snd rule type) m.
+    WfConcatActionT (snd rule ty) m.
 Proof.
   unfold inlineAll_Rules.
   eauto using WfConcatActionT_inlineSingle_Rule_pos.
 Qed.
 
-Lemma mergeSeparatedDistributed_Wf (m : ModWf):
+Lemma mergeSeparatedDistributed_Wf ty (m : ModWf ty):
   let t := separateModHides m in
-  WfMod (createHideMod (ConcatMod (mergeSeparatedBaseFile (fst (snd t))) (snd (snd t))) (fst t)).
+  WfMod ty (createHideMod (ConcatMod (mergeSeparatedBaseFile (fst (snd t))) (snd (snd t))) (fst t)).
 Proof.
   specialize (WfMod_merge (wfMod m)) as P0.
   unfold mergeSeparatedMod, separateMod in P0; simpl in *.
@@ -8745,8 +8761,8 @@ Proof.
            assert
              (forall meth,
                  In meth (inlineAll_Meths (getAllMethods (mergeSeparatedBaseMod l0))) ->
-                 forall v : type (fst (projT1 (snd meth))),
-                   WfConcatActionT (projT2 (snd meth) type v) (mergeSeparatedBaseFile l)).
+                 forall v : ty (fst (projT1 (snd meth))),
+                   WfConcatActionT (projT2 (snd meth) ty v) (mergeSeparatedBaseFile l)).
            { intros. eapply WfConcatActionT_inlineAll_Meths; eauto. }
            clear H0.
            eapply WfConcatActionT_inlineAll_Rules; eauto.
@@ -8768,13 +8784,13 @@ Proof.
     apply IHl; tauto.
 Qed.
 
-Definition mergeSeparatedDistributed_ModWf (m : ModWf) : ModWf :=
+Definition mergeSeparatedDistributed_ModWf {ty} (m : ModWf ty) : ModWf ty :=
   Build_ModWf (mergeSeparatedDistributed_Wf m).
 
-Lemma ConcatMod_CreateHide_RemoveHides (m1 : Mod) (m2 : BaseModule) (hl1 hl2 : list string):
+Lemma ConcatMod_CreateHide_RemoveHides ty (m1 : Mod) (m2 : BaseModule) (hl1 hl2 : list string):
   (forall h, ~In h hl1 \/ ~In h hl2) ->
-  WfMod (createHideMod (ConcatMod m1 (createHide m2 hl1)) hl2)->
-  WfMod (createHideMod (ConcatMod m1 (removeHides m2 hl1)) hl2).
+  WfMod ty (createHideMod (ConcatMod m1 (createHide m2 hl1)) hl2)->
+  WfMod ty (createHideMod (ConcatMod m1 (removeHides m2 hl1)) hl2).
 Proof.
   intros.
   rewrite WfMod_createHideMod in *; split; dest.
@@ -8823,9 +8839,9 @@ Proof.
         induction H0; econstructor; eauto.
 Qed.
 
-Lemma mergeSeparatedRemoved_Wf (m : ModWf):
+Lemma mergeSeparatedRemoved_Wf ty (m : ModWf ty):
   let t := separateModRemove m in
-  WfMod (createHideMod (ConcatMod (mergeSeparatedBaseFile (fst (snd t))) (snd (snd t))) (fst t)).
+  WfMod ty (createHideMod (ConcatMod (mergeSeparatedBaseFile (fst (snd t))) (snd (snd t))) (fst t)).
 Proof.
   intros.
   specialize (mergeSeparatedDistributed_Wf m); intros.
@@ -8837,23 +8853,23 @@ Proof.
   intro h; specialize (P0 h); destruct P0; auto.
 Qed.
 
-Lemma mergeSeparatedRemoved_Wf_new (m : ModWf_new):
+Lemma mergeSeparatedRemoved_Wf_new ty (m : ModWf_new ty):
   let t := separateModRemove m in
-  WfMod_new (createHideMod (ConcatMod (mergeSeparatedBaseFile (fst (snd t))) (snd (snd t))) (fst t)).
+  WfMod_new ty (createHideMod (ConcatMod (mergeSeparatedBaseFile (fst (snd t))) (snd (snd t))) (fst t)).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   rewrite WfMod_new_WfMod_iff.
-  eapply (@mergeSeparatedRemoved_Wf m').
+  eapply (@mergeSeparatedRemoved_Wf _ m').
 Qed.
 
-Definition mergeSeparatedRemoved_ModWf (m : ModWf) : ModWf :=
+Definition mergeSeparatedRemoved_ModWf {ty} (m : ModWf ty) : ModWf ty :=
   Build_ModWf (mergeSeparatedRemoved_Wf m).
 
-Definition mergeSeparatedRemoved_ModWf_new (m : ModWf_new) : ModWf_new :=
-  Build_ModWf_new _ (mergeSeparatedRemoved_Wf_new m).
+Definition mergeSeparatedRemoved_ModWf_new {ty} (m : ModWf_new ty) : ModWf_new ty :=
+  Build_ModWf_new _ _ (mergeSeparatedRemoved_Wf_new m).
 
-Lemma mergeSeparatedRemoved_TraceInclusion_l (m : ModWf):
+Lemma mergeSeparatedRemoved_TraceInclusion_l (m : ModWf type):
   baseNoSelfCalls m ->
   TraceInclusion (mergeSeparatedRemoved_ModWf m) m.
 Proof.
@@ -8941,16 +8957,16 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem mergeSeparatedRemoved_TraceInclusion_l_new (m : ModWf_new):
+Theorem mergeSeparatedRemoved_TraceInclusion_l_new (m : ModWf_new type):
   baseNoSelfCalls m ->
   TraceInclusion (mergeSeparatedRemoved_ModWf_new m) m.
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@mergeSeparatedRemoved_TraceInclusion_l m').
 Qed.
 
-Lemma mergeSeparatedRemoved_TraceInclusion_r (m : ModWf):
+Lemma mergeSeparatedRemoved_TraceInclusion_r (m : ModWf type):
   baseNoSelfCalls m ->
   TraceInclusion m (mergeSeparatedRemoved_ModWf m).
 Proof.
@@ -9037,12 +9053,12 @@ Proof.
   eauto using TraceInclusion_trans.
 Qed.
 
-Theorem mergeSeparatedRemoved_TraceInclusion_r_new (m : ModWf_new):
+Theorem mergeSeparatedRemoved_TraceInclusion_r_new (m : ModWf_new type):
   baseNoSelfCalls m ->
   TraceInclusion m (mergeSeparatedRemoved_ModWf_new m).
 Proof.
   destruct m.
-  pose (Build_ModWf (WfMod_new_WfMod _ wfMod_new)) as m'.
+  pose (Build_ModWf (WfMod_new_WfMod _ _ wfMod_new)) as m'.
   eapply (@mergeSeparatedRemoved_TraceInclusion_r m').
 Qed.
 
@@ -9532,7 +9548,7 @@ Proof.
   intros; induction a; econstructor; eauto.
 Qed.
 
-Lemma WfBaseMod_inlineSingle (m : BaseModule) (HWfMod : WfBaseModule m) k (a : ActionT type k):
+Lemma WfBaseMod_inlineSingle ty (m : BaseModule) (HWfMod : WfBaseModule ty m) k (a : ActionT ty k):
   forall  (f : DefMethT),
     In f (getMethods m) ->
     WfActionT (getRegisters m) a ->
@@ -9553,7 +9569,7 @@ Proof.
   setoid_rewrite in_app_iff; split; intros; inv H5; eauto.
 Qed.
 
-Lemma WfExpand k (a : ActionT type k):
+Lemma WfExpand ty k (a : ActionT ty k):
   forall  (m1 m2 : BaseModule),
     SubList (getRegisters m1) (getRegisters m2) ->
     WfActionT (getRegisters m1) a ->
