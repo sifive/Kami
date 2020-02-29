@@ -8,10 +8,33 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Vector as V
 import qualified Data.Char as C
+import System.IO
 
+import Control.Monad
 import Simulator.Util
 import Unsafe.Coerce
 
+import qualified Data.Vector.Mutable as MV
+import Control.Monad.Primitive
+import qualified Data.Vector.Generic as G
+
+mvec_pair_init :: Int -> a -> [(Int,a)] -> IO (MV.MVector (PrimState IO) a)
+mvec_pair_init n xdef xs = do
+    arr <- MV.replicate n xdef
+    foldM (\_ (i,x) -> MV.write arr i x) () xs
+    return arr
+
+mvec_fromList :: [a] -> IO (MV.MVector (PrimState IO) a)
+mvec_fromList xs = do
+    let n = length xs
+    arr <- MV.new n
+    go arr n 0 xs
+
+    where
+        go arr n _ [] = return arr
+        go arr n m (x:xs) = if m == n then return arr else do
+            MV.write arr m x
+            go arr n (m+1) xs
 
 data Tok = Addr Integer | Value BV.BV deriving (Show)
 
@@ -34,5 +57,5 @@ getToks n text = toks_to_addr_vals $ concat $ map ((map $ readTok n) . (filter (
 parseFile :: Int -> Int -> String -> a
 parseFile size idxNum path = unsafeCoerce $ do
     text <- T.readFile path
-    let pairs = getToks size text
-    return $ (V.replicate idxNum 0) V.// (map (\(i,v) -> (fromIntegral i, v)) pairs)
+    let pairs = map (\(i,v) -> (fromIntegral i,v)) $ getToks size $  text
+    return pairs

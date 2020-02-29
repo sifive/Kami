@@ -172,12 +172,38 @@ Instance IOPrintMonad : IOMonad IO := {|
   |}.
 
 Extract Constant IO "a" => "Prelude.IO a".
-Extract Constant Hret => "Prelude.return".
-Extract Constant Hbind => "(GHC.Base.>>=)".
-Extract Constant Herror => "Prelude.error".
+Extract Inlined Constant Hret => "Prelude.return".
+Extract Inlined Constant Hbind => "(GHC.Base.>>=)".
+Extract Inlined Constant Herror => "Prelude.error".
 (*Extract Constant Hprint => "(\str -> (GHC.Base.>>) (Prelude.putStrLn str) (System.IO.hFlush System.IO.stdout))". *)
-Extract Constant Hprint => "Prelude.putStr".
+Extract Inlined Constant Hprint => "Prelude.putStr".
 Extract Constant Hrand_bool => "Prelude.return Prelude.False". (*FIXME*)
 Extract Constant Hrand_word => "Prelude.undefined". (*FIXME*)
 Extract Constant Hrand_vec => "Prelude.undefined". (*FIXME*)
 Extract Constant Hexit => "System.Exit.exitSuccess".
+
+(* Arrays *)
+
+Parameter HArray : Type -> Type.
+Parameter Harr_repl : forall {X}, nat -> X -> IO (HArray X).
+Parameter Harr_slice : forall {X} (i m : nat), HArray X -> IO (HVec m X).
+Parameter Harr_updates : forall {X}, HArray X -> list (nat * X) -> IO unit.
+Parameter Harr_new : forall {X}, nat -> IO (HArray X).
+
+Instance HArrayIsArray : IsArray HArray := {|
+  arr_repl := @Harr_repl;
+  arr_slice := @Harr_slice;
+  arr_updates := @Harr_updates
+  |}.
+
+(** does not work at the moment **)
+(*Extract Constant HArray "a" => "Data.Array.IO.IOArray Prelude.Int a".
+Extract Constant Harr_repl => "(\n x -> Data.Array.MArray.newArray (0, n Prelude.- 1) x)".
+Extract Constant Harr_slice => "(\i m a -> Control.Monad.liftM Data.Vector.fromList (Prelude.sequence (Prelude.map (\j -> Data.Array.MArray.readArray a (j Prelude.+ i)) [0..(m Prelude.- 1)])))".
+Extract Constant Harr_updates => "(\a ps -> Control.Monad.foldM (\_ (i,e) -> Data.Array.MArray.writeArray a i e) () ps)".*)
+
+
+Extract Constant HArray "a" => "Data.Vector.Mutable.MVector (Control.Monad.Primitive.PrimState Prelude.IO) a".
+Extract Constant Harr_repl => "Data.Vector.Mutable.replicate".
+Extract Constant Harr_slice => "(\i m a -> Data.Vector.Generic.freeze (Data.Vector.Mutable.slice i m a))".
+Extract Constant Harr_updates => "(\a ps -> Control.Monad.foldM (\_ (i,x) -> Data.Vector.Mutable.write a i x) () ps)".

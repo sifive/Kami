@@ -22,6 +22,9 @@ Context `{StringMap M}.
 Context {IO : Type -> Type}.
 Context `{IOMonad W V IO}.
 
+Context {Arr : Type -> Type}.
+Context `{IsArray W V IO Arr}.
+
 Definition Val k := eval_Kind W V k.
 Definition ValFK k := eval_FK W V k.
 
@@ -43,7 +46,7 @@ Record RegFile := {
   write : string;
   size : nat;
   kind : Kind;
-  arr : V size (Val kind)
+  arr : Arr (Val kind)
   }.
 
 Record FileState := {
@@ -58,8 +61,8 @@ Definition empty_state : FileState := {|
   files := empty
   |}.
 
-Definition file_async_read(file : RegFile)(i : nat) : Val (Array (chunk_size file) (kind file)) :=
-  slice i _ (arr file).
+Definition file_async_read(file : RegFile)(i : nat) : IO (Val (Array (chunk_size file) (kind file))) :=
+  arr_slice i _ (arr file).
 
 Definition isAddr(file : RegFile) : bool :=
   match readers file with
@@ -67,10 +70,10 @@ Definition isAddr(file : RegFile) : bool :=
   | _ => false
   end.
 
-Definition file_sync_readreq(val : {k : Kind & Val k})(file : RegFile)(regName : string) : option {k : Kind & Val k}. refine
+Definition file_sync_readreq(val : {k : Kind & Val k})(file : RegFile)(regName : string) : IO {k : Kind & Val k}. refine
   match readers file with
-  | Async _ => None
-  | Sync true _ => if Kind_decb (projT1 val) (Bit (Nat.log2_up (size file))) then Some val else None
+  | Async _ => error "Async file encountered while Sync file expected."
+  | Sync true _ => if Kind_decb (projT1 val) (Bit (Nat.log2_up (size file))) then ret val else error "Kind mismatch."
   | Sync false _ => _
   end.
 Proof.
@@ -79,18 +82,17 @@ Proof.
   destruct (Kind_decb k (Bit (Nat.log2_up (size file)))) eqn:Keq.
   - rewrite Kind_decb_eq in Keq.
     rewrite Keq in v.
-    apply Some.
-    exists (Array (chunk_size file) (kind file)).
-    exact (slice (word_to_nat v) (chunk_size file) (arr file)).
-  - exact None.
+    exact (io_do x <- arr_slice (word_to_nat v) (chunk_size file) (arr file);
+           ret (existT _ (Array (chunk_size file) (kind file)) x)).
+  - exact (error "Kind mismatch").
 Defined.
 
-Definition file_sync_readresp(state : FileState)(file : RegFile)(regName : string) : option (Val (Array (chunk_size file) (kind file))). refine
+Definition file_sync_readresp(state : FileState)(file : RegFile)(regName : string) : IO (Val (Array (chunk_size file) (kind file))). refine
   match map_lookup (M := M) regName (int_regs state) with
-  | None => None
+  | None => error "register not found."
   | Some (existT k v) =>
       match readers file with
-      | Async _ => None
+      | Async _ => error "Async file encountered while Sync file expected."
       | Sync true _ => _
       | Sync false _ => _
       end
@@ -100,14 +102,14 @@ Proof.
   - destruct (Kind_decb k (Bit (Nat.log2_up (size file)))) eqn:Keq.
     * rewrite Kind_decb_eq in Keq.
       rewrite Keq in v.
-      exact (Some (slice (word_to_nat v) (chunk_size file) (arr file))).
-    * exact None.
+      exact ((arr_slice (word_to_nat v) (chunk_size file) (arr file))).
+    * exact (error "Kind mismatch.").
   (* isAddr = false *)
   - destruct (Kind_decb k (Array (chunk_size file) (kind file))) eqn:Keq.
     * rewrite Kind_decb_eq in Keq.
       rewrite Keq in v.
-      exact (Some v).
-    * exact None.
+      exact (ret v).
+    * exact (error "Kind mismatch.").
 Defined.
 
 Definition file_writes_mask(file : RegFile)(i : nat)(mask : Val (Array (chunk_size file) Bool))(vals : Val (Array (chunk_size file) (kind file))) : list (nat * Val (kind file)) :=
@@ -120,15 +122,15 @@ Definition file_writes_no_mask(file : RegFile)(i : nat)(vals : Val (Array (chunk
 Definition void_nil : {k : Kind & Val k} :=
   existT _ (Bit 0) (nat_to_word 0).
 
-Definition coerce(v : {k : Kind & Val k})(k : Kind) : option (Val k).
+Definition coerce(v : {k : Kind & Val k})(k : Kind) : IO (Val k).
   refine
     match v with
     | existT k' v' => _
     end.
 Proof.
   destruct (Kind_dec k k').
-  * rewrite e. exact (Some v').
-  * exact None.
+  * rewrite e. exact (ret v').
+  * exact (error "Kind mismatch.").
 Defined.
 
 Fixpoint Tup_lookup{n} : forall (i : Fin.t n)(ks : Fin.t n -> Kind), Tuple (fun i => Val (ks i)) -> {k : Kind & Val k} :=
@@ -137,21 +139,17 @@ Fixpoint Tup_lookup{n} : forall (i : Fin.t n)(ks : Fin.t n -> Kind), Tuple (fun 
   | S m => fun i ks X => fin_case i _ (existT _ (ks F1) (fst X)) (fun j => (Tup_lookup  j _ (snd X)))
   end.
 
-Definition  rf_methcall(state : FileState)(methName : string)(val : {k : Kind & Val k}) : option (option FileUpd * {k : Kind & Val k}). refine
+Definition rf_methcall(state : FileState)(methName : string)(val : {k : Kind & Val k}) : IO (option (option FileUpd * {k : Kind & Val k})). refine
   match map_lookup methName (methods state) with
-  | None => None
+  | None => ret None
   | Some (fc, fileName) => match map_lookup fileName (files state) with
-                           | None => None
+                           | None => ret None
                            | Some file => match fc with
                                           | AsyncRead => _
-                                          | ReadReq regName => match file_sync_readreq val file regName with
-                                                               | None => None
-                                                               | Some p => Some (Some (IntRegWrite regName p), void_nil)
-                                                               end
-                                          | ReadResp regName => match file_sync_readresp state file regName with
-                                                                | None => None
-                                                                | Some v => Some (None, existT _ _ v)
-                                                                end
+                                          | ReadReq regName => (io_do p <- file_sync_readreq val file regName;
+                                                                ret (Some (Some (IntRegWrite regName p), void_nil)))
+                                          | ReadResp regName => (io_do v <- file_sync_readresp state file regName;
+                                                                 ret (Some (None, existT _ _ v)))
                                           | WriteFC => match is_wr_mask file with
                                                        | true => _
                                                        | false => _
@@ -163,93 +161,94 @@ Proof.
   (* AsyncRead *)
   - destruct val as [k v].
     destruct k eqn:G.
-    + exact None.
+    + exact (ret None).
     + pose (i := word_to_nat v).
-      exact (Some (None, existT _ _ (file_async_read file i))).
-    + exact None.
-    + exact None.
+      exact (io_do v <- file_async_read file i;
+             ret (Some (None, existT _ _ v))).
+    + exact (ret None).
+    + exact (ret None).
   (* WriteFC is_wr_mask = true *)
   - destruct val as [k v].
     destruct k eqn:G.
-    + exact None.
-    + exact None.
-    + destruct n as [|[|[|]]]; [exact None | exact None | exact None | idtac]. (* n should be 3 *)
+    + exact (ret None).
+    + exact (ret None).
+    + destruct n as [|[|[|]]]; [ exact (error "Kind mismatch.")
+                               | exact (error "Kind mismatch.")
+                               | exact (error "Kind mismatch.")
+                               | idtac ]. (* n should be 3 *)
       exact (let addr := Tup_lookup F1 k0 v in
              let data_k := Tup_lookup (FS F1) k0 v in
              let mask := Tup_lookup (FS (FS F1)) k0 v in
-             o_do addr' <- coerce addr (Bit (Nat.log2_up (size file)));
-             o_do data' <- coerce data_k (Array (chunk_size file) (kind file));
-             o_do mask' <- coerce mask (Array (chunk_size file) Bool);
-             o_ret (Some (ArrWrite fileName _ (file_writes_mask file (word_to_nat addr') mask' data')), void_nil)).
-    + exact None.
+             io_do addr' <- coerce addr (Bit (Nat.log2_up (size file)));
+             io_do data' <- coerce data_k (Array (chunk_size file) (kind file));
+             io_do mask' <- coerce mask (Array (chunk_size file) Bool);
+             ret (Some (Some (ArrWrite fileName _ (file_writes_mask file (word_to_nat addr') mask' data')), void_nil))).
+    + exact (ret None).
   (* WriteFC is_wr_mask = false *)
   - destruct val as [k v].
     destruct k eqn:G.
-    + exact None.
-    + exact None.
-    + destruct n as [|[|]]; [exact None | exact None | idtac]. (* n should be 2 *)
+    + exact (error "Kind mismatch.").
+    + exact (error "Kind mismatch.").
+    + destruct n as [|[|]]; [ exact (error "Kind mismatch.")
+                            | exact (error "Kind mismatch.")
+                            | idtac ]. (* n should be 2 *)
       exact (let addr := Tup_lookup F1 k0 v in
              let data_k := Tup_lookup (FS F1) k0 v in
-             o_do addr' <- coerce addr (Bit (Nat.log2_up (size file)));
-             o_do data' <- coerce data_k (Array (chunk_size file) (kind file));
-             o_ret (Some (ArrWrite fileName _ (file_writes_no_mask file (word_to_nat addr') data')), void_nil)).
-    + exact None.
+             io_do addr' <- coerce addr (Bit (Nat.log2_up (size file)));
+             io_do data' <- coerce data_k (Array (chunk_size file) (kind file));
+             ret (Some (Some (ArrWrite fileName _ (file_writes_no_mask file (word_to_nat addr') data')), void_nil))).
+    + exact (error "Kind mismatch.").
 Defined.
 
-Definition exec_file_update(u : FileUpd)(state : FileState) : FileState. refine
+Definition exec_file_update(u : FileUpd)(state : FileState) : IO FileState. refine
   match u with
-  | IntRegWrite regName v =>
+  | IntRegWrite regName v => ret
     {| methods := methods state;
        int_regs := insert regName v (int_regs state);
        files := files state
     |}
-  | ArrWrite fileName k upds => 
-    {| methods := methods state;
-       int_regs := int_regs state;
-       files := match map_lookup fileName (files state) with
-                | None => files state
-                | Some file => match Kind_dec k (kind file) with
-                               | left pf => insert fileName 
-                                    {|
-                                      file_name := file_name file;
-                                      is_wr_mask := is_wr_mask file;
-                                      chunk_size := chunk_size file;
-                                      readers := readers file;
-                                      write := write file;
-                                      size := size file;
-                                      kind := kind file;
-                                      arr := updates (arr file) _
-                                    |} (files state)
-                               | right _ => files state
-                               end
-                end
-    |}
+  | ArrWrite fileName k upds => match map_lookup fileName (files state) with
+                                | None => error "File not found."
+                                | Some file => match Kind_dec k (kind file) with
+                                               | left pf => io_do _ <- arr_updates (arr file) _; ret state
+                                               | _ => error "Kind mismatch."
+                                               end
+                                end
   end.
 Proof.
   rewrite pf in upds.
   exact upds.
 Defined.
 
-Definition exec_file_updates := List.fold_right exec_file_update.
+Fixpoint fold_right_m{A B}(f : B -> A -> IO A)(a : A)(bs : list B) : IO A :=
+  match bs with
+  | [] => ret a
+  | b::bs' => io_do x <- f b a;
+              fold_right_m f x bs'
+  end.
 
-Axiom parseFile : forall (size idxNum : nat)(filepath : string), IO (V idxNum (W size)).
+Definition exec_file_updates := fold_right_m exec_file_update.
+
+Axiom parseFile : forall (size idxNum : nat)(filepath : string), IO (list (nat * W size)).
 
 Definition initialize_file(args : list (string * string))(rfb : RegFileBase)(state : FileState) : IO FileState :=
 
   let array := match rfInit rfb with
-               | RFNonFile None => ret (make_vec (fun (_ : Fin.t (rfIdxNum rfb)) => default_val (rfData rfb)))
-               | RFNonFile (Some c) => ret (make_vec (fun _ => eval_ConstT c))
+               | RFNonFile None => arr_repl (rfIdxNum rfb) (default_val (rfData rfb))
+               | RFNonFile (Some c) => arr_repl (rfIdxNum rfb) (eval_ConstT c)
                | RFFile isAscii isArg file _ _ _ =>
                   let filepath := if isArg then match lookup String.eqb file args with
                                                | Some fp => ret fp
                                                | None => error ("File " ++ file ++ " not found!")
                                                end else ret file in
                   (io_do path <- filepath;
-                   io_do words <- parseFile (Syntax.size (rfData rfb)) (rfIdxNum rfb) path;
-                   ret (vec_map (@val_unpack W V _ _ _) words))
+                   io_do pairs <- parseFile (Syntax.size (rfData rfb)) (rfIdxNum rfb) path;
+                   io_do arr <- arr_repl (rfIdxNum rfb) (default_val (rfData rfb));
+                   io_do _ <- arr_updates arr (List.map (fun '(i,w) => (i,@val_unpack W V _ _ _ w)) pairs);
+                   ret arr)
                end in
- (
-  io_do new_arr <- array;
+
+  io_do new_arr <- array; 
 
   let rf := {|
                 file_name := rfDataArray rfb;
@@ -269,7 +268,7 @@ Definition initialize_file(args : list (string * string))(rfb : RegFileBase)(sta
                end in
 
   let newmeths := (rfWrite rfb, (WriteFC, rfDataArray rfb)) :: reads in
-  
+
   let newvals := match rfRead rfb with
                  | Async _ => []
                  | Sync b rs => let k := if b then Bit (Nat.log2_up (rfIdxNum rfb)) else rfData rfb in
@@ -281,7 +280,7 @@ Definition initialize_file(args : list (string * string))(rfb : RegFileBase)(sta
     int_regs := fold_right (fun '(x,y) st => insert x y st) (int_regs state) newvals;
     files := insert (rfDataArray rfb) rf (files state)
     |}
-  ).
+  .
 
 Fixpoint initialize_files(args : list (string * string))(rfbs : list RegFileBase) : IO FileState :=
   match rfbs with

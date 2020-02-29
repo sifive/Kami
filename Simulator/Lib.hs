@@ -114,7 +114,7 @@ user_rules rs = rule :+ user_rules rs where
         b <- isEOF
         if not b then do
             ruleName <- getLine
-            case lookup ruleName rs of
+            case Prelude.lookup ruleName rs of
                 Nothing -> do
                     putStrLn ("Rule " ++ ruleName ++ " not found.")
                     rule
