@@ -422,7 +422,7 @@ Notation "'MODULE_WF' { m1 'with' .. 'with' mN }" :=
 
 Notation "'MOD_WF' { m1 'with' .. 'with' mN }" :=
   {| modWf := {| module := Base (makeModule ((app m1%kami .. (app mN%kami nil) ..))) ;
-                 wfMod := ltac:(discharge_wf) |} ;
+                    wfMod := ltac:(discharge_wf) |} ;
      modOrd := getOrder ((app m1%kami .. (app mN%kami nil) ..)) |}
     (only parsing).
 
@@ -478,39 +478,39 @@ Section mod_test.
   Variable a: string.
   Local Notation "^ x" := (a ++ "." ++ x)%string (at level 0).
 
-  Local Example test : ModWf := MOD_WF{
-                              (concat [Register (^"x") : Bool <- true; Register (^"z") : Bool <- false])
-                                with Register (^"y") : Bool <- false
-                                with Rule (^"r1") := ( Read y: Bool <- ^"y";
-                                                         Write (^"x"): Bool <- #y;
-                                                         Retv )
-                          }.
+  Local Example test : ModWf type := MOD_WF{
+                                         (concat [Register (^"x") : Bool <- true; Register (^"z") : Bool <- false])
+                                           with Register (^"y") : Bool <- false
+                                           with Rule (^"r1") := ( Read y: Bool <- ^"y";
+                                                                Write (^"x"): Bool <- #y;
+                                                                Retv)
+                                       }.
 
-  Local Example test1 := MODULE_WF{
-                             (concat [Register (^"x") : Bool <- true; Register (^"w"): Bool <- true;
-                                        Register (^"t"): Bit 0 <- WO])
-                               with Register (^"y") : Bool <- false
-                               with Rule (^"r1") := ( Read y: Bool <- ^"y";
-                                                        Write (^"x"): Bool <- #y;
-                                                        Retv )
-                           }.
+  Local Example test1 : ModWf type := MODULE_WF{
+                                        (concat [Register (^"x") : Bool <- true; Register (^"w"): Bool <- true;
+                                                Register (^"t"): Bit 0 <- WO])
+                                          with Register (^"y") : Bool <- false
+                                          with Rule (^"r1") := ( Read y: Bool <- ^"y";
+                                                               Write (^"x"): Bool <- #y;
+                                                               Retv )
+                                      }.
 
-  Local Example test_new : ModWf_new := MOD_WF_new {
-                              (concat [Register (^"x") : Bool <- true; Register (^"z") : Bool <- false])
-                                with Register (^"y") : Bool <- false
-                                with Rule (^"r1") := ( Read y: Bool <- ^"y";
-                                                         Write (^"x"): Bool <- #y;
-                                                         Retv )
-                          }.
+  Local Example test_new : ModWf_new type := MOD_WF_new {
+                                                 (concat [Register (^"x") : Bool <- true; Register (^"z") : Bool <- false])
+                                                   with Register (^"y") : Bool <- false
+                                                   with Rule (^"r1") := ( Read y: Bool <- ^"y";
+                                                                        Write (^"x"): Bool <- #y;
+                                                                        Retv )
+                                               }.
 
-  Local Example test1_new := MODULE_WF{
-                             (concat [Register (^"x") : Bool <- true; Register (^"w"): Bool <- true;
-                                        Register (^"t"): Bit 0 <- WO])
-                               with Register (^"y") : Bool <- false
-                               with Rule (^"r1") := ( Read y: Bool <- ^"y";
-                                                        Write (^"x"): Bool <- #y;
-                                                        Retv )
-                           }.
+Local Example test1_new : BaseModuleWf_new type := MODULE_WF_new{
+                                                       (concat [Register (^"x") : Bool <- true; Register (^"w"): Bool <- true;
+                                                               Register (^"t"): Bit 0 <- WO])
+                                                         with Register (^"y") : Bool <- false
+                                                         with Rule (^"r1") := ( Read y: Bool <- ^"y";
+                                                                              Write (^"x"): Bool <- #y;
+                                                                              Retv )
+                                                       }.
 
 End mod_test.
 

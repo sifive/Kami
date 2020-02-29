@@ -2,21 +2,21 @@ Require Import Kami.Syntax Kami.Notations Kami.Tactics.
 Section mod_test.
   Variable a: string.
   Local Notation "^ x" := (a ++ "." ++ x)%string (at level 0).
-  Local Example test := MOD_WF{
-                              Register (^"x") : Bool <- true
-                                with Register (^"y") : Bool <- false
-                                with Rule (^"r1") := ( Read y: Bool <- ^"y";
-                                                         Write (^"x"): Bool <- #y;
-                                                         Retv )
-                          }.
+  Local Example test : ModWf type := MOD_WF{
+                                       Register (^"x") : Bool <- true
+                                         with Register (^"y") : Bool <- false
+                                         with Rule (^"r1") := ( Read y: Bool <- ^"y";
+                                                              Write (^"x"): Bool <- #y;
+                                                              Retv )
+                                     }.
 
-  Local Example test1 := MODULE_WF{
-                             Register (^"x") : Bool <- true
-                               with Register (^"y") : Bool <- false
-                               with Rule (^"r1") := ( Read y: Bool <- ^"y";
-                                                        Write (^"x"): Bool <- #y;
-                                                        Retv )
-                           }.
+  Local Example test1 : ModWf type := MODULE_WF{
+                                          Register (^"x") : Bool <- true
+                                            with Register (^"y") : Bool <- false
+                                            with Rule (^"r1") := ( Read y: Bool <- ^"y";
+                                                                 Write (^"x"): Bool <- #y;
+                                                                 Retv )
+                                        }.
 End mod_test.
 
 

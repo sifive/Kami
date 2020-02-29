@@ -55,6 +55,12 @@ Section Named.
                         :: nil
     }.
 
+Ltac bsimplify_simulatingRule name :=
+  right;
+  exists name;
+  eexists; split; [eauto| do 2 eexists; split; [discharge_SemAction|]].
+
+  
   (* Proving the trace inclusion of the implementation with respect to the spec *)
   Theorem Incrementer_TraceInclusion:
     TraceInclusion (Base IncrementerImpl) (Base IncrementerSpec).
@@ -67,7 +73,7 @@ Section Named.
       discharge_CommonRegisterAuto discharges the goals that require that two methods or a method and rule of
       the implementation are not combinable by automatically searching for at least one register with the two actions write to *)
     discharge_simulation Incrementer_invariant; discharge_CommonRegisterAuto.
-    - simplify_simulatingRule @^"send_and_inc"; subst.
+    - bsimplify_simulatingRule @^"send_and_inc"; subst.
       + auto.
       + simpl. discharge_string_dec.
         repeat (econstructor; eauto; simpl; subst).

@@ -705,10 +705,10 @@ Fixpoint type (k: Kind): Type :=
 
 Section WfBaseMod.
 
+  Variable ty : Kind -> Type.
+  
   Section WfActionT.
-
     Variable regs : list (string * {x : FullKind & RegInitValT x}).
-    Variable ty : Kind -> Type.
 
     Inductive WfActionT: forall lretT, ActionT ty lretT -> Prop :=
     | WfMCall meth s e lretT c: (forall v, WfActionT (c v)) -> @WfActionT lretT (MCall meth s e c)
@@ -770,8 +770,20 @@ Section WfBaseMod.
       | [] => True
       | m::ms => (forall v, WfActionT_new (projT2 (snd m) ty v)) /\ WfMeths ms
       end.
-
+    
   End WfActionT.
+
+  Definition WfBaseModule (m : BaseModule) :=
+    (forall rule, In rule (getRules m) -> WfActionT (getRegisters m) (snd rule ty)) /\
+    (forall meth, In meth (getMethods m) -> forall v, WfActionT (getRegisters m) (projT2 (snd meth) ty v)) /\
+    NoDup (map fst (getMethods m)) /\ NoDup (map fst (getRegisters m)) /\ NoDup (map fst (getRules m)).
+
+  Definition WfBaseModule_new(m : BaseModule) :=
+    (WfRules (getRegisters m) (getRules m)) /\
+    (WfMeths (getRegisters m) (getMethods m)) /\
+    (NoDup (map fst (getMethods m))) /\
+    (NoDup (map fst (getRegisters m))) /\
+    (NoDup (map fst (getRules m))).
 
   Section WfActionT'.
 
@@ -793,17 +805,7 @@ Section WfBaseMod.
 
   End WfActionT'.
 
-  Definition WfBaseModule(m : BaseModule) :=
-    (forall ty rule, In rule (getRules m) -> WfActionT (getRegisters m) (snd rule ty)) /\
-    (forall ty meth, In meth (getMethods m) -> forall v, WfActionT (getRegisters m) (projT2 (snd meth) ty v)) /\
-    NoDup (map fst (getMethods m)) /\ NoDup (map fst (getRegisters m)) /\ NoDup (map fst (getRules m)).
-
-  Definition WfBaseModule_new(m : BaseModule) :=
-    (forall ty, WfRules (getRegisters m) ty (getRules m)) /\
-    (forall ty, WfMeths (getRegisters m) ty (getMethods m)) /\
-    (NoDup (map fst (getMethods m))) /\
-    (NoDup (map fst (getRegisters m))) /\
-    (NoDup (map fst (getRules m))).
+End WfBaseMod.
 
   Lemma WfLetExprSyntax k m (e: LetExprSyntax type k): WfActionT (getRegisters m) (convertLetExprSyntax_ActionT e).
   Proof.
@@ -814,8 +816,6 @@ Section WfBaseMod.
   Proof.
     induction e; simpl; repeat split; auto.
   Qed.
-
-End WfBaseMod.
 
 Section WfBaseModProofs.
 
@@ -956,7 +956,7 @@ Proof.
   - auto.
 Qed.
 
-Lemma wf_rules_In : forall ty regs rules, NoDup (map fst regs) -> (forall rule : RuleT, In rule rules -> WfActionT regs (snd rule ty)) -> WfRules regs ty rules.
+Lemma wf_rules_In : forall ty regs rules, NoDup (map fst regs) -> (forall rule : RuleT, In rule rules -> WfActionT regs (snd rule ty)) -> WfRules ty regs rules.
 Proof.
   induction rules; intros.
   - simpl; auto.
@@ -973,7 +973,7 @@ Proof.
 Qed.
 
 Lemma wf_meths_In : forall ty regs dms, NoDup (map fst regs) -> (forall (meth : string * {x : Signature & MethodT x}),
-    In meth dms -> forall v : ty (fst (projT1 (snd meth))), WfActionT regs (projT2 (snd meth) ty v)) -> WfMeths regs ty dms.
+    In meth dms -> forall v : ty (fst (projT1 (snd meth))), WfActionT regs (projT2 (snd meth) ty v)) -> WfMeths ty regs dms.
 Proof.
   induction dms; intros.
   - simpl; auto.
@@ -1005,21 +1005,15 @@ Proof.
 Qed.
  *)
 
-Lemma WfBaseModule_WfBaseModule_new : forall bm, WfBaseModule bm -> WfBaseModule_new bm.
+Lemma WfBaseModule_WfBaseModule_new : forall ty bm, WfBaseModule ty bm -> WfBaseModule_new ty bm.
 Proof.
-  intros bm [wf_actions [wf_meths [nodup_meths [nodup_regs nodup_rules]]]].
+  intros ty bm [wf_actions [wf_meths [nodup_meths [nodup_regs nodup_rules]]]].
   unfold WfBaseModule_new.
-  repeat split.
-  - intro.
-    destruct bm.
+  repeat split; auto.
+  - destruct bm.
     + exact I.
-    + simpl.
-      eapply wf_rules_In; auto.
-  - simpl.
-    intro; eapply wf_meths_In; auto.
-  - auto.
-  - auto.
-  - auto.
+    + simpl; eapply wf_rules_In; auto.
+  - eapply wf_meths_In; auto.
 Qed.
 
 Lemma WfActionT_new_WfActionT{ty lret} : forall (a : ActionT ty lret) m, WfActionT_new m a -> WfActionT m a.
@@ -1076,7 +1070,7 @@ Proof.
   - apply WfActionT_WfActionT_new; auto.
 Qed.
 
-Lemma In_wf_rules : forall ty regs rules, NoDup (map fst regs) -> WfRules regs ty rules -> (forall rule : RuleT, In rule rules -> WfActionT regs (snd rule ty)).
+Lemma In_wf_rules : forall ty regs rules, NoDup (map fst regs) -> WfRules ty regs rules -> (forall rule : RuleT, In rule rules -> WfActionT regs (snd rule ty)).
 Proof.
   induction rules; intros.
   - destruct H1.
@@ -1086,7 +1080,7 @@ Proof.
     + apply IHrules; auto.
 Qed.
 
-Lemma In_wf_meths : forall ty regs dms, NoDup (map fst regs) -> WfMeths regs ty dms -> forall meth : string * {x : Signature & MethodT x}, In meth dms -> forall v : ty (fst (projT1 (snd meth))),
+Lemma In_wf_meths : forall ty regs dms, NoDup (map fst regs) -> WfMeths ty regs dms -> forall meth : string * {x : Signature & MethodT x}, In meth dms -> forall v : ty (fst (projT1 (snd meth))),
   WfActionT regs (projT2 (snd meth) ty v).
 Proof.
   induction dms; intros.
@@ -1099,23 +1093,20 @@ Proof.
     + apply IHdms; auto.
 Qed.
 
-Lemma WfBaseModule_new_WfBaseModule : forall bm, WfBaseModule_new bm -> WfBaseModule bm.
+Lemma WfBaseModule_new_WfBaseModule : forall ty bm, WfBaseModule_new ty bm -> WfBaseModule ty bm.
 Proof.
-  intros bm [wf_actions [wf_meths [nodup_meths [nodup_regs nodup_rules]]]].
+  intros ty bm [wf_actions [wf_meths [nodup_meths [nodup_regs nodup_rules]]]].
   unfold WfBaseModule.
-  repeat split.
+  repeat split; auto.
   - intros.
-    + eapply In_wf_rules; auto.
+    + eapply In_wf_rules; eauto.
   - intros.
-    + eapply In_wf_meths; auto.
-  - auto.
-  - auto.
-  - auto.
+    + eapply In_wf_meths; eauto.
 Qed.
 
-Lemma WfBaseModule_WfBaseModule_new_iff : forall bm, WfBaseModule bm <-> WfBaseModule_new bm.
+Lemma WfBaseModule_WfBaseModule_new_iff : forall ty bm, WfBaseModule ty bm <-> WfBaseModule_new ty bm.
 Proof.
-  intro bm; split; intro.
+  intros ty bm; split; intro.
   - apply WfBaseModule_WfBaseModule_new; auto.
   - apply WfBaseModule_new_WfBaseModule; auto.
 Qed.
@@ -1173,15 +1164,15 @@ Proof.
   - apply WfConcatActionT_new_WfConcatActionT; auto.
 Qed.
 
-Definition WfConcat m m' :=
-  (forall rule, In rule (getAllRules m) -> WfConcatActionT (snd rule type) m') /\
-  (forall meth, In meth (getAllMethods m) -> forall v, WfConcatActionT (projT2 (snd meth) type v) m').
+Definition WfConcat ty m m' :=
+  (forall rule, In rule (getAllRules m) -> WfConcatActionT (snd rule ty) m') /\
+  (forall meth, In meth (getAllMethods m) -> forall v, WfConcatActionT (projT2 (snd meth) ty v) m').
 
-Definition WfConcat_new m m' :=
-  (forall rule, In rule (getAllRules m) -> WfConcatActionT_new (snd rule type) m') /\
-  (forall meth, In meth (getAllMethods m) -> forall v, WfConcatActionT_new (projT2 (snd meth) type v) m').
+Definition WfConcat_new ty m m' :=
+  (forall rule, In rule (getAllRules m) -> WfConcatActionT_new (snd rule ty) m') /\
+  (forall meth, In meth (getAllMethods m) -> forall v, WfConcatActionT_new (projT2 (snd meth) ty v) m').
 
-Lemma WfConcat_WfConcat_new_iff : forall m m', WfConcat m m' <-> WfConcat_new m m'.
+Lemma WfConcat_WfConcat_new_iff : forall ty m m', WfConcat ty m m' <-> WfConcat_new ty m m'.
 Proof.
   unfold WfConcat, WfConcat_new; intros; repeat split; intros; destruct H.
   - rewrite <- WfConcatActionT_WfConcatActionT_new_iff; auto.
@@ -1190,34 +1181,38 @@ Proof.
   - rewrite WfConcatActionT_WfConcatActionT_new_iff; auto.
 Qed.
 
-Inductive WfMod: Mod -> Prop :=
-| BaseWf m (HWfBaseModule: WfBaseModule m): WfMod (Base m)
-| HideMethWf m s (HHideWf: In s (map fst (getAllMethods m))) (HWf: WfMod m): WfMod (HideMeth m s)
-| ConcatModWf m1 m2 (HDisjRegs: DisjKey (getAllRegisters m1) (getAllRegisters m2))
-              (HDisjRules: DisjKey (getAllRules m1) (getAllRules m2))
-              (HDisjMeths: DisjKey (getAllMethods m1) (getAllMethods m2))
-              (HWf1: WfMod m1) (HWf2: WfMod m2)(WfConcat1: WfConcat m1 m2)
-              (WfConcat2 : WfConcat m2 m1): WfMod (ConcatMod m1 m2).
+Section WfMod.
+  Variable ty : Kind -> Type.
+  Inductive WfMod : Mod -> Prop :=
+  | BaseWf m (HWfBaseModule: WfBaseModule ty m): WfMod (Base m)
+  | HideMethWf m s (HHideWf: In s (map fst (getAllMethods m))) (HWf: WfMod m): WfMod (HideMeth m s)
+  | ConcatModWf m1 m2 (HDisjRegs: DisjKey (getAllRegisters m1) (getAllRegisters m2))
+                (HDisjRules: DisjKey (getAllRules m1) (getAllRules m2))
+                (HDisjMeths: DisjKey (getAllMethods m1) (getAllMethods m2))
+                (HWf1: WfMod m1) (HWf2: WfMod m2)(WfConcat1: WfConcat ty m1 m2)
+                (WfConcat2 : WfConcat ty m2 m1): WfMod (ConcatMod m1 m2).
 
 Fixpoint WfMod_new(m : Mod) : Prop :=
   match m with
-  | Base m => WfBaseModule_new m
+  | Base m => WfBaseModule_new ty m
   | HideMeth m s => In s (map fst (getAllMethods m)) /\ WfMod_new m
   | ConcatMod m1 m2 => DisjKey (getAllRegisters m1) (getAllRegisters m2) /\ DisjKey (getAllRules m1) (getAllRules m2) /\ DisjKey (getAllMethods m1) (getAllMethods m2) /\
-                         WfMod_new m1 /\ WfMod_new m2 /\ WfConcat_new m1 m2 /\ WfConcat_new m2 m1
+                         WfMod_new m1 /\ WfMod_new m2 /\ WfConcat_new ty m1 m2 /\ WfConcat_new ty m2 m1
   end.
 
-Lemma WfMod_WfMod_new : forall m, WfMod m -> WfMod_new m.
+End WfMod.
+
+Lemma WfMod_WfMod_new : forall ty m, WfMod ty m -> WfMod_new ty m.
 Proof.
-  intros m wf_m; induction m; inversion wf_m; simpl.
+  intros ty m wf_m; induction m; inversion wf_m; simpl.
   - rewrite <- WfBaseModule_WfBaseModule_new_iff; auto.
   - auto.
   - repeat rewrite <- WfConcat_WfConcat_new_iff; tauto.
 Qed.
 
-Lemma WfMod_new_WfMod : forall m, WfMod_new m -> WfMod m.
+Lemma WfMod_new_WfMod : forall ty m, WfMod_new ty m -> WfMod ty m.
 Proof.
-  intros m wf_m; induction m; inversion wf_m; simpl.
+  intros ty m wf_m; induction m; inversion wf_m; simpl.
   - econstructor; auto; simpl in wf_m.
     unfold WfBaseModule.
     unfold WfBaseModule_new in wf_m; dest.
@@ -1228,44 +1223,44 @@ Proof.
   - repeat rewrite <- WfConcat_WfConcat_new_iff in H0; econstructor; try tauto.
 Qed.
 
-Lemma WfMod_new_WfMod_iff : forall m, WfMod_new m <-> WfMod m.
+Lemma WfMod_new_WfMod_iff : forall ty m, WfMod_new ty m <-> WfMod ty m.
 Proof.
-  intro m; split; eauto using WfMod_new_WfMod, WfMod_WfMod_new.
+  intros ty m; split; eauto using WfMod_new_WfMod, WfMod_WfMod_new.
 Qed.
 
-Record ModWf : Type := { module :> Mod;
-                         wfMod : WfMod module }.
+Record ModWf ty : Type := { module :> Mod;
+                            wfMod : WfMod ty module }.
 
-Record ModWf_new : Type := { module_new :> Mod;
-  wfMod_new : WfMod_new module_new }.
+Record ModWf_new ty : Type := { module_new :> Mod;
+  wfMod_new : WfMod_new ty module_new }.
 
-Record ModWfOrd := { modWf :> ModWf ;
+Record ModWfOrd ty := { modWf :> ModWf ty;
                      modOrd : list string }.
 
-Record ModWfOrd_new := { modWf_new :> ModWf_new ;
-                     modOrd_new : list string }.
+Record ModWfOrd_new ty := { modWf_new :> ModWf_new ty;
+                            modOrd_new : list string }.
 
-Record BaseModuleWf :=
+Record BaseModuleWf ty :=
   { baseModule :> BaseModule ;
-    wfBaseModule : WfBaseModule baseModule }.
+    wfBaseModule : WfBaseModule ty baseModule }.
 
-Record BaseModuleWf_new :=
+Record BaseModuleWf_new ty :=
   { baseModule_new :> BaseModule ;
-    wfBaseModule_new : WfBaseModule_new baseModule_new }.
+    wfBaseModule_new : WfBaseModule_new ty baseModule_new }.
 
-Record BaseModuleWfOrd :=
-  { baseModuleWf :> BaseModuleWf ;
+Record BaseModuleWfOrd ty :=
+  { baseModuleWf :> BaseModuleWf ty;
     baseModuleOrd : list string }.
 
-Record BaseModuleWfOrd_new :=
-  { baseModuleWf_new :> BaseModuleWf_new ;
+Record BaseModuleWfOrd_new ty :=
+  { baseModuleWf_new :> BaseModuleWf_new ty ;
     baseModuleOrd_new : list string }.
 
-Definition getModWf (m: BaseModuleWf) :=
+Definition getModWf ty (m: BaseModuleWf ty) :=
   {| module := m;
      wfMod := BaseWf (wfBaseModule m) |}.
 
-Definition getModWfOrd (m: BaseModuleWfOrd) :=
+Definition getModWfOrd ty (m: BaseModuleWfOrd ty) :=
   {| modWf := getModWf m;
      modOrd := baseModuleOrd m |}.
 

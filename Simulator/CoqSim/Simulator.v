@@ -365,7 +365,7 @@ Proof.
 Qed.
 
 
-Definition get_wf_rules{ty} : forall init_regs rules, WfRules init_regs ty rules -> 
+Definition get_wf_rules{ty} : forall init_regs rules, WfRules ty init_regs rules -> 
   list {r : RuleT & WfActionT_new init_regs (snd r ty)}.
 Proof.
   intros.
@@ -402,8 +402,8 @@ Proof.
     destruct r; apply kc_cons; auto.
 Qed.
 
-Definition eval_Basemodule_rr{E}`{Environment E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule_new basemod) : mkProd (List.map dec_sig meths) -> M unit. refine (
-  match basemod return WfBaseModule_new basemod -> _ with
+Definition eval_Basemodule_rr{E}`{Environment E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule_new eval_K basemod) : mkProd (List.map dec_sig meths) -> M unit. refine (
+  match basemod return WfBaseModule_new eval_K basemod -> _ with
   | BaseRegFile rf => fun pf fs => _
   | BaseMod regs rules dms =>
       match rules with
@@ -416,13 +416,13 @@ Proof.
   - unfold WfBaseModule_new in pf.
     destruct pf.
     refine (do state <- initialize_files args rfbs;
-    eval_Rules env state (timeout * (List.length rules)) meths _ (unwind_list (get_wf_rules _ _ (H12 _)) _) fs).
+    eval_Rules env state (timeout * (List.length rules)) meths _ (unwind_list (get_wf_rules _ _ H12) _) fs).
     + apply init_regs_kc.
     + simpl.
       destruct H12; discriminate.
 Defined.
 
-Definition eval_BaseMod{E}`{Environment E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule_new basemod) :=
+Definition eval_BaseMod{E}`{Environment E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule_new eval_K basemod) :=
   curry _ (eval_Basemodule_rr env args rfbs timeout meths wf).
 
 End Regs2.
@@ -445,8 +445,7 @@ Context `{StringMap Map}.
 Context `{IOMonad Word Vec M}.
 Context `{IsArray Word Vec IO Arr}.
 
-Definition eval_BaseMod_Wf{E}`{Environment _ _ _ _ _ E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule basemod) :=
+Definition eval_BaseMod_Wf{E}`{Environment _ _ _ _ _ E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule (eval_K Word Vec) basemod) :=
   curry _ (eval_Basemodule_rr env args rfbs timeout meths (WfBaseModule_WfBaseModule_new wf)).
-
 
 End Eval_Wf.

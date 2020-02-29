@@ -83,11 +83,11 @@ Ltac discharge_DisjKey :=
 
 Ltac discharge_wf :=
   repeat match goal with
-         | |- @WfMod _ => constructor_simpl
+         | |- @WfMod _ _ => constructor_simpl
          | |- @WfConcat _ _ => constructor_simpl
          | |- _ /\ _ => constructor_simpl
-         | |- @WfConcatActionT _ _ _ _ => constructor_simpl
-         | |- @WfBaseModule _ => constructor_simpl
+         | |- @WfConcatActionT _ _ _ _ _ => constructor_simpl
+         | |- @WfBaseModule _ _ => constructor_simpl
          | |- @WfActionT _ _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
          | |- @WfActionT _ _ _ _ => constructor_simpl
          | |- NoDup _ => constructor_simpl
@@ -100,11 +100,11 @@ Ltac discharge_wf :=
 
 Ltac discharge_wf_new :=
   repeat match goal with
-         | |- @WfBaseModule_new _ => unfold WfBaseModule_new
-         | |- @WfMod_new _ => constructor_simpl
+         | |- @WfBaseModule_new _ _ => unfold WfBaseModule_new
+         | |- @WfMod_new _ _ => constructor_simpl
          | |- _ /\ _ => constructor_simpl
-         | |- @WfActionT_new _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
-         | |- @WfActionT _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
+         | |- @WfActionT_new _ _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
+         | |- @WfActionT _ _ _ (convertLetExprSyntax_ActionT ?e) => apply WfLetExprSyntax
          | |- NoDup _ => constructor_simpl
          | H: _ \/ _ |- _ => destruct H; subst; simpl
          | |- forall _, _ => intros
@@ -257,7 +257,7 @@ Ltac discharge_simulationWf mySimRel :=
 Ltac discharge_simulation mySimRel :=
   apply simulation with (simRel := mySimRel); auto; simpl; intros;
   try match goal with
-      | |- WfBaseModule _ => discharge_wf
+      | |- WfBaseModule _ _ => discharge_wf
       | H: mySimRel _ _ |- _ => inv H
       end;
   clean_hyp; auto; clean_hyp.

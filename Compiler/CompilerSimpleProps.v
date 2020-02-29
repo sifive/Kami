@@ -83,7 +83,7 @@ Lemma CompActionSimpleTraceEquiv (b : BaseModule) (lrf : list RegFileBase) o :
   let m := inlineAll_All_mod (mergeSeparatedSingle b lrf) in
   let regInits := (getRegisters b) ++ (concat (map getRegFileRegisters lrf)) in
   forall rules lupds lcalls
-         (HWfMod : WfMod (mergeSeparatedSingle b lrf))
+         (HWfMod : WfMod type (mergeSeparatedSingle b lrf))
          (HNoSelfCallsBase : NoSelfCallBaseModule b),
     SubList rules (getRules b) ->
     SemCompActionSimple_Trace regInits (fun s => CompActionSimple_of_CA
