@@ -1223,7 +1223,8 @@ Proof.
     intros.
     rewrite sappendEmpty.
     reflexivity.
-  - intros. rewrite sappend_String_assoc.
+  - intros.
+    rewrite sappend_String_assoc.
     destruct s.
     + simpl.
       rewrite ?String.eqb_refl.
@@ -1238,6 +1239,20 @@ Proof.
         -- reflexivity.
         -- reflexivity.
       * reflexivity.
+Qed.
+
+Theorem sappend_empty_equal: forall a s, (sappend s a=a) <-> (s="").
+Proof.
+  intros.
+  split.
+  - intros.
+    rewrite <- String.eqb_eq in H.
+    rewrite sappend_empty_eq in H.
+    rewrite String.eqb_eq in H.
+    apply H.
+  - intros.
+    subst.
+    reflexivity.
 Qed.
 
 Theorem sappend_assoc: forall a b c, sappend a (sappend b c)=sappend (sappend a b) c.
@@ -1382,51 +1397,14 @@ Qed.
 Theorem srev_eqb : forall s1 s2, String.eqb s1 s2=String.eqb (srev s1) (srev s2).
 Proof.
   intros.
-  induction s1.
-  - destruct s2.
-    + reflexivity.
-    + simpl.
-      remember (srev s2).
-      destruct s.
-      * reflexivity.
-      * reflexivity.
-  - destruct s2.
-    + simpl.
-      remember (srev s1).
-      destruct s.
-      * reflexivity.
-      * reflexivity.
-    + simpl.
-      remember (a =? a0)%char.
-      destruct b.
-      * simpl.
-        assert (forall s1 c1 s2 c2, String.eqb (sappend s1 (String c1 "")) (sappend s2 (String c2 ""))=if (c1 =? c2)%char then String.eqb s1 s2 else false).
-        -- simpl.
-           intros.
-           induction s0.
-           ++ simpl.
-              destruct s3.
-              ** reflexivity.
-              ** simpl.
-                 destruct s3.
-                 --- simpl.
-                     destruct (c1 =? a1)%char.
-                     +++ destruct (c1 =? c2)%char.
-                         *** reflexivity.
-                         *** reflexivity.
-                     +++ destruct (c1 =? c2)%char.
-                         *** reflexivity.
-                         *** reflexivity.
-                 --- simpl.
-                     destruct (c1 =? a1)%char.
-                     +++ destruct (c1 =? c2)%char.
-                         *** reflexivity.
-                         *** reflexivity.
-                     +++ destruct (c1 =? c2)%char.
-                         *** reflexivity.
-                         *** reflexivity.
-           ++ simpl.
-Admitted.
+  erewrite <- sappend_eq_reduce.
+  instantiate (1 := "").
+  assert ((srev s1 =? srev s2) = (sappend (srev s1) "" =? sappend (srev s2) "")).
+      rewrite sappend_eq_reduce.
+      reflexivity.
+  rewrite H.
+  apply srev_eqb_gen.
+Qed.
 
 Fixpoint sdisjPrefix (s1: string) (s2: string) :=
   match s1,s2 with
@@ -1436,9 +1414,131 @@ Fixpoint sdisjPrefix (s1: string) (s2: string) :=
 
 (*Goal sdisjPrefix (srev "_mode") (srev "_int_data_reg")=true.
   simpl.*)
-  
+
+Theorem srev_sappend: forall a b, srev (sappend a b)=sappend (srev b) (srev a).
+Proof.
+  intro a.
+  induction a.
+  - simpl.
+    intros.
+    rewrite sappendEmpty.
+    reflexivity.
+  - intros.
+    simpl.
+    rewrite IHa.
+    rewrite sappend_assoc.
+    reflexivity.
+Qed.
+
+Theorem String_same_false: forall b a, String a b=b -> False.
+Proof.
+  intro b.
+  induction b.
+  - simpl.
+    intros.
+    inversion H.
+  - intros.
+    remember (Ascii.eqb a a0) in H.
+    destruct b0.
+    + symmetry in Heqb0.
+      rewrite Ascii.eqb_eq in Heqb0.
+      subst.
+      inversion H; subst; clear H.
+      apply IHb in H1.
+      inversion H1.
+    + symmetry in Heqb0.
+      apply Ascii.eqb_neq in Heqb0.
+      inversion H;subst;clear H.
+      apply Heqb0.
+      reflexivity.
+Qed.
+
+Theorem sappend_equal_tail: forall c b a, a=b <-> sappend a c=sappend b c.
+Proof.
+  split.
+  - intros.
+    subst.
+    reflexivity.
+  - generalize a.
+    generalize b.
+    induction c.
+    + simpl.
+      intros.
+      rewrite sappendEmpty in H.
+      rewrite sappendEmpty in H.
+      subst.
+      reflexivity.
+    + simpl.
+      intros.
+      
+Admitted.
+
+Theorem sappend_different_last: forall a b c d, sappend a (String b "")=sappend c (String d "") -> b<>d -> False.
+Admitted.
+
+Theorem equal_srev: forall a b c, a=b <-> sappend (srev a) c=sappend (srev b) c.
+Proof.
+  intro a.
+  induction a.
+  - simpl.
+    intros.
+    destruct b.
+    + simpl.
+      split.
+      * reflexivity.
+      * reflexivity.
+    + simpl.
+      split.
+      * intros.
+        inversion H.
+      * intros.
+        remember (srev b).
+        destruct s.
+        -- simpl in H.
+           symmetry in H.
+           apply String_same_false in H.
+           inversion H.
+        -- symmetry in H.
+           rewrite sappend_empty_equal in H.
+           inversion H.
+  - split.
+    + intros.
+      subst.
+      reflexivity.
+    + intros.
+      destruct b.
+      * simpl in H.
+        rewrite sappend_empty_equal in H.
+        remember (srev a0).
+        destruct s.
+        -- inversion H.
+        -- inversion H.
+      * simpl in H.
+        rewrite <- sappend_assoc in H.
+        rewrite <- sappend_assoc in H.
+        remember (Ascii.eqb a a1).
+        destruct b0.
+        -- symmetry in Heqb0.
+           apply Ascii.eqb_eq in Heqb0.
+           subst.
+           apply <- IHa in H.
+           subst.
+           reflexivity.
+        -- symmetry in Heqb0.
+           apply Ascii.eqb_neq in Heqb0.
+           rewrite sappend_assoc in H.
+           rewrite sappend_assoc in H.
+           apply sappend_equal_tail in H.
+           apply sappend_different_last in H.
+           ++ inversion H.
+           ++ apply Heqb0.
+Qed.
+
 Theorem sdisjPrefix_false: forall p1 p2 s1 s2,
     sdisjPrefix (srev s1) (srev s2)=true -> False=(p1++s1=p2++s2)%string.
+Proof.
+  intros.
+  
 Admitted.
 
 Theorem sappend_append: forall s1 s2, sappend s1 s2=String.append s1 s2.
