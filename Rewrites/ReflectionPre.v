@@ -1640,7 +1640,7 @@ Proof.
         reflexivity.
 Qed.
 
-Theorem sdisjPrefix_false: forall p1 p2 s1 s2,
+Theorem sdisjPrefix_sappend_false: forall p1 p2 s1 s2,
     sdisjPrefix (srev s1) (srev s2)=true -> sappend p1 s1=sappend p2 s2 -> False.
 Proof.
   intros.
@@ -1663,6 +1663,25 @@ Proof.
     rewrite IHs1.
     reflexivity.
 Qed.
+
+Theorem sdisjPrefix_false': forall p1 p2 s1 s2,
+    sdisjPrefix (srev s1) (srev s2)=true -> (p1++s1=p2++s2)%string -> False.
+Proof.
+  intros p1 p2 s1 s2.
+  repeat (rewrite <- sappend_append).
+  assert ((p2++s2)%string=sappend p2 s2).
+  - rewrite <- sappend_append.
+    reflexivity.
+  - rewrite H.
+    intros.
+    eapply sdisjPrefix_sappend_false.
+    + apply H0.
+    + apply H1.
+Qed.
+
+Theorem sdisjPrefix_false: forall p1 p2 s1 s2,
+    sdisjPrefix (srev s1) (srev s2)=true -> False=(p1++s1=p2++s2)%string.
+Admitted.
 
 Hint Rewrite sappend_append : kami_rewrite_db.
     
