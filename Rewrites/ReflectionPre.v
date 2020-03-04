@@ -1453,6 +1453,32 @@ Proof.
       reflexivity.
 Qed.
 
+Theorem sappend_String_equal: forall a b c, sappend a (String c "")=sappend b (String c "") -> a = b.
+Proof.
+  intro a.
+  induction a.
+  - intros.
+    destruct b.
+    + reflexivity.
+    + simpl in H.
+      inversion H; subst; clear H.
+      destruct b.
+      * inversion H2.
+      * inversion H2.
+  - intros.
+    destruct b.
+    + simpl in H.
+      inversion H; subst; clear H.
+      destruct a0.
+      * inversion H2.
+      * inversion H2.
+    + simpl in H.
+      inversion H; subst; clear H.
+      f_equal.
+      eapply IHa.
+      apply H2.
+Qed.
+
 Theorem sappend_equal_tail: forall c b a, a=b <-> sappend a c=sappend b c.
 Proof.
   split.
@@ -1470,13 +1496,48 @@ Proof.
       reflexivity.
     + simpl.
       intros.
-      
-Admitted.
+      rewrite sappend_String_assoc in H.
+      assert (sappend b0 (String a0 c)=(sappend (sappend b0 (String a0 "")) c)).
+        rewrite <- sappend_String_assoc.
+        reflexivity.
+      rewrite H0 in H.
+      apply IHc in H.
+      apply sappend_String_equal in H.
+      apply H.
+Qed.
 
 Theorem sappend_different_last: forall a b c d, sappend a (String b "")=sappend c (String d "") -> b<>d -> False.
-Admitted.
+Proof.
+  intro a.
+  induction a.
+  - intros.
+    simpl in H.
+    destruct c.
+    + simpl in H.
+      inversion H; subst; clear H.
+      apply H0.
+      reflexivity.
+    + simpl in H.
+      inversion H; subst; clear H.
+      destruct c.
+      * inversion H3.
+      * inversion H3.
+  - intros.
+    simpl in H.
+    destruct c.
+    + simpl in H.
+      inversion H.
+      destruct a0.
+      * inversion H3.
+      * inversion H3.
+    + simpl in H.
+      inversion H; subst; clear H.
+      eapply IHa.
+      apply H3.
+      apply H0.
+Qed.
 
-Theorem equal_srev: forall a b c, a=b <-> sappend (srev a) c=sappend (srev b) c.
+Theorem equal_srev_sappend: forall a b c, a=b <-> sappend (srev a) c=sappend (srev b) c.
 Proof.
   intro a.
   induction a.
@@ -1534,12 +1595,64 @@ Proof.
            ++ apply Heqb0.
 Qed.
 
-Theorem sdisjPrefix_false: forall p1 p2 s1 s2,
-    sdisjPrefix (srev s1) (srev s2)=true -> False=(p1++s1=p2++s2)%string.
+Theorem equal_srev: forall a b, a=b <-> srev a=srev b.
 Proof.
   intros.
-  
-Admitted.
+  split.
+  - intros.
+    subst.
+    reflexivity.
+  - intros.
+    assert (sappend (srev a) ""=sappend (srev b) "").
+    + rewrite H.
+      reflexivity.
+    + apply <- equal_srev_sappend in H0.
+      apply H0.
+Qed.
+
+Theorem sdisjPrefix_sappend_not_equal: forall s1 s2 p1 p2,
+    sdisjPrefix s1 s2=true -> (sappend s1 p1=sappend s2 p2)%string -> False.
+Proof.
+  intro s1.
+  induction s1.
+  - intros.
+    inversion H.
+  - destruct s2.
+    + intros.
+      inversion H.
+    + intros.
+      simpl in H.
+      remember (Ascii.eqb a a0).
+      destruct b.
+      * symmetry in Heqb.
+        rewrite Ascii.eqb_eq in Heqb.
+        subst.
+        simpl.
+        simpl in H0.
+        inversion H0; subst; clear H0.
+        eapply IHs1.
+        ++ apply H.
+        ++ apply H2.
+      * inversion H0; subst; clear H0.
+        symmetry in Heqb.
+        rewrite Ascii.eqb_neq in Heqb.
+        apply Heqb.
+        reflexivity.
+Qed.
+
+Theorem sdisjPrefix_false: forall p1 p2 s1 s2,
+    sdisjPrefix (srev s1) (srev s2)=true -> sappend p1 s1=sappend p2 s2 -> False.
+Proof.
+  intros.
+  eapply sdisjPrefix_sappend_not_equal in H.
+  - inversion H.
+  - instantiate (1 := (srev p2)).
+    instantiate (1 := (srev p1)).
+    rewrite <- srev_sappend.
+    rewrite <- srev_sappend.
+    rewrite H0.
+    reflexivity.
+Qed.
 
 Theorem sappend_append: forall s1 s2, sappend s1 s2=String.append s1 s2.
 Proof.
