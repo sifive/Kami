@@ -7,11 +7,8 @@ Require Import Kami.Rewrites.ReflectionPre.
 Require Import Kami.Rewrites.ReflectionSoundTopTheorems.
 Require Import Kami.Rewrites.ReflectionSoundTheorems1.
 Require Import Kami.Rewrites.ReflectionSoundTheorems2.
-Require Import Kami.Rewrites.ReflectionSoundTheorems3.
-Require Import Kami.Rewrites.ReflectionSoundTheorems4.
-Require Import Kami.Rewrites.ReflectionSoundTheorems5.
 
-Goal forall (a:ModuleElt) (b:list ModuleElt) c, app (cons a b) c=cons a (app b c).
+(*Goal forall (a:ModuleElt) (b:list ModuleElt) c, app (cons a b) c=cons a (app b c).
   intros.
   match goal with
   | |- ?A = ?B => let x := (ltac:(KRExprReify A (KRTypeList (KRTypeElem KRElemModuleElt)))) in
@@ -19,7 +16,7 @@ Goal forall (a:ModuleElt) (b:list ModuleElt) c, app (cons a b) c=cons a (app b c
                     rewrite KRSimplifySound_list_ModuleElt;
                     cbv [KRSimplify_list_ModuleElt KRSimplifyTop_list_ModuleElt KRExprDenote_list_ModuleElt KRExprDenote_ModuleElt KRSimplifyTop_ModuleElt KRSimplify_ModuleElt]
   end.
-Abort.
+Abort.*)
 
 Ltac KRSimplifyTac e tp :=
   let x := (ltac:(KRExprReify e tp)) in
@@ -74,7 +71,7 @@ Ltac KRSimplifyTac e tp :=
                 | (KRTypeList (KRTypeElem KRElemMod)) => KRSimplifySound_list_Mod
                 | (KRTypeElem KRElemProp) => KRSimplifySound_Prop
                 end in
-  change e with (denote x);repeat (rewrite simplifySound;cbv [
+  change e with (denote x);repeat (rewrite <- simplifySound;cbv [
                 sappend srev sdisjPrefix String.eqb Ascii.eqb Bool.eqb
                 KRSimplify_RegInitT KRSimplifyTop_RegInitT
                 KRSimplify_RegInitValT KRSimplifyTop_RegInitValT
@@ -210,7 +207,7 @@ Goal forall proc_name, ~(( proc_name ++ "_" ++ "a")%string = (proc_name ++ "_" +
   | |- ~ ?A => 
     let x := (ltac:(KRExprReify (~A) (KRTypeElem KRElemProp))) in change (~A) with (KRExprDenote_Prop x)
   end.
-  rewrite KRSimplifySound_Prop.
+  rewrite <- KRSimplifySound_Prop.
   cbv [
                 KRSimplify_RegInitT KRSimplifyTop_RegInitT
                 KRSimplify_RegInitValT KRSimplifyTop_RegInitValT

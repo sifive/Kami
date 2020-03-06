@@ -409,3 +409,11 @@ Qed.
 
 Hint Rewrite KRSimplifySound_list_Mod : KRSimplify.
 
+Theorem KRSimplifySound_RegFileBase: forall e,
+     KRExprDenote_RegFileBase (KRSimplify_RegFileBase e) = KRExprDenote_RegFileBase e.
+Proof.
+  intros.
+  destruct e. reflexivity.
+Qed.
+
+Hint Rewrite KRSimplifySound_RegFileBase : KRSimplify.
