@@ -3,7 +3,7 @@
  *)
 Require Import Kami.AllNotations.
 Require Import Kami.Notations.
-Require Import Kami.Notations_rewrites.
+Require Import Kami.Rewrites.Notations_rewrites.
 Require Import Kami.Properties.
 Require Import Kami.PProperties.
 Require Import Kami.Syntax.
