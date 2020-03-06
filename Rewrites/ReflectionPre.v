@@ -1,7 +1,7 @@
 Require Import Kami.Notations.
 Require Import Kami.Syntax.
 Require Import List.
-Require Import Kami.Notations_rewrites.
+Require Import Kami.Rewrites.Notations_rewrites.
 Require Import Program.Equality.
 
 Inductive KRExpr_RegInitT: Type :=
