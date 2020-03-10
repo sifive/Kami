@@ -501,3 +501,5 @@ Proof.
       reflexivity.
       exact H6.
 Qed.
+
+End Proofs.
