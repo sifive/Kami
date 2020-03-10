@@ -4823,6 +4823,115 @@ Section Fold.
   Qed.
 End Fold.
 
+Section FoldExpr.
+  Variable k: Kind.
+
+  Variable f: Expr type (SyntaxKind k) -> Expr type (SyntaxKind k) -> Expr type (SyntaxKind k).
+  Variable fEval: type k -> type k -> type k.
+  Variable fEval_f: forall x y, evalExpr (f x y) = fEval (evalExpr x) (evalExpr y).
+
+  Lemma evalFoldLeft_Expr ls:
+    forall seed,
+      evalExpr (fold_left f ls seed) =
+      fold_left fEval (map (@evalExpr _) ls) (evalExpr seed).
+  Proof.
+    induction ls; simpl; auto; intros.
+    rewrite IHls; simpl.
+    rewrite fEval_f.
+    reflexivity.
+  Qed.
+
+  Lemma evalFoldRight_Expr ls:
+    forall seed,
+      evalExpr (fold_right f seed ls) =
+      fold_right fEval (evalExpr seed) (map (@evalExpr _) ls).
+  Proof.
+    induction ls; simpl; auto; intros.
+    rewrite fEval_f.
+    rewrite IHls; simpl.
+    reflexivity.
+  Qed.
+
+  Local Ltac name_term n t H := 
+    assert (H: exists n', n' = t);
+    try (exists t; reflexivity);
+    destruct H as [n H]. 
+
+
+  Lemma evalFoldTree_Expr ls:
+    forall seed,
+      evalExpr (fold_tree f seed ls) =
+      fold_tree fEval (evalExpr seed) (map (@evalExpr _) ls).
+  Proof.
+    assert (exists l, length ls <= l) 
+      as [l K] by (exists (length ls); auto). 
+    revert ls K.
+    induction l as [| l]; intros * K.
+    - assert (A1: length ls = 0) by omega. 
+      apply length_zero_iff_nil in A1.
+      now subst ls.
+    - destruct ls as [| x1 xs]. now simpl.
+      destruct xs as [| x2 xs].
+      intros.
+      simpl.
+      rewrite ?fold_tree_equation.
+      auto.
+
+      intros.
+      rewrite fold_tree_equation.
+      name_term tpl (unapp_half (x1::x2::xs)) Tpl;
+        rewrite <- Tpl; destruct tpl as [m1 m2].
+      simpl in K. 
+      assert (K': S (length xs) <= l) by (rewrite le_S_n; auto); 
+        clear K; rename K' into K.
+      assert (length m1 <= length (x2::xs) 
+              /\ length m2 <= length (x2::xs))
+        as [A1 A2]. {
+        symmetry in Tpl.
+        apply unapp_half_nonnil_reduces in Tpl; auto.
+        2: simpl; omega. 
+        simpl in *.
+        omega. 
+      }
+      simpl in A1, A2.
+      assert (A3: length m1 <= l) by omega; clear A1.
+      assert (A4: length m2 <= l) by omega; clear A2.
+      remember (f (fold_tree f seed m1) (fold_tree f seed m2)) as sth.
+      rewrite fold_tree_equation.
+      simpl.
+      apply unapp_half_map with (f := (@evalExpr _)) in Tpl.
+      simpl in Tpl.
+      rewrite <- Tpl.
+      rewrite Heqsth; clear Heqsth.
+      rewrite <- ?IHl; auto.
+      destruct xs; simpl; auto.
+  Qed.
+
+  Variable fComm: forall a b, fEval a b = fEval b a.
+  Variable fAssoc: forall a b c, fEval (fEval a b) c = fEval a (fEval b c).
+  Variable unit: Expr type (SyntaxKind k).
+  Variable fUnit: forall x, fEval (evalExpr unit) x = x.
+  
+  Lemma evalExprFoldTree_evalExprFoldLeft ls:
+    evalExpr (fold_tree f unit ls) =
+    evalExpr (fold_left f ls unit).
+  Proof.
+    rewrite evalFoldLeft_Expr.
+    rewrite evalFoldTree_Expr.
+    rewrite fold_left_fold_tree; auto.
+  Qed.
+
+  
+  Lemma evalExprFoldTree_evalExprFoldRight ls:
+    evalExpr (fold_tree f unit ls) =
+    evalExpr (fold_right f unit ls).
+  Proof.
+    rewrite evalFoldRight_Expr.
+    rewrite evalFoldTree_Expr.
+    rewrite fold_right_fold_tree; auto.
+  Qed.
+End FoldExpr.
+
 Section SimulationZeroAct.
   Variable imp spec: BaseModuleWf type.
   Variable simRel: RegsT -> RegsT -> Prop.
