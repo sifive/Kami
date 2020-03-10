@@ -892,3 +892,14 @@ Hint Rewrite getAllRules_makeModule_Registers : kami_rewrite_db.
 
 Hint Rewrite map_app : kami_rewrite_db.
 
+Lemma getAllMethods_createHideMod: forall m h, getAllMethods (createHideMod m h)=getAllMethods m.
+Proof.
+  intros.
+  induction h.
+  - reflexivity.
+  - simpl.
+    apply IHh.
+Qed.
+
+Hint Rewrite getAllMethods_createHideMod : kami_rewrite_db.
+
