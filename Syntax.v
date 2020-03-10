@@ -1308,6 +1308,22 @@ End NoSelfCallBaseModule.
 
 
 (* Semantics *)
+
+Definition mk_eq : forall m n, (m =? n)%nat = true -> m = n.
+Proof.
+  induction m.
+  - destruct n.
+    + auto.
+    + intro; discriminate.
+  - destruct n.
+    + intro; discriminate.
+    + simpl.
+      intro.
+      f_equal.
+      apply IHm.
+      exact H.
+Defined.
+
 Fixpoint Kind_decb(k1 k2 : Kind) : bool.
 Proof.
   refine (
@@ -1319,10 +1335,9 @@ Proof.
     | _,_ => false
     end).
   destruct (Nat.eqb n m) eqn:G.
-  exact (Fin_forallb (fun i => Kind_decb (ks i) (ks' (Fin_cast i (proj1 (Nat.eqb_eq n m) G)))) && Fin_forallb (fun i => String.eqb (fs i) (fs' (Fin_cast i (proj1 (Nat.eqb_eq n m) G))))).
+  exact (Fin_forallb (fun i => Kind_decb (ks i) (ks' (Fin_cast i (mk_eq _ _ G)))) && Fin_forallb (fun i => String.eqb (fs i) (fs' (Fin_cast i (mk_eq _ _ G))))).
   exact false.
 Defined.
-
 
 Lemma Kind_decb_refl : forall k, Kind_decb k k = true.
 Proof.
