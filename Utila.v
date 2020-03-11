@@ -92,7 +92,7 @@ Section utila.
     Definition utila_any
       :  list (Bool @# ty) -> Bool @# ty
       (* := fold_right (fun x acc => x || acc) ($$false). *)
-      := CABool Or.
+      := (@Kor _ Bool).
 
     (*
       Note: [f] must only return true for exactly one value in
@@ -103,7 +103,7 @@ Section utila.
       (f : k @# ty -> Bool @# ty)
       (xs : list (k @# ty))
       :  k @# ty
-      := unpack k (CABit Bor (map (fun x => IF f x then pack x else $0) xs)).
+      := unpack k (Kor (map (fun x => IF f x then pack x else $0) xs)).
 
     (*
       Note: exactly one of the packets must be valid.
@@ -421,7 +421,7 @@ Section utila.
       (xs : list (ActionT ty Bool))
       :  ActionT ty Bool
       := GatherActions xs as ys;
-         Ret (CABool Or ys).
+         Ret ((@Kor _ Bool) ys).
 
     Definition utila_acts_find
       (k : Kind)
@@ -792,13 +792,13 @@ Section utila.
     Lemma utila_many_nil
       :  [[utila_many ([] : list (m Bool)) ]] = false.
     Proof utila_sem_foldr_nil_correct
-            (fun x acc => CABool Or [x; acc])
+            (fun x acc => (@Kor _ Bool) [x; acc])
             (Const type false).
 
     Lemma utila_many_cons
       :  forall (x0 : m Bool) (xs : list (m Bool)), [[utila_many (x0 :: xs)]] = orb [[x0]] [[utila_many xs]].
     Proof utila_sem_foldr_cons_correct
-            (fun x acc => CABool Or [x; acc])
+            (fun x acc  => (@Kor _ Bool) [x; acc])
             (Const type false).
 
     Theorem utila_many_correct
@@ -1248,7 +1248,7 @@ Section utila.
         replace
           (fun (x0 : Expr type (SyntaxKind k))
                (acc : Expr type (SyntaxKind (Bit (size k))))
-           => (CABit (Bor) ((IF f x0 then pack x0 else (Const type (natToWord _ 0))) :: acc :: nil)))
+           => (Kor ((IF f x0 then pack x0 else (Const type (natToWord _ 0))) :: acc :: nil)))
           with (case f).
         (rewrite (utila_expr_find_lm2 f xs H)).
         (apply unpack_pack).
@@ -1421,7 +1421,7 @@ Section utila.
   Definition readReg ty (ls: list string) len (idx: Bit (Nat.log2_up len) @# ty) k :=
     GatherActions (map (fun '(i, reg) => Read val: k <- reg;
                                          Ret (IF $i == idx then pack #val else $0)) (tag ls)) as vals;
-      Ret (unpack k (CABit Bor vals)).
+      Ret (unpack k (Kor vals)).
       
   Definition writeReg ty (ls: list string) len (idx: Bit (Nat.log2_up len) @# ty) k (newval: k @# ty) :=
     GatherActions (map (fun '(i, reg) => Read val: k <- reg;

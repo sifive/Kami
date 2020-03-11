@@ -27,6 +27,7 @@ Section ty.
       | ReadArrayConst n k e i => (@goodDfExpr _ e)
       | BuildArray n k fv => forallb (fun i => @goodDfExpr _ (fv i)) (getFins n)
       | BuildStruct n fk fs fv => forallb (fun i => @goodDfExpr _ (fv i)) (getFins n)
+      | Kor k es => forallb(@goodDfExpr _ ) es
       end.
   Defined.
 
