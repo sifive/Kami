@@ -35,6 +35,24 @@ data Val = BoolVal Bool | BVVal BV.BV | StructVal [(String,Val)] | ArrayVal (A.I
     return $ foldr (&&) True bs
 (.==) _ _ = return False
 
+bitwise_or :: Val -> Val -> IO Val
+bitwise_or (BoolVal b1) (BoolVal b2) = return $ BoolVal $ b1 || b2
+bitwise_or (BVVal bv1) (BVVal bv2) = return $ BVVal $ bv1 BV..|. bv2
+bitwise_or (StructVal ps1) (StructVal ps2) = do
+    ps3 <- zipWithM (\(name,v1) (_,v2) -> do
+        v3 <- bitwise_or v1 v2
+        return (name, v3)
+        ) ps1 ps2
+    return $ StructVal ps3
+bitwise_or (ArrayVal a1) (ArrayVal a2) = do
+    elts1 <- M.getElems a1
+    elts2 <- M.getElems a2
+    elts3 <- zipWithM bitwise_or elts1 elts2
+    let n = length elts1
+    arr <- M.newListArray (0,n-1) elts3
+    return $ ArrayVal arr
+bitwise_or _ _ = error "Kind mismatch."
+
 
 boolCoerce :: Val -> Bool
 boolCoerce (BoolVal b) = b
