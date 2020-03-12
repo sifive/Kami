@@ -139,7 +139,7 @@ ppRtlExpr who e =
     T.Const k c -> return $ ppDealSize0 k "0" (ppConst c)
     T.UniBool T.Neg e -> uniExpr "~" e
     T.CABool T.And es -> listExpr "&" es "1'b1"
-    T.CABool T.Or es -> listExpr "|" es "1'b0"
+    --T.CABool T.Or es -> listExpr "|" es "1'b0"
     T.CABool T.Xor es -> listExpr "^" es "1'b0"
     T.UniBit _ _ (T.Inv _) e -> uniExpr "~" e
     T.UniBit _ _ (T.UAnd _) e -> uniExpr "&" e
@@ -150,13 +150,14 @@ ppRtlExpr who e =
     T.CABit n T.Add es -> listExpr "+" es (show n ++ "'b0")
     T.CABit n T.Mul es -> listExpr "*" es (show n ++ "'b1")
     T.CABit n T.Band es -> listExpr "&" es (show n ++ "'b" ++ Data.List.replicate n '1')
-    T.CABit n T.Bor es -> listExpr "|" es (show n ++ "'b0")
+    --T.CABit n T.Bor es -> listExpr "|" es (show n ++ "'b0")
     T.CABit n T.Bxor es -> listExpr "^" es (show n ++ "'b0")
     T.BinBit _ _ _ (T.Sub _) e1 e2 -> binExpr e1 "-" e2
     T.BinBit _ _ _ (T.Div _) e1 e2 -> binExpr e1 "/" e2
     T.BinBit _ _ _ (T.Rem _) e1 e2 -> binExpr e1 "%" e2
     T.BinBit _ _ _ (T.Sll _ _) e1 e2 -> binExpr e1 "<<" e2
     T.BinBit _ _ _ (T.Srl _ _) e1 e2 -> binExpr e1 ">>" e2
+    T.Kor k es -> listExpr "|" es (ppConst (T.getDefaultConst k))
     T.BinBit _ _ _ (T.Sra n m) e1 e2 ->
       do
         x1 <- ppRtlExpr who e1
