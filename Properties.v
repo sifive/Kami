@@ -6480,3 +6480,30 @@ Section Simulation_new.
   Qed.
 
 End Simulation_new.
+
+Lemma evalExpr_Kor_Default k (e : Expr type (SyntaxKind k)):
+  evalKorOpBin k (evalExpr e) (evalConstT (getDefaultConst k)) = (evalExpr e).
+Proof.
+  induction k; simpl.
+  - rewrite orb_false_r; reflexivity.
+  - rewrite wzero_wor; reflexivity.
+  - apply functional_extensionality_dep; intros.
+    apply (H x (Var _ (SyntaxKind (k x)) (evalExpr e x))).
+  - simpl.
+    apply functional_extensionality_dep; intros.
+    apply (IHk (Var _ (SyntaxKind k) (evalExpr e x))).
+Qed.
+
+Lemma evalExpr_Kor_comm k (e1 e2 : Expr type (SyntaxKind k)):
+  evalKorOpBin k (evalExpr e1) (evalExpr e2) = evalKorOpBin k (evalExpr e2) (evalExpr e1).
+Proof.
+  induction k; simpl.
+  - apply orb_comm.
+  - apply wor_comm.
+  - apply functional_extensionality_dep; intros.
+    apply (H x (Var _ (SyntaxKind (k x)) (evalExpr e1 x))
+             (Var _ (SyntaxKind (k x)) (evalExpr e2 x))).
+  - apply functional_extensionality_dep; intros.
+    apply (IHk (Var _ (SyntaxKind k) (evalExpr e1 x))
+               (Var _ (SyntaxKind k) (evalExpr e2 x))).
+Qed.

@@ -61,7 +61,7 @@ Inductive UniBoolOp: Set :=
 
 Inductive CABoolOp: Set :=
 | And: CABoolOp
-| Or: CABoolOp
+(* | Or: CABoolOp *)
 | Xor: CABoolOp.
 
 Inductive UniBitOp: nat -> nat -> Set :=
@@ -87,7 +87,7 @@ Inductive CABitOp: Set :=
 | Add: CABitOp
 | Mul: CABitOp
 | Band: CABitOp
-| Bor: CABitOp
+(* | Bor: CABitOp *)
 | Bxor: CABitOp.
 
 Inductive BinBitBoolOp: nat -> nat -> Set :=
@@ -127,7 +127,8 @@ Section Phoas.
   | ReadArrayConst n k: Expr (SyntaxKind (Array n k)) ->
                         Fin.t n ->
                         Expr (SyntaxKind k)
-  | BuildArray n k: (Fin.t n -> Expr (SyntaxKind k)) -> Expr (SyntaxKind (Array n k)).
+  | BuildArray n k: (Fin.t n -> Expr (SyntaxKind k)) -> Expr (SyntaxKind (Array n k))
+  | Kor k: list (Expr (SyntaxKind k)) -> Expr (SyntaxKind k).
 
   Definition UpdateArray n m k (e: Expr (SyntaxKind (Array n k)))
              (i: Expr (SyntaxKind (Bit m)))
@@ -1450,7 +1451,7 @@ Definition evalUniBool (op: UniBoolOp) : bool -> bool :=
 Definition evalCABool (op: CABoolOp) (ws : list bool) : bool :=
   match op with
     | And => fold_left andb ws true
-    | Or => fold_left orb ws false
+    (* | Or => fold_left orb ws false *)
     | Xor => fold_left xorb ws false
   end.
 
@@ -1503,7 +1504,7 @@ Definition evalCABit n (op: CABitOp) (ls: list (word n)): word n :=
     | Add => fold_left (@wadd n) ls (ZToWord n 0)
     | Mul => fold_left (@wmul n) ls (ZToWord n 1)
     | Band => fold_left (@wand n) ls  (ZToWord n ((2 ^ (Z.of_nat n)) - 1))
-    | Bor => fold_left (@wor n) ls (ZToWord n 0)
+    (* | Bor => fold_left (@wor n) ls (ZToWord n 0) *)
     | Bxor => fold_left (@wxor n) ls (ZToWord n 0)
   end.
 
@@ -1527,6 +1528,18 @@ Definition evalConstFullT k (e: ConstFullT k) :=
     | NativeConst t c' => c'
   end.
 
+Fixpoint evalKorOpBin (k : Kind) : type k -> type k -> type k :=
+  match k in Kind return (type k -> type k -> type k) with
+  | Bool => orb
+  | Bit n => @wor n
+  | Array n k' => fun a1 a2 => (fun i => (evalKorOpBin k' (a1 i) (a2 i)))
+  | Struct n fv _ => fun (s1 s2 : forall i, type (fv i)) =>
+                     (fun i => (evalKorOpBin (fv i) (s1 i) (s2 i)))
+  end.
+
+Definition evalKorOp (k : Kind) : list (type k) -> type k -> type k :=
+  fold_left (evalKorOpBin k).
+
 (* maps register names to the values which they currently hold *)
 Notation RegT := (Attribute (sigT (fullType type))).
 Definition RegsT := (list RegT).
@@ -1537,7 +1550,6 @@ Definition SignT k := (type (fst k) * type (snd k))%type.
 (* a list of simulatenous method call actions made during a single step *)
 Notation MethT := (Attribute (sigT SignT)).
 Definition MethsT := (list MethT).
-
 
 Section Semantics.
   Fixpoint evalExpr exprT (e: Expr type exprT): fullType type exprT :=
@@ -1564,9 +1576,10 @@ Section Semantics.
       | ReadArrayConst n k fv i =>
         (@evalExpr _ fv) i
       | BuildArray n k fv => fun i => @evalExpr _ (fv i)
+      | Kor k e => evalKorOp k (map (@evalExpr _) e) (evalConstT (getDefaultConst k))
     end.
   Arguments evalExpr : simpl nomatch.
-  
+      
   Fixpoint evalLetExpr k (e: LetExprSyntax type k) :=
     match e in LetExprSyntax _ _ return type k with
     | NormExpr e' => evalExpr e'

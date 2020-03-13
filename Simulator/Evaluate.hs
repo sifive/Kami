@@ -41,7 +41,6 @@ instance Eval (T.UniBoolOp) (Bool -> Bool) where
 
 instance Eval (T.CABoolOp) ([Bool] -> Bool) where
     eval T.And = foldr (&&) True
-    eval T.Or = foldr (||) False
     eval T.Xor = foldr (/=) False
 
 instance Eval T.UniBitOp (BV.BV -> BV.BV) where
@@ -65,7 +64,6 @@ instance Eval T.CABitOp (Int -> [BV.BV] -> BV.BV) where
     eval T.Add _ = foldr (+) 0
     eval T.Mul _ = foldr (*) 1
     eval T.Band n = foldr (.&.) $ BV.ones n
-    eval T.Bor n = foldr (.|.) $ BV.zeros n
     eval T.Bxor n = foldr xor $ BV.zeros n
 
 instance Eval (T.Expr ty) (IO Val) where
@@ -78,6 +76,10 @@ instance Eval (T.Expr ty) (IO Val) where
     eval (T.CABit n o es) = liftM (BVVal . eval o n) $ mapM (liftM bvCoerce . eval) es
     eval (T.BinBit _ _ _ o e1 e2) = liftM BVVal $ (liftM2 $ eval o) (liftM bvCoerce $ eval e1) (liftM bvCoerce $ eval e2)  
     eval (T.BinBitBool _ _ _ e1 e2) = liftM BoolVal $ liftM2 (BV.<.) (liftM bvCoerce $ eval e1) (liftM bvCoerce $ eval e2) --only works a.t.m. because there is only one BinBitBoolOp
+    eval (T.Kor k es) = do
+        d <- defVal k
+        vals <- mapM eval es
+        foldM bitwise_or d vals
     eval (T.ITE _ e1 e2 e3) = do
         b <- eval e1
         if boolCoerce b then eval e2 else eval e3

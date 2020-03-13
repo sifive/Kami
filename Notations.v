@@ -105,7 +105,7 @@ Notation "$$ e" := (Const ltac:(assumption) e) (at level 8, only parsing) : kami
 
 Notation "! v" := (UniBool Neg v) (at level 35): kami_expr_scope.
 Notation "e1 && e2" := (CABool And (e1 :: e2 :: nil)) : kami_expr_scope.
-Notation "e1 || e2" := (CABool Or (e1 :: e2 :: nil)) : kami_expr_scope.
+Notation "e1 || e2" := ((@Kor _ Bool) (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 ^^ e2" := (CABool Xor (e1 :: e2 :: nil)) (at level 50): kami_expr_scope.
 Notation "~ x" := (UniBit (Inv _) x) : kami_expr_scope.
 
@@ -139,7 +139,7 @@ Notation "e1 + e2" := (CABit (Add) (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 * e2" := (CABit (Mul) (e1 :: e2 :: nil)) : kami_expr_scope.
 Notation "e1 .& e2" := (CABit (Band) (e1 :: e2 :: nil)) (at level 201)
                        : kami_expr_scope.
-Notation "e1 .| e2" := (CABit (Bor) (e1 :: e2 :: nil)) (at level 201)
+Notation "e1 .| e2" := (Kor (e1 :: e2 :: nil)) (at level 201)
                        : kami_expr_scope.
 Notation "e1 .^ e2" := (CABit (Bxor) (e1 :: e2 :: nil)) (at level 201) : kami_expr_scope.
 Infix "-" := (BinBit (Sub _)) : kami_expr_scope.
@@ -197,13 +197,13 @@ Notation "nkind <[ def ]>" := (@NativeKind nkind def) (at level 100): kami_expr_
 
 (* One hot switches *)
 Notation "'Switch' val 'Retn' retK 'With' { s1 ; .. ; sN }" :=
-  (unpack retK (CABit Bor (cons (IF val == fst s1%switch_init then pack (snd s1%switch_init) else $0)%kami_expr ..
-                                (cons (IF val == fst sN%switch_init then pack (snd sN%switch_init)else $0)%kami_expr nil) ..))):
+  (unpack retK (Kor (cons (IF val == fst s1%switch_init then pack (snd s1%switch_init) else $0)%kami_expr ..
+                          (cons (IF val == fst sN%switch_init then pack (snd sN%switch_init)else $0)%kami_expr nil) ..))):
     kami_expr_scope.
 
 Notation "'Switch' val 'Of' inK 'Retn' retK 'With' { s1 ; .. ; sN }" :=
-  (unpack retK (CABit Bor (cons (IF val == ((fst s1%switch_init): inK @# _) then pack (snd s1%switch_init) else $0)%kami_expr ..
-                                (cons (IF val == ((fst sN%switch_init): inK @# _) then pack (snd sN%switch_init)else $0)%kami_expr nil) ..))):
+  (unpack retK (Kor (cons (IF val == ((fst s1%switch_init): inK @# _) then pack (snd s1%switch_init) else $0)%kami_expr ..
+                          (cons (IF val == ((fst sN%switch_init): inK @# _) then pack (snd sN%switch_init)else $0)%kami_expr nil) ..))):
     kami_expr_scope.
 
 (* Notations for Let Expressions *)

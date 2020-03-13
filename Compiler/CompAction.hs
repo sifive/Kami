@@ -310,7 +310,7 @@ eval_bool_expr :: T.RtlExpr' -> Maybe Bool
 eval_bool_expr (T.Const T.Bool (T.ConstBool b)) = Just b
 eval_bool_expr (T.UniBool T.Neg e) = liftM not $ eval_bool_expr e
 eval_bool_expr (T.CABool T.And es) = foldr maybe_and (Just True) $ map eval_bool_expr es
-eval_bool_expr (T.CABool T.Or es) = foldr maybe_or (Just False) $ map eval_bool_expr es
+eval_bool_expr (T.Kor T.Bool es) = foldr maybe_or (Just False) $ map eval_bool_expr es
 eval_bool_expr (T.CABool T.Xor es) = foldr (liftM2 (/=)) (Just False) $ map eval_bool_expr es
 eval_bool_expr _ = Nothing
 
@@ -748,6 +748,7 @@ kind_of_expr (T.BuildStruct n fk fs _) = T.SyntaxKind $ T.Struct n fk fs
 kind_of_expr (T.ReadArray _ _ k _ _) = T.SyntaxKind k
 kind_of_expr (T.ReadArrayConst _ k _ _) = T.SyntaxKind k
 kind_of_expr (T.BuildArray n k _) = T.SyntaxKind $ T.Array n k
+kind_of_expr (T.Kor k _) = T.SyntaxKind k
 
 data RtlModStats = RtlModStats {
     num_hiddenWires :: Int

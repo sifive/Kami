@@ -93,7 +93,6 @@ Definition eval_UniBool(op : UniBoolOp) : bool -> bool :=
 Definition eval_CABool(op : CABoolOp) : list bool -> bool :=
   match op with
   | And => fun xs => fold_left andb xs true
-  | Or => fun xs => fold_left orb xs false
   | Xor => fun xs => fold_left xorb xs false
   end.
 
@@ -123,7 +122,6 @@ Definition eval_CABit{n}(op : CABitOp) : list (BV n) -> BV n :=
   | Add => bv_add
   | Mul => bv_mul
   | Band => bv_band
-  | Bor => bv_bor
   | Bxor => bv_bxor
   end.
 
@@ -146,6 +144,16 @@ Definition eval_ConstFullT{k} (e : ConstFullT k) : eval_FK k :=
   | NativeConst t c' => c'
   end.
 
+Fixpoint val_or (k : Kind) : eval_Kind k -> eval_Kind k -> eval_Kind k :=
+  match k in Kind return (eval_Kind k -> eval_Kind k -> eval_Kind k) with
+  | Bool => orb
+  | Bit n => fun b1 b2 => bv_bor [b1 ; b2]
+  | Array n k' => fun a1 a2 => make_vector (fun i => val_or k' (vector_index i a1)
+                                                            (vector_index i a2))
+  | Struct n ks _ => fun t1 t2 => mkTup _ (fun i => val_or (ks i) (tup_index i _ t1)
+                                                         (tup_index i _ t2))
+  end.
+
 Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   match e with
   | Var _ v => v
@@ -166,6 +174,7 @@ Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
                            end
   | ReadArrayConst n k v i => vector_index i (eval_Expr v)
   | BuildArray n k v => make_vector (fun i => eval_Expr (v i))
+  | Kor k es => fold_right (val_or k) (default_val k) (map eval_Expr es)
   end.
 
 (* Fixpoint val_unpack'(k : Kind) : BV (size k) -> eval_Kind k.
