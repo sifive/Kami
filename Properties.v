@@ -6494,13 +6494,6 @@ Proof.
     apply (IHk (Var _ (SyntaxKind k) (evalExpr e x))).
 Qed.
 
-Lemma wor_comm width (x y : word width) :
-  wor x y = wor y x.
-Proof.
-  arithmetizeWord.
-  rewrite Z.lor_comm; reflexivity.
-Qed.
-
 Lemma evalExpr_Kor_comm k (e1 e2 : Expr type (SyntaxKind k)):
   evalKorOpBin k (evalExpr e1) (evalExpr e2) = evalKorOpBin k (evalExpr e2) (evalExpr e1).
 Proof.

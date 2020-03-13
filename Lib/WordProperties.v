@@ -1390,3 +1390,10 @@ Proof.
   intros.
   destruct (weq w1 w2); [auto | discriminate].
 Qed.
+
+Lemma wor_comm width (x y : word width) :
+  wor x y = wor y x.
+Proof.
+  arithmetizeWord.
+  rewrite Z.lor_comm; reflexivity.
+Qed.
