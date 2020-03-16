@@ -67,7 +67,7 @@ file_sync_readreq val state file regName = case readers file of
         then
 
             --isAddr = True
-            return $ trace (show $ bvCoerce val) val
+            return $ {-trace (show $ bvCoerce val)-} val
 
         else
 
@@ -85,7 +85,7 @@ file_sync_readresp state file regName = case readers file of
 
             --isAddr = True
             case M.lookup regName $ int_regs state of
-                Just v -> liftM ArrayVal $ slice (trace ("i = " ++ show i ++ "\n") $ fromIntegral i) (chunkSize file) (array_of_file state file)
+                Just v -> liftM ArrayVal $ slice ({- trace ("i = " ++ show i ++ "\n") $-} fromIntegral i) (chunkSize file) (array_of_file state file)
 
                     where i = BV.nat $ bvCoerce v
 
