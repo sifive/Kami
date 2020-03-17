@@ -69,6 +69,12 @@ Fixpoint Tuple{n} : (Fin.t n -> Type) -> Type :=
   | S m => fun ts => ((ts Fin.F1) * (Tuple (fun j => ts (Fin.FS j))))%type
   end.
 
+Fixpoint Tup_map{n} : forall (ts1 ts2 : Fin.t n -> Type)(fs : forall i, ts1 i -> ts2 i)(t : Tuple ts1), Tuple ts2 :=
+  match n with
+  | 0 => fun _ _ _ _ => tt
+  | S m => fun ts1 ts2 fs t => (fs F1 (fst t), Tup_map (fun i => ts1 (FS i)) (fun i => ts2 (FS i)) (fun i => fs (FS i)) (snd t))
+  end.
+
 Fixpoint tup_index{n} : forall (i : Fin.t n) ts, Tuple ts -> ts i :=
   match n with
   | 0 => case0 _
@@ -107,11 +113,13 @@ Fixpoint Fin_lookup{X}(pred : X -> bool){n} : (Fin.t n -> X) -> option (Fin.t n)
       end
   end.
 
+(* Check lookup.
+
 Definition lookup{K X} : (K -> K -> bool) -> K -> list (K * X) -> option X :=
   fun eqbk key pairs => match List.find (fun p => eqbk key (fst p)) pairs with
                         | Some p => Some (snd p)
                         | None => None
-                        end.
+                        end. *)
 
 End Lookup.
 

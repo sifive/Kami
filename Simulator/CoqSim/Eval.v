@@ -7,6 +7,7 @@ Require Import Kami.Simulator.CoqSim.Misc.
 Require Import Kami.Simulator.CoqSim.TransparentProofs.
 Require Import Kami.Simulator.CoqSim.HaskellTypes.
 Import Kami.Simulator.CoqSim.HaskellTypes.Notations.
+Require Import Program.
 
 Section Eval.
 
@@ -177,21 +178,35 @@ Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   | Kor k es => fold_right (val_or k) (default_val k) (map eval_Expr es)
   end.
 
-(* Fixpoint val_unpack'(k : Kind) : BV (size k) -> eval_Kind k.
+Fixpoint get_chunk_struct{n} : forall (f : Fin.t n -> nat)(v : BV (sumSizes f))(i : Fin.t n), BV (f i) :=
+  match n with
+  | 0 => fun f _ i => case0 (fun j => BV (f j)) i
+  | _ => fun f v i => fin_case _ (fun j => BV (f j)) (bv_trunc_msb v) (fun j => get_chunk_struct (fun k => f (FS k)) (bv_trunc_lsb v) j)
+  end.
+
+Fixpoint get_chunk_array{n} : forall (k : nat)(v : BV (n * k))(i : Fin.t n), BV k.
+  refine match n with
+  | 0 => fun _ _ i => case0 _ i
+  | S m => fun k v i => _
+  end.
 Proof.
-  induction k; simpl; intro e.
-  (* Bool *)
-  - exact (weqb e (nat_to_word 1)).
-  (* BV *)
-  - exact e.
-  (* Tup *)
-  - admit.
-  - 
- *)
+  dependent destruction i.
+  - exact (bv_trunc_lsb v).
+  - exact (get_chunk_array _ _ (bv_trunc_msb v) i).
+Defined.
 
+Fixpoint val_unpack(k : Kind) : BV (size k) -> eval_Kind k :=
+  match k return BV (size k) -> eval_Kind k with
+  | Bool => fun e => bv_eq e (nat_to_bv 1)
+  | Bit n => fun e => e
+  | Struct n ks fs => fun e => Tup_map _ _ (fun i => val_unpack (ks i)) (mkTup (fun i => BV (size (ks i))) (get_chunk_struct (fun i => size (ks i)) e))
+  | Array n k => fun e => vector_map (val_unpack k) (make_vector (get_chunk_array _ e))
+  end.
 
+(*
 Definition val_unpack(k : Kind) : BV (size k) -> eval_Kind k :=
   fun w => eval_Expr (unpack _ (Const _ (ConstBit (natToWord _ (bv_to_nat w))))).
+*)
 
 Definition eval_SysT(s : SysT eval_Kind) : IO unit :=
   match s with

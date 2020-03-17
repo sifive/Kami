@@ -1,5 +1,7 @@
 Require Extraction.
 Require Import String Fin.
+Require Import Kami.All.
+Require Import Kami.Simulator.CoqSim.Misc.
 
 Extraction Language Haskell.
 
@@ -12,11 +14,19 @@ Parameter Map : Type -> Type.
 Parameter empty : forall {V}, Map V.
 Parameter map_lookup : forall {V}, string -> Map V -> option V.
 Parameter insert : forall {V}, string -> V -> Map V -> Map V.
+Parameter map_of_list : forall {V}, list (string * V) -> Map V.
 
-Extract Constant Map "v" => "Data.Map.Map Prelude.String v".
-Extract Constant empty => "Data.Map.empty".
-Extract Constant map_lookup => "Data.Map.lookup".
-Extract Constant insert => "Data.Map.insert".
+Axiom empty_lookup : forall V x, map_lookup x (empty : Map V) = None.
+Axiom map_of_list_lookup : forall V x (ps : list (string * V)),
+  map_lookup x (map_of_list ps) = lookup String.eqb x ps.
+Axiom insert_lookup_hit : forall V x (v : V) m, map_lookup x (insert x v m) = Some v.
+Axiom insert_lookup_miss : forall V x x' (v : V) m, x <> x' -> map_lookup x' (insert x v m) = map_lookup x' m.
+
+Extract Constant Map "v" => "Data.Map.Strict.Map Prelude.String v".
+Extract Constant empty => "Data.Map.Strict.empty".
+Extract Constant map_lookup => "Data.Map.Strict.lookup".
+Extract Constant insert => "Data.Map.Strict.insert".
+Extract Constant map_of_list => "Data.Map.Strict.fromList".
 
 (* Vectors *)
 

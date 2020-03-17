@@ -97,12 +97,12 @@ do
   fi
 done
 
-for file in $(grep -l "Data\.Map" $1/*.hs)
+for file in $(grep -l "Data\.Map\.Strict" $1/*.hs)
 do
-  grep -q "import qualified Data\.Map" $file
+  grep -q "import qualified Data\.Map\.Strict" $file
   if [ $? -ne 0 ]
   then
-    $SED -i -e '0,/^import/{s/^import/import qualified Data.Map\nimport/}' $file
+    $SED -i -e '0,/^import/{s/^import/import qualified Data.Map.Strict\nimport/}' $file
   fi
 done
 

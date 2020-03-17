@@ -12,8 +12,7 @@ Import Kami.Simulator.CoqSim.HaskellTypes.Notations.
 
 Section EvalAction.
 
-Definition SimReg := (string * {x : _ & fullType eval_Kind x})%type.
-Definition SimRegs := list SimReg.
+Definition SimRegs := Map {x : _ & fullType eval_Kind x}.
 
 Section Regs.
 
@@ -22,19 +21,19 @@ Variable init_regs : list (string * {x : FullKind & RegInitValT x}).
 Variable regs : SimRegs.
 
 Definition kind_consistent := forall r k, 
-    (exists v, lookup String.eqb r init_regs = Some (existT _ k v)) <-> (exists v', lookup String.eqb r regs = Some (existT _ k v')).
+    (exists v, lookup String.eqb r init_regs = Some (existT _ k v)) <-> (exists v', map_lookup r regs = Some (existT _ k v')).
 
 Variable kc : kind_consistent.
 
 (* helper lemmas *)
-Lemma kc_init_sim : forall r k v, lookup String.eqb r init_regs = Some (existT _ k v) -> exists v', lookup String.eqb r regs = Some (existT _ k v').
+Lemma kc_init_sim : forall r k v, lookup String.eqb r init_regs = Some (existT _ k v) -> exists v',  map_lookup r regs = Some (existT _ k v').  
 Proof.
   intros.
   apply kc.
   exists v; auto.
 Qed.
 
-Lemma kc_sim_init : forall r k v, lookup String.eqb r regs = Some (existT _ k v) -> exists v', lookup String.eqb r init_regs = Some (existT _ k v').
+Lemma kc_sim_init : forall r k v, map_lookup r regs = Some (existT _ k v) -> exists v', lookup String.eqb r init_regs = Some (existT _ k v').
 Proof.
   intros.
   apply kc.
@@ -44,9 +43,8 @@ Qed.
 Record Update := {
   reg_name : string;
   kind : FullKind;
-  init_val : RegInitValT kind;
   new_val : fullType eval_Kind kind;
-  lookup_match : lookup String.eqb reg_name init_regs = Some (existT _ kind init_val)
+  lookup_match : exists v, lookup String.eqb reg_name init_regs = Some (existT _ kind v)
   }.
 
 Definition Updates := list Update.
@@ -87,6 +85,14 @@ Defined.
 Definition reg_not_found{X} : string -> IO X :=
   fun reg => error ("register " ++ reg ++ " not found.").
 
+Lemma dep_pair_rewrite{X}{Y : X -> Type} : forall {x x'} (pf : x = x')(y : Y x),
+  existT Y x y = existT Y x' (@eq_rect X x Y y x' pf).
+Proof.
+  intros.
+  destruct pf.
+  reflexivity.
+Qed.
+
 Fixpoint eval_ActionT{k}{E}`{Environment E}(env : E)(state : FileState)(meths : list (string * Signature))(updates : Updates)(fupdates : FileUpdates)(a : ActionT eval_Kind k)(a_wf : WfActionT_new init_regs a)(fs : mkProd (List.map dec_sig meths)){struct a} : IO (Updates * FileUpdates * eval_Kind k).
   refine (match a return WfActionT_new init_regs a -> _ with
   | MCall meth s e cont => fun pf => do x <- rf_methcall state meth (existT _ (fst s) (eval_Expr e));
@@ -112,7 +118,7 @@ Fixpoint eval_ActionT{k}{E}`{Environment E}(env : E)(state : FileState)(meths : 
       do v <- rand_val_FK k;
       eval_ActionT _ _ _ env state meths updates fupdates (cont v) _ fs
       )
-  | ReadReg r k cont => fun pf=> _
+  | ReadReg r k cont => fun pf => _
   | WriteReg r k e a => fun pf => (* match lookup String.eqb r regs with
                         | None => reg_not_found r
                         | Some p => _
@@ -139,48 +145,68 @@ Proof.
   - apply pf.
   - apply pf.
   (* ReadReg *)
-  - destruct (lookup String.eqb r regs) eqn:G.
-    + simpl in pf.
-      destruct lookup eqn:G' in pf.
-      * destruct s0.
+  - destruct (map_lookup r regs) eqn:G.
+    + pose (@eq_rect FullKind (projT1 s) (fullType eval_Kind) (projT2 s) k).
+      assert (projT1 s = k).
+      * simpl in pf.
         destruct s.
-        assert (x = x0).
-        ** destruct (kc_init_sim _ G') as [v Hv].
-           rewrite Hv in G.
-           inversion G; auto.
+        simpl.
+        destruct (@kc_sim_init _ _ _ G).
+        rewrite H0 in pf.
+        destruct pf.
+        congruence.
+      * refine (eval_ActionT _ _ _ env state meths updates fupdates (cont (f H0)) _ fs).
+        simpl in pf.
+        destruct lookup in pf.
+        ** destruct s0.
+           destruct pf.
+           apply H2.
         ** destruct pf.
-           clear G.
-           rewrite <- H0, <- H1 in f.
-           exact (eval_ActionT _ _ _ env state meths updates fupdates (cont f) (H2 _) fs).
+    + simpl in pf.
+      destruct lookup eqn:G0 in pf.
+      * absurd (map_lookup r regs = None).
+        ** destruct s.
+           destruct (@kc_init_sim _ _ _ G0).
+           rewrite H0; discriminate.
+        ** exact G.
       * destruct pf.
-   + exact (reg_not_found r).
   (* WriteReg *)
-  - simpl in pf.
-    destruct lookup eqn:lk in pf.
-    + destruct s.
-      destruct pf as [keq pf'].
-      rewrite keq in e.
-      destruct (lookup String.eqb r regs) eqn:G.
-      * destruct s.
-        assert (x = x0).
-        ** destruct (kc_init_sim _ lk) as [v Hv].
-           rewrite Hv in G.
-           inversion G.
-           reflexivity.
+  - destruct (map_lookup r regs) eqn:G.
+    + assert (projT1 s = k).
+      * simpl in pf.
+        destruct s.
+        simpl.
+        destruct (@kc_sim_init _ _ _ G).
+        rewrite H0 in pf.
+        destruct pf.
+        congruence.
+      * assert (exists v, lookup String.eqb r init_regs = Some (existT _ k v)).
+        ** simpl in pf.
+           destruct s; destruct (@kc_sim_init _ _  _ G).
+           rewrite H1 in pf; destruct pf.
+           rewrite (dep_pair_rewrite (eq_sym H2)) in H1.
+           eexists; exact H1.
         ** pose (upd := {|
-                    reg_name := r;
-                    kind := x;
-                    init_val := r0;
-                    new_val := eval_Expr e;
-                    lookup_match := lk
-                    |}).
-           exact (eval_ActionT _ _ _ env state meths (upd::updates) fupdates a pf' fs).
-      * absurd (lookup String.eqb r regs = None).
-        ** destruct (kc_init_sim _ lk) as [v Hv].
-           rewrite Hv in G.
-           discriminate G.
-        ** auto.
-    + destruct pf.
+                   reg_name := r;
+                   kind := k;
+                   new_val := eval_Expr e;
+                   lookup_match := H1
+                        |}).
+           refine (eval_ActionT _ _ _ env state meths (upd::updates) fupdates a _ fs).
+           simpl in pf.
+           destruct lookup in pf.
+           *** destruct s0.
+               destruct pf.
+               exact H3.
+           *** destruct pf.
+    + simpl in pf.
+      destruct lookup eqn:G0 in pf.
+      * absurd (map_lookup r regs = None).
+        ** destruct s.
+           destruct (@kc_init_sim _ _ _ G0).
+           rewrite H0; discriminate.
+        ** exact G.
+      * destruct pf.
   - simpl in pf; destruct (eval_Expr e); tauto.
   - apply pf.
   - exact pf.
@@ -201,11 +227,8 @@ Fixpoint curry(X : Type)(ts : list Type) : (mkProd ts -> X) -> curried X ts :=
 Definition eval_RuleT{E}`{Environment E}(env : E)(state : FileState)(meths : list (string * Signature))(r : RuleT)(r_wf : WfActionT_new init_regs (snd r eval_Kind))(fs : mkProd (List.map dec_sig meths)) : IO (Updates * FileUpdates * eval_Kind Void) :=
   eval_ActionT env state meths [] [] ((snd r) eval_Kind) r_wf fs.
 
-Fixpoint do_single_update(upd : Update)(regs : SimRegs) : SimRegs :=
-  match regs with
-  | [] => []
-  | (reg',v')::regs' => if String.eqb (reg_name upd) reg' then (reg', existT _ (kind upd) (new_val upd))::regs' else (reg',v')::do_single_update upd regs'
-  end.
+Definition do_single_update(upd : Update)(regs : SimRegs) : SimRegs :=
+  insert (reg_name upd) (existT _ (kind upd) (new_val upd)) regs.
 
 Definition do_updates(upds : Updates)(regs : SimRegs) : SimRegs :=
   fold_right do_single_update regs upds.
@@ -214,46 +237,25 @@ End Regs.
 
 Section Regs2.
 
-Lemma update_hit : forall init_regs regs k v (upd : Update init_regs), lookup String.eqb (reg_name upd) regs = Some (existT _ k v) -> lookup String.eqb (reg_name upd) (do_single_update upd regs) = Some (existT _ (kind upd) (new_val upd)).
+Lemma update_hit : forall init_regs regs k v (upd : Update init_regs), map_lookup (reg_name upd) regs = Some (existT _ k v) -> map_lookup (reg_name upd) (do_single_update upd regs) = Some (existT _ (kind upd) (new_val upd)).
 Proof.
-  induction regs; intros.
-  - discriminate H.
-  - simpl do_single_update.
-    destruct a.
-    destruct String.eqb eqn:G.
-    + rewrite lookup_cons.
-      rewrite G.
-      reflexivity.
-    + rewrite lookup_cons.
-      rewrite G.
-      eapply IHregs.
-      rewrite lookup_cons in H.
-      rewrite G in H.
-      exact H.
+  intros.
+  unfold do_single_update.
+  rewrite insert_lookup_hit; auto.
 Qed.
 
-Lemma update_miss : forall r init_regs regs (upd : Update init_regs), r <> reg_name upd -> lookup String.eqb r (do_single_update upd regs) = lookup String.eqb r regs.
+Lemma update_miss : forall r init_regs regs (upd : Update init_regs), r <> reg_name upd -> map_lookup r (do_single_update upd regs) = map_lookup r regs.
 Proof.
-  induction regs; intros.
-  - auto.
-  - simpl do_single_update.
-    destruct a.
-    destruct String.eqb eqn:G.
-    + repeat rewrite lookup_cons.
-      rewrite String.eqb_eq in G.
-      rewrite G in H.
-      rewrite <- String.eqb_neq in H.
-      rewrite H.
-      auto.
-    + repeat rewrite lookup_cons.
-      destruct (r =? s).
-      * auto.
-      * apply IHregs; auto.
+  intros.
+  unfold do_single_update.
+  rewrite insert_lookup_miss; auto.
 Qed.
 
-Lemma lookup_update : forall init_regs regs k x (upd : Update init_regs) r, lookup String.eqb r (do_single_update upd regs) = Some (existT (fun x : FullKind => fullType eval_Kind x) k x) -> exists k' y, lookup String.eqb r regs = Some (existT _ k' y).
+(*
+Lemma lookup_update : forall init_regs regs k x (upd : Update init_regs) r, map_lookup r (do_single_update upd regs) = Some (existT (fun x : FullKind => fullType eval_Kind x) k x) -> exists k' y, map_lookup r regs = Some (existT _ k' y).
 Proof.
-  induction regs; intros.
+  intros.
+  pose (lookup_match upd).
   - discriminate H.
   - simpl do_single_update in H.
     destruct a.
@@ -271,6 +273,14 @@ Proof.
         exact H.
 Qed.
 
+
+
+Lemma lookup_update : forall init_regs regs k x (upd : Update init_regs) r, map_lookup r (do_single_update upd regs) = Some (existT (fun x : FullKind => fullType eval_Kind x) k x) -> exists k' y, map_lookup r regs = Some (existT _ k' y).
+Proof.
+  intros.
+  destruct upd.
+*)
+
 Lemma update_consistent : forall (curr_regs : SimRegs)(init_regs : list RegInitT)(upd : Update init_regs),
   kind_consistent init_regs curr_regs -> kind_consistent init_regs (do_single_update upd curr_regs).
 Proof.
@@ -281,7 +291,7 @@ Proof.
       rewrite G.
       destruct (kc_init_sim kc _ H).
       erewrite update_hit.
-      * pose (lookup_match upd) as lk.
+      * destruct (lookup_match upd) as [v lk].
         rewrite <- G in lk.
         rewrite H in lk.
         inversion lk.
@@ -297,16 +307,17 @@ Proof.
   - destruct (String.eqb r (reg_name upd)) eqn:G.
     + rewrite String.eqb_eq in G.
       rewrite G in H.
-      destruct (lookup_update _ _ _ H) as [k' [y Hy]].
+      destruct (lookup_match upd).
+      destruct (@kc_init_sim _ _ kc _ _ _ H0).
       erewrite update_hit in H.
-      * pose (lookup_match upd) as lk.
+      * destruct (lookup_match upd) as [v lk].
         rewrite G.
         inversion H.
         eexists; exact lk.
-      * exact Hy.
+      * exact H1.
     + rewrite String.eqb_neq in G.
       erewrite update_miss in H; auto.
-      destruct (kc_sim_init kc _ H).
+      destruct (kc_sim_init kc H).
       eexists; exact H0.
 Qed.
 
@@ -336,17 +347,49 @@ Proof.
   - apply updates_consistent; auto.
 Defined.
 
-Definition initialize_SimRegs(regs : list RegInitT) : SimRegs :=
-  List.map (fun '(r,existT k v) => match v return SimReg with
-                                   | None => (r,existT _ k (eval_ConstFullT (getDefaultConstFullKind k)))
-                                   | Some c => (r,existT _ k (eval_ConstFullT c))
-                                   end) regs.
+Print RegInitT.
+
+Print SimRegs.
+
+Definition eval_RegInitValT : {k : FullKind & RegInitValT k} -> {k : FullKind & fullType eval_Kind k} :=
+  fun '(existT k o) => match o with
+                         | None => existT _ k (eval_ConstFullT (getDefaultConstFullKind k))
+                         | Some c => existT _ k (eval_ConstFullT c)
+                         end.
+
+Definition initialize_SimRegs(regs : list RegInitT) : SimRegs := map_of_list (
+  List.map (fun '(r,p) => (r, eval_RegInitValT p)) regs).
+
+Lemma lookup_map : forall {V V'}(f : V -> V')(ps : list (string * V)) x v, lookup String.eqb x ps = Some v -> lookup String.eqb x (map (fun '(r,v') => (r, f v')) ps) = Some (f v).
+Proof.
+  induction ps; intros.
+  - discriminate.
+  - simpl.
+    destruct a.
+    rewrite lookup_cons in *.
+    destruct (x =? s).
+    + inversion H; auto.
+    + apply IHps; auto.
+Qed.
+
+Lemma lookup_map_back : forall {V V'}(f : V -> V')(ps : list (string * V)) x v',
+  lookup String.eqb x (map (fun '(r,v) => (r, f v)) ps) = Some v' ->
+  exists v, f v = v' /\ lookup String.eqb x ps = Some v.
+Proof.
+  induction ps; intros.
+  - discriminate.
+  - destruct a.
+    simpl in H.
+    rewrite lookup_cons in *.
+    destruct (x =? s).
+    + exists v; inversion H; auto.
+    + apply IHps; auto.
+Qed.
 
 Lemma cons_neq{X}(x : X)(xs : list X) : x::xs <> [].
 Proof.
   discriminate.
 Qed.
-
 
 Definition get_wf_rules{ty} : forall init_regs rules, WfRules ty init_regs rules -> 
   list {r : RuleT & WfActionT_new init_regs (snd r ty)}.
@@ -358,31 +401,33 @@ Proof.
     exact ((existT _ a H) :: (IHrules H0)).
 Defined.
 
-Lemma kc_nil : kind_consistent [] [].
-Proof.
-  intros r k; split; intros []; discriminate.
-Qed.
-
-Lemma kc_cons : forall init_regs regs r k v v', kind_consistent init_regs regs -> kind_consistent ((r,(existT _ k v)) :: init_regs) ((r, (existT _ k v')) :: regs).
-Proof.
-  intros.
-  intros r' k'; split; intro; rewrite lookup_cons in *; destruct (r' =? r) eqn:G; destruct H0.
-  - inversion H0.
-    eexists; auto.
-  - apply (kc_init_sim H _ H0).
-  - inversion H0.
-    eexists; auto.
-  - apply (kc_sim_init H _ H0).
-Qed.
-
 Lemma init_regs_kc : forall init_regs, kind_consistent init_regs (initialize_SimRegs init_regs).
 Proof.
-  induction init_regs.
-  - exact kc_nil.
-  - simpl initialize_SimRegs.
-    destruct a.
-    destruct s0.
-    destruct r; apply kc_cons; auto.
+  intros; intros r k; split.
+  - intros [v Hv].
+    unfold initialize_SimRegs.
+    rewrite map_of_list_lookup.
+    rewrite (lookup_map eval_RegInitValT init_regs r Hv).
+    unfold eval_RegInitValT.
+    destruct v.
+    simpl.
+    + exists (eval_ConstFullT c); reflexivity.
+    + exists (eval_ConstFullT (getDefaultConstFullKind k)); reflexivity.
+  - intros [v Hv].
+    unfold initialize_SimRegs in Hv.
+    rewrite map_of_list_lookup in Hv.
+    destruct (lookup_map_back eval_RegInitValT init_regs r Hv) as [[k' x] [Hx1 Hx2]].
+    unfold eval_RegInitValT in Hx1.
+    destruct x.
+    + inversion Hx1.
+      eexists.
+      rewrite Hx2.
+      reflexivity.
+    + inversion Hx1.
+      eexists.
+      rewrite Hx2.
+      rewrite <- H0.
+      reflexivity.
 Qed.
 
 Definition eval_Basemodule_rr{E}`{Environment E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule_new eval_Kind basemod) : mkProd (List.map dec_sig meths) -> IO unit. refine (
