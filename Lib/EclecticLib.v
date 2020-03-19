@@ -3120,3 +3120,502 @@ Lemma Natlog2_up_pow2 :
 Proof.
   intros; apply Nat.log2_up_pow2; lia.
 Qed.
+
+Lemma log2_of_nat n :
+  Z.log2 (Z.of_nat n) = Z.of_nat (Nat.log2 n).
+Proof.
+  induction n; auto.
+  destruct (Nat.log2_spec_alt (S n) (ltac:(lia))) as [m [P0 P1]].
+  apply (Z.log2_unique' (Z.of_nat (S n)) (Z.of_nat (Nat.log2 (S n))) (Z.of_nat m)).
+  - apply Zle_0_nat.
+  - destruct P1; split; [apply Zle_0_nat|].
+    rewrite <- Zpow_of_nat.
+    apply (inj_lt _ _ H0).
+  - rewrite <- Zpow_of_nat, <- Nat2Z.inj_add.
+    apply (inj_eq _ _ P0).
+Qed.
+
+Lemma Log2_up_of_nat n :
+  Z.of_nat (Nat.log2_up n) = Z.log2_up (Z.of_nat n).
+Proof.
+  induction n.
+  - unfold Z.log2_up; simpl; reflexivity.
+  - unfold Nat.log2_up, Z.log2_up.
+    destruct Nat.compare eqn:G, Z.compare eqn:G0; auto.
+    + exfalso.
+      apply Nat.compare_eq in G.
+      rewrite Z.compare_lt_iff in G0.
+      apply inj_eq in G; lia.
+    + exfalso.
+      rewrite Nat.compare_lt_iff in G.
+      apply Z.compare_eq in G0.
+      rewrite <- (Z2Nat.id 1%Z) in G0; lia.
+    + repeat rewrite Nat2Z.inj_succ.
+      rewrite Nat.pred_succ, Z.pred_succ, log2_of_nat; reflexivity.
+    + exfalso.
+      rewrite Nat.compare_lt_iff in G.
+      rewrite Z.compare_gt_iff in G0.
+      apply inj_lt in G.
+      lia.
+    + exfalso.
+      rewrite Nat.compare_gt_iff in G.
+      rewrite Z.compare_lt_iff in G0.
+      apply inj_lt in G.
+      lia.
+Qed.
+
+Lemma cutList_nil_0 {A : Type} (l : list A) :
+  cutList 0 l = [].
+Proof. auto. Qed.
+
+Lemma cutList_nil_nil {A : Type} n :
+  @cutList A n [] = [].
+Proof. destruct n; auto. Qed.
+
+Lemma cutList_nil_iff {A : Type} n (l : list A) :
+  cutList n l = [] <-> n = 0 \/ l = nil.
+Proof.
+  red; split; intros.
+  - destruct n; destruct l; auto.
+    exfalso.
+    inv H.
+  - destruct H; subst; auto.
+    destruct n; auto.
+Qed.
+
+Lemma rotateLength {A : Type} n :
+  forall (l : list A),
+  length (rotateList n l) = length l.
+Proof.
+  induction n; auto; intros.
+  simpl; rewrite IHn.
+  destruct l; auto.
+  rewrite snoc_rapp, app_length; simpl; lia.
+Qed.
+
+Lemma hdCutList {A : Type} (l : list A):
+  forall n,
+    n <> 0 ->
+    hd_error (cutList n l) = hd_error l.
+Proof.
+  induction l; intros.
+  - rewrite cutList_nil_nil; reflexivity.
+  - simpl; destruct n; simpl; auto.
+    exfalso; apply H; reflexivity.
+Qed.
+
+Lemma hdRotateList {A : Type} n:
+  forall (l : list A),
+    n < length l ->
+    hd_error (rotateList n l) = nth_error l n.
+Proof.
+  induction n; intros; destruct l; auto.
+  - exfalso; simpl in H; lia.
+  - simpl; rewrite IHn, snoc_rapp.
+    + rewrite nth_error_app1; auto.
+      apply lt_S_n; assumption.
+    + rewrite snoc_rapp, app_length; simpl in *; lia.
+Qed.
+
+Lemma cut_app {A : Type} (l1 : list A):
+  forall n l2,
+    n <= length l1 ->
+    cutList n (l1 ++ l2) = cutList n l1.
+Proof.
+  induction l1; intros.
+  - rewrite cutList_nil_nil.
+    simpl in H.
+    assert (n = 0) by lia; rewrite H0, cutList_nil_0; reflexivity.
+  - destruct n; simpl; auto.
+    rewrite IHl1; auto.
+    simpl in H; lia.
+Qed.
+
+Lemma tail_cut_rotate {A : Type} :
+  forall (l : list A),
+    cutList ((length l) - 1) (rotateList 1 l) = tl l.
+Proof.
+  destruct l; simpl; auto.
+  rewrite Nat.sub_0_r, snoc_rapp, cut_app; try lia.
+  induction l; simpl; auto.
+  rewrite IHl; reflexivity.
+Qed.
+
+Lemma rotateList_nil {A : Type} n:
+  @rotateList A n [] = [].
+Proof. induction n; simpl; auto. Qed.
+
+Lemma rotateList_add {A : Type} m:
+  forall (l : list A) n,
+    rotateList (n + m) l = rotateList n (rotateList m l).
+Proof.
+  induction m; auto; intros.
+  - rewrite Nat.add_0_r; reflexivity.
+  - rewrite <- plus_n_Sm; simpl.
+    rewrite IHm; reflexivity.
+Qed.
+
+Lemma cutList_length {A : Type} (l : list A):
+  forall n,
+    n <= length l ->
+    length (cutList n l) = n.
+Proof.
+  induction l; intros; simpl.
+  - rewrite cutList_nil_nil; simpl in *; lia.
+  - destruct n; simpl; auto.
+    simpl in H; apply Peano.le_S_n in H.
+    specialize (IHl _ H); auto.
+Qed.
+
+Lemma cutList_idemp {A : Type} (l : list A) :
+  forall n,
+    length l <= n ->
+    cutList n l = l.
+Proof.
+  induction l; intros.
+  - rewrite cutList_nil_nil; reflexivity.
+  - destruct n; simpl in H.
+    + exfalso; lia.
+    + simpl; f_equal; apply IHl.
+      lia.
+Qed.
+
+
+Lemma cutList_length_bnd {A : Type} (l : list A):
+  forall n,
+    length (cutList n l) <= n.
+Proof.
+  intros.
+  destruct (le_lt_dec n (length l)).
+  - rewrite cutList_length; auto.
+  - rewrite cutList_idemp; lia.
+Qed.
+  
+Lemma cutList_rotList_1 {A : Type} (l : list A) :
+  forall n,
+    n <= length l ->
+    cutList n (rotateList 1 (cutList (S n) l)) = cutList n (rotateList 1 l).
+Proof.
+  destruct l; intros.
+  - rewrite cutList_nil_nil; reflexivity.
+  - simpl; repeat rewrite snoc_rapp.
+    destruct (le_lt_or_eq _ _ H).
+    + simpl in H0.
+      apply lt_n_Sm_le in H0.
+      repeat rewrite cut_app; auto.
+      * rewrite cutList_idemp; auto.
+        apply cutList_length_bnd.
+      * rewrite cutList_length; auto.
+    + repeat rewrite cutList_idemp; auto; try rewrite app_length; simpl in *; lia.
+Qed.
+
+Lemma nth_error_nil_None' :
+  forall {A : Type} (n : nat),
+    nth_error (nil : list A) n = None.
+Proof.
+  intros; rewrite nth_error_None; simpl; lia.
+Qed.
+
+Lemma snoc_cutList {A : Type} (l : list A) :
+  forall n a,
+    nth_error l n = Some a ->
+    cutList (n + 1) l = snoc a (cutList n l).
+Proof.
+  induction l; simpl; intros.
+  - exfalso.
+    rewrite nth_error_nil_None' in H; discriminate.
+  - destruct n; simpl in *.
+    + inv H; reflexivity.
+    + erewrite IHl; auto.
+Qed.
+
+Lemma nth_error_rotate {A : Type} m :
+  forall n (l : list A),
+    (m + n) < length l ->
+    nth_error (rotateList n l) m = nth_error l (m + n).
+Proof.
+  induction n; intros.
+  - rewrite Nat.add_0_r; auto.
+  - destruct l.
+    + rewrite rotateList_nil.
+      repeat rewrite nth_error_nil_None'; reflexivity.
+    + cbn [rotateList].
+      rewrite IHn.
+      * rewrite <- plus_n_Sm, snoc_rapp, nth_error_app1; auto.
+        simpl in *; lia.
+      * rewrite snoc_rapp, app_length; simpl in *; lia.
+Qed.
+
+Lemma nth_error_rotate' {A : Type} m :
+  forall n (l : list A),
+    m < length l ->
+    nth_error (rotateList n l) m = nth_error l ((m + n) mod (length l)).
+Proof.
+  induction n; intros.
+  - rewrite Nat.add_0_r, Nat.mod_small; auto.
+  - destruct l.
+    + rewrite rotateList_nil.
+      repeat rewrite nth_error_nil_None'; reflexivity.
+    + cbn [rotateList].
+      rewrite IHn.
+      * rewrite <- plus_n_Sm, snoc_rapp.
+        destruct (Nat.eq_dec (S (m + n) mod Datatypes.length (a :: l)) 0).
+        -- rewrite e.
+           rewrite Nat.mod_divide in e; [|simpl; auto].
+           destruct e.
+           assert (m + n = x * S (length l) - 1) as P0.
+           { simpl in H0; lia. }
+           assert (forall n m, 0 < n ->
+                             (n * S m - 1) mod S m = m) as P1.
+           { clear.
+             induction n; intros; try lia.
+             rewrite Nat.mul_succ_l.
+             destruct (zerop n).
+             - subst; rewrite Nat.mul_0_l, Nat.add_0_l, Nat.mod_small; lia.
+             - rewrite Nat.add_comm, <- Nat.add_sub_assoc, Nat.add_comm, mod_add_r; try lia.
+               apply IHn; assumption.
+           }
+           rewrite P0, app_length, Nat.add_1_r, nth_error_app2.
+           ++ rewrite P1, Nat.sub_diag; simpl; auto.
+              destruct (zerop x); auto.
+              exfalso; subst; lia.
+           ++ rewrite P1; auto.
+              destruct (zerop x); auto.
+              exfalso; subst; lia.
+        -- specialize (Nat.mod_upper_bound (m + n) (S (length l)) ltac:(lia)) as P0.
+           apply lt_n_Sm_le in P0.
+           destruct (le_lt_or_eq _ _ P0) as [P1 | P1].
+           ++ rewrite app_length, Nat.add_1_r, nth_error_app1; auto.
+              rewrite <- (Nat.add_1_l (m + n)), <- (Nat.add_mod_idemp_r 1 _); [|simpl; lia].
+              rewrite (Nat.mod_small (1 + _)), (Nat.add_1_l ((m + n) mod _)); [simpl; auto|].
+              cbn [length]; lia.
+           ++ exfalso.
+              apply n0; cbn[length].
+              rewrite <- Nat.add_1_l, <- Nat.add_mod_idemp_r, P1, Nat.add_1_l, Nat.mod_same; auto.
+      * rewrite snoc_rapp, app_length; simpl in *; lia.
+Qed.
+
+Lemma nth_error_eq {A : Type} :
+  forall (l1 l2 : list A),
+    (forall m, nth_error l1 m = nth_error l2 m) ->
+    l1 = l2.
+Proof.
+  induction l1; intros.
+  - destruct l2; auto.
+    exfalso.
+    specialize (H 0); simpl in *; discriminate.
+  - destruct l2.
+    + exfalso.
+      specialize (H 0); simpl in *; discriminate.
+    + specialize (H 0) as P0; inv P0.
+      erewrite IHl1; auto.
+      intros; specialize (H (S m)); simpl in *; assumption.
+Qed.
+
+Lemma nth_error_eq_iff {A : Type} :
+  forall (l1 l2 : list A),
+    (forall m, nth_error l1 m = nth_error l2 m) <-> l1 = l2.
+Proof. red; split; intros; subst; eauto using nth_error_eq. Qed.
+
+Lemma nth_error_cutList {A : Type} m:
+  forall n (l : list A),
+    n <  m ->
+    nth_error (cutList m l) n = nth_error l n.
+Proof.
+  induction m; intros; try lia.
+  destruct l, n; simpl; auto.
+  apply IHm; lia.
+Qed.
+
+Lemma Fineqb_refl {m} (n : t m) :
+  Fin.eqb n n = true.
+Proof.
+  rewrite Fin.eqb_eq; reflexivity.
+Qed.
+
+Lemma Nat_mod_congr a b c :
+  c <> 0 ->
+  a < b ->
+  a mod c = b mod c ->
+  Nat.divide c (b - a).
+Proof.
+  intros.
+  repeat (rewrite Nat.mod_eq in H1; auto).
+  exists (b / c - a / c).
+  rewrite Nat.mul_sub_distr_r, Nat.mul_comm.
+  rewrite (Nat.mul_comm _ c).
+  rewrite <- (Nat.add_cancel_r _ _ (c * (b / c))), (Nat.add_comm (b - _) (c * (b / c))), le_plus_minus_r in H1.
+  - rewrite <- H1 at 1.
+    rewrite <- (Nat.add_cancel_r _ _ a), Nat.sub_add; try lia.
+    assert (c * (a / c) <= c * (b / c)).
+    { apply Nat.mul_le_mono_l.
+      apply Nat.div_le_mono; lia.
+    }
+    assert (c * (a / c) <= a).
+    { apply Nat.mul_div_le; assumption. }
+    lia.
+  - apply Nat.mul_div_le; assumption.
+Qed.
+
+Section FifoProps.
+  Variable size : nat.
+  Local Notation lgSize := (Nat.log2_up size).
+  Variable A : Type.
+  Variable implArray : Fin.t size -> A.
+
+  Variable enqP1 deqP1 : nat.
+  Variable enqP1Bnd : 0 <= enqP1 < 2 ^ (lgSize + 1).
+  Variable deqP1Bnd : 0 <= deqP1 < 2 ^ (lgSize + 1).
+  Local Notation enq := (enqP1 mod (2 ^ lgSize)).
+  Local Notation deq := (deqP1 mod (2 ^ lgSize)).
+  
+  Definition convertToList {n} (kamiArray : Fin.t n -> A) :=
+    @list_arr A n kamiArray.
+
+  Local Notation specList := (cutList (enqP1 - deqP1) (rotateList deq (convertToList implArray))).
+
+  Variable inBounds : deqP1 <= enqP1 <= deqP1 + size.
+  Variable sizePow2 : Nat.pow 2 (Nat.log2_up size) = size.
+
+  Lemma sizeNeq0 :
+    size <> 0.
+  Proof.
+    intro P; rewrite P in *.
+    simpl in sizePow2; discriminate.
+  Qed.
+  
+  Lemma deq_lt_size :
+    deq < size.
+  Proof.
+    rewrite sizePow2.
+    apply Nat.mod_upper_bound.
+    apply sizeNeq0.
+  Qed.
+
+  Lemma enq_lt_size :
+    enq < size.
+  Proof.
+    rewrite sizePow2.
+    apply Nat.mod_upper_bound.
+    apply sizeNeq0.
+  Qed.
+  
+  Lemma hdCorrect :
+    enqP1 <> deqP1 ->
+    hd_error specList = Some (implArray (Fin.of_nat_lt deq_lt_size)).
+  Proof.
+    intros.
+    rewrite hdCutList.
+    - rewrite hdRotateList.
+      + unfold convertToList.
+        rewrite <- list_arr_correct_simple, to_nat_of_nat; reflexivity.
+      + unfold convertToList, list_arr.
+        rewrite map_length, getFins_length.
+        apply deq_lt_size.
+    - intro P.
+      rewrite Nat.sub_0_le in P.
+      lia.
+  Qed.
+
+  Lemma hdEmpty :
+    enqP1 = deqP1 ->
+    hd_error specList = None.
+  Proof.
+    intros.
+    rewrite H, Nat.sub_diag, cutList_nil_0; reflexivity.
+  Qed.
+
+  Lemma tailCorrect :
+    tl specList = cutList (enqP1 - deqP1 - 1) (rotateList (deq + 1) (convertToList implArray)).
+  Proof.
+    destruct (Nat.eq_dec enqP1 deqP1).
+    - rewrite e, Nat.sub_diag, not_le_minus_0; try lia.
+      repeat rewrite cutList_nil_0; simpl; reflexivity.
+    - rewrite <- tail_cut_rotate, cutList_length, Nat.add_comm, rotateList_add.
+      + assert (enqP1 - deqP1 = (S (enqP1 - deqP1 - 1))) as P by lia.
+        rewrite P at 2.
+        rewrite cutList_rotList_1; auto.
+        unfold convertToList, list_arr.
+        rewrite rotateLength, map_length, getFins_length.
+        lia.
+      + unfold convertToList, list_arr.
+        rewrite rotateLength, map_length, getFins_length.
+        lia.
+  Qed.
+
+  Lemma listSnoc (val : A) :
+    enqP1 - deqP1 <> size ->
+    snoc val specList = cutList (enqP1 + 1 - deqP1) (rotateList deq (convertToList (fun i => if (Fin.eqb i (Fin.of_nat_lt enq_lt_size)) then val else implArray i))).
+  Proof.
+    intros HNotFull.
+    rewrite Nat.add_comm, <- Nat.add_sub_assoc; try lia.
+    rewrite Nat.add_comm.
+    erewrite snoc_cutList with (a := val).
+    - f_equal.
+      rewrite <- nth_error_eq_iff.
+      intros.
+      destruct (le_lt_dec (enqP1 - deqP1) m).
+      + destruct nth_error eqn:G.
+        * exfalso.
+          assert (nth_error specList m <> None) as G0.
+          { intro G0; rewrite G0 in G; discriminate. }
+          rewrite nth_error_Some, cutList_length in G0; [lia|].
+          rewrite rotateLength.
+          unfold convertToList, list_arr.
+          rewrite map_length, getFins_length; lia.
+        * destruct (nth_error (cutList _ (rotateList deq (convertToList (fun i => _))))) eqn: G0; auto.
+          exfalso.
+          assert (nth_error (cutList (enqP1 - deqP1) (rotateList deq (convertToList (fun i : Fin.t size => if Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)))) m
+                  <> None) as G1.
+          { intro G1; rewrite G1 in G0; discriminate. }
+          rewrite nth_error_Some, cutList_length in G1; [lia|].
+          rewrite rotateLength.
+          unfold convertToList, list_arr.
+          rewrite map_length, getFins_length; lia.
+      + repeat rewrite nth_error_cutList; auto.
+        assert (length (convertToList implArray) = size) as P.
+        { unfold convertToList, list_arr.
+          rewrite map_length, getFins_length; reflexivity.
+        }
+        assert (length (convertToList (fun i : t size => if Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)) = size) as P0.
+        { unfold convertToList, list_arr.
+          rewrite map_length, getFins_length; reflexivity.
+        }
+        repeat rewrite nth_error_rotate'; 
+          [rewrite P0, P |rewrite P0 | rewrite P]; try lia.
+        specialize (Nat.mod_upper_bound (m + deq) _ sizeNeq0) as P1.
+        assert (proj1_sig (to_nat (of_nat_lt P1)) = (m + deq) mod size) as P2.
+        { rewrite to_nat_of_nat; reflexivity. }
+        rewrite <- P2.
+        unfold convertToList.
+        repeat rewrite list_arr_correct_simple.
+        f_equal.
+        destruct Fin.eqb eqn:G; auto.
+        exfalso.
+        rewrite Fin.eqb_eq in G.
+        assert (proj1_sig (to_nat (of_nat_lt P1)) = proj1_sig (to_nat (of_nat_lt enq_lt_size))).
+        { rewrite G; auto. }
+        repeat rewrite to_nat_of_nat in H; simpl in H.
+        rewrite sizePow2 in H.
+        rewrite Nat.add_mod_idemp_r in H; [|apply sizeNeq0].
+        assert (enqP1 - deqP1 < size) as P3 by lia.
+        assert (m + deqP1 < enqP1) as P4 by lia.
+        apply Nat_mod_congr in H; auto; [|apply sizeNeq0].
+        destruct H.
+        destruct x; lia.
+    - assert (length (convertToList (fun i : t size => if Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)) = size) as P.
+        { unfold convertToList, list_arr.
+          rewrite map_length, getFins_length; reflexivity.
+        }
+        rewrite nth_error_rotate'; rewrite P; try lia.
+        rewrite sizePow2 at 1.
+        rewrite Nat.add_mod_idemp_r; [|apply sizeNeq0].
+        rewrite Nat.add_comm, le_plus_minus_r; try lia.
+        unfold convertToList.
+        assert (proj1_sig (to_nat (of_nat_lt enq_lt_size)) = enq) as P0.
+        { rewrite to_nat_of_nat; reflexivity. }
+        rewrite sizePow2 in P0 at 2.
+        rewrite <- P0, list_arr_correct_simple, Fineqb_refl; reflexivity.
+  Qed.
+  
+End FifoProps.
