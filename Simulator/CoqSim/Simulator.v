@@ -460,25 +460,7 @@ End Regs2.
 
 End EvalAction.
 
-Definition eval_Basemodule_restart{E}`{Environment E}(env : E)(args : list (string * string))(state : FileState)(sregs : SimRegs)(basemod : BaseModule)(kc : kind_consistent (getRegisters basemod) sregs)(timeout : nat)(meths : list (string * Signature))(wf : WfBaseModule_new eval_Kind basemod) : mkProd (List.map dec_sig meths) -> IO unit. refine (
-  match basemod return kind_consistent (getRegisters basemod) sregs -> WfBaseModule_new eval_Kind basemod -> _ with
-  | BaseRegFile rf => fun _ pf fs => _
-  | BaseMod regs rules dms =>
-      match rules with
-      | [] => fun _ _ _ => error "empty rules"
-      | r::rs => fun _ pf fs => _ (* eval_Rules timeout meths (initialize_SimRegs regs) (unwind_list (r::rs) (@cons_neq _ r rs)) *)
-      end
-  end kc wf).
-Proof.
-  - exact (error "BaseRegFile not simulatable").
-  - unfold WfBaseModule_new in pf.
-    destruct pf.
-    refine (
-    @eval_Rules E _ env state (timeout * (List.length rules)) meths _ sregs k (unwind_list (get_wf_rules _ _ H0) _) fs).
-    simpl.
-    destruct H0.
-    discriminate.
-Defined.
+
 
 Section Eval_Wf.
 
