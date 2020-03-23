@@ -347,9 +347,12 @@ Proof.
   - apply updates_consistent; auto.
 Defined.
 
-Print RegInitT.
-
-Print SimRegs.
+Definition execute_Rule{E}`{Environment E}(env : E)(init_regs : list RegInitT)(meths : list (string * Signature))(fs : mkProd (List.map dec_sig meths))(rule : RuleT)(wf_rule : WfActionT_new init_regs (snd rule eval_Kind))(state : FileState)(curr_regs : SimRegs)(kc_curr : kind_consistent init_regs curr_regs) : IO (FileState * SimRegs) :=
+  do env' <- envPre env state curr_regs (fst rule);
+  do p <- @eval_RuleT _ curr_regs kc_curr _ _ env' state meths rule wf_rule fs;
+  do env'' <- envPost env' state curr_regs (fst rule);
+  do state' <- exec_file_updates state (snd (fst p));
+  ret (state', (do_updates (fst (fst p)) curr_regs)).
 
 Definition eval_RegInitValT : {k : FullKind & RegInitValT k} -> {k : FullKind & fullType eval_Kind k} :=
   fun '(existT k o) => match o with
@@ -456,6 +459,26 @@ Definition eval_BaseMod{E}`{Environment E}(env : E)(args : list (string * string
 End Regs2.
 
 End EvalAction.
+
+Definition eval_Basemodule_restart{E}`{Environment E}(env : E)(args : list (string * string))(state : FileState)(sregs : SimRegs)(basemod : BaseModule)(kc : kind_consistent (getRegisters basemod) sregs)(timeout : nat)(meths : list (string * Signature))(wf : WfBaseModule_new eval_Kind basemod) : mkProd (List.map dec_sig meths) -> IO unit. refine (
+  match basemod return kind_consistent (getRegisters basemod) sregs -> WfBaseModule_new eval_Kind basemod -> _ with
+  | BaseRegFile rf => fun _ pf fs => _
+  | BaseMod regs rules dms =>
+      match rules with
+      | [] => fun _ _ _ => error "empty rules"
+      | r::rs => fun _ pf fs => _ (* eval_Rules timeout meths (initialize_SimRegs regs) (unwind_list (r::rs) (@cons_neq _ r rs)) *)
+      end
+  end kc wf).
+Proof.
+  - exact (error "BaseRegFile not simulatable").
+  - unfold WfBaseModule_new in pf.
+    destruct pf.
+    refine (
+    @eval_Rules E _ env state (timeout * (List.length rules)) meths _ sregs k (unwind_list (get_wf_rules _ _ H0) _) fs).
+    simpl.
+    destruct H0.
+    discriminate.
+Defined.
 
 Section Eval_Wf.
 
