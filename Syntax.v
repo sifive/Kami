@@ -367,7 +367,7 @@ Section Phoas.
   Fixpoint fullFormatHex k : FullFormat k :=
     match k return FullFormat k with
     | Bool => FBool 1 Hex
-    | Bit n => FBit n (n/4) Hex
+    | Bit n => FBit n ((n+3)/4) Hex
     | Struct n fk fs => FStruct fk fs (fun i => fullFormatHex (fk i))
     | Array n k => FArray n (fullFormatHex k)
     end.
