@@ -8,7 +8,7 @@ Inductive Failure :=
   | RegNotFound : string -> Failure
   | HideMethodNotFound : string -> Failure
   | RegKindMismatch : string -> FullKind -> FullKind -> Failure
-  | DuplicateMethod : string -> Signature -> Signature -> Failure
+  | DuplicateMethod : string -> (* Signature -> Signature -> *) Failure
   | DuplicateRegister : string -> FullKind -> FullKind -> Failure
   | DuplicateRule : string -> Failure.
 
@@ -67,10 +67,10 @@ Fixpoint find_dups_aux{X}(acc ps : list (string * X)) : list (string * X * X) :=
 
 Definition find_dups{X} : list (string * X) -> list (string * X * X) := find_dups_aux [].
 
-Definition test := [("a", 5); ("b", 156); ("c", 3); ("a", 4); ("d", 46); ("b", 75)].
+Local Definition test := [("a", 5); ("b", 156); ("c", 3); ("a", 4); ("d", 46); ("b", 75)].
 
 Definition WfBaseModule_unit(m : BaseModule) :=
-     map (fun '(s,x1,x2) => DuplicateMethod s (projT1 x1) (projT1 x2)) (find_dups (getMethods m))
+     map (fun '(s,x1,x2) => DuplicateMethod s (* (projT1 x1) (projT1 x2) *)) (find_dups (getMethods m))
   ++ map (fun '(s,x1,x2) => DuplicateRegister s (projT1 x1) (projT1 x2)) (find_dups (getRegisters m))
   ++ map (fun '(s,x1,x2) => DuplicateRule s) (find_dups (getRules m))
   ++ WfBaseModule_rules_unit m
@@ -117,7 +117,7 @@ Fixpoint WfMod_unit(m : Mod) :=
       ++ WfMod_unit m2
       ++ map (fun '(s,x1,x2) => DuplicateRegister s (projT1 x1) (projT1 x2)) (find_overlaps (getAllRegisters m1) (getAllRegisters m2))
       ++ map (fun '(s,x1,x2) => DuplicateRule s) (find_overlaps (getAllRules m1) (getAllRules m2))
-      ++ map (fun '(s,x1,x2) => DuplicateMethod s (projT1 x1) (projT1 x2)) (find_overlaps (getAllMethods m1) (getAllMethods m2))
+      ++ map (fun '(s,x1,x2) => DuplicateMethod s (* (projT1 x1) (projT1 x2) *)) (find_overlaps (getAllMethods m1) (getAllMethods m2))
       ++ WfConcat_unit m1 m2
       ++ WfConcat_unit m2 m1
   end.
