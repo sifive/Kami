@@ -10,70 +10,6 @@ Ltac mySubst :=
                     try rewrite H in *; clear H; subst
                   end].
 
-(* Shouldn't be called explicitly *)
-(* Ltac expand_semaction := *)
-(*   lazymatch goal with *)
-(*   | [|- SemAction _ ?a _ _ _ _] => *)
-(*            eapply SemActionExpandRegs; *)
-(*            [> repeat match goal with *)
-(*                      | [H: SemAction _ a _ _ _ _ |- _] => solve[eapply H] *)
-(*                      end | idtac | idtac ] *)
-(*   end. *)
-
-(* Handles some trivial goals, potentially unifying evars along the way. *)
-(* Ltac finisher := *)
-(*   repeat match goal with *)
-(*          | [H: In _ [] |- _] => solve [inversion H] *)
-(*          | [H: SubList _ _ |- SubList _ _ ] => solve [eapply H] *)
-(*          | [H: SemAction _ _ _ _ _ _ |- SemAction _ _ _ _ _ _] => eapply H *)
-(*          | [|- In _ (getKindAttr _) ] => eapply InGetKindAttr *)
-(*          | [ H: forall _, In _ _ -> In _ _ |- _ ] => solve [eapply H] *)
-(*          | [H: In _ _ |- In _ _] => solve [eapply H] *)
-(*          | _ => progress mySubst *)
-(*          | _ => progress (autorewrite with cor_db in *; simpl in *; auto) *)
-(*          end. *)
-
-(* Finishes goals raised by application of lemmas relating to SubList.
-   Shouldn't be called explicitly. *)
-(* Ltac sublist_finisher SubmodImplRegs := *)
-(*   match goal with *)
-(*   | |- ~ In (?name,_) _ => assert (~ In name (map fst SubmodImplRegs)); intro *)
-(*   | [H: NoDup _ |- False] => inversion H; clear H; solve[intuition] *)
-(*   | [H: ~ In _ _ |- False] => eapply H *)
-(*   | [H: map (fun x : RegT => (let (x0, _) := x in x0, let (a, _) := let (_, y) := x in y in a)) _ = map (fun x : RegT => (let (x0, _) := x in x0, let (a, _) := let (_, y) := x in y in a)) _ |- _] =>  *)
-(*     erewrite <-(getKindAttrEqImpFstEq _ _ H) *)
-(*   | |- In _ (map fst _) => eapply inImpInFst; solve[finisher] *)
-(*   | |- _  => solve[finisher] *)
-(*   end. *)
-
-(* Solves Sublist goals about "submodule" implementation registers *)
-(* Ltac discharge_SubList SubmodImplRegs := *)
-(*   match goal with *)
-(*   | |- SubList _ SubmodImplRegs => solve[eapply SubList_transitive; repeat sublist_finisher SubmodImplRegs; eapply SubList_Strengthen; repeat sublist_finisher SubmodImplRegs] *)
-(*   end. *)
-
-(* Solves some List.In goals by making use of List.NoDup
-   hypotheses. Should not be called explicitly. *)
-(* Ltac solve_leftover_Ins SubmodImplRegs := *)
-(*   match goal with *)
-(*   | [H: NoDup ?a |- _] => *)
-(*     match a with *)
-(*     | context[SubmodImplRegs] => inversion H; intuition *)
-(*     end *)
-(*   end; *)
-(*   repeat match goal with *)
-(*          | [H: In _ _ |- _] => eapply inImpInFst in H *)
-(*          | [H: In _ (map fst (getKindAttr SubmodImplRegs)) |- _] => eapply inFstGetKindAttrIffInFst in H; contradiction *)
-(*          end; *)
-(*   intuition auto. *)
-
-(* Ltac noExtraGoals tac := *)
-(*   (let n := numgoals in *)
-(*    tac; *)
-(*    let n' := numgoals in *)
-(*    guard n' = n). *)
-
-
 Ltac find_if_inside :=
   match goal with
   | [H : ?X = _ |- context[if ?X then _ else _]] => rewrite H
@@ -84,7 +20,6 @@ Ltac find_if_inside :=
   end.
 
 (* clear out trivially true statements *)
-(* keep *)
 Ltac clean_useless_hyp :=
   match goal with
   | [ H : ?a = ?a |- _] => clear H
@@ -98,43 +33,8 @@ Ltac clean_useless_hyp :=
   | [ H : ~In _ nil |- _] => clear H
   | [ H1 : ?P, H2 : ?P |- _] => clear H1
   end.
-(* throw? *)
-(* Ltac normalize_key_hyps := *)
-(*   match goal with *)
-(*   | [ H : key_not_In _ (_ ++ _) |- _] => rewrite key_not_In_app_iff in H; destruct H as [? ?] *)
-(*   | [ H : key_not_In _ (_ :: _) |- _] => rewrite key_not_In_cons in H; destruct H as [? ?] *)
-(*   | [ H : key_not_In _ _ |- _] => rewrite key_not_In_fst in H *)
-(*   | [ H : DisjKey (_ ++ _) _ |- _] => rewrite DisjKey_app_split_l in H; destruct H as [? ?] *)
-(*   | [ H : DisjKey _ (_ ++ _) |- _] => rewrite DisjKey_app_split_r in H; destruct H as [? ?] *)
-(*   | [ H : DisjKey (_ :: _) _ |- _] => rewrite DisjKey_cons_l_str in H; destruct H as [? ?] *)
-(*   | [ H : DisjKey _ (_ :: _) |- _] => rewrite DisjKey_cons_r_str in H; destruct H as [? ?] *)
-(*   | [ H : NoDup (_ :: _) |- _] => rewrite NoDup_cons_iff in H; destruct H as [? ?] *)
-(*   | [ H : NoDup (_ ++ _) |- _] => rewrite (NoDup_app_Disj_iff string_dec) in H; destruct H as [? [? ?]] *)
-(*   | [ H : ~In _ (_ :: _) |- _] => rewrite not_in_cons in H; destruct H as [? ?] *)
-(*   | [ H : ~In _ (_ ++ _) |- _] => rewrite (nIn_app_iff string_dec) in H; destruct H as [? ?] *)
-(*   end. *)
-
-(* Ltac normalize_key_concl := *)
-(*   match goal with *)
-(*   | [ |- key_not_In _ (_ ++ _)] => rewrite key_not_In_app_iff; split *)
-(*   | [ |- key_not_In _ (_ :: _)] => rewrite key_not_In_cons; split *)
-(*   | [ |- DisjKey (_ ++ _) _] => rewrite DisjKey_app_split_l; split *)
-(*   | [ |- DisjKey _ (_ ++ _)] => rewrite DisjKey_app_split_r; split *)
-(*   | [ |- DisjKey (_ :: _) _] => rewrite DisjKey_cons_l_str; split *)
-(*   | [ |- DisjKey _ (_ :: _)] => rewrite DisjKey_cons_r_str; split *)
-(*   | [ |- NoDup (_ :: _)] => rewrite NoDup_cons_iff; split *)
-(*   | [ |- NoDup (_ ++ _)] => rewrite (NoDup_app_Disj_iff string_dec); repeat split *)
-(*   | [ |- key_not_In _ ?l] => *)
-(*     match l with *)
-(*     | _ => has_evar l; idtac *)
-(*     | _ => rewrite key_not_In_fst *)
-(*     end *)
-(*   | [ |- ~In _ (_ :: _)] => rewrite not_in_cons; split *)
-(*   | [ |- ~In _ (_ ++ _)] => rewrite (nIn_app_iff string_dec); split *)
-(*   end. *)
 
 (* Transforms hypotheses and goals into a form suitable for the solvers *)
-(* keep *)
 Ltac my_simplifier :=
   match goal with
   | [ H1 : ?a = ?b,
@@ -168,29 +68,8 @@ Ltac my_simplifier :=
   | [ H : SubList (_ ++ _) _ |- _] => rewrite SubList_app_l_iff in H
   end.
 
-(* solves trivial goals and trivial unifications *)
-(* Ltac my_simpl_solver := *)
-(*   match goal with *)
-(*   | [ H : ?P |- ?P] => apply H *)
-(*   | [ |- DisjKey nil _] => apply DisjKey_nil_l *)
-(*   | [ |- DisjKey _ nil] => apply DisjKey_nil_r *)
-(*   | [ |- ?a = ?a] => reflexivity *)
-(*   | [ |- True] => apply I *)
-(*   | [ |- NoDup nil] => constructor *)
-(*   | [ |- ~In _ nil] => intro; my_simpl_solver *)
-(*   | [ H : False |- _] => exfalso; apply H *)
-(*   | [ H : ?a <> ?a |- _] => exfalso; apply H; reflexivity *)
-(*   | [ H : In _ nil |- _] => inversion H *)
-(*   | [ |- SubList nil _ ] => apply SubList_nil_l *)
-(*   | [ |- SubList ?a ?a] => apply SubList_refl *)
-(*   | [ |- ?a = ?b] => is_evar a; reflexivity *)
-(*   | [ |- ?a = ?b] => is_evar b; reflexivity *)
-(*   | [ H: ?a = ?b |- _] => discriminate *)
-(*   end. *)
-
 Ltac decompose_In H :=
   repeat (rewrite in_cons_iff in H || rewrite in_app_iff in H).
-
 
 Ltac aggressive_key_finder2 :=
   (match goal with
@@ -249,7 +128,6 @@ Ltac aggressive_gka_finder2 :=
    end)
   ; intros.
 
-
 (* Searches for hypotheses that can be transormed into SubList statements *)
 Ltac aggressive_sublist_finder2 :=
   (match goal with
@@ -297,6 +175,7 @@ Ltac solve_keys :=
                   | [H : SubList (map fst _) (map fst _) |- _] => specialize (H k)
                   | [H : DisjKey _ _ |- _] => specialize (H k)
                   end)
+        ; repeat rewrite key_not_In_fst in *
    | [ |- DisjKey ?l1 ?l2]
      => specialize (SubList_refl (map fst l1)) as TMP1
         ; specialize (SubList_refl (map fst l2)) as TMP2
@@ -306,7 +185,7 @@ Ltac solve_keys :=
                   | [H : SubList (map fst _) (map fst _) |- _] => specialize (H v)
                   | [H : DisjKey _ _ |- _] => specialize (H v)
                   end)
-   end)
+   end); repeat rewrite key_not_In_fst in *
   ; tauto.
 
 (* Breaks SubList goal into multiple, generic goals recognizable by the solver *)
@@ -363,56 +242,8 @@ Ltac resolve_sublist2 :=
        ; mySubst
   end.
 
-(* solves the very specific wb conditions *)
-(* Ltac resolve_wb' := *)
-(*   let HNoDup := fresh "H" in *)
-(*   let HSubList := fresh "H" in *)
-(*   match goal with *)
-(*   | [HSemAction1 :SemAction ?o1 ?a_i _ _ _ _, *)
-(*                   HActionWb : ActionWb ?myR ?a_i |- _] => *)
-(*     assert (NoDup (map fst o1)) as HNoDup *)
-(*     ;[repeat my_simplifier *)
-(*       ; repeat normalize_key_concl *)
-(*       ; (solve_keys || my_simpl_solver) *)
-(*      | assert (SubList myR (getKindAttr o1)) as HSubList *)
-(*        ;[clear HNoDup HSemAction1 *)
-(*          ; repeat normalize_sublist_l *)
-(*          ; sublist_sol *)
-(*         | specialize (HActionWb _ _ _ _ _ HNoDup HSubList HSemAction1) *)
-(*           as [[? [? [? [? ?]]]] ?] *)
-(*           ; try resolve_sublist2 *)
-(*           ; clear HSemAction1 HNoDup HSubList]] *)
-(*   | [HSemAction1 : SemAction ?o1 (?a_i _) _ _ _ _, *)
-(*                    HActionWb : forall _, ActionWb ?myR (?a_i _) |- _] => *)
-(*     assert (NoDup (map fst o1)) as HNoDup *)
-(*     ;[repeat my_simplifier *)
-(*       ; repeat normalize_key_concl *)
-(*       ; (solve_keys || my_simpl_solver) *)
-(*      | assert (SubList myR (getKindAttr o1)) as HSubList *)
-(*        ;[clear HNoDup HSemAction1 *)
-(*          ; repeat normalize_sublist_l *)
-(*          ; sublist_sol *)
-(*         | specialize (HActionWb _ _ _ _ _ _ HNoDup HSubList HSemAction1) *)
-(*           as [[? [? [? [? ?]]]] ?] *)
-(*           ; try resolve_sublist2 *)
-(*           ; clear HSemAction1 HNoDup HSubList]] *)
-(*   | [HSemAction1 : SemAction ?o1 (?a_i _ _ _ _ _) _ _ _ _, *)
-(*                    HActionWb :  forall _ _ _ _, ActionWb ?myR (?a_i _ _ _ _ _)|- _] => *)
-(*     assert (NoDup (map fst o1)) as HNoDup *)
-(*     ;[repeat my_simplifier *)
-(*       ; repeat normalize_key_concl *)
-(*       ; (solve_keys || my_simpl_solver) *)
-(*      | assert (SubList myR (getKindAttr o1)) as HSubList *)
-(*        ;[clear HNoDup HSemAction1 *)
-(*         | specialize (HActionWb _ _ _ _ _ _ _ _ _ HNoDup HSubList HSemAction1) *)
-(*           as [[? [? [? [? ?]]]] ?] *)
-(*           ; try resolve_sublist2 *)
-(*           ; clear HSemAction1 HNoDup HSubList]] *)
-(*   end. *)
-
 (* solves specific Effectful/Effectless relation conditions *)
-(* keep *)
-Ltac resolve_rel' :=
+Ltac resolve_rel :=
   let HupdsNil := fresh "HupdsNil" in
   let HcallsNil := fresh "HcallsNil" in
   let reads_s := fresh "reads_s" in
@@ -474,58 +305,6 @@ Ltac doUpdRegs_simpl :=
   | [H : context [doUpdReg (?a ++ ?b) ?c] |- _] => rewrite doUpdReg_app in H
   | [H : context [doUpdReg (?a_ :: ?b) ?c] |- _] => rewrite doUpdReg_cons in H
   end.
-
-(* Attempts to reduce statements about doUpdRegs to their most basic components *)
-(* Ltac doUpdRegs_red := *)
-(*   match goal with *)
-(*   | [ |- context [ doUpdRegs nil _]] => rewrite doUpdRegs_nil *)
-(*   | [ |- context [ doUpdReg nil _]] => rewrite doUpdReg_nil *)
-(*   | [ |- context [ oneUpdRegs ?r ?o]] *)
-(*     => let TMP := fresh "H" in *)
-(*        assert (~ In (fst r) (map fst o)) as TMP *)
-(*        ; [ repeat ( match goal with *)
-(*                       [ |- context [map fst (doUpdRegs _ _)]] *)
-(*                       => rewrite doUpdRegs_preserves_keys *)
-(*                     end ) *)
-(*            ; solve_keys *)
-(*          | rewrite (oneUpdRegs_notIn _ _ TMP) *)
-(*            ; clear TMP] *)
-(*   | [ |- context [doUpdReg ?u ?r]] *)
-(*     => let TMP := fresh "H" in *)
-(*        assert (~ In (fst r) (map fst u)) as TMP *)
-(*        ; [ repeat ( match goal with *)
-(*                       [ |- context [map fst (doUpdRegs _ _)]] *)
-(*                       => rewrite doUpdRegs_preserves_keys *)
-(*                     end ) *)
-(*            ; solve_keys *)
-(*          | rewrite (doUpdReg_notIn _ _ TMP) *)
-(*            ; clear TMP] *)
-(*   | [ |- context [doUpdRegs ?u ?o]] *)
-(*     => let TMP := fresh "H" in *)
-(*        assert (DisjKey u o) as TMP *)
-(*        ; [ repeat ( match goal with *)
-(*                     | [|- DisjKey _ (doUpdRegs _ _)] => rewrite (DisjKey_rewrite_r _ _ _ (doUpdRegs_preserves_keys _ _)) *)
-(*                     | [|- DisjKey (doUpdRegs _ _) _] => rewrite (DisjKey_rewrite_l _ _ _ (doUpdRegs_preserves_keys _ _)) *)
-(*                     end) *)
-(*            ; solve_keys *)
-(*          | rewrite (doUpdRegs_DisjKey TMP) *)
-(*            ; clear TMP] *)
-(*   | [ |- context [(oneUpdReg (?a, ?b) (?a, ?c))]] *)
-(*     => cbv [oneUpdReg] *)
-(*        ; rewrite String.eqb_refl *)
-(*   | [ H : (fst ?r1) = (fst ?r2) |- context [(oneUpdReg ?r1 ?r2)]] *)
-(*     => cbv [oneUpdReg] *)
-(*        ; rewrite String.eqb_sym, <- (String.eqb_eq H) *)
-(*   | [ H : (fst ?r2) = (fst ?r1) |- context [(oneUpdReg ?r1 ?r2)]] *)
-(*     => cbv [oneUpdReg] *)
-(*        ; rewrite <- (String.eqb_eq H) *)
-(*   | [ H : (fst ?r1) <> (fst ?r2) |- context [(oneUpdReg ?r1 ?r2)]] *)
-(*     => cbv [oneUpdReg] *)
-(*        ; rewrite String.eqb_sym, <- (String.eqb_neq H) *)
-(*   | [ H : (fst ?r1) <> (fst ?r2) |- context [(oneUpdReg ?r1 ?r2)]] *)
-(*     => cbv [oneUpdReg] *)
-(*        ; rewrite <- (String.eqb_neq H) *)
-(*   end. *)
 
 (* Simply breaks apart a goal *)
 Ltac goal_split :=
@@ -590,7 +369,6 @@ Ltac extract_gatherActions' subRegs :=
   end.
 
 (* consumes the main body of a SemAction *)
-(* keep *)
 Ltac main_body :=
   match goal with
   | [H: SemAction _ (Return _) _ _ _ _ |- _]
@@ -624,85 +402,6 @@ Ltac main_body :=
   | [H: SemAction _ (gatherActions (map _ ?l) _) _ _ _ _ |- _]
     => idtac (* TODO : put gatherActions workflow here *)
   end.
-
-(* Attempts to consume all hypotheses.
-     Probably needs to be thought out a little more. *)
-(* Ltac hyp_consumer := *)
-(*   match goal with *)
-(*   | _ => sublist_sol *)
-(*   | _ => normalize_key_concl *)
-(*   | _ => clean_useless_hyp *)
-(*   | _ => mySubst *)
-(*   | _ => my_simplifier *)
-(*   | _ => normalize_key_hyps *)
-(*   | _ =>my_simpl_solver *)
-(*   | _ => find_if_inside *)
-(*   | _ => resolve_wb' *)
-(*   | _ => resolve_sublist *)
-(*   | _ => resolve_rel' *)
-(*   | _ => main_body *)
-(*   | _ => sublist_iff *)
-(*   end. *)
-
-(* Ltac goal_body := *)
-(*   match goal with *)
-(*   | [ |- SemAction _ (Return _) _ _ _ _ ] => econstructor 10 *)
-(*   | [ |- SemAction _ (MCall _ _ _ _) _ _ _ _] => econstructor 1 *)
-(*   | [ |- SemAction _ (LetAction _ _) _ _ _ _] => econstructor 3 *)
-(*   | [ |- SemAction _ (ReadReg _ _ _) _ _ _ _] => econstructor 5 *)
-(*   | [ |- SemAction _ (WriteReg _ _ _) _ _ _ _] => econstructor 6 *)
-(*   | [ |- SemAction _ (IfElse _ _ _ _) _ _ _ _] *)
-(*     => eapply SemAction_if_split *)
-(*        ;[ find_if_inside| | | | ] *)
-(*   | [ |- SemAction _ (LetExpr _ _) _ _ _ _] => econstructor 2 *)
-(*   | [ |- SemAction _ (ReadNondet _ _) _ _ _ _] => econstructor 4 *)
-(*   | [ |- SemAction _ (Sys _ _) _ _ _ _] => econstructor 9 *)
-(*   | [ H : SemAction ?o ?a _ _ _ _ |- SemAction ?o ?a _ _ _ _] *)
-(*     => apply H *)
-(*   | [ H : SemAction ?o1 ?a _ _ _ _ |- SemAction ?o2 ?a _ _ _ _] *)
-(*     => eapply SemActionExpand;[| apply H] *)
-(*   end. *)
-
-(* Attempts to break down goals into easily solved pieces *)
-(* Ltac goal_consumer := *)
-(*   match goal with *)
-(*   | _ => goal_split *)
-(*   | _ => goal_body *)
-(*   | _ => solve_keys *)
-(*   | _ => my_risky_simplifier *)
-(*   | _ => my_risky_solver *)
-(*   | _ => gka_doUpdReg_red *)
-(*   | _ => normalize_sublist_l *)
-(*   end. *)
-
-(* Added ad hoc since regular resolve_wb' doesn't seem to handle the binders correctly *)
-(* Should probably match on context, then try up to 10 length binders instead *)
-(* Ltac resolve_wb'' := *)
-(*   let HNoDup := fresh "H" in *)
-(*   let HSubList := fresh "H" in *)
-(*   match goal with *)
-(*   | [HSemAction1 : SemAction ?o1 (?a_i _ _ _ _ _) _ _ _ _, *)
-(*                    HActionWb :  forall _ _ _ _, ActionWb ?myR (?a_i _ _ _ _ _)|- _] => *)
-(*     assert (NoDup (map fst o1)) as HNoDup *)
-(*     ;[ *)
-(*       | assert (SubList myR (getKindAttr o1)) as HSubList *)
-(*         ;[clear HNoDup HSemAction1 *)
-(*          | specialize (HActionWb _ _ _ _ _ _ _ _ _ HNoDup HSubList HSemAction1) *)
-(*            as [[? [? [? [? ?]]]] ?] *)
-(*            ; clear HSemAction1 HNoDup HSubList]] *)
-(*   end. *)
-
-(* Ltac hyp_consumer1 := *)
-(*   repeat (repeat main_body *)
-(*           ; repeat mySubst *)
-(*           ; repeat (my_simplifier; repeat clean_useless_hyp) *)
-(*           ; repeat mySubst *)
-(*           ; repeat normalize_key_hyps *)
-(*           ; repeat (my_simplifier; repeat clean_useless_hyp) *)
-(*           ; repeat (resolve_wb'; repeat clean_useless_hyp) *)
-(*           ; repeat resolve_rel' *)
-(*           ; repeat mySubst *)
-(*           ; repeat (my_simplifier ; repeat clean_useless_hyp)). *)
 
 Ltac risky_unify :=
   match goal with
@@ -779,78 +478,6 @@ Ltac right_subst :=
       |- _] => rewrite <- H1 in H2
   end.
 
-(* Ltac basic_goal_consumer := *)
-(*   repeat goal_split *)
-(*   ; repeat goal_body *)
-(*   ; repeat normal_solver *)
-(*   ; repeat doUpdRegs_simpl *)
-(*   ; repeat doUpdRegs_red *)
-(*   ; repeat normal_solver *)
-(*   ; repeat my_risky_solver *)
-(*   ; repeat gka_doUpdReg_red *)
-(*   ; repeat normal_solver. *)
-
-(* Ltac extract_gatherActions subRegs1 subRegs2:= *)
-(*   match goal with *)
-(*   | [ H : SemAction ?o (gatherActions (map ?f ?l) (fun _ : _ => ?s)) _ _ _ _ |- _] *)
-(*     => let HCont := fresh "H" in *)
-(*        let HBody := fresh "H" in *)
-(*        let P := fresh "H" in *)
-(*        assert (ActionWb (getKindAttr (subRegs1++subRegs2)) s) as HCont *)
-(*        ; [ eapply ActionWbExpand with (myRegs1 := getKindAttr subRegs2) *)
-(*            ;[ sublist_sol *)
-(*             | unfold ActionWb; intros; hyp_consumer1; basic_goal_consumer] *)
-(*          | assert(forall t, *)
-(*                      ActionWb (getKindAttr (subRegs1 ++ subRegs2)) (f t)) as HBody *)
-(*            ;[intros *)
-(*              ;eapply ActionWbExpand with (myRegs1 := getKindAttr subRegs1) *)
-(*              ;[ sublist_sol *)
-(*               | unfold ActionWb *)
-(*                 ; intros *)
-(*                 ; hyp_consumer1 *)
-(*                 ; extract_in_map *)
-(*                 ; basic_goal_consumer *)
-(*                 ;repeat((repeat normalize_sublist_l; repeat sublist_sol; repeat my_simpl_solver); repeat dangerous_solver) *)
-(*                 ;repeat right_subst *)
-(*                 ; repeat resolve_sublist2 *)
-(*                 ; repeat my_simpl_solver] *)
-(*             |] *)
-(*            ; specialize (gatherAction_invar _ HCont HBody l) as P *)
-(*            ; clear HCont HBody *)
-(*          ] *)
-(*   end. *)
-
-(* Ltac extract_gatherActions2' subRegs1 subRegs2 := *)
-(*   match goal with *)
-(*   | [ H : SemAction ?o (gatherActions (map ?f ?l) (fun _ : _ => ?s)) _ _ _ _ |- _] *)
-(*     => let HCont := fresh "H" in *)
-(*        let HBody := fresh "H" in *)
-(*        let P := fresh "H" in *)
-(*        assert (ActionWb (subRegs1 ++ subRegs2) s) as HCont *)
-(*        ; [ eapply ActionWbExpand with (myRegs1 := subRegs2) *)
-(*            ;[ sublist_sol *)
-(*             | unfold ActionWb; intros; hyp_consumer1; basic_goal_consumer] *)
-(*          | assert (forall t, *)
-(*                       ActionWb (subRegs1 ++ subRegs2) (f t)) as HBody *)
-(*            ;[intros *)
-(*              ;eapply ActionWbExpand with (myRegs1 := subRegs1) *)
-(*              ;[ repeat sublist_sol *)
-(*               | unfold ActionWb *)
-(*                 ; intros *)
-(*                 ; hyp_consumer1 *)
-(*                 ; extract_in_map *)
-(*                 ; basic_goal_consumer *)
-(*                 ; repeat normalize_sublist_l *)
-(*                 ; repeat resolve_sublist2 *)
-(*                 ; repeat dangerous_solver *)
-(*                 ; repeat my_simpl_solver] *)
-(*             |] *)
-(*            ; specialize (gatherAction_invar _ HCont HBody l) as P *)
-(*            ; clear HCont HBody *)
-(*          ] *)
-(*   end. *)
-
-(* keep *)
 Ltac normalize_key_hyps1 :=
   match goal with
   | [ H : context [map fst (_ ++ _)] |- _] => rewrite map_app in H
@@ -865,7 +492,6 @@ Ltac normalize_key_hyps1 :=
   | [ H : DisjKey _ (_ :: _) |- _] => rewrite DisjKey_cons_r_str in H; destruct H as [? ?]
   end.
 
-(* keep *)
 Ltac normalize_key_hyps2 :=
   match goal with
   | [ H : context [map fst (_ :: _)] |- _] => rewrite map_cons in H
@@ -875,15 +501,13 @@ Ltac normalize_key_hyps2 :=
   | [ H : ~In _ (_ :: _) |- _] => rewrite not_in_cons in H; destruct H as [? ?]
   end.
 
-(* keep *)
-Ltac normalize_key_hyps' :=
+Ltac normalize_key_hyps :=
   repeat normalize_key_hyps1;
   repeat normalize_key_hyps2;
   cbn [fst] in *;
   repeat clean_useless_hyp.
 
-(* keep *)
-Ltac my_simpl_solver' :=
+Ltac my_simpl_solver :=
   match goal with
   | [ H : ?P |- ?P] => apply H
   | [ |- DisjKey nil _] => apply DisjKey_nil_l
@@ -891,7 +515,7 @@ Ltac my_simpl_solver' :=
   | [ |- ?a = ?a] => reflexivity
   | [ |- True] => apply I
   | [ |- NoDup nil] => constructor
-  | [ |- ~In _ nil] => intro; my_simpl_solver'
+  | [ |- ~In _ nil] => intro; my_simpl_solver
   | [ H : False |- _] => exfalso; apply H
   | [ H : ?a <> ?a |- _] => exfalso; apply H; reflexivity
   | [ H : In _ nil |- _] => inversion H
@@ -906,17 +530,22 @@ Ltac my_simpl_solver' :=
           H2 : ?b <> ?a |- _] => exfalso; apply H2; rewrite H1; reflexivity
   | [|- nil = ?l1 ++ ?l2] => symmetry; apply (app_eq_nil l1 l2); split
   | [|- ?l1 ++ ?l2 = nil] => apply (app_eq_nil l1 l2); split
+  | [H1 : key_not_In ?s ?l, H2 : In (?s, _) ?l |- _]
+    => exfalso; specialize (H1 _ H2); contradiction
+  | [H1 : key_not_In ?s ?l |- ~In ?s (map fst ?l)]
+      => rewrite <- key_not_In_fst; apply H1
+  | [H1 : key_not_In ?s ?l, H2 : In ?s (map fst ?l) |- _]
+      => exfalso; rewrite key_not_In_fst in H1; contradiction
   end.
 
 Ltac or_unify :=
   match goal with
-  | [ |- In _ _ ] => repeat my_simplifier; my_simpl_solver'
-  | [ |- ?a = ?b] => repeat my_simplifier; my_simpl_solver'
+  | [ |- In _ _ ] => repeat my_simplifier; my_simpl_solver
+  | [ |- ?a = ?b] => repeat my_simplifier; my_simpl_solver
   | [ |- ?a \/ ?b] => left; or_unify
   | [ |- ?a \/ ?b] => right; or_unify
   end.
 
-(* keep *)
 Ltac normalize_key_concl1 :=
   match goal with
   | [|- context [map fst (_ ++ _)]] => rewrite map_app               
@@ -930,7 +559,6 @@ Ltac normalize_key_concl1 :=
   | [ |- DisjKey _ (_ :: _)] => rewrite DisjKey_cons_r_str; split
   end.
 
-(* keep *)
 Ltac normalize_key_concl2 :=
   match goal with
   | [ |- context [map fst (_ :: _)]] => rewrite map_cons
@@ -947,43 +575,42 @@ Ltac normalize_key_concl2 :=
   | [ |- ~In _ (_ ++ _)] => rewrite (nIn_app_iff string_dec); split
   end.
 
-Ltac normalize_key_concl' :=
+Ltac normalize_key_concl :=
   repeat normalize_key_concl1;
   repeat normalize_key_concl2;
   cbn [fst];
-  repeat (solve_keys || my_simpl_solver').
+  repeat (solve_keys || my_simpl_solver).
 
 Ltac normal_solver :=
   repeat my_simplifier
-  ; repeat my_simpl_solver'
+  ; repeat my_simpl_solver
   ; repeat or_unify
   ; repeat find_if_inside
-  ; repeat normalize_key_concl'
+  ; repeat normalize_key_concl
   ; repeat sublist_sol
   ; repeat solve_keys.
 
 Ltac normal_solver2 :=
   repeat my_simplifier
-  ; repeat my_simpl_solver'
+  ; repeat my_simpl_solver
   ; repeat resolve_In
   ; repeat or_unify
   ; repeat risky_unify
   ; repeat resolve_sublist2
   ; repeat find_if_inside
-  ; repeat normalize_key_concl'
+  ; repeat normalize_key_concl
   ; repeat normalize_sublist_l
   ; repeat sublist_sol
   ; repeat solve_keys.
 
-(* keep *)
-Ltac resolve_wb'' :=
+Ltac resolve_wb :=
   let HNoDup := fresh "H" in
   let HSubList := fresh "H" in
   match goal with
   | [HSemAction1 :SemAction ?o1 ?a_i _ _ _ _,
                   HActionWb : ActionWb ?myR ?a_i |- _] =>
     assert (NoDup (map fst o1)) as HNoDup
-    ;[repeat normalize_key_concl'
+    ;[repeat normalize_key_concl
      | assert (SubList myR (getKindAttr o1)) as HSubList
        ;[clear HNoDup HSemAction1
          ; repeat normalize_sublist_l
@@ -995,7 +622,7 @@ Ltac resolve_wb'' :=
   | [HSemAction1 : SemAction ?o1 (?a_i _) _ _ _ _,
                    HActionWb : forall _, ActionWb ?myR (?a_i _) |- _] =>
     assert (NoDup (map fst o1)) as HNoDup
-    ;[repeat normalize_key_concl'
+    ;[repeat normalize_key_concl
      | assert (SubList myR (getKindAttr o1)) as HSubList
        ;[clear HNoDup HSemAction1
          ; repeat normalize_sublist_l
@@ -1004,35 +631,25 @@ Ltac resolve_wb'' :=
           as [[? [? [? [? ?]]]] ?]
           ; try resolve_sublist2
           ; clear HSemAction1 HNoDup HSubList]]
-  (* | [HSemAction1 : SemAction ?o1 (?a_i _ _ _ _ _) _ _ _ _, *)
-  (*                  HActionWb :  forall _ _ _ _, ActionWb ?myR (?a_i _ _ _ _ _)|- _] => *)
-  (*   assert (NoDup (map fst o1)) as HNoDup *)
-  (*   ;[repeat normalize_key_concl' *)
-  (*    | assert (SubList myR (getKindAttr o1)) as HSubList *)
-  (*      ;[clear HNoDup HSemAction1 *)
-  (*       | specialize (HActionWb _ _ _ _ _ _ _ _ _ HNoDup HSubList HSemAction1) *)
-  (*         as [[? [? [? [? ?]]]] ?] *)
-  (*         ; try resolve_sublist2 *)
-  (*         ; clear HSemAction1 HNoDup HSubList]] *)
   end.
 
-Ltac hyp_consumer1' :=
+Ltac hyp_consumer :=
   repeat mySubst;
-  normalize_key_hyps';
+  normalize_key_hyps;
   repeat (repeat main_body
           ; repeat mySubst
-          ; repeat (my_simplifier; repeat clean_useless_hyp)
+          ; repeat (my_simplifier; repeat my_simpl_solver; repeat clean_useless_hyp)
           ; repeat mySubst
-          ; repeat normalize_key_hyps'
-          ; repeat (my_simplifier; repeat clean_useless_hyp)
-          ; repeat (resolve_wb''; repeat clean_useless_hyp)
-          ; repeat resolve_rel'
+          ; repeat normalize_key_hyps
+          ; repeat (my_simplifier; repeat my_simpl_solver; repeat clean_useless_hyp)
+          ; repeat (resolve_wb; repeat my_simpl_solver; repeat clean_useless_hyp)
+          ; repeat resolve_rel
           ; repeat mySubst
-          ; repeat (my_simplifier ; repeat clean_useless_hyp))
-  ; repeat my_simpl_solver'
+          ; repeat (my_simplifier ; repeat my_simpl_solver; repeat clean_useless_hyp))
+  ; repeat my_simpl_solver
   ; cbn [fst] in *.
 
-Ltac goal_body' :=
+Ltac goal_body :=
   match goal with
   | [ |- SemAction _ (Return _) _ _ _ _ ] => econstructor 10
   | [ |- SemAction _ (MCall _ _ _ _) _ _ _ _] => econstructor 1
@@ -1051,7 +668,7 @@ Ltac goal_body' :=
     => eapply SemActionExpand;[| apply H; sublist_sol]
   end.
 
-Ltac doUpdRegs_red' :=  
+Ltac doUpdRegs_red :=  
   repeat 
     (match goal with
      | [ |- context [ doUpdRegs nil _]] => rewrite doUpdRegs_nil
@@ -1062,7 +679,7 @@ Ltac doUpdRegs_red' :=
        [ repeat
            match goal with
            | |- context [ map fst (doUpdRegs _ _) ] => rewrite doUpdRegs_preserves_keys
-           end; solve_keys
+           end; (solve_keys || my_simpl_solver)
        | rewrite (oneUpdRegs_notIn _ _ TMP); clear TMP ]
      | |- context [ doUpdReg ?u ?r ] =>
        let TMP := fresh "H" in
@@ -1070,7 +687,7 @@ Ltac doUpdRegs_red' :=
        [ repeat
            match goal with
            | |- context [ map fst (doUpdRegs _ _) ] => rewrite doUpdRegs_preserves_keys
-           end; solve_keys
+           end; (solve_keys || my_simpl_solver)
        | rewrite (doUpdReg_notIn _ _ TMP); clear TMP ]; cbn[fst]
      end);
   repeat
@@ -1124,12 +741,12 @@ Ltac extractGKAs :=
        repeat resolve_In
   end.
 
-Ltac basic_goal_consumer' :=
+Ltac goal_consumer1 :=
   repeat (repeat goal_split
-          ; repeat goal_body'
+          ; repeat goal_body
           ; repeat normal_solver)
   ; repeat (repeat doUpdRegs_simpl
-            ; doUpdRegs_red'
+            ; doUpdRegs_red
             ; repeat normal_solver).
 
 Ltac SubList_gka_deconstruct :=
@@ -1145,7 +762,7 @@ Ltac goal_consumer2 :=
   repeat SubList_gka_deconstruct;
   repeat extractGKAs;
   repeat goal_split
-  ; repeat goal_body'
+  ; repeat goal_body
   ; repeat normal_solver2
   ; repeat my_risky_solver
   ; repeat normal_solver2.
