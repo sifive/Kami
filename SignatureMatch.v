@@ -70,7 +70,7 @@ Section Proofs.
       | SFReturn lret e : @SFActionT lret (Return e).
     End SFInd.
     
-    Definition SFBaseModule (m : Mod) :=
+    Definition SFMod (m : Mod) :=
       (forall rule, In rule (getAllRules m) -> SFActionT (getAllMethods m) (snd rule ty)) /\
       (forall meth, In meth (getAllMethods m) ->
                     forall v, SFActionT (getAllMethods m) (projT2 (snd meth) ty v)).
@@ -110,8 +110,8 @@ Section Proofs.
   Qed.
   
   Lemma SFActionT_correct :
-    forall lret m (a : ActionT _ lret),
-      SigMatch_ActionT (getMethods m) a = [] -> SFActionT (getMethods m) a.
+    forall lret l (a : ActionT _ lret),
+      SigMatch_ActionT l a = [] -> SFActionT l a.
   Proof.
     induction a; intros.
     - econstructor; intros.
@@ -148,5 +148,41 @@ Section Proofs.
     - inv H.
       econstructor; eauto.
     - econstructor.
+  Qed.
+
+  Lemma SFMod_correct m :
+    SigMatch_Mod m = [] -> SFMod (fun _ => unit ) m.
+  Proof.
+    unfold SigMatch_Mod, SigMatch_rules, SigMatch_methods, SFMod; intros.
+    apply app_eq_nil in H; dest.
+    split; intros.
+    + clear H0.
+      induction (getAllRules m);[inv H1|].
+      simpl in H.
+      apply app_eq_nil in H; dest.
+      destruct H1; subst.
+      * apply SFActionT_correct; assumption.
+      * apply IHl; assumption.
+    + clear H.
+      enough
+        (forall l l',
+            fold_right (fun meth sigfs =>
+                          SigMatch_ActionT l' (projT2 (action_from_MethodT meth)) ++ sigfs)
+                       nil l  = nil ->
+            (forall meth,
+                In meth l ->
+                forall v, SFActionT l' (projT2 (snd meth) (fun _ => unit) v))) as P.
+      { apply (P (getAllMethods m) (getAllMethods m)); assumption. }
+      clear; intros.
+      induction l; [inv H0|].
+      simpl in H.
+      apply app_eq_nil in H; dest.
+      destruct H0; subst.
+      * unfold action_from_MethodT in H.
+        destruct meth, s0; simpl in *.
+        destruct v.
+        apply SFActionT_correct.
+        apply H.
+      * apply IHl; assumption.
   Qed.
 End Proofs.
