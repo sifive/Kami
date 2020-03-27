@@ -14,6 +14,8 @@ Section EvalAction.
 
 Definition SimRegs := Map {x : _ & fullType eval_Kind x}.
 
+Definition KamiState := (SimRegs * FileState)%type.
+
 Section Regs.
 
 Variable init_regs : list (string * {x : FullKind & RegInitValT x}).
@@ -50,36 +52,27 @@ Record Update := {
 Definition Updates := list Update.
 Definition FileUpdates := list FileUpd.
 
+(*
 Fixpoint mkProd(ts : list Type) : Type :=
   match ts with
   | [] => unit
   | T::ts' => (T * mkProd ts')%type
   end.
+*)
 
-Class Environment E := {
-  envPre  : E -> FileState -> SimRegs -> string -> IO E;
-  envPost : E -> FileState -> SimRegs -> string -> IO E
-  }.
+Definition meth_sig(sig : Signature) : Type :=
+  eval_Kind (fst sig) -> KamiState -> IO (eval_Kind (snd sig)).
 
-Definition meth_sig{E}`{Environment E}(sig : Signature) : Type :=
-  eval_Kind (fst sig) -> FileState -> SimRegs -> E -> IO (E * (eval_Kind (snd sig))).
-
-Definition dec_sig{E}`{Environment E}(dec : string * Signature) : Type :=
-  meth_sig (snd dec).
-
-Fixpoint return_meth{E}`{Environment E}(meth : string)(sig : Signature)(meths : list (string * Signature)) : mkProd (List.map dec_sig meths) -> option (meth_sig sig).
- refine match meths return mkProd (List.map dec_sig meths) -> option (meth_sig sig) with
-  | [] => fun _ => None
-  | dec::meths' => match string_sigb (meth,sig) dec with
-                   | left pf => fun fs => Some _
-                   | right _ => fun fs => return_meth _ _ meth sig meths' (snd fs)
-                   end
+Definition return_meth(meth_name : string)(sig : Signature)(meths : Map {sig : Signature & meth_sig sig}) : option (meth_sig sig). refine
+  match map_lookup meth_name meths with
+  | Some (existT sig' meth) => _
+  | None => None
   end.
 Proof.
-  assert (sig = snd dec).
-  rewrite <- pf; auto.
-  rewrite H0.
-  exact (fst fs).
+  destruct (Signature_decb sig sig') eqn:G.
+  - rewrite Signature_decb_eq in G.
+    rewrite G; exact (Some meth).
+  - exact None.
 Defined.
 
 Definition reg_not_found{X} : string -> IO X :=
@@ -93,7 +86,7 @@ Proof.
   reflexivity.
 Qed.
 
-Fixpoint eval_ActionT{k}{E}`{Environment E}(env : E)(state : FileState)(meths : list (string * Signature))(updates : Updates)(fupdates : FileUpdates)(a : ActionT eval_Kind k)(a_wf : WfActionT_new init_regs a)(fs : mkProd (List.map dec_sig meths)){struct a} : IO (Updates * FileUpdates * eval_Kind k).
+Fixpoint eval_ActionT{k}(state : FileState)(updates : Updates)(fupdates : FileUpdates)(a : ActionT eval_Kind k)(a_wf : WfActionT_new init_regs a)(ms : Map {sig : Signature & meth_sig sig}){struct a} : IO (Updates * FileUpdates * eval_Kind k).
   refine (match a return WfActionT_new init_regs a -> _ with
   | MCall meth s e cont => fun pf => do x <- rf_methcall state meth (existT _ (fst s) (eval_Expr e));
        match x with
@@ -101,22 +94,22 @@ Fixpoint eval_ActionT{k}{E}`{Environment E}(env : E)(state : FileState)(meths : 
                                 | left _ => _
                                 | right _ => error ("Type mismatch")
                                 end
-      | None => match return_meth meth s meths fs with
+      | None => match return_meth meth s ms with
                 | None => error ("Method " ++ meth ++ " not found")
                 | Some f => (
-                    do p <- f (eval_Expr e) state regs env;
-                    eval_ActionT _ _ _ (fst p) state meths updates fupdates (cont (snd p)) _ fs
+                    do p <- f (eval_Expr e) (regs,state);
+                    eval_ActionT _ state updates fupdates (cont p) _ ms
                     )
                 end
       end
-  | LetExpr k e cont => fun pf => eval_ActionT _ _ _ env state meths updates fupdates (cont (eval_Expr e)) _ fs
+  | LetExpr k e cont => fun pf => eval_ActionT _ state updates fupdates (cont (eval_Expr e)) _ ms
   | LetAction k a cont => fun pf => (
-      do p <- eval_ActionT _ _ _ env state meths updates fupdates a _ fs;
-      eval_ActionT _ _ _ env state meths (fst (fst p)) (snd (fst p)) (cont (snd p)) _ fs
+      do p <- eval_ActionT _ state updates fupdates a _ ms;
+      eval_ActionT _ state (fst (fst p)) (snd (fst p)) (cont (snd p)) _ ms
       )
   | ReadNondet k cont => fun pf => (
       do v <- rand_val_FK k;
-      eval_ActionT _ _ _ env state meths updates fupdates (cont v) _ fs
+      eval_ActionT _ state updates fupdates (cont v) _ ms
       )
   | ReadReg r k cont => fun pf => _
   | WriteReg r k e a => fun pf => (* match lookup String.eqb r regs with
@@ -124,12 +117,12 @@ Fixpoint eval_ActionT{k}{E}`{Environment E}(env : E)(state : FileState)(meths : 
                         | Some p => _
                         end *) _
   | IfElse e k a1 a2 cont => fun pf => let a := if (eval_Expr e) then a1 else a2 in (
-      do p <- eval_ActionT _ _ _ env state meths updates fupdates a _ fs;
-      eval_ActionT _ _ _ env state meths (fst (fst p)) (snd (fst p)) (cont ((snd p))) _ fs
+      do p <- eval_ActionT _ state updates fupdates a _ ms;
+      eval_ActionT _ state (fst (fst p)) (snd (fst p)) (cont ((snd p))) _ ms
       )
   | Sys ss a => fun pf => (
       do _ <- eval_list_SysT ss;
-      eval_ActionT _ _ _ env state meths updates fupdates a _ fs
+      eval_ActionT _ state updates fupdates a _ ms
       )
   | Return e => fun pf => ret (updates, fupdates, eval_Expr e)
   end a_wf).
@@ -137,8 +130,8 @@ Proof.
   (* MCall *)
   - rewrite e0 in v.
     destruct o as [fupd|].
-    + exact (eval_ActionT _ _ _ env state meths updates (fupd::fupdates) (cont v) (pf _) fs).
-    + exact (eval_ActionT _ _ _ env state meths updates fupdates (cont v) (pf _) fs).
+    + exact (eval_ActionT _ state updates (fupd::fupdates) (cont v) (pf _) ms).
+    + exact (eval_ActionT _ state updates fupdates (cont v) (pf _) ms).
   - apply pf.
   - apply pf.
   - apply pf.
@@ -152,22 +145,22 @@ Proof.
         destruct s.
         simpl.
         destruct (@kc_sim_init _ _ _ G).
-        rewrite H0 in pf.
+        rewrite H in pf.
         destruct pf.
         congruence.
-      * refine (eval_ActionT _ _ _ env state meths updates fupdates (cont (f H0)) _ fs).
+      * refine (eval_ActionT _ state updates fupdates (cont (f H)) _ ms).
         simpl in pf.
         destruct lookup in pf.
         ** destruct s0.
            destruct pf.
-           apply H2.
+           apply H1.
         ** destruct pf.
     + simpl in pf.
       destruct lookup eqn:G0 in pf.
       * absurd (map_lookup r regs = None).
         ** destruct s.
            destruct (@kc_init_sim _ _ _ G0).
-           rewrite H0; discriminate.
+           rewrite H; discriminate.
         ** exact G.
       * destruct pf.
   (* WriteReg *)
@@ -177,34 +170,34 @@ Proof.
         destruct s.
         simpl.
         destruct (@kc_sim_init _ _ _ G).
-        rewrite H0 in pf.
+        rewrite H in pf.
         destruct pf.
         congruence.
       * assert (exists v, lookup String.eqb r init_regs = Some (existT _ k v)).
         ** simpl in pf.
            destruct s; destruct (@kc_sim_init _ _  _ G).
-           rewrite H1 in pf; destruct pf.
-           rewrite (dep_pair_rewrite (eq_sym H2)) in H1.
-           eexists; exact H1.
+           rewrite H0 in pf; destruct pf.
+           rewrite (dep_pair_rewrite (eq_sym H1)) in H0.
+           eexists; exact H0.
         ** pose (upd := {|
                    reg_name := r;
                    kind := k;
                    new_val := eval_Expr e;
-                   lookup_match := H1
+                   lookup_match := H0
                         |}).
-           refine (eval_ActionT _ _ _ env state meths (upd::updates) fupdates a _ fs).
+           refine (eval_ActionT _ state (upd::updates) fupdates a _ ms).
            simpl in pf.
            destruct lookup in pf.
            *** destruct s0.
                destruct pf.
-               exact H3.
+               exact H2.
            *** destruct pf.
     + simpl in pf.
       destruct lookup eqn:G0 in pf.
       * absurd (map_lookup r regs = None).
         ** destruct s.
            destruct (@kc_init_sim _ _ _ G0).
-           rewrite H0; discriminate.
+           rewrite H; discriminate.
         ** exact G.
       * destruct pf.
   - simpl in pf; destruct (eval_Expr e); tauto.
@@ -212,6 +205,7 @@ Proof.
   - exact pf.
 Defined.
 
+(*
 Fixpoint curried(X : Type)(ts : list Type) : Type :=
   match ts with
   | [] => X
@@ -223,9 +217,10 @@ Fixpoint curry(X : Type)(ts : list Type) : (mkProd ts -> X) -> curried X ts :=
   | [] => fun f => f tt
   | T::ts' => fun f t => curry ts' (fun xs => f (t,xs))
   end.
+*)
 
-Definition eval_RuleT{E}`{Environment E}(env : E)(state : FileState)(meths : list (string * Signature))(r : RuleT)(r_wf : WfActionT_new init_regs (snd r eval_Kind))(fs : mkProd (List.map dec_sig meths)) : IO (Updates * FileUpdates * eval_Kind Void) :=
-  eval_ActionT env state meths [] [] ((snd r) eval_Kind) r_wf fs.
+Definition eval_RuleT(state : FileState)(r : RuleT)(r_wf : WfActionT_new init_regs (snd r eval_Kind))(ms : Map {sig : Signature & meth_sig sig}) : IO (Updates * FileUpdates * eval_Kind Void) :=
+  eval_ActionT state [] [] ((snd r) eval_Kind) r_wf ms.
 
 Definition do_single_update(upd : Update)(regs : SimRegs) : SimRegs :=
   insert (reg_name upd) (existT _ (kind upd) (new_val upd)) regs.
@@ -329,30 +324,10 @@ Proof.
   - apply update_consistent; auto.
 Qed.
 
-Fixpoint eval_Rules{E}`{Environment E}(env : E)(state : FileState)(numRules : nat)(meths : list (string * Signature))(init_regs : list (string * {x : FullKind & RegInitValT x}))(curr_regs : SimRegs)(kc_curr : kind_consistent init_regs curr_regs)(rules : Stream {r : RuleT & WfActionT_new init_regs (snd r eval_Kind)}){struct numRules} : mkProd (List.map dec_sig meths) -> IO unit. refine
-  match numRules with
-  | 0 => fun fs => error "TIMEOUT"
-  | S numRules' => fun fs => match rules with
-                            | Cons r rules' => (
-                                do env' <- envPre env state curr_regs (fst (projT1 r));
-                                do p <- eval_RuleT _ env' state meths (projT1 r) (projT2 r)  fs;
-                                do env'' <- envPost env' state curr_regs (fst (projT1 r));
-                                do state' <- exec_file_updates state (snd (fst p));
-                                eval_Rules _ _  env'' state' numRules' meths init_regs (do_updates (fst (fst p)) curr_regs) _ (rules') fs
-                                )
-                            end
-  end.
-Proof.
-  - exact kc_curr.
-  - apply updates_consistent; auto.
-Defined.
-
-Definition execute_Rule{E}`{Environment E}(env : E)(init_regs : list RegInitT)(meths : list (string * Signature))(fs : mkProd (List.map dec_sig meths))(rule : RuleT)(wf_rule : WfActionT_new init_regs (snd rule eval_Kind))(state : FileState)(curr_regs : SimRegs)(kc_curr : kind_consistent init_regs curr_regs) : IO (FileState * SimRegs) :=
-  do env' <- envPre env state curr_regs (fst rule);
-  do p <- @eval_RuleT _ curr_regs kc_curr _ _ env' state meths rule wf_rule fs;
-  do env'' <- envPost env' state curr_regs (fst rule);
+Definition execute_Rule(init_regs : list RegInitT)(rule : RuleT)(wf_rule : WfActionT_new init_regs (snd rule eval_Kind))(state : FileState)(curr_regs : SimRegs)(kc_curr : kind_consistent init_regs curr_regs)(ms : Map {sig : Signature & meth_sig sig}) : IO KamiState :=
+  do p <- @eval_RuleT _ curr_regs kc_curr state rule wf_rule ms;
   do state' <- exec_file_updates state (snd (fst p));
-  ret (state', (do_updates (fst (fst p)) curr_regs)).
+  ret (do_updates (fst (fst p)) curr_regs, state').
 
 Definition eval_RegInitValT : {k : FullKind & RegInitValT k} -> {k : FullKind & fullType eval_Kind k} :=
   fun '(existT k o) => match o with
@@ -433,38 +408,20 @@ Proof.
       reflexivity.
 Qed.
 
-Definition eval_Basemodule_rr{E}`{Environment E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule_new eval_Kind basemod) : mkProd (List.map dec_sig meths) -> IO unit. refine (
-  match basemod return WfBaseModule_new eval_Kind basemod -> _ with
-  | BaseRegFile rf => fun pf fs => _
-  | BaseMod regs rules dms =>
-      match rules with
-      | [] => fun _ _ => error "empty rules"
-      | r::rs => fun pf fs => _ (* eval_Rules timeout meths (initialize_SimRegs regs) (unwind_list (r::rs) (@cons_neq _ r rs)) *)
-      end
-  end wf).
-Proof.
-  - exact (error "BaseRegFile not simulatable").
-  - unfold WfBaseModule_new in pf.
-    destruct pf.
-    refine (do state <- initialize_files args rfbs;
-    eval_Rules env state (timeout * (List.length rules)) meths _ (unwind_list (get_wf_rules _ _ H0) _) fs).
-    + apply init_regs_kc.
-    + simpl.
-      destruct H0; discriminate.
-Defined.
-
-Definition eval_BaseMod{E}`{Environment E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule_new eval_Kind basemod) :=
-  curry _ (eval_Basemodule_rr env args rfbs timeout meths wf).
-
 End Regs2.
 
 End EvalAction.
 
+Section SimAPI.
 
+Definition init_state(m : Mod)(args : list (string * string)) : IO KamiState :=
+  let init_regs := getAllRegisters m in
+  let '(_,(rfs,_)) := separateModRemove m in
+  let regs := initialize_SimRegs init_regs in
+    do s <- initialize_files args rfs;
+    ret (regs,s).
 
-Section Eval_Wf.
+Definition sim_step(init_regs : list RegInitT)(rule : RuleT)(s : KamiState)(wf_rule : WfActionT_new init_regs (snd rule eval_Kind))(kc : kind_consistent init_regs (fst s)) :=
+  @execute_Rule init_regs rule wf_rule  (snd s) (fst s) kc.
 
-Definition eval_BaseMod_Wf{E}`{Environment E}(env : E)(args : list (string * string))(rfbs : list RegFileBase)(timeout : nat)(meths : list (string * Signature))(basemod : BaseModule)(wf : WfBaseModule (eval_Kind) basemod) :=
-  curry _ (eval_Basemodule_rr env args rfbs timeout meths (WfBaseModule_WfBaseModule_new wf)).
-
-End Eval_Wf.
+End SimAPI.

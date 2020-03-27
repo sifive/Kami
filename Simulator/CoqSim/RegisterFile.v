@@ -276,6 +276,56 @@ Fixpoint initialize_files(args : list (string * string))(rfbs : list RegFileBase
       initialize_file args file st)
   end.
 
+Definition initialize_file_zero(rfb : RegFileBase)(state : FileState) : IO FileState :=
+
+  let array := match rfInit rfb with
+               | RFNonFile None => arr_repl (rfIdxNum rfb) (default_val (rfData rfb))
+               | RFNonFile (Some c) => arr_repl (rfIdxNum rfb) (eval_ConstT c)
+               | RFFile isAscii isArg file _ _ _ => arr_repl (rfIdxNum rfb) (default_val (rfData rfb))
+               end in
+
+  do new_arr <- array; 
+
+  let rf := {|
+                file_name := rfDataArray rfb;
+                is_wr_mask := rfIsWrMask rfb;
+                chunk_size := rfNum rfb;
+                readers := rfRead rfb;
+                write := rfWrite rfb;
+                size := rfIdxNum rfb;
+                kind := rfData rfb;
+                arr := new_arr
+            |} in
+
+  let reads := match rfRead rfb with
+               | Async rs => map (fun r => (r, (AsyncRead, rfDataArray rfb))) rs
+               | Sync b rs => map (fun r => (readReqName r, (ReadReq (readRegName r), rfDataArray rfb))) rs ++
+                              map (fun r => (readResName r, (ReadResp (readRegName r), rfDataArray rfb))) rs
+               end in
+
+  let newmeths := (rfWrite rfb, (WriteFC, rfDataArray rfb)) :: reads in
+
+  let newvals := match rfRead rfb with
+                 | Async _ => []
+                 | Sync b rs => let k := if b then Bit (Nat.log2_up (rfIdxNum rfb)) else rfData rfb in
+                     map (fun r => (readRegName r, existT _ k (default_val k))) rs
+                 end in 
+
+  ret {|
+    methods := fold_right (fun '(x,y) st => insert x y st) (methods state) newmeths;
+    int_regs := fold_right (fun '(x,y) st => insert x y st) (int_regs state) newvals;
+    files := insert (rfDataArray rfb) rf (files state)
+    |}
+  .
+
+Fixpoint initialize_files_zero(rfbs : list RegFileBase) : IO FileState :=
+  match rfbs with
+  | [] => ret empty_state
+  | (file::files) => (
+      do st <- initialize_files_zero files;
+      initialize_file_zero file st)
+  end.
+
 End RegFile.
 
 Extract Constant parseFile => "ParseExtract.parseFile".
