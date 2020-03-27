@@ -84,6 +84,7 @@ Ltac find_if_inside :=
   end.
 
 (* clear out trivially true statements *)
+(* keep *)
 Ltac clean_useless_hyp :=
   match goal with
   | [ H : ?a = ?a |- _] => clear H
@@ -97,7 +98,7 @@ Ltac clean_useless_hyp :=
   | [ H : ~In _ nil |- _] => clear H
   | [ H1 : ?P, H2 : ?P |- _] => clear H1
   end.
-
+(* throw? *)
 Ltac normalize_key_hyps :=
   match goal with
   | [ H : key_not_In _ (_ ++ _) |- _] => rewrite key_not_In_app_iff in H; destruct H as [? ?]
@@ -133,6 +134,7 @@ Ltac normalize_key_concl :=
   end.
 
 (* Transforms hypotheses and goals into a form suitable for the solvers *)
+(* keep *)
 Ltac my_simplifier :=
   match goal with
   | [ H1 : ?a = ?b,
@@ -411,6 +413,7 @@ Ltac resolve_wb' :=
   end.
 
 (* solves specific Effectful/Effectless relation conditions *)
+(* keep *)
 Ltac resolve_rel' :=
   let HupdsNil := fresh "HupdsNil" in
   let HcallsNil := fresh "HcallsNil" in
@@ -597,6 +600,7 @@ Ltac extract_gatherActions' subRegs :=
   end.
 
 (* consumes the main body of a SemAction *)
+(* keep *)
 Ltac main_body :=
   match goal with
   | [H: SemAction _ (Return _) _ _ _ _ |- _]
@@ -719,18 +723,6 @@ Ltac normal_solver :=
   ; repeat sublist_sol
   ; repeat solve_keys.
 
-(* Ltac goal_consumer1 := *)
-(*   repeat goal_split *)
-(*   ; repeat goal_body *)
-(*   ; repeat normal_solver *)
-(*   ; repeat doUpdRegs_simpl *)
-(*   ; repeat doUpdRegs_red *)
-(*   ; repeat Record_construct *)
-(*   ; repeat normal_solver *)
-(*   ; repeat my_risky_solver *)
-(*   ; repeat gka_doUpdReg_red *)
-(*   ; repeat normal_solver. *)
-
 Ltac risky_unify :=
   match goal with
   | [ |- ?a = _] => has_evar a; reflexivity
@@ -777,14 +769,6 @@ Ltac extract_in_map :=
    end)
   ; intros
   ; dest.
-
-Ltac goal_consumer2 :=
-  repeat goal_split
-  ; repeat goal_body
-  ; repeat normal_solver2
-  ; repeat my_risky_solver
-  ; repeat normal_solver2.
-
 
 Ltac extract_in_map' :=
   (match goal with
@@ -898,6 +882,7 @@ Ltac extract_gatherActions2' subRegs1 subRegs2 :=
          ]
   end.
 
+(* keep *)
 Ltac normalize_key_hyps1 :=
   match goal with
   | [ H : context [map fst (_ ++ _)] |- _] => rewrite map_app in H
@@ -912,6 +897,7 @@ Ltac normalize_key_hyps1 :=
   | [ H : DisjKey _ (_ :: _) |- _] => rewrite DisjKey_cons_r_str in H; destruct H as [? ?]
   end.
 
+(* keep *)
 Ltac normalize_key_hyps2 :=
   match goal with
   | [ H : context [map fst (_ :: _)] |- _] => rewrite map_cons in H
@@ -921,12 +907,14 @@ Ltac normalize_key_hyps2 :=
   | [ H : ~In _ (_ :: _) |- _] => rewrite not_in_cons in H; destruct H as [? ?]
   end.
 
+(* keep *)
 Ltac normalize_key_hyps' :=
   repeat normalize_key_hyps1;
   repeat normalize_key_hyps2;
   cbn [fst] in *;
   repeat clean_useless_hyp.
 
+(* keep *)
 Ltac my_simpl_solver' :=
   match goal with
   | [ H : ?P |- ?P] => apply H
@@ -952,13 +940,7 @@ Ltac my_simpl_solver' :=
   | [|- ?l1 ++ ?l2 = nil] => apply (app_eq_nil l1 l2); split
   end.
 
-Ltac goal_consumer2' :=
-  repeat goal_split
-  ; repeat goal_body
-  ; repeat normal_solver2
-  ; repeat my_risky_solver
-  ; repeat normal_solver2.
-
+(* keep *)
 Ltac normalize_key_concl1 :=
   match goal with
   | [|- context [map fst (_ ++ _)]] => rewrite map_app               
@@ -972,6 +954,7 @@ Ltac normalize_key_concl1 :=
   | [ |- DisjKey _ (_ :: _)] => rewrite DisjKey_cons_r_str; split
   end.
 
+(* keep *)
 Ltac normalize_key_concl2 :=
   match goal with
   | [ |- context [map fst (_ :: _)]] => rewrite map_cons
@@ -994,6 +977,7 @@ Ltac normalize_key_concl' :=
   cbn [fst];
   repeat (solve_keys || my_simpl_solver).
 
+(* keep *)
 Ltac resolve_wb'' :=
   let HNoDup := fresh "H" in
   let HSubList := fresh "H" in
@@ -1034,23 +1018,6 @@ Ltac resolve_wb'' :=
           ; clear HSemAction1 HNoDup HSubList]]
   end.
 
-Ltac resolve_wb_testing :=
-  let HNoDup := fresh "H" in
-  let HSubList := fresh "H" in
-  match goal with
-  | [HSemAction1 :SemAction ?o1 ?a_i _ _ _ _,
-                  HActionWb : ActionWb ?myR ?a_i |- _] =>
-    idtac "found 1 :" HSemAction1 HActionWb
-  | [HSemAction1 : SemAction ?o1 (?a_i _) _ _ _ _,
-                   HActionWb : forall _, ActionWb ?myR (?a_i _) |- _] =>
-    idtac "found 2 :" HSemAction1 HActionWb;
-    assert (NoDup (map fst o1)) as HNoDup
-    ;[|]
-  | [HSemAction1 : SemAction ?o1 (?a_i _ _ _ _ _) _ _ _ _,
-                   HActionWb :  forall _ _ _ _, ActionWb ?myR (?a_i _ _ _ _ _)|- _] =>
-    idtac "found 3 :" HSemAction1 HActionWb
-  end.
-
 Ltac hyp_consumer1' :=
   repeat mySubst;
   normalize_key_hyps';
@@ -1058,13 +1025,14 @@ Ltac hyp_consumer1' :=
           ; repeat mySubst
           ; repeat (my_simplifier; repeat clean_useless_hyp)
           ; repeat mySubst
-          ; repeat normalize_key_hyps
+          ; repeat normalize_key_hyps'
           ; repeat (my_simplifier; repeat clean_useless_hyp)
           ; repeat (resolve_wb''; repeat clean_useless_hyp)
           ; repeat resolve_rel'
           ; repeat mySubst
           ; repeat (my_simplifier ; repeat clean_useless_hyp))
-  ; repeat my_simpl_solver'.
+  ; repeat my_simpl_solver'
+  ; cbn [fst] in *.
 
 Ltac goal_body' :=
   match goal with
@@ -1137,6 +1105,27 @@ Ltac doUpdRegs_red' :=
       rewrite eqb_sym, (proj2 (String.eqb_neq b a) H)
     end.
 
+Ltac extractGKAs :=
+  let var := fresh "x" in
+  let vfst := fresh "x" in
+  let vsnd := fresh "x" in
+  let p1 := fresh "x" in
+  let p2 := fresh "x" in
+  let Heq := fresh "H" in
+  let HIn := fresh "H" in
+  let Heq1 := fresh "H" in
+  let Heq2 := fresh "H" in
+  match goal with
+  | [HNoDup : NoDup (map fst ?o),
+              H1 : In (?a, ?b) (map (fun x => (fst x, projT1 (snd x))) ?o) |- _]
+    => rewrite in_map_iff in H1; destruct H1 as [var [Heq HIn]];
+       destruct var as [vfst vsnd]; destruct vsnd as [p1 p2];
+       cbn [fst snd projT1] in Heq;
+       apply inversionPair in Heq;
+       inversion_clear Heq as [Heq1 Heq2]; subst;
+       repeat resolve_In
+  end.
+
 Ltac basic_goal_consumer' :=
   repeat (repeat goal_split
           ; repeat goal_body'
@@ -1144,3 +1133,21 @@ Ltac basic_goal_consumer' :=
   ; repeat (repeat doUpdRegs_simpl
             ; doUpdRegs_red'
             ; repeat normal_solver).
+
+Ltac SubList_gka_deconstruct :=
+  let x := fresh "x" in
+  let Heq1 := fresh "H" in
+  let Heq2 := fresh "H" in
+  match goal with
+  | [H : SubList _ (map (fun x => (fst x, projT1 (snd x))) ?o) |- _]
+    => apply SubList_map_iff in H; destruct H as [x [Heq1 Heq2]]; mySubst
+  end.
+
+Ltac goal_consumer2 :=
+  repeat SubList_gka_deconstruct;
+  repeat extractGKAs;
+  repeat goal_split
+  ; repeat goal_body'
+  ; repeat normal_solver2
+  ; repeat my_risky_solver
+  ; repeat normal_solver2.
