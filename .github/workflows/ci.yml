@@ -1,0 +1,24 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Make
+      run: |
+        docker run -d -i --init --name=COQ -v `pwd`:/repo/Kami -w /repo/Kami coqorg/coq:8.11.0
+        docker exec COQ /bin/bash --login -c '
+          set -e # exit on failure
+          set -x # trace for debug
+          sudo chown -R coq /repo
+          (cd ..; git clone https://github.com/tchajed/coq-record-update.git)
+          (cd ../coq-record-update; make)
+          make coq' bash
