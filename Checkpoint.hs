@@ -3,7 +3,6 @@ module Checkpoint where
 
 import qualified Data.BitVector as BV
 import qualified Data.Char as C
-import Data.String.Builder as B
 import System.IO
 
 import Control.Monad
