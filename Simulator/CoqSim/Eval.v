@@ -26,23 +26,24 @@ Definition print_BF(bf : BitFormat){n} : BV n -> string :=
   | Hex => print_bv_hex
   end.
 
-Fixpoint print_Kind(k : Kind)(ff : FullFormat k) : eval_Kind k -> string :=
+Fixpoint print_Val(k : Kind)(ff : FullFormat k) : eval_Kind k -> string :=
   match ff with
   | FBool n _ => fun x => space_pad n (if x then "1" else "0")
   | FBit n m bf => fun x => match m with
                             | 0 => print_BF bf x
                             | _ => zero_pad m (print_BF bf x)
                             end
-  | FStruct n fk fs ffs => fun x => ("{ " ++ String.concat "; " (v_to_list (vmap (fun '(str1,str2) => str1 ++ ":" ++ str2) (add_strings fs (tup_to_vec _ (fun i => print_Kind (ffs i)) x)))) ++ "; }")%string
-  | FArray n k' ff' => fun x => ("[" ++ String.concat "; " (List.map (fun i => nat_decimal_string (f2n i) ++ "=" ++ print_Kind ff' (vector_index i x)) (getFins n)) ++ "; ]")%string
+  | FStruct n fk fs ffs => fun x => ("{ " ++ String.concat "; " (v_to_list (vmap (fun '(str1,str2) => str1 ++ ":" ++ str2) (add_strings fs (tup_to_vec _ (fun i => print_Val (ffs i)) x)))) ++ "; }")%string
+  | FArray n k' ff' => fun x => ("[" ++ String.concat "; " (List.map (fun i => nat_decimal_string (f2n i) ++ "=" ++ print_Val ff' (vector_index i x)) (getFins n)) ++ "; ]")%string
   end.
 
-Fixpoint print_Kind2(k : Kind)(ff : FullFormat k) : eval_Kind k -> string :=
+(* for checkpointing *)
+Fixpoint print_Val2(k : Kind)(ff : FullFormat k) : eval_Kind k -> string :=
   match ff with
   | FBool n _ => fun x => space_pad n (if x then "tt" else "ff")
   | FBit n m bf => fun x => zero_pad m (print_BF bf x)
-  | FStruct n fk fs ffs => fun x => (("{ " ++ String.concat " ; " (v_to_list ((tup_to_vec _ (fun i => print_Kind2 (ffs i)) x)))) ++ " }")%string
-  | FArray n k' ff' => fun x => ("[ " ++ String.concat " ; " (List.map (fun i => print_Kind2 ff' (vector_index i x)) (getFins n)) ++ " ]")%string
+  | FStruct n fk fs ffs => fun x => (("{ " ++ String.concat " ; " (v_to_list ((tup_to_vec _ (fun i => print_Val2 (ffs i)) x)))) ++ " }")%string
+  | FArray n k' ff' => fun x => ("[ " ++ String.concat " ; " (List.map (fun i => print_Val2 ff' (vector_index i x)) (getFins n)) ++ " ]")%string
   end.
 
 Fixpoint Kind_eq{k} : eval_Kind k -> eval_Kind k -> bool :=
@@ -222,7 +223,7 @@ Definition val_unpack(k : Kind) : BV (size k) -> eval_Kind k :=
 Definition eval_SysT(s : SysT eval_Kind) : IO unit :=
   match s with
   | DispString s => print s
-  | DispExpr k e ff => print (print_Kind ff (eval_Expr e))
+  | DispExpr k e ff => print (print_Val ff (eval_Expr e))
   | Finish => exit
   end.
 

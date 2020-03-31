@@ -3,7 +3,6 @@ module Checkpoint where
 
 import qualified Data.BitVector as BV
 import qualified Data.Char as C
-import Data.String.Builder as B
 import System.IO
 
 import Control.Monad
@@ -29,7 +28,7 @@ print_mvec out f arr = do
         forM_ a $ \x -> hPutStrLn h (f x)
 
 print_Val_hex :: Kind -> Coq_eval_Kind -> String
-print_Val_hex k v = print_Kind2 k (fullFormatBinary k) v
+print_Val_hex k v = print_Val2 k (fullFormatBinary k) v
 
 print_SimReg :: String -> (FullKind, Coq_fullType Coq_eval_Kind) -> String
 print_SimReg r (SyntaxKind k, v) = r ++ ": " ++ print_Val_hex k v
@@ -45,20 +44,6 @@ print_RegFile :: String -> RegFile -> IO ()
 print_RegFile out file = do
     print_mvec out (print_Val_hex $ RegisterFile.kind file) (arr file)
     appendFile out "\n"
-
-dump_state :: String -> SimRegs -> FileState -> IO ()
-dump_state out regs state = do
-    writeFile out "REGS\n\n"
-    print_SimRegs regs out
-    appendFile out "\n"
-    appendFile out "INT_REGS\n\n"
-    print_SimRegs (fmap (\(k,v) -> (SyntaxKind k,v)) $ int_regs state) out
-    appendFile out "\n"
-    appendFile out "REGFILES\n\n"
-    let rfs = Map.toList (files state)
-    forM_ rfs $ \(name,file) -> do
-        appendFile out (name ++ "\n")
-        print_RegFile out file
 
 --Parsing
 
@@ -192,8 +177,8 @@ restart_FileState :: [(String, MV.MVector (PrimState IO) Any)] -> [(String, (Kin
 restart_FileState new_arrs new_int_regs (Build_FileState methods int_regs files) =
     Build_FileState methods (Map.fromList new_int_regs) (Prelude.foldr (\(name,a) -> Map.adjust (restart_RegFile (name,a)) name) files new_arrs)
 
-restart_state :: FilePath -> [(String,String)] -> [RegFileBase] -> IO (SimRegs,FileState)
-restart_state path args rfbs = do
+read_checkpoint :: FilePath -> [(String,String)] -> [RegFileBase] -> IO KamiState
+read_checkpoint path args rfbs = do
     txt <- readFile path
     let tokss = parse_tokss txt
     let (regs, int_regs, rfs) = split_tokss tokss
