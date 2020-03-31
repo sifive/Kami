@@ -3457,25 +3457,192 @@ Proof.
   - apply Nat.mul_div_le; assumption.
 Qed.
 
+Lemma seq_nth_error_Some size m n :
+  n < size <->
+  nth_error (seq m size) n = Some (m + n).
+Proof.
+  red; split.
+  - induction size; intros; [lia|].
+    apply lt_n_Sm_le in H.
+    rewrite seq_eq.
+    destruct (le_lt_or_eq _ _ H).
+    + rewrite nth_error_app1; auto.
+      rewrite seq_length; assumption.
+    + rewrite nth_error_app2; subst.
+      * rewrite seq_length, diag.
+        reflexivity.
+      * rewrite seq_length; assumption.
+  - intros.
+    assert (nth_error (seq m size) n <> None) as P.
+    { intro P; rewrite P in H; discriminate. }
+    rewrite nth_error_Some, seq_length in P.
+    assumption.
+Qed.
+
+Lemma seq_nth_error_None size m n :
+  size <= n <->
+  nth_error (seq m size) n = None.
+Proof.
+  rewrite nth_error_None, seq_length; reflexivity.
+Qed.
+
+Lemma Zlor_bounds sz m n :
+  (0 <= m < 2 ^ sz ->
+   0 <= n < 2 ^ sz ->
+   0 <= Z.lor m n < 2 ^ sz)%Z.
+Proof.
+  intros; split; dest.
+  - rewrite Z.lor_nonneg; auto.
+  - destruct (Zle_lt_or_eq _ _ H), (Zle_lt_or_eq _ _ H0).
+    + rewrite Z.log2_lt_pow2 in *; auto.
+      * rewrite Z.log2_lor; auto.
+        apply Z.max_lub_lt; auto.
+      * specialize ((proj2 (Z.lor_nonneg m n)) (conj H H0)) as P.
+        destruct (Zle_lt_or_eq _ _ P); auto.
+        exfalso.
+        symmetry in H5.
+        rewrite Z.lor_eq_0_iff in H5; lia.
+    + rewrite <- H4, Z.lor_0_r; assumption.
+    + rewrite <- H3, Z.lor_0_l; assumption.
+    + rewrite <- H3, Z.lor_0_l; assumption.
+Qed.
+
+Lemma list_arr_length {A : Type} n :
+  forall (arr : t n -> A),
+    n = length (list_arr arr).
+Proof.
+  unfold list_arr; intros.
+  rewrite map_length, getFins_length; reflexivity.
+Qed.
+Lemma firstn_map {A B: Type} (l : list A) (f : A -> B):
+  forall n,
+    firstn n (map f l) = map f (firstn n l).
+Proof.
+  induction l; intros.
+  - repeat rewrite firstn_nil; reflexivity.
+  - destruct n; simpl; auto.
+    rewrite IHl; reflexivity.
+Qed.
+
+Lemma skipn_map {A B: Type} (l : list A) (f : A -> B):
+  forall n,
+    skipn n (map f l) = map f (skipn n l).
+Proof.
+  induction l; intros.
+  - repeat rewrite skipn_nil; reflexivity.
+  - destruct n; simpl; auto.
+Qed.
+
+Lemma firstn_seq_le n :
+  forall m size,
+    n <= size ->
+    firstn n (seq m size) = seq m n.
+Proof.
+  induction n; intros.
+  - rewrite firstn_O; reflexivity.
+  - destruct size;[lia|].
+    simpl; rewrite IHn; auto; lia.
+Qed.
+
+Lemma skipn_seq_le n :
+  forall m size,
+    n <= size ->
+    skipn n (seq m size) = seq (m + n) (size - n).
+Proof.
+  induction n; intros.
+  - rewrite Nat.add_0_r, Nat.sub_0_r; reflexivity.
+  - destruct size;[lia|].
+    simpl; rewrite IHn; try lia.
+    rewrite Nat.add_succ_comm; reflexivity.
+Qed.
+
+Corollary firstn_seq_le2 n :
+  forall m size,
+    size <= n ->
+    firstn n (seq m size) = seq m size.
+Proof.
+  intros; rewrite firstn_all2; auto.
+  rewrite seq_length; assumption.
+Qed.
+
+Corollary skipn_seq_le2 n :
+  forall m size,
+    size <= n ->
+    skipn n (seq m size) = nil.
+Proof.
+  intros; rewrite skipn_all2; auto.
+  rewrite seq_length; assumption.
+Qed.
+
+Lemma tl_map {A B : Type} (l : list A) (f : A -> B) :
+  tl (map f l) = map f (tl l).
+Proof. destruct l; auto. Qed.
+
+Lemma tl_seq n:
+  forall m,
+  tl (seq m n) = (seq (S m) (n - 1)).
+Proof.
+  destruct n; intros; auto.
+  simpl; rewrite Nat.sub_0_r; reflexivity.
+Qed.
+
+Lemma seq_extract1 n:
+  n <> 0 ->
+  forall m,
+    seq m n = m :: seq (S m) (n - 1).
+Proof.
+  destruct n; intros.
+  - contradiction.
+  - simpl; rewrite Nat.sub_0_r; reflexivity.
+Qed.
+
+Lemma Z_mod_congr (a b c : Z):
+  (0 < c)%Z ->
+  (a mod c = b mod c)%Z ->
+  Z.divide c (b - a).
+Proof.
+  intros.
+  do 2 (rewrite Z.mod_eq in H0; auto); try lia.
+  exists (b / c - a / c)%Z.
+  lia.
+Qed.
+
 Section FifoProps.
   Variable size : nat.
   Local Notation lgSize := (Nat.log2_up size).
   Variable A : Type.
   Variable implArray : Fin.t size -> A.
 
-  Variable enqP1 deqP1 : nat.
-  Variable enqP1Bnd : 0 <= enqP1 < 2 ^ (lgSize + 1).
-  Variable deqP1Bnd : 0 <= deqP1 < 2 ^ (lgSize + 1).
-  Local Notation enq := (enqP1 mod (2 ^ lgSize)).
-  Local Notation deq := (deqP1 mod (2 ^ lgSize)).
+  Variable enqP1 deqP1 : Z.
+  Variable enqP1Bnd : (0 <= enqP1 < 2 ^ Z.of_nat (lgSize + 1))%Z.
+  Variable deqP1Bnd : (0 <= deqP1 < 2 ^ Z.of_nat (lgSize + 1))%Z.
+  Local Notation enq := (enqP1 mod (2 ^ (Z.of_nat lgSize)))%Z.
+  Local Notation deq := (deqP1 mod (2 ^ (Z.of_nat lgSize)))%Z.
+  Local Definition cutLen := ((enqP1 - deqP1) mod (2 ^ (Z.of_nat (lgSize + 1))))%Z.
   
-  Definition convertToList {n} (kamiArray : Fin.t n -> A) :=
-    @list_arr A n kamiArray.
+  Definition convertToList {n} (kamiArray : Fin.t n -> A) := @list_arr A n kamiArray.
 
-  Local Notation specList := (cutList (enqP1 - deqP1) (rotateList deq (convertToList implArray))).
+  Local Notation specList := (cutList (Z.to_nat cutLen)
+                                      (rotateList (Z.to_nat deq) (convertToList implArray))).
 
-  Variable inBounds : deqP1 <= enqP1 <= deqP1 + size.
-  Variable sizePow2 : Nat.pow 2 (Nat.log2_up size) = size.
+  Variable inBounds : (cutLen <= Z.of_nat size)%Z.
+  Variable sizePow2 : Nat.pow 2 lgSize = size.
+
+  Lemma cutLen_0_iff :
+    cutLen = 0%Z <-> enqP1 = deqP1.
+  Proof.
+    red; split; intro; unfold cutLen in *.
+    - apply Znumtheory.Zmod_divide_minus in H; try lia.
+      rewrite Z.sub_0_r in H; unfold Z.divide in H; destruct H as [x P].
+         rewrite <- Zpow_of_nat, Nat.pow_add_r, sizePow2, Nat2Z.inj_mul in *; simpl in *.
+          destruct (Z_dec 0 x) as [[P0 | P0] | P0]; try lia.
+          * apply Zlt_le_succ in P0; simpl in P0; try lia.
+            apply (Z.mul_le_mono_nonneg_r _ _ (Z.of_nat size * 2)) in P0; lia.
+          * apply Z.gt_lt in P0.
+            rewrite Z.lt_le_pred in P0; simpl in P0.
+            apply (Z.mul_le_mono_nonneg_r _ _ (Z.of_nat size * 2)) in P0; lia.
+    - rewrite H, Z.sub_diag, Zmod_0_l; reflexivity.
+  Qed.
 
   Lemma sizeNeq0 :
     size <> 0.
@@ -3485,19 +3652,23 @@ Section FifoProps.
   Qed.
   
   Lemma deq_lt_size :
-    deq < size.
+    ((Z.to_nat deq) < size).
   Proof.
-    rewrite sizePow2.
-    apply Nat.mod_upper_bound.
-    apply sizeNeq0.
+    specialize sizeNeq0 as P.
+    apply inj_eq in sizePow2.
+    rewrite Zpow_of_nat in sizePow2.
+    rewrite sizePow2, Zmod_mod', Nat2Z.id; try lia.
+    apply Nat.mod_upper_bound; assumption.
   Qed.
 
   Lemma enq_lt_size :
-    enq < size.
+    ((Z.to_nat enq) < size).
   Proof.
-    rewrite sizePow2.
-    apply Nat.mod_upper_bound.
-    apply sizeNeq0.
+    specialize sizeNeq0 as P.
+    apply inj_eq in sizePow2.
+    rewrite Zpow_of_nat in sizePow2.
+    rewrite sizePow2, Zmod_mod', Nat2Z.id; try lia.
+    apply Nat.mod_upper_bound; assumption.
   Qed.
   
   Lemma hdCorrect :
@@ -3512,79 +3683,121 @@ Section FifoProps.
       + unfold convertToList, list_arr.
         rewrite map_length, getFins_length.
         apply deq_lt_size.
-    - intro P.
-      rewrite Nat.sub_0_le in P.
-      lia.
+    - intro P; apply H.
+      rewrite <- cutLen_0_iff.
+      assert (0 = Z.to_nat 0) as TMP by lia; rewrite TMP in P; clear TMP.
+      apply Z2Nat.inj in P; try lia.
+      unfold cutLen; apply Z.mod_pos_bound; lia.
   Qed.
 
   Lemma hdEmpty :
     enqP1 = deqP1 ->
     hd_error specList = None.
   Proof.
-    intros.
-    rewrite H, Nat.sub_diag, cutList_nil_0; reflexivity.
+    intros; unfold cutLen.
+    rewrite H, Z.sub_diag, cutList_nil_0; reflexivity.
   Qed.
 
   Lemma tailCorrect :
-    tl specList = cutList (enqP1 - deqP1 - 1) (rotateList (deq + 1) (convertToList implArray)).
+    tl specList = cutList (Z.to_nat ((enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)) - 1)
+                          (rotateList (Z.to_nat (deq + 1)) (convertToList implArray)).
   Proof.
-    destruct (Nat.eq_dec enqP1 deqP1).
-    - rewrite e, Nat.sub_diag, not_le_minus_0; try lia.
-      repeat rewrite cutList_nil_0; simpl; reflexivity.
-    - rewrite <- tail_cut_rotate, cutList_length, Nat.add_comm, rotateList_add.
-      + assert (enqP1 - deqP1 = (S (enqP1 - deqP1 - 1))) as P by lia.
-        rewrite P at 2.
-        rewrite cutList_rotList_1; auto.
-        unfold convertToList, list_arr.
-        rewrite rotateLength, map_length, getFins_length.
-        lia.
-      + unfold convertToList, list_arr.
-        rewrite rotateLength, map_length, getFins_length.
-        lia.
+    destruct (Z.eq_dec enqP1 deqP1); unfold cutLen in *.
+    - rewrite e, Z.sub_diag, Zmod_0_l; simpl; reflexivity.
+    - unfold convertToList.
+      rewrite <- tail_cut_rotate, cutList_length;
+        [|rewrite rotateLength, <- list_arr_length]; try lia.
+      assert ((Z.to_nat ((enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)))
+              = S (Z.to_nat ((enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)) - 1)) as TMP.
+      { rewrite <- (Nat.add_1_r (Z.to_nat _ - _)), Nat.sub_add; auto.
+        specialize (Nat.le_0_l (Z.to_nat ((enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)))) as P.
+        destruct (le_lt_or_eq _ _ P); try lia.
+        exfalso.
+        apply n; rewrite <-cutLen_0_iff; unfold cutLen.
+        assert (0 = Z.to_nat 0) as TMP by lia; rewrite TMP in H at 1; clear TMP.
+        apply Z2Nat.inj in H; try lia.
+        apply Z.mod_pos_bound; lia. }
+      rewrite TMP at 2; clear TMP.
+      rewrite cutList_rotList_1, Z2Nat.inj_add, (Nat.add_comm (Z.to_nat deq)), rotateList_add;
+        try lia; auto.
+      + specialize sizeNeq0 as P.
+        apply Z.mod_pos_bound.
+        rewrite <- Zpow_of_nat, sizePow2; lia.
+      + rewrite rotateLength, <- list_arr_length; lia.
   Qed.
 
+  Lemma cutLen_succ :
+    cutLen <> Z.of_nat size ->
+    ((enqP1 + 1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1) = cutLen + 1)%Z.
+  Proof.
+    intros.
+    assert (cutLen < Z.of_nat size)%Z as P by lia.
+    specialize sizeNeq0 as P0.
+    destruct (Z_lt_le_dec (Z.of_nat size) 1); try lia.
+    unfold cutLen in *.
+    assert (0 <= (enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1) + 1
+            < 2 ^ Z.of_nat (lgSize + 1))%Z as P1.
+    { specialize (Z.mod_pos_bound (enqP1 - deqP1) (2 ^ Z.of_nat (lgSize + 1)) ltac:(lia)) as P1.
+      split; try lia.
+      destruct P1.
+      rewrite Nat2Z.inj_add, Z.pow_add_r, Z.pow_1_r, <- Zpow_of_nat, sizePow2 in *; try lia.
+    }
+    rewrite <- (Z.mod_small _ _ P1), Zplus_mod_idemp_l.
+    f_equal; lia.
+  Qed.
+  
   Lemma listSnoc (val : A) :
-    enqP1 - deqP1 <> size ->
-    snoc val specList = cutList (enqP1 + 1 - deqP1) (rotateList deq (convertToList (fun i => if (Fin.eqb i (Fin.of_nat_lt enq_lt_size)) then val else implArray i))).
+    cutLen <> Z.of_nat size ->
+    snoc val specList
+    = cutList (Z.to_nat ((enqP1 + 1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)))
+              (rotateList (Z.to_nat deq) (convertToList
+              (fun i => if (Fin.eqb i (Fin.of_nat_lt enq_lt_size)) then val else implArray i))).
   Proof.
     intros HNotFull.
-    rewrite Nat.add_comm, <- Nat.add_sub_assoc; try lia.
-    rewrite Nat.add_comm.
+    rewrite cutLen_succ, Z2Nat.inj_add; auto; try lia;
+      [| unfold cutLen in *; apply Z.mod_pos_bound; try lia].
     erewrite snoc_cutList with (a := val).
     - f_equal.
-      rewrite <- nth_error_eq_iff.
-      intros.
-      destruct (le_lt_dec (enqP1 - deqP1) m).
+      rewrite <- nth_error_eq_iff; intros.
+      destruct (le_lt_dec (Z.to_nat cutLen) m).
       + destruct nth_error eqn:G.
         * exfalso.
           assert (nth_error specList m <> None) as G0.
           { intro G0; rewrite G0 in G; discriminate. }
           rewrite nth_error_Some, cutList_length in G0; [lia|].
-          rewrite rotateLength.
-          unfold convertToList, list_arr.
-          rewrite map_length, getFins_length; lia.
-        * destruct (nth_error (cutList _ (rotateList deq (convertToList (fun i => _))))) eqn: G0; auto.
+          unfold convertToList.
+          rewrite rotateLength, <- list_arr_length; lia.
+        * destruct (nth_error (cutList _ (rotateList (Z.to_nat deq)
+                                                     (convertToList (fun i => _))))) eqn: G0;
+            auto.
           exfalso.
-          assert (nth_error (cutList (enqP1 - deqP1) (rotateList deq (convertToList (fun i : Fin.t size => if Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)))) m
+          assert (nth_error
+                    (cutList (Z.to_nat cutLen)
+                             (rotateList (Z.to_nat deq)
+                                         (convertToList
+                                            (fun i : t size =>
+                                               if Fin.eqb i (of_nat_lt enq_lt_size)
+                                               then val else implArray i)))) m
                   <> None) as G1.
           { intro G1; rewrite G1 in G0; discriminate. }
           rewrite nth_error_Some, cutList_length in G1; [lia|].
-          rewrite rotateLength.
-          unfold convertToList, list_arr.
-          rewrite map_length, getFins_length; lia.
+          unfold convertToList.
+          rewrite rotateLength, <- list_arr_length, <- Nat2Z.id, <- Z2Nat.inj_le; try lia.
+          unfold cutLen.
+          apply Z.mod_pos_bound; lia.
       + repeat rewrite nth_error_cutList; auto.
         assert (length (convertToList implArray) = size) as P.
-        { unfold convertToList, list_arr.
-          rewrite map_length, getFins_length; reflexivity.
+        { unfold convertToList.
+          rewrite <- list_arr_length; reflexivity.
         }
         assert (length (convertToList (fun i : t size => if Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)) = size) as P0.
-        { unfold convertToList, list_arr.
-          rewrite map_length, getFins_length; reflexivity.
+        { unfold convertToList.
+          rewrite <- list_arr_length; reflexivity.
         }
         repeat rewrite nth_error_rotate'; 
           [rewrite P0, P |rewrite P0 | rewrite P]; try lia.
-        specialize (Nat.mod_upper_bound (m + deq) _ sizeNeq0) as P1.
-        assert (proj1_sig (to_nat (of_nat_lt P1)) = (m + deq) mod size) as P2.
+        specialize (Nat.mod_upper_bound (m + (Z.to_nat deq)) _ sizeNeq0) as P1.
+        assert (proj1_sig (to_nat (of_nat_lt P1)) = (m + (Z.to_nat deq)) mod size) as P2.
         { rewrite to_nat_of_nat; reflexivity. }
         rewrite <- P2.
         unfold convertToList.
@@ -3592,30 +3805,88 @@ Section FifoProps.
         f_equal.
         destruct Fin.eqb eqn:G; auto.
         exfalso.
+        unfold cutLen in l.
         rewrite Fin.eqb_eq in G.
         assert (proj1_sig (to_nat (of_nat_lt P1)) = proj1_sig (to_nat (of_nat_lt enq_lt_size))).
         { rewrite G; auto. }
         repeat rewrite to_nat_of_nat in H; simpl in H.
-        rewrite sizePow2 in H.
-        rewrite Nat.add_mod_idemp_r in H; [|apply sizeNeq0].
-        assert (enqP1 - deqP1 < size) as P3 by lia.
-        assert (m + deqP1 < enqP1) as P4 by lia.
-        apply Nat_mod_congr in H; auto; [|apply sizeNeq0].
-        destruct H.
-        destruct x; lia.
+        rewrite <- (Nat2Z.id m), <- Z2Nat.inj_add in H; try lia;
+          [|apply Z.mod_pos_bound; rewrite pow2_of_nat, sizePow2; lia].
+        rewrite <- (Nat2Z.id size) in H at 2.
+        assert (0 <= deq)%Z as P3.
+        { apply Z.mod_pos_bound.
+          rewrite pow2_of_nat, sizePow2; lia. }
+        rewrite <- Zmod_mod', pow2_of_nat, sizePow2 in H; try lia.
+        rewrite Zplus_mod_idemp_r in H.
+        apply Z2Nat.inj in H; try (apply Z.mod_pos_bound; lia).
+        apply Z_mod_congr in H; try lia.
+        destruct H as [x P4].
+        destruct (Z_lt_le_dec 0 x).
+        * assert (cutLen < Z.of_nat size)%Z as P5 by lia.
+          unfold cutLen in P5.
+          apply Zlt_le_succ in l0; simpl in l0.
+          apply (Z.mul_le_mono_nonneg_r _ _ (Z.of_nat size) ltac:(lia)) in l0.
+          rewrite <- P4 in l0.
+          assert (Z.of_nat m + Z.of_nat size <= enqP1 - deqP1)%Z as P6 by lia.
+          rewrite Z.mod_small in P5; lia.
+        * destruct (Zle_lt_or_eq _ _ l0).
+          -- clear P P0 G.
+             assert (cutLen < Z.of_nat size)%Z as P5 by lia.
+             unfold cutLen in *.
+             rewrite Z.lt_le_pred in H; simpl in H.
+             specialize H as H'.
+             apply (Z.mul_le_mono_nonneg_r _ _ (Z.of_nat size) ltac:(lia)) in H.
+             rewrite <- P4 in H.
+             rewrite pow2_of_nat, Nat.pow_add_r, sizePow2, Nat.pow_1_r, Nat2Z.inj_mul in *.
+             rewrite <- (Z_mod_plus_full _ 1 _), Z.mod_small in inBounds; try lia.
+             rewrite <- (Z_mod_plus_full _ 1 _), Z.mod_small in l; try lia.
+             rewrite <- (Z_mod_plus_full _ 1 _), Z.mod_small in P5; try lia.
+             assert (enqP1 - deqP1 - (Z.of_nat m) < - (Z.of_nat size))%Z as P6 by lia.
+             assert ((- 2) * Z.of_nat size <  enqP1 - deqP1 - (Z.of_nat m))%Z as P7 by lia.
+             destruct (Zle_lt_or_eq _ _ H'); try lia.
+             rewrite Z.lt_le_pred in H0; simpl in H0.
+             destruct (Zle_lt_or_eq _ _ H0); try lia.
+             rewrite (Z.mul_lt_mono_pos_r (Z.of_nat size)) in H1; lia.
+          -- rewrite H in P4.
+             assert (enqP1 - deqP1 = Z.of_nat m)%Z as P5 by lia.
+             rewrite P5, Z.mod_small in l; try lia.
     - assert (length (convertToList (fun i : t size => if Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)) = size) as P.
         { unfold convertToList, list_arr.
           rewrite map_length, getFins_length; reflexivity.
         }
+        specialize sizeNeq0 as P1.
         rewrite nth_error_rotate'; rewrite P; try lia.
-        rewrite sizePow2 at 1.
-        rewrite Nat.add_mod_idemp_r; [|apply sizeNeq0].
-        rewrite Nat.add_comm, le_plus_minus_r; try lia.
         unfold convertToList.
-        assert (proj1_sig (to_nat (of_nat_lt enq_lt_size)) = enq) as P0.
+        assert (proj1_sig (to_nat (of_nat_lt enq_lt_size)) = Z.to_nat enq) as P0.
         { rewrite to_nat_of_nat; reflexivity. }
-        rewrite sizePow2 in P0 at 2.
-        rewrite <- P0, list_arr_correct_simple, Fineqb_refl; reflexivity.
+        assert ((Z.to_nat cutLen + Z.to_nat deq) mod size = Z.to_nat enq) as P2.
+        { unfold cutLen.
+          destruct (Z_lt_le_dec (enqP1 - deqP1) 0).
+          - rewrite <- (Z_mod_plus_full _ 1 _), Z.mod_small; try lia.
+            assert (0 <= deq)%Z as P2.
+            { apply Z.mod_pos_bound.
+              rewrite pow2_of_nat, sizePow2; lia.
+            }
+            rewrite <- Z2Nat.inj_add; try lia.
+            rewrite <- (Nat2Z.id size) at 3.
+            rewrite <- Zmod_mod'; try lia.
+            repeat rewrite pow2_of_nat.
+            rewrite Nat.pow_add_r, Nat2Z.inj_mul, sizePow2, Z.add_mod_idemp_r, Nat.pow_1_r;
+              try lia.
+            assert (enqP1 - deqP1 + 1 * (Z.of_nat size * Z.of_nat 2) + deqP1
+                    = enqP1 + (2 * Z.of_nat size))%Z as TMP by lia; rewrite TMP; clear TMP.
+            rewrite Z_mod_plus_full; reflexivity.
+          - rewrite Z.mod_small; try lia.
+            rewrite Z2Nat.inj_sub; try lia.
+            repeat rewrite pow2_of_nat.
+            rewrite sizePow2, Zmod_mod', Nat2Z.id, Nat.add_mod_idemp_r; try lia.
+            rewrite <- (Z2Nat.id enqP1) at 2; try lia.
+            rewrite <- mod_Zmod, Nat2Z.id; try lia.
+            rewrite <- Z2Nat.inj_sub, <- Z2Nat.inj_add, Z.sub_add; lia.
+        }
+        rewrite P2.
+        rewrite <- P0 at 1.
+        rewrite list_arr_correct_simple, Fineqb_refl; reflexivity.
   Qed.
   
 End FifoProps.

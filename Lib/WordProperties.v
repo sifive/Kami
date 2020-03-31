@@ -1397,3 +1397,12 @@ Proof.
   arithmetizeWord.
   rewrite Z.lor_comm; reflexivity.
 Qed.
+
+Lemma wor_assoc n (x y z : word n):
+  wor x (wor y z) = wor (wor x y) z.
+Proof.
+  arithmetizeWord.
+  - rewrite (Zmod_small _ _ (Zlor_bounds _ H0 H)),
+    (Zmod_small _ _ (Zlor_bounds _ H1 H0)),
+    Z.lor_assoc; reflexivity.
+Qed.

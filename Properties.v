@@ -6507,3 +6507,246 @@ Proof.
     apply (IHk (Var _ (SyntaxKind k) (evalExpr e1 x))
                (Var _ (SyntaxKind k) (evalExpr e2 x))).
 Qed.
+
+Lemma evalExpr_Kor_idemp k (e1 : Expr type (SyntaxKind k)):
+  evalKorOpBin k (evalExpr e1) (evalExpr e1) = (evalExpr e1).
+Proof.
+  induction k; simpl.
+  - apply orb_diag.
+  - apply wor_idemp.
+  - apply functional_extensionality_dep; intros.
+    apply (H x (Var _ (SyntaxKind (k x)) (evalExpr e1 x))).
+  - apply functional_extensionality_dep; intros.
+    apply (IHk (Var _ (SyntaxKind k) (evalExpr e1 x))).
+Qed.
+
+Local Lemma Kor_default_rev k (l : list (Expr type (SyntaxKind k))):
+  (forall a,
+    In a (rev l) ->
+    a = Const type Default) ->
+    evalExpr (@Kor _ k (rev l)) = evalExpr (Const type Default).
+Proof.
+  cbn [evalExpr].
+  unfold evalKorOp.
+  rewrite <- fold_left_rev_right, map_rev, rev_involutive.
+  induction l; intros; simpl in *; subst; auto.
+  rewrite IHl.
+  - rewrite (H _ (in_or_app _ _ _ (or_intror _ (InSingleton _)))); simpl.
+    assert (evalConstT Default = (evalExpr (@Const type k Default))) as P by reflexivity.
+    repeat rewrite P.
+    apply evalExpr_Kor_idemp.
+  - intros; apply H; rewrite in_app_iff; left; assumption.
+Qed.
+
+Local Lemma Kor_default_rev' k (l : list (Expr type (SyntaxKind k))):
+  (forall a,
+    In (evalExpr a) (map (fun x => evalExpr x) (rev l)) ->
+    (evalExpr a) = (evalExpr (Const type Default))) ->
+    evalExpr (@Kor _ k (rev l)) = evalExpr (Const type Default).
+Proof.
+  cbn [evalExpr].
+  unfold evalKorOp.
+  repeat rewrite map_rev.
+  rewrite <- fold_left_rev_right, rev_involutive.
+  induction l; intros; simpl in *; subst; auto.
+  rewrite IHl.
+  - rewrite (H _ (in_or_app _ _ _ (or_intror _ (InSingleton _)))); simpl.
+    assert (evalConstT Default = (evalExpr (@Const type k Default))) as P by reflexivity.
+    repeat rewrite P.
+    apply evalExpr_Kor_idemp.
+  - intros; apply H; rewrite in_app_iff; left; assumption.
+Qed.
+
+Lemma Kor_default k (l : list (Expr type (SyntaxKind k))):
+  (forall a,
+      In a l ->
+      a = Const type Default) ->
+  evalExpr (@Kor _ k l) = evalExpr (Const type Default).
+Proof.
+  setoid_rewrite <- rev_involutive.
+  apply Kor_default_rev.
+Qed.
+
+Lemma Kor_default' k (l : list (Expr type (SyntaxKind k))):
+  (forall a,
+      In (evalExpr a) (map (fun x => evalExpr x) l) ->
+      (evalExpr a) = (evalExpr (Const type Default))) ->
+  evalExpr (@Kor _ k l) = evalExpr (Const type Default).
+Proof.
+  setoid_rewrite <- (rev_involutive l).
+  apply Kor_default_rev'.
+Qed.
+  
+Local Lemma Kor_sparse_rev k (l : list (Expr type (SyntaxKind k))):
+  forall (val : Expr type (SyntaxKind k)),
+    In (evalExpr val) (map (fun x => evalExpr x) (rev l)) ->
+    (forall a,
+        In (evalExpr a) (map (fun x => evalExpr x) (rev l)) ->
+        (evalExpr a) = (evalExpr val) \/ (evalExpr a) = (evalExpr (Const type Default))) ->
+    evalExpr (@Kor _ k (rev l)) =  evalExpr val.
+Proof.
+  intros.
+  cbn [evalExpr].
+  unfold evalKorOp.
+  rewrite <- fold_left_rev_right, map_rev, rev_involutive.
+  induction l; intros; simpl in *; dest; subst; [contradiction|rewrite map_app in *].
+  rewrite in_app_iff in H; destruct H.
+  - rewrite IHl; auto.
+    + destruct (H0 _ (in_or_app _ _ _ (or_intror _ (InSingleton _)))); rewrite H1.
+      * apply evalExpr_Kor_idemp.
+      * apply evalExpr_Kor_Default.
+    + intros.
+      apply H0; rewrite in_app_iff; left; assumption.
+  - inv H; [|contradiction].
+    destruct (In_dec (isEq k) (evalExpr val) (map (fun x => evalExpr x) (rev l))).
+    + rewrite IHl, H1; auto.
+      * apply evalExpr_Kor_idemp.
+      * intros.
+        apply H0; rewrite in_app_iff; left; assumption.
+    + assert (forall a, In (evalExpr a) (map (fun x => evalExpr x) (rev l))
+                                         -> (evalExpr a) = (evalExpr (Const type Default))) as P.
+      { intros.
+        destruct (H0 _ (in_or_app _ _ _ (or_introl _ H))); subst; auto.
+        rewrite H2 in H.
+        exfalso; contradiction.
+      }
+      specialize (Kor_default_rev' l) as P0.
+      cbn [evalExpr] in P0.
+      unfold evalKorOp in P0.
+      repeat rewrite map_rev in P0.
+      rewrite <- fold_left_rev_right, rev_involutive in P0.
+      setoid_rewrite P0; [|rewrite <-map_rev; auto].
+      rewrite H1.
+      assert (@evalConstT k Default = evalExpr (Const type Default)) as P1 by reflexivity.
+      rewrite P1, evalExpr_Kor_comm.
+      apply evalExpr_Kor_Default.
+Qed.
+
+Lemma Kor_sparse k (l : list (Expr type (SyntaxKind k))):
+  forall val,
+    In (evalExpr val) (map (fun x => evalExpr x) l) ->
+    (forall a,
+        In (evalExpr a) (map (fun x => evalExpr x) l) ->
+        (evalExpr a) = (evalExpr val) \/ (evalExpr a) = (evalExpr (Const type Default))) ->
+    evalExpr (@Kor _ k l) =  evalExpr val.
+Proof.
+  setoid_rewrite <- (rev_involutive l).
+  apply Kor_sparse_rev.
+Qed.
+
+Lemma evalExpr_Kor_Default_l k (e : Expr type (SyntaxKind k)):
+  evalKorOpBin k (evalConstT Default) (evalExpr e) = evalExpr e.
+Proof.
+  assert (@evalConstT k Default = evalExpr (Const type Default)) as P by reflexivity.
+  rewrite P, evalExpr_Kor_comm.
+  apply evalExpr_Kor_Default.
+Qed.
+
+Lemma evalExpr_Kor_assoc k (e1 e2 e3 : Expr type (SyntaxKind k)):
+  evalKorOpBin k (evalExpr e1) (evalKorOpBin k (evalExpr e2) (evalExpr e3)) =
+  evalKorOpBin k (evalKorOpBin k (evalExpr e1) (evalExpr e2)) (evalExpr e3).
+Proof.
+  induction k; simpl.
+  - apply orb_assoc.
+  - apply wor_assoc.
+  - apply functional_extensionality_dep; intros.
+    apply (H _ (Var _ (SyntaxKind (k x)) (evalExpr e1 x))
+             (Var _ (SyntaxKind (k x)) (evalExpr e2 x))
+             (Var _ (SyntaxKind (k x)) (evalExpr e3 x))).
+  - apply functional_extensionality_dep; intros.
+    apply (IHk (Var _ (SyntaxKind k) (evalExpr e1 x))
+             (Var _ (SyntaxKind k) (evalExpr e2 x))
+             (Var _ (SyntaxKind k) (evalExpr e3 x))).
+Qed.
+
+Local Lemma evalExpr_Kor_perm_rev k (l : list (Expr type (SyntaxKind k))) :
+  forall l',
+    l [=] l' ->
+    evalExpr (Kor (rev l)) = evalExpr (Kor (rev l')).
+Proof.
+  induction 1; auto.
+  - cbn [evalExpr] in *.
+    unfold evalKorOp in *.
+    repeat rewrite <- fold_left_rev_right, map_rev, rev_involutive in *.
+    simpl.
+    setoid_rewrite IHPermutation.
+    reflexivity.
+  - cbn [evalExpr].
+    unfold evalKorOp.
+    repeat rewrite <- fold_left_rev_right, map_rev, rev_involutive.
+    simpl.
+    assert (evalExpr (Var _ (SyntaxKind k)
+                          (fold_right (fun y0 x0 => evalKorOpBin k x0 y0) (evalConstT Default)
+                                      (map (evalExpr (exprT:=SyntaxKind k)) l))) =
+            (fold_right (fun y0 x0 => evalKorOpBin k x0 y0) (evalConstT Default)
+                        (map (evalExpr (exprT:=SyntaxKind k)) l))) as P by reflexivity.
+    setoid_rewrite <- P.
+    rewrite <- evalExpr_Kor_assoc, evalExpr_Kor_comm, evalExpr_Kor_assoc; reflexivity.
+  - rewrite IHPermutation1, IHPermutation2; reflexivity.
+Qed.
+
+Lemma evalExpr_Kor_perm k (l : list (Expr type (SyntaxKind k))) :
+  forall l',
+    l [=] l' ->
+    evalExpr (Kor l) = evalExpr (Kor l').
+Proof.
+  intros.
+  rewrite (Permutation.Permutation_rev l), (Permutation.Permutation_rev l')  in H.
+  rewrite <- (rev_involutive l),  <- (rev_involutive l').
+  apply evalExpr_Kor_perm_rev; assumption.
+Qed.
+
+Lemma evalExpr_Kor_head k (e : Expr type (SyntaxKind k)) (l : list (Expr type (SyntaxKind k))):
+  evalExpr (Kor (e :: l)) = evalKorOpBin k (evalExpr e) (evalExpr (Kor l)).
+Proof.
+  rewrite (evalExpr_Kor_perm (Permutation.Permutation_rev (e :: l))),
+  (evalExpr_Kor_perm (Permutation.Permutation_rev l)) at 1.
+  cbn [evalExpr].
+  unfold evalKorOp.
+  repeat rewrite <- fold_left_rev_right, map_rev, rev_involutive.
+  simpl.
+  assert ((fold_right (fun y x : type k => evalKorOpBin k x y) (evalConstT Default)
+                      (map (evalExpr (exprT:=SyntaxKind k)) l)) =
+          evalExpr (Var _ (SyntaxKind k)
+                        (fold_right (fun y x : type k => evalKorOpBin k x y) (evalConstT Default)
+                                    (map (evalExpr (exprT:=SyntaxKind k)) l)))) as P
+      by reflexivity.
+  setoid_rewrite P.
+  rewrite evalExpr_Kor_comm; reflexivity.
+Qed.
+
+Lemma arr_nth_Fin' {A : Type} :
+  forall m (arr : t m -> A),
+    arr = (nth_Fin' _ (list_arr_length arr)).
+Proof.
+  intros.
+  apply functional_extensionality; intros.
+  rewrite (nth_Fin'_nth (arr x)).
+  rewrite <- nth_default_eq, <- list_arr_correct.
+  destruct lt_dec.
+  - specialize (of_nat_to_nat_inv x) as P.
+    rewrite (of_nat_ext l (proj2_sig (to_nat x))), P; reflexivity.
+  - exfalso.
+    apply n, fin_to_nat_bound.
+Qed.
+
+Lemma evalExpr_Kor_same_eval (k : Kind) (l l' : list (Expr type (SyntaxKind k))) :
+  Forall2 (fun x y => evalExpr x = evalExpr y) l l' ->
+  evalExpr (Kor l) = evalExpr (Kor l').
+Proof.
+  induction 1; auto.
+  repeat rewrite evalExpr_Kor_head.
+  rewrite H, IHForall2; reflexivity.
+Qed.
+
+Lemma split_seq :
+  forall start i size,
+    i < size ->
+    seq start size = (seq start i) ++ [start + i] ++ (seq (start + (S i)) (size - (S i))).
+Proof.
+  intros.
+  rewrite (@seq_app' start size i), (@seq_app' (start + i) (size - i) 1); try lia.
+  cbn.
+  assert (size - i - 1 = size - S i) as P by lia.
+  rewrite Nat.add_1_r, plus_n_Sm, P; reflexivity.
+Qed.
