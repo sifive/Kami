@@ -3607,6 +3607,62 @@ Proof.
   lia.
 Qed.
 
+Lemma rotateList_periodic {A : Type} n:
+  forall (l : list A),
+    rotateList n l = rotateList (n mod (length l)) l.
+Proof.
+  intros.
+  rewrite <-nth_error_eq_iff; intros.
+  destruct (le_lt_dec (length l) m).
+  - repeat rewrite (proj2 (nth_error_None _ _)); auto; rewrite rotateLength; assumption.
+  - rewrite (nth_error_rotate' n l l0), (nth_error_rotate' (n mod (length l)) l l0),
+    Nat.add_mod_idemp_r; auto; lia.
+Qed.    
+
+Lemma emptyb_true {A : Type} (l : list A) :
+  emptyb l = true <-> l = nil.
+Proof.
+  red; split; destruct l; intros; auto; discriminate.
+Qed.
+
+Lemma emptyb_false {A : Type} (l : list A) :
+  emptyb l = false <-> exists x, In x l.
+Proof.
+  red; split; destruct l; intros; auto; try discriminate.
+  - exists a; left; reflexivity.
+  - dest; inv H.
+Qed.
+
+Lemma emptyb_true_len {A : Type} (l : list A) :
+  emptyb l = true <-> length l = 0.
+Proof.
+  rewrite length_zero_iff_nil; apply emptyb_true.
+Qed.
+
+Lemma emptyb_false_len {A : Type} (l : list A) :
+  emptyb l = false <-> 0 < length l.
+Proof.
+  rewrite emptyb_false; red; split; intros; dest.
+  - destruct l; [inv H| simpl; lia].
+  - destruct l; [simpl in H; lia| exists a; left; reflexivity].
+Qed.
+
+Lemma hd_error_Some {A : Type} (l : list A) (a : A) :
+  hd_error l = Some a <-> l = a :: tl l.
+Proof.
+  red; split; intros.
+  - destruct l; inv H; reflexivity.
+  - rewrite H; reflexivity.
+Qed.
+
+Lemma hd_error_None {A : Type} (l : list A) :
+  hd_error l = None <-> l = nil.
+Proof.
+  red; split; intros.
+  - destruct l; auto; discriminate.
+  - destruct l; auto; discriminate.
+Qed.
+
 Section FifoProps.
   Variable size : nat.
   Local Notation lgSize := (Nat.log2_up size).
@@ -3618,7 +3674,7 @@ Section FifoProps.
   Variable deqP1Bnd : (0 <= deqP1 < 2 ^ Z.of_nat (lgSize + 1))%Z.
   Local Notation enq := (enqP1 mod (2 ^ (Z.of_nat lgSize)))%Z.
   Local Notation deq := (deqP1 mod (2 ^ (Z.of_nat lgSize)))%Z.
-  Local Definition cutLen := ((enqP1 - deqP1) mod (2 ^ (Z.of_nat (lgSize + 1))))%Z.
+  Local Notation cutLen := ((enqP1 - deqP1) mod (2 ^ (Z.of_nat (lgSize + 1))))%Z.
   
   Definition convertToList {n} (kamiArray : Fin.t n -> A) := @list_arr A n kamiArray.
 
@@ -3631,7 +3687,7 @@ Section FifoProps.
   Lemma cutLen_0_iff :
     cutLen = 0%Z <-> enqP1 = deqP1.
   Proof.
-    red; split; intro; unfold cutLen in *.
+    red; split; intro.
     - apply Znumtheory.Zmod_divide_minus in H; try lia.
       rewrite Z.sub_0_r in H; unfold Z.divide in H; destruct H as [x P].
          rewrite <- Zpow_of_nat, Nat.pow_add_r, sizePow2, Nat2Z.inj_mul in *; simpl in *.
@@ -3685,16 +3741,16 @@ Section FifoProps.
         apply deq_lt_size.
     - intro P; apply H.
       rewrite <- cutLen_0_iff.
-      assert (0 = Z.to_nat 0) as TMP by lia; rewrite TMP in P; clear TMP.
+      assert (0 = Z.to_nat 0) as TMP by lia; rewrite TMP in P at 2; clear TMP.
       apply Z2Nat.inj in P; try lia.
-      unfold cutLen; apply Z.mod_pos_bound; lia.
+      apply Z.mod_pos_bound; lia.
   Qed.
 
   Lemma hdEmpty :
     enqP1 = deqP1 ->
     hd_error specList = None.
   Proof.
-    intros; unfold cutLen.
+    intros.
     rewrite H, Z.sub_diag, cutList_nil_0; reflexivity.
   Qed.
 
@@ -3702,7 +3758,7 @@ Section FifoProps.
     tl specList = cutList (Z.to_nat ((enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)) - 1)
                           (rotateList (Z.to_nat (deq + 1)) (convertToList implArray)).
   Proof.
-    destruct (Z.eq_dec enqP1 deqP1); unfold cutLen in *.
+    destruct (Z.eq_dec enqP1 deqP1).
     - rewrite e, Z.sub_diag, Zmod_0_l; simpl; reflexivity.
     - unfold convertToList.
       rewrite <- tail_cut_rotate, cutList_length;
@@ -3713,7 +3769,7 @@ Section FifoProps.
         specialize (Nat.le_0_l (Z.to_nat ((enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)))) as P.
         destruct (le_lt_or_eq _ _ P); try lia.
         exfalso.
-        apply n; rewrite <-cutLen_0_iff; unfold cutLen.
+        apply n; rewrite <-cutLen_0_iff.
         assert (0 = Z.to_nat 0) as TMP by lia; rewrite TMP in H at 1; clear TMP.
         apply Z2Nat.inj in H; try lia.
         apply Z.mod_pos_bound; lia. }
@@ -3734,7 +3790,6 @@ Section FifoProps.
     assert (cutLen < Z.of_nat size)%Z as P by lia.
     specialize sizeNeq0 as P0.
     destruct (Z_lt_le_dec (Z.of_nat size) 1); try lia.
-    unfold cutLen in *.
     assert (0 <= (enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1) + 1
             < 2 ^ Z.of_nat (lgSize + 1))%Z as P1.
     { specialize (Z.mod_pos_bound (enqP1 - deqP1) (2 ^ Z.of_nat (lgSize + 1)) ltac:(lia)) as P1.
@@ -3805,7 +3860,6 @@ Section FifoProps.
         f_equal.
         destruct Fin.eqb eqn:G; auto.
         exfalso.
-        unfold cutLen in l.
         rewrite Fin.eqb_eq in G.
         assert (proj1_sig (to_nat (of_nat_lt P1)) = proj1_sig (to_nat (of_nat_lt enq_lt_size))).
         { rewrite G; auto. }
@@ -3823,7 +3877,6 @@ Section FifoProps.
         destruct H as [x P4].
         destruct (Z_lt_le_dec 0 x).
         * assert (cutLen < Z.of_nat size)%Z as P5 by lia.
-          unfold cutLen in P5.
           apply Zlt_le_succ in l0; simpl in l0.
           apply (Z.mul_le_mono_nonneg_r _ _ (Z.of_nat size) ltac:(lia)) in l0.
           rewrite <- P4 in l0.
@@ -3832,7 +3885,6 @@ Section FifoProps.
         * destruct (Zle_lt_or_eq _ _ l0).
           -- clear P P0 G.
              assert (cutLen < Z.of_nat size)%Z as P5 by lia.
-             unfold cutLen in *.
              rewrite Z.lt_le_pred in H; simpl in H.
              specialize H as H'.
              apply (Z.mul_le_mono_nonneg_r _ _ (Z.of_nat size) ltac:(lia)) in H.
@@ -3860,8 +3912,7 @@ Section FifoProps.
         assert (proj1_sig (to_nat (of_nat_lt enq_lt_size)) = Z.to_nat enq) as P0.
         { rewrite to_nat_of_nat; reflexivity. }
         assert ((Z.to_nat cutLen + Z.to_nat deq) mod size = Z.to_nat enq) as P2.
-        { unfold cutLen.
-          destruct (Z_lt_le_dec (enqP1 - deqP1) 0).
+        { destruct (Z_lt_le_dec (enqP1 - deqP1) 0).
           - rewrite <- (Z_mod_plus_full _ 1 _), Z.mod_small; try lia.
             assert (0 <= deq)%Z as P2.
             { apply Z.mod_pos_bound.
