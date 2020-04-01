@@ -669,16 +669,6 @@ Section Arr.
     apply getFins_nth_error.
   Qed.
 
-  Fixpoint cutList (n : nat) (ls : list A) :=
-    match n with
-    | O => nil
-    | S m =>
-      match ls with
-      | nil => ls
-      | x :: ls' => x :: (cutList m ls')
-      end
-    end.
-
   Fixpoint snoc (a : A) (ls : list A) :=
     match ls with
     | nil => a::nil
@@ -3164,16 +3154,8 @@ Proof.
       lia.
 Qed.
 
-Lemma cutList_nil_0 {A : Type} (l : list A) :
-  cutList 0 l = [].
-Proof. auto. Qed.
-
-Lemma cutList_nil_nil {A : Type} n :
-  @cutList A n [] = [].
-Proof. destruct n; auto. Qed.
-
-Lemma cutList_nil_iff {A : Type} n (l : list A) :
-  cutList n l = [] <-> n = 0 \/ l = nil.
+Lemma firstn_nil_iff {A : Type} n (l : list A) :
+  firstn n l = [] <-> n = 0 \/ l = nil.
 Proof.
   red; split; intros.
   - destruct n; destruct l; auto.
@@ -3193,13 +3175,13 @@ Proof.
   rewrite snoc_rapp, app_length; simpl; lia.
 Qed.
 
-Lemma hdCutList {A : Type} (l : list A):
+Lemma hd_firstn {A : Type} (l : list A):
   forall n,
     n <> 0 ->
-    hd_error (cutList n l) = hd_error l.
+    hd_error (firstn n l) = hd_error l.
 Proof.
   induction l; intros.
-  - rewrite cutList_nil_nil; reflexivity.
+  - rewrite firstn_nil; reflexivity.
   - simpl; destruct n; simpl; auto.
     exfalso; apply H; reflexivity.
 Qed.
@@ -3217,15 +3199,15 @@ Proof.
     + rewrite snoc_rapp, app_length; simpl in *; lia.
 Qed.
 
-Lemma cut_app {A : Type} (l1 : list A):
+Lemma firstn_app' {A : Type} (l1 : list A):
   forall n l2,
     n <= length l1 ->
-    cutList n (l1 ++ l2) = cutList n l1.
+    firstn n (l1 ++ l2) = firstn n l1.
 Proof.
   induction l1; intros.
-  - rewrite cutList_nil_nil.
+  - rewrite firstn_nil.
     simpl in H.
-    assert (n = 0) by lia; rewrite H0, cutList_nil_0; reflexivity.
+    assert (n = 0) by lia; rewrite H0, firstn_O; reflexivity.
   - destruct n; simpl; auto.
     rewrite IHl1; auto.
     simpl in H; lia.
@@ -3233,10 +3215,10 @@ Qed.
 
 Lemma tail_cut_rotate {A : Type} :
   forall (l : list A),
-    cutList ((length l) - 1) (rotateList 1 l) = tl l.
+    firstn ((length l) - 1) (rotateList 1 l) = tl l.
 Proof.
   destruct l; simpl; auto.
-  rewrite Nat.sub_0_r, snoc_rapp, cut_app; try lia.
+  rewrite Nat.sub_0_r, snoc_rapp, firstn_app'; try lia.
   induction l; simpl; auto.
   rewrite IHl; reflexivity.
 Qed.
@@ -3255,58 +3237,22 @@ Proof.
     rewrite IHm; reflexivity.
 Qed.
 
-Lemma cutList_length {A : Type} (l : list A):
-  forall n,
-    n <= length l ->
-    length (cutList n l) = n.
-Proof.
-  induction l; intros; simpl.
-  - rewrite cutList_nil_nil; simpl in *; lia.
-  - destruct n; simpl; auto.
-    simpl in H; apply Peano.le_S_n in H.
-    specialize (IHl _ H); auto.
-Qed.
-
-Lemma cutList_idemp {A : Type} (l : list A) :
-  forall n,
-    length l <= n ->
-    cutList n l = l.
-Proof.
-  induction l; intros.
-  - rewrite cutList_nil_nil; reflexivity.
-  - destruct n; simpl in H.
-    + exfalso; lia.
-    + simpl; f_equal; apply IHl.
-      lia.
-Qed.
-
-
-Lemma cutList_length_bnd {A : Type} (l : list A):
-  forall n,
-    length (cutList n l) <= n.
-Proof.
-  intros.
-  destruct (le_lt_dec n (length l)).
-  - rewrite cutList_length; auto.
-  - rewrite cutList_idemp; lia.
-Qed.
-  
 Lemma cutList_rotList_1 {A : Type} (l : list A) :
   forall n,
     n <= length l ->
-    cutList n (rotateList 1 (cutList (S n) l)) = cutList n (rotateList 1 l).
+    firstn n (rotateList 1 (firstn (S n) l)) = firstn n (rotateList 1 l).
 Proof.
   destruct l; intros.
-  - rewrite cutList_nil_nil; reflexivity.
+  - repeat rewrite firstn_nil; reflexivity.
   - simpl; repeat rewrite snoc_rapp.
     destruct (le_lt_or_eq _ _ H).
     + simpl in H0.
       apply lt_n_Sm_le in H0.
-      repeat rewrite cut_app; auto.
-      * rewrite cutList_idemp; auto.
-        apply cutList_length_bnd.
-      * rewrite cutList_length; auto.
-    + repeat rewrite cutList_idemp; auto; try rewrite app_length; simpl in *; lia.
+      repeat rewrite firstn_app'; auto.
+      * rewrite firstn_all2; auto.
+        apply firstn_le_length.
+      * rewrite firstn_length_le; auto.
+    + repeat rewrite firstn_all2; auto; try rewrite app_length; simpl in *; lia.
 Qed.
 
 Lemma nth_error_nil_None' :
@@ -3319,7 +3265,7 @@ Qed.
 Lemma snoc_cutList {A : Type} (l : list A) :
   forall n a,
     nth_error l n = Some a ->
-    cutList (n + 1) l = snoc a (cutList n l).
+    firstn (n + 1) l = snoc a (firstn n l).
 Proof.
   induction l; simpl; intros.
   - exfalso.
@@ -3420,7 +3366,7 @@ Proof. red; split; intros; subst; eauto using nth_error_eq. Qed.
 Lemma nth_error_cutList {A : Type} m:
   forall n (l : list A),
     n <  m ->
-    nth_error (cutList m l) n = nth_error l n.
+    nth_error (firstn m l) n = nth_error l n.
 Proof.
   induction m; intros; try lia.
   destruct l, n; simpl; auto.
@@ -3678,7 +3624,7 @@ Section FifoProps.
   
   Definition convertToList {n} (kamiArray : Fin.t n -> A) := @list_arr A n kamiArray.
 
-  Local Notation specList := (cutList (Z.to_nat cutLen)
+  Local Notation specList := (firstn (Z.to_nat cutLen)
                                       (rotateList (Z.to_nat deq) (convertToList implArray))).
 
   Variable inBounds : (cutLen <= Z.of_nat size)%Z.
@@ -3732,7 +3678,7 @@ Section FifoProps.
     hd_error specList = Some (implArray (Fin.of_nat_lt deq_lt_size)).
   Proof.
     intros.
-    rewrite hdCutList.
+    rewrite hd_firstn.
     - rewrite hdRotateList.
       + unfold convertToList.
         rewrite <- list_arr_correct_simple, to_nat_of_nat; reflexivity.
@@ -3751,17 +3697,17 @@ Section FifoProps.
     hd_error specList = None.
   Proof.
     intros.
-    rewrite H, Z.sub_diag, cutList_nil_0; reflexivity.
+    rewrite H, Z.sub_diag, firstn_O; reflexivity.
   Qed.
 
   Lemma tailCorrect :
-    tl specList = cutList (Z.to_nat ((enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)) - 1)
+    tl specList = firstn (Z.to_nat ((enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)) - 1)
                           (rotateList (Z.to_nat (deq + 1)) (convertToList implArray)).
   Proof.
     destruct (Z.eq_dec enqP1 deqP1).
     - rewrite e, Z.sub_diag, Zmod_0_l; simpl; reflexivity.
     - unfold convertToList.
-      rewrite <- tail_cut_rotate, cutList_length;
+      rewrite <- tail_cut_rotate, firstn_length_le;
         [|rewrite rotateLength, <- list_arr_length]; try lia.
       assert ((Z.to_nat ((enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)))
               = S (Z.to_nat ((enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)) - 1)) as TMP.
@@ -3804,7 +3750,7 @@ Section FifoProps.
   Lemma listSnoc (val : A) :
     cutLen <> Z.of_nat size ->
     snoc val specList
-    = cutList (Z.to_nat ((enqP1 + 1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)))
+    = firstn (Z.to_nat ((enqP1 + 1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)))
               (rotateList (Z.to_nat deq) (convertToList
               (fun i => if (Fin.eqb i (Fin.of_nat_lt enq_lt_size)) then val else implArray i))).
   Proof.
@@ -3819,23 +3765,23 @@ Section FifoProps.
         * exfalso.
           assert (nth_error specList m <> None) as G0.
           { intro G0; rewrite G0 in G; discriminate. }
-          rewrite nth_error_Some, cutList_length in G0; [lia|].
+          rewrite nth_error_Some, firstn_length_le in G0; [lia|].
           unfold convertToList.
           rewrite rotateLength, <- list_arr_length; lia.
-        * destruct (nth_error (cutList _ (rotateList (Z.to_nat deq)
-                                                     (convertToList (fun i => _))))) eqn: G0;
+        * destruct (nth_error (firstn _ (rotateList (Z.to_nat deq)
+                                                    (convertToList (fun i => _))))) eqn: G0;
             auto.
           exfalso.
           assert (nth_error
-                    (cutList (Z.to_nat cutLen)
-                             (rotateList (Z.to_nat deq)
-                                         (convertToList
-                                            (fun i : t size =>
-                                               if Fin.eqb i (of_nat_lt enq_lt_size)
-                                               then val else implArray i)))) m
+                    (firstn (Z.to_nat cutLen)
+                            (rotateList (Z.to_nat deq)
+                                        (convertToList
+                                           (fun i : t size =>
+                                              if Fin.eqb i (of_nat_lt enq_lt_size)
+                                              then val else implArray i)))) m
                   <> None) as G1.
           { intro G1; rewrite G1 in G0; discriminate. }
-          rewrite nth_error_Some, cutList_length in G1; [lia|].
+          rewrite nth_error_Some, firstn_length_le in G1; [lia|].
           unfold convertToList.
           rewrite rotateLength, <- list_arr_length, <- Nat2Z.id, <- Z2Nat.inj_le; try lia.
           unfold cutLen.
