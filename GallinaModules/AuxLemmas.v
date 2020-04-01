@@ -19,8 +19,6 @@ Fixpoint oneUpdRegs (r : RegT) (o : RegsT) : RegsT :=
 Definition oneUpdReg (r1 r2 : RegT) : RegT :=
   if String.eqb (fst r2) (fst r1) then r1 else r2.
 
-
-
 Lemma InGetKindAttr: forall {name} {o: RegsT} {k} {v} (H: In (name, existT (fullType type) (SyntaxKind k) v) o),
     In (name, SyntaxKind k) (getKindAttr o).
 Proof.
@@ -804,3 +802,57 @@ Proof.
   intros; subst; apply doUpdRegs_idemp; auto.
 Qed.
 
+Require Import RelationClasses.
+
+Section Effect_trans.
+  Variable k : Kind.
+  Variable R1 R2: RegsT -> RegsT -> Prop.
+
+  Lemma Effectless_trans (a1 a2 a3 : ActionT type k):
+    EffectlessRelation R1 a1 a2 ->
+    EffectlessRelation R2 a2 a3 ->
+    EffectlessRelation (fun o1 o2 => exists o3, R1 o1 o3 /\ R2 o3 o2) a1 a3.
+  Proof.
+    unfold EffectlessRelation; intros; dest.
+    specialize (H _ _ H1 _ _ _ _ H2); dest; subst; repeat split.
+    eapply H0; eauto.
+  Qed.
+
+  Lemma Effectful_trans (a1 a2 a3 : ActionT type k):
+    EffectfulRelation R1 a1 a2 ->
+    EffectfulRelation R2 a2 a3 ->
+    EffectfulRelation (fun o1 o2 => exists o3, R1 o1 o3 /\ R2 o3 o2) a1 a3.
+  Proof.
+    unfold EffectfulRelation; intros; dest.
+    specialize (H _ _ H1 _ _ _ _ H2); dest; subst.
+    specialize (H0 _ _ H3 _ _ _ _ H); dest.
+    exists x2, x3; split; auto.
+    exists (doUpdRegs x1 x); split; auto.
+  Qed.
+End Effect_trans.
+
+Section Effect_refl.
+  Variable k : Kind.
+
+  Definition EffectlessAction (a : ActionT type k) :=
+    forall o reads upds calls retVal,
+      SemAction o a reads upds calls retVal ->
+      upds = nil /\ calls = nil.
+    
+  Lemma Effectful_refl (a : ActionT type k):
+    EffectfulRelation (fun o1 o2 => o1 = o2) a a.
+  Proof.
+    unfold EffectfulRelation; intros; dest.
+    exists reads_i, upds_i; subst; split; auto.
+  Qed.
+
+  Lemma Effectless_refl (a : ActionT type k):
+    EffectlessAction a ->
+    EffectlessRelation (fun o1 o2 => o1 = o2) a a.
+  Proof.
+    unfold EffectlessRelation; intros.
+    specialize (H _ _ _ _ _ H1); dest; subst.
+    repeat split.
+    exists reads_i; assumption.
+  Qed.
+End Effect_refl.
