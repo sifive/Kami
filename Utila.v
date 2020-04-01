@@ -1431,3 +1431,64 @@ Section utila.
     
   Local Close Scope kami_action.
 End utila.
+
+Lemma snd_tagFrom {A : Type} (l : list A):
+  forall n,
+    map snd (tagFrom n l) = l.
+Proof.
+  induction l; simpl; auto; intros.
+  f_equal; apply IHl.
+Qed.
+
+Lemma fst_tagFrom {A : Type} (l : list A):
+  forall n,
+    map fst (tagFrom n l) = seq n (length l).
+Proof.
+  induction l; simpl; auto; intros.
+  f_equal; apply IHl.
+Qed.
+
+Corollary length_tagFrom {A : Type} (l : list A):
+  forall n,
+    length (tagFrom n l) = length l.
+Proof.
+  intros.
+  rewrite <- (snd_tagFrom l n) at 2.
+  rewrite map_length; reflexivity.
+Qed.
+
+Lemma tagFrom_n {A : Type} (l : list A):
+  forall n t,
+    In t (tagFrom n l) ->
+    n <= fst t < (n + length l).
+Proof.
+  induction l; simpl; intros; [contradiction|].
+  destruct H; subst; simpl; [|specialize (IHl _ _ H)]; lia.
+Qed.
+
+
+Lemma tagFromO_Correct {A : Type} (l  : list A): 
+  forall t n,
+    In t (tagFrom n l) ->
+    nth_error l ((fst t) - n) = Some (snd t).
+Proof.
+  induction l; simpl; intros; [contradiction|].
+  destruct H; subst; simpl.
+  - rewrite Nat.sub_diag; simpl; reflexivity.
+  - specialize (IHl _ _ H).
+    specialize (tagFrom_n _ _ _ H) as P0.
+    assert (a :: l = [a] ++ l) as P by auto.
+    rewrite P, nth_error_app2; simpl; try lia.
+    rewrite <- IHl.
+    f_equal; lia.
+Qed.
+
+Lemma tagApp {A : Type} (l1 l2 : list A):
+  forall m,
+    tagFrom m (l1 ++ l2) = tagFrom m l1 ++ tagFrom (length l1 + m) l2.
+Proof.
+  induction l1; simpl; auto; intros.
+  f_equal.
+  rewrite <- Nat.add_succ_r.
+  apply IHl1.
+Qed.

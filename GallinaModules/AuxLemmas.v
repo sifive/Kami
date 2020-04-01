@@ -783,3 +783,24 @@ Lemma SemActionSub :
     -> SubList reads o /\ SubList (getKindAttr upds) (getKindAttr o).
 Proof. intros; eauto using SemActionReadsSub, SemActionUpdSub. Qed.
 
+Lemma doUpdRegs_idemp o :
+  NoDup (map fst o) ->
+  doUpdRegs o o = o.
+Proof.
+  induction o; auto; intros.
+  inv H; destruct a; simpl.
+  rewrite String.eqb_refl, doUpdRegs_cons_l, doUpdRegs_key_not_In, IHo; auto.
+  rewrite IHo; auto.
+  repeat intro; apply H2.
+  rewrite in_map_iff.
+  exists (s, v); auto.
+Qed.
+
+Lemma doUpdRegs_idemp' o o' :
+  o = o' ->
+  NoDup (map fst o) ->
+  doUpdRegs o o' = o'.
+Proof.
+  intros; subst; apply doUpdRegs_idemp; auto.
+Qed.
+
