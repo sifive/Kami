@@ -58,7 +58,7 @@ simulate_action defmeths methcalls modes envRef state meths act regs = sim methc
                 u' <- u
                 sim (methName:mcs) (cont v') updates (u':fupdates)
             Nothing -> case lookup methName defmeths of
-                Just (_,f) -> sim (methName:mcs) (unsafeCoerce $ f () $ unsafeCoerce arg') updates fupdates
+                Just (_,f) -> sim (methName:mcs) (cont $ unsafeCoerce $ f () $ unsafeCoerce arg') updates fupdates
                 Nothing -> case lookup methName meths of
                                 Nothing -> error ("Method " ++ methName ++ " not found.")
                                 Just f -> do
