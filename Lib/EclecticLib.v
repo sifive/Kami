@@ -3609,6 +3609,16 @@ Proof.
   - destruct l; auto; discriminate.
 Qed.
 
+Lemma Fin_eqb_neq {n : nat} (p q : Fin.t n):
+  Fin.eqb p q = false <-> p <> q.
+Proof.
+  red; split; repeat intro.
+  - rewrite <- Fin.eqb_eq in H0; rewrite H0 in H; discriminate.
+  - destruct Fin.eqb eqn:G; auto.
+    exfalso.
+    rewrite Fin.eqb_eq in G; contradiction.
+Qed.
+
 Section FifoProps.
   Variable size : nat.
   Local Notation lgSize := (Nat.log2_up size).
