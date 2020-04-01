@@ -3747,6 +3747,23 @@ Section FifoProps.
     f_equal; lia.
   Qed.
   
+  Lemma cutLen_pred :
+    enqP1 <> deqP1 ->
+    ((enqP1 - (deqP1 + 1)) mod 2 ^ Z.of_nat (lgSize + 1) = cutLen - 1)%Z.
+  Proof.
+    intros.
+    rewrite Z.sub_add_distr.
+    assert (0 <= (enqP1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1) - 1
+            < 2 ^ Z.of_nat (lgSize + 1))%Z as P.
+    { destruct (Z.eq_dec cutLen 0).
+      - exfalso; rewrite cutLen_0_iff in e; contradiction.
+      - specialize (Z.mod_pos_bound (enqP1 - deqP1)
+                                    (2 ^ Z.of_nat (lgSize + 1)) ltac:(lia)) as P.
+        destruct P; split; lia.
+    }
+    rewrite <- (Z.mod_small _ _ P), Zminus_mod_idemp_l; reflexivity.
+  Qed.
+  
   Lemma listSnoc (val : A) :
     cutLen <> Z.of_nat size ->
     snoc val specList
