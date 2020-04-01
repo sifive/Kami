@@ -133,11 +133,17 @@ Fixpoint char_replicate(c : ascii)(n : nat) : string :=
   | S m => String c (char_replicate c m)
   end.
 
-Definition space_pad(final_len : nat)(x : string) : string :=
-  char_replicate " " (final_len - String.length x) ++ x.
+Fixpoint string_drop(n : nat)(str : string) : string :=
+  match n with
+  | 0 => str
+  | S m => match str with
+           | EmptyString => EmptyString
+           | String c str' => string_drop m str'
+           end
+  end.
 
-Definition zero_pad(final_len : nat)(x : string) : string :=
-  char_replicate "0" (final_len - String.length x) ++ x.
+Definition pad_with(c : ascii)(n : nat)(str : string) : string :=
+  if Nat.ltb (String.length str) n then char_replicate c (n - String.length str) ++ str else string_drop (String.length str - n) str.
 
 (* 
 Fixpoint intersperse(x : string)(xs : list string) : list string :=
