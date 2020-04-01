@@ -20,6 +20,9 @@ pair_sequence xs = return $ map (\(a,m) -> (a, unsafePerformIO m)) xs
 space_pad :: Int -> String -> String
 space_pad n str = replicate (n - length str) ' ' ++ str
 
+zero_pad :: Int -> String -> String
+zero_pad n str = replicate (n - length str) '0' ++ str
+
 resize_num :: Int -> String -> String
 resize_num n num
     | n > length num = replicate (n - length num) '0' ++ num

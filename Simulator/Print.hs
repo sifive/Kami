@@ -41,7 +41,7 @@ printNum T.Hex v = resize_num (BV.size v `cdiv` 4) $ tail $ tail $ BV.showHex v
 
 printVal :: T.FullFormat -> Val -> IO String
 printVal (T.FBool n bf) (BoolVal b) = return $ space_pad n (if b then "1" else "0")
-printVal (T.FBit n m bf) (BVVal bs) = return $ space_pad m $ printNum bf bs
+printVal (T.FBit n m bf) (BVVal bs) = return $ zero_pad m $ printNum bf bs
 printVal (T.FStruct n _ names ffs) (StructVal fields) = do
     ps <- pair_sequence $ zipWith (\(name,val) ff -> (name, printVal ff val)) fields (map ffs $ T.getFins n)
     return ("{ " ++ concatMap (\(name,pval) -> name ++ ":" ++ pval ++ "; ") ps ++ "}")
