@@ -324,10 +324,15 @@ Proof.
   - apply update_consistent; auto.
 Qed.
 
-Definition execute_Rule(init_regs : list RegInitT)(rule : RuleT)(wf_rule : WfActionT_new init_regs (snd rule eval_Kind))(state : FileState)(curr_regs : SimRegs)(kc_curr : kind_consistent init_regs curr_regs)(ms : Map {sig : Signature & meth_sig sig}) : IO KamiState :=
-  do p <- @eval_RuleT _ curr_regs kc_curr state rule wf_rule ms;
-  do state' <- exec_file_updates state (snd (fst p));
-  ret (do_updates (fst (fst p)) curr_regs, state').
+Definition evaluated_Rule init_regs := forall (st : KamiState), kind_consistent init_regs (fst st) -> Map {sig : Signature & meth_sig sig} -> IO KamiState.
+
+Definition eval_Rule : forall init_regs (r : RuleT), WfActionT_new init_regs (snd r eval_Kind) -> evaluated_Rule init_regs :=
+    fun init_regs r wf st kc methods => (
+      do p <- @eval_RuleT init_regs (fst st) kc (snd st) r wf methods;
+      let regs := @do_updates _ (fst (fst p)) (fst st) in
+      do state <- exec_file_updates (snd st) (snd (fst p));
+      ret (regs, state)
+      ).
 
 Definition eval_RegInitValT : {k : FullKind & RegInitValT k} -> {k : FullKind & fullType eval_Kind k} :=
   fun '(existT k o) => match o with
@@ -421,7 +426,10 @@ Definition init_state(m : Mod)(args : list (string * string)) : IO KamiState :=
     do s <- initialize_files args rfs;
     ret (regs,s).
 
-Definition sim_step(init_regs : list RegInitT)(rule : RuleT)(s : KamiState)(wf_rule : WfActionT_new init_regs (snd rule eval_Kind))(kc : kind_consistent init_regs (fst s)) :=
-  @execute_Rule init_regs rule wf_rule  (snd s) (fst s) kc.
+Print evaluated_Rule.
+
+Definition sim_step{init_regs}(r : evaluated_Rule init_regs) : forall st : KamiState,
+  kind_consistent init_regs (fst st) -> Map {sig : Signature & meth_sig sig} -> IO KamiState :=
+  r.
 
 End SimAPI.

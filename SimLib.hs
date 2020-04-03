@@ -19,8 +19,9 @@ initialize = init_state
 
 -- one-step simulation
 
-simulate :: M.Map String (Signature, Coq_meth_sig) -> RuleT -> KamiState -> IO KamiState
+simulate :: M.Map String (Signature, Coq_meth_sig) -> Coq_evaluated_Rule -> KamiState -> IO KamiState
 simulate meths rule state = Simulator.sim_step undefined rule state meths
+
 
 -- checkpointing
 
