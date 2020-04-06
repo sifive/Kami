@@ -164,6 +164,8 @@ Fixpoint val_or (k : Kind) : eval_Kind k -> eval_Kind k -> eval_Kind k :=
                                                          (tup_index i _ t2))
   end.
 
+Axiom cheat : forall x, x.
+
 Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   match e with
   | Var _ v => v
@@ -185,6 +187,8 @@ Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   | ReadArrayConst n k v i => vector_index i (eval_Expr v)
   | BuildArray n k v => make_vector (fun i => eval_Expr (v i))
   | Kor k es => fold_right (val_or k) (default_val k) (map eval_Expr es)
+  | @ToNative _ k' _ default => default
+  | @FromNative _ k' _ _  => eval_ConstT (getDefaultConst k')
   end.
 
 Fixpoint get_chunk_struct{n} : forall (f : Fin.t n -> nat)(v : BV (sumSizes f))(i : Fin.t n), BV (f i) :=
