@@ -19,29 +19,23 @@ Fixpoint eval_Kind(k : Kind) : Type :=
   | Array n k' => Vector n (eval_Kind k')
   end.
 
-Definition eval_KindToType {k : Kind} : eval_Kind k -> type k.
-  induction k; intros.
-  - exact X.
-  - apply (natToWord n (bv_to_nat X)).
-  - intro; simpl in *; apply X.
-    apply (tup_index i _ X0).
-  - simpl in *; intros.
-    apply IHk.
-    apply (vector_index H X).
-Defined.
+Fixpoint eval_KindToType {k : Kind} : eval_Kind k -> type k :=
+  match k return (eval_Kind k -> type k) with
+  | Bool => (fun x => x)
+  | Bit n => (fun x => (natToWord n (bv_to_nat x)))
+  | Struct n km sm => (fun x i => eval_KindToType (tup_index i (fun j => eval_Kind (km j)) x))
+  | Array n k' => (fun x i => eval_KindToType (vector_index i x))
+  end.
 
-Definition eval_KindFromType {k : Kind} : type k -> eval_Kind k.
-  induction k; intros.
-  - exact X.
-  - apply nat_to_bv, (wordToNat X).
-  - simpl in *.
-    apply mkTup; intro.
-    apply (X i (X0 i)).
-  - simpl in *.
-    apply make_vector; intro.
-    apply (IHk (X H)).
-Defined.
-    
+Fixpoint eval_KindFromType {k : Kind} : type k -> eval_Kind k :=
+  match k return (type k -> eval_Kind k) with
+  | Bool => (fun x => x)
+  | Bit n => (fun x => nat_to_bv (wordToNat x))
+  | Struct n km sm => (fun x => mkTup (fun i => eval_Kind (km i))
+                                      (fun j => eval_KindFromType (x j)))
+  | Array n k' => (fun x => make_vector (fun i => eval_KindFromType (x i)))
+  end.
+
 Definition print_BF(bf : BitFormat){n} : BV n -> string :=
   match bf with
   | Binary => print_bv_bin
@@ -187,53 +181,6 @@ Fixpoint val_or (k : Kind) : eval_Kind k -> eval_Kind k -> eval_Kind k :=
                                                          (tup_index i _ t2))
   end.
 
-Fixpoint convertExpr {k} (e : Expr eval_Kind k) : Expr type k :=
-  match e with
-  | Var (SyntaxKind k) v => Var type (SyntaxKind k) (eval_KindToType v)
-  | Var (NativeKind k t) v => Var type (NativeKind t) v
-  | Const _ v => Const _ v
-  | UniBool op e => UniBool op (convertExpr e)
-  | CABool op es => CABool op (map convertExpr es)
-  | UniBit m n op e => UniBit op (convertExpr e)
-  | BinBit m n p op e1 e2 => BinBit op (convertExpr e1) (convertExpr e2)
-  | CABit n op es => CABit op (map convertExpr es)
-  | BinBitBool m n op e1 e2 => BinBitBool op (convertExpr e1) (convertExpr e2)
-  | ITE _ p e1 e2 => ITE (convertExpr p) (convertExpr e1) (convertExpr e2)
-  | Eq _ e1 e2 => Eq (convertExpr e1) (convertExpr e2)
-  | ReadStruct n ks ss e i => @ReadStruct type n ks ss (convertExpr e) i
-  | BuildStruct n ks ss es => @BuildStruct type n ks ss (fun i => convertExpr (es i))
-  | ReadArray n m k v i => @ReadArray type n m k (convertExpr v) (convertExpr i)
-  | ReadArrayConst n k v i => @ReadArrayConst type n k (convertExpr v) i
-  | BuildArray n k v => @BuildArray type n k (fun i => convertExpr (v i))
-  | Kor k es => Kor (map convertExpr es)
-  | @ToNative _ k' e' => Var type (NativeKind _) (evalExpr (convertExpr e'))
-  | @FromNative _ k' e' => Var type (SyntaxKind k') (evalExpr (convertExpr e'))
-  end.
-
-(* Fixpoint convertExpr' {k} (e : Expr type k) : Expr eval_Kind k := *)
-(*   match e with *)
-(*   | Var (SyntaxKind k) v => Var eval_Kind (SyntaxKind k) (eval_KindFromType v) *)
-(*   | Var (NativeKind k t) v => Var eval_Kind (NativeKind t) v *)
-(*   | Const _ v => Const _ v *)
-(*   | UniBool op e => UniBool op (convertExpr' e) *)
-(*   | CABool op es => CABool op (map convertExpr' es) *)
-(*   | UniBit m n op e => UniBit op (convertExpr' e) *)
-(*   | BinBit m n p op e1 e2 => BinBit op (convertExpr' e1) (convertExpr' e2) *)
-(*   | CABit n op es => CABit op (map convertExpr' es) *)
-(*   | BinBitBool m n op e1 e2 => BinBitBool op (convertExpr' e1) (convertExpr' e2) *)
-(*   | ITE _ p e1 e2 => ITE (convertExpr' p) (convertExpr' e1) (convertExpr' e2) *)
-(*   | Eq _ e1 e2 => Eq (convertExpr' e1) (convertExpr' e2) *)
-(*   | ReadStruct n ks ss e i => @ReadStruct eval_Kind n ks ss (convertExpr' e) i *)
-(*   | BuildStruct n ks ss es => @BuildStruct eval_Kind n ks ss (fun i => convertExpr' (es i)) *)
-(*   | ReadArray n m k v i => @ReadArray eval_Kind n m k (convertExpr' v) (convertExpr' i) *)
-(*   | ReadArrayConst n k v i => @ReadArrayConst eval_Kind n k (convertExpr' v) i *)
-(*   | BuildArray n k v => @BuildArray eval_Kind n k (fun i => convertExpr' (v i)) *)
-(*   | Kor k es => Kor (map convertExpr' es) *)
-(*   | @ToNative _ k' e' default => Var eval_Kind (NativeKind default) (evalExpr e') *)
-(*   | @FromNative _ k' _ e' => Var eval_Kind (SyntaxKind k') (eval_KindFromType *)
-(*                                                               (evalExpr e')) *)
-(*   end. *)
-                                
 Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   match e with
   | Var _ v => v
@@ -255,7 +202,7 @@ Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   | ReadArrayConst n k v i => vector_index i (eval_Expr v)
   | BuildArray n k v => make_vector (fun i => eval_Expr (v i))
   | Kor k es => fold_right (val_or k) (default_val k) (map eval_Expr es)
-  | @ToNative _ _ e' => evalExpr (convertExpr e')
+  | @ToNative _ k' e' => evalExpr (Var type (SyntaxKind k') (eval_KindToType (eval_Expr e')))
   | @FromNative _ k' e'  => (eval_KindFromType (eval_Expr e'))
   end.
 
