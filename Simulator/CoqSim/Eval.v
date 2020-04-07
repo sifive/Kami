@@ -206,8 +206,8 @@ Fixpoint convertExpr {k} (e : Expr eval_Kind k) : Expr type k :=
   | ReadArrayConst n k v i => @ReadArrayConst type n k (convertExpr v) i
   | BuildArray n k v => @BuildArray type n k (fun i => convertExpr (v i))
   | Kor k es => Kor (map convertExpr es)
-  | @ToNative _ k' e' default => Var type (NativeKind default) (evalExpr (convertExpr e'))
-  | @FromNative _ k' _ e' => Var type (SyntaxKind k') (evalExpr (convertExpr e'))
+  | @ToNative _ k' e' => Var type (NativeKind _) (evalExpr (convertExpr e'))
+  | @FromNative _ k' e' => Var type (SyntaxKind k') (evalExpr (convertExpr e'))
   end.
 
 (* Fixpoint convertExpr' {k} (e : Expr type k) : Expr eval_Kind k := *)
@@ -255,8 +255,8 @@ Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   | ReadArrayConst n k v i => vector_index i (eval_Expr v)
   | BuildArray n k v => make_vector (fun i => eval_Expr (v i))
   | Kor k es => fold_right (val_or k) (default_val k) (map eval_Expr es)
-  | @ToNative _ _ e' _ => evalExpr (convertExpr e')
-  | @FromNative _ k' _ e'  => (eval_KindFromType (eval_Expr e'))
+  | @ToNative _ _ e' => evalExpr (convertExpr e')
+  | @FromNative _ k' e'  => (eval_KindFromType (eval_Expr e'))
   end.
 
 Fixpoint get_chunk_struct{n} : forall (f : Fin.t n -> nat)(v : BV (sumSizes f))(i : Fin.t n), BV (f i) :=
