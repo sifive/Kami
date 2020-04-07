@@ -101,6 +101,14 @@ Fixpoint type (k: Kind): Type :=
   | Array n k' => Fin.t n -> type k'
   end.
 
+Fixpoint evalConstT k (e: ConstT k): type k :=
+  match e in ConstT k return type k with
+    | ConstBool b => b
+    | ConstBit n w => w
+    | ConstStruct n fk fs fv => fun i => evalConstT (fv i)
+    | ConstArray n k' fv => fun i => evalConstT (fv i)
+  end.
+
 Section Phoas.
   Variable ty: Kind -> Type.
   Definition fullType k := match k with
@@ -138,9 +146,9 @@ Section Phoas.
   | BuildArray n k: (Fin.t n -> Expr (SyntaxKind k)) -> Expr (SyntaxKind (Array n k))
   | Kor k: list (Expr (SyntaxKind k)) -> Expr (SyntaxKind k)
   | ToNative k:
-      Expr (SyntaxKind k) -> forall default, Expr (@NativeKind (type k) default)
-  | FromNative k: forall default,
-      Expr (@NativeKind (type k) default) -> Expr (SyntaxKind k).
+      Expr (SyntaxKind k) -> Expr (@NativeKind (type k) (evalConstT (getDefaultConst k)))
+  | FromNative k: Expr (@NativeKind (type k) (evalConstT (getDefaultConst k))) ->
+                  Expr (SyntaxKind k).
 
   Definition UpdateArray n m k (e: Expr (SyntaxKind (Array n k)))
              (i: Expr (SyntaxKind (Bit m)))
@@ -1518,14 +1526,6 @@ Definition evalBinBitBool n1 n2 (op: BinBitBoolOp n1 n2)
     | LessThan n => fun a b => @wltu n a b
   end.
 
-Fixpoint evalConstT k (e: ConstT k): type k :=
-  match e in ConstT k return type k with
-    | ConstBool b => b
-    | ConstBit n w => w
-    | ConstStruct n fk fs fv => fun i => evalConstT (fv i)
-    | ConstArray n k' fv => fun i => evalConstT (fv i)
-  end.
-
 Definition evalConstFullT k (e: ConstFullT k) :=
   match e in ConstFullT k return fullType type k with
     | SyntaxConst k' c' => evalConstT c'
@@ -1581,8 +1581,8 @@ Section Semantics.
         (@evalExpr _ fv) i
       | BuildArray n k fv => fun i => @evalExpr _ (fv i)
       | Kor k e => evalKorOp k (map (@evalExpr _) e) (evalConstT (getDefaultConst k))
-      | ToNative _ e _ => evalExpr e
-      | FromNative _ _ e => evalExpr e
+      | ToNative _ e => evalExpr e
+      | FromNative _ e => evalExpr e
     end.
   Arguments evalExpr : simpl nomatch.
       
