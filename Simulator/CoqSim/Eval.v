@@ -202,8 +202,8 @@ Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   | ReadArrayConst n k v i => vector_index i (eval_Expr v)
   | BuildArray n k v => make_vector (fun i => eval_Expr (v i))
   | Kor k es => fold_right (val_or k) (default_val k) (map eval_Expr es)
-  | @ToNative _ k' e' => evalExpr (Var type (SyntaxKind k') (eval_KindToType (eval_Expr e')))
-  | @FromNative _ k' e'  => (eval_KindFromType (eval_Expr e'))
+  | @ToNative _ k' e' => eval_KindToType (eval_Expr e')
+  | @FromNative _ k' e'  => eval_KindFromType (eval_Expr e')
   end.
 
 Fixpoint get_chunk_struct{n} : forall (f : Fin.t n -> nat)(v : BV (sumSizes f))(i : Fin.t n), BV (f i) :=
