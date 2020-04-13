@@ -1406,3 +1406,15 @@ Proof.
     (Zmod_small _ _ (Zlor_bounds _ H1 H0)),
     Z.lor_assoc; reflexivity.
 Qed.
+
+Lemma wltu_lt {n} (w1 w2 : word n):
+  wltu w1 w2 = true <-> wordToNat w1 < wordToNat w2.
+Proof.
+  rewrite wltu_wordToNat, Nat.ltb_lt; split; intro; auto.
+Qed.
+
+Lemma wltu_ge {n} (w1 w2 : word n):
+  wltu w1 w2 = false <-> wordToNat w2 <= wordToNat w1.
+Proof.
+  rewrite wltu_wordToNat, Nat.ltb_ge; split; intro; auto.
+Qed.

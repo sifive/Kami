@@ -3914,3 +3914,9 @@ Section FifoProps.
   Qed.
   
 End FifoProps.
+
+Lemma app_emptyb {A : Type} (l1 l2 : list A) :
+  emptyb (l1 ++ l2) = emptyb l1 && emptyb l2.
+Proof.
+  destruct l1, l2; simpl; auto.
+Qed.
