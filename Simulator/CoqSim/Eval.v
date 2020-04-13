@@ -19,6 +19,23 @@ Fixpoint eval_Kind(k : Kind) : Type :=
   | Array n k' => Vector n (eval_Kind k')
   end.
 
+Fixpoint eval_KindToType {k : Kind} : eval_Kind k -> type k :=
+  match k return (eval_Kind k -> type k) with
+  | Bool => (fun x => x)
+  | Bit n => (fun x => (natToWord n (bv_to_nat x)))
+  | Struct n km sm => (fun x i => eval_KindToType (tup_index i (fun j => eval_Kind (km j)) x))
+  | Array n k' => (fun x i => eval_KindToType (vector_index i x))
+  end.
+
+Fixpoint eval_KindFromType {k : Kind} : type k -> eval_Kind k :=
+  match k return (type k -> eval_Kind k) with
+  | Bool => (fun x => x)
+  | Bit n => (fun x => nat_to_bv (wordToNat x))
+  | Struct n km sm => (fun x => mkTup (fun i => eval_Kind (km i))
+                                      (fun j => eval_KindFromType (x j)))
+  | Array n k' => (fun x => make_vector (fun i => eval_KindFromType (x i)))
+  end.
+
 Definition print_BF(bf : BitFormat){n} : BV n -> string :=
   match bf with
   | Binary => print_bv_bin
@@ -185,6 +202,8 @@ Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   | ReadArrayConst n k v i => vector_index i (eval_Expr v)
   | BuildArray n k v => make_vector (fun i => eval_Expr (v i))
   | Kor k es => fold_right (val_or k) (default_val k) (map eval_Expr es)
+  | @ToNative _ k' e' => eval_KindToType (eval_Expr e')
+  | @FromNative _ k' e'  => eval_KindFromType (eval_Expr e')
   end.
 
 Fixpoint get_chunk_struct{n} : forall (f : Fin.t n -> nat)(v : BV (sumSizes f))(i : Fin.t n), BV (f i) :=

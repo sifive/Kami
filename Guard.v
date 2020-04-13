@@ -5,7 +5,6 @@ Set Implicit Arguments.
 Section ty.
   Variable ty: Kind -> Type.
   Definition boolTy (k: Kind) := bool.
-  
   Fixpoint goodDfExpr k (e: Expr boolTy k) {struct e}: bool.
     refine
       match e with
@@ -28,6 +27,8 @@ Section ty.
       | BuildArray n k fv => forallb (fun i => @goodDfExpr _ (fv i)) (getFins n)
       | BuildStruct n fk fs fv => forallb (fun i => @goodDfExpr _ (fv i)) (getFins n)
       | Kor k es => forallb(@goodDfExpr _ ) es
+      | ToNative _ e => goodDfExpr _ e
+      | FromNative _ e => goodDfExpr _ e
       end.
   Defined.
 
