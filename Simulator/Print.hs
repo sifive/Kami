@@ -1,8 +1,11 @@
 {-# OPTIONS_GHC -XStandaloneDeriving #-}
 {-# LANGUAGE Strict #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Simulator.Print where
 
+import Simulator.Classes
 import Simulator.Evaluate
 import Simulator.Util
 import Simulator.Value
@@ -10,7 +13,6 @@ import Simulator.Value
 import qualified HaskellTarget as T
 
 import qualified Data.BitVector as BV
-import qualified Data.Array.MArray as M
 
 import Data.List (intersperse)
 import Numeric (showHex)
@@ -39,19 +41,19 @@ printNum T.Binary v = resize_num (BV.size v) $ tail $ tail $ BV.showBin v
 printNum T.Decimal v = show (BV.nat v)
 printNum T.Hex v = resize_num (BV.size v `cdiv` 4) $ tail $ tail $ BV.showHex v
 
-printVal :: T.FullFormat -> Val -> IO String
-printVal (T.FBool n bf) (BoolVal b) = return $ space_pad n (if b then "1" else "0")
-printVal (T.FBit n m bf) (BVVal bs) = return $ zero_pad m $ printNum bf bs
-printVal (T.FStruct n _ names ffs) (StructVal fields) = do
-    ps <- pair_sequence $ zipWith (\(name,val) ff -> (name, printVal ff val)) fields (map ffs $ T.getFins n)
-    return ("{ " ++ concatMap (\(name,pval) -> name ++ ":" ++ pval ++ "; ") ps ++ "}")
-printVal (T.FArray n k ff) (ArrayVal vals) = do
-    ps <- pair_sequence $ map (\i -> (i, M.readArray vals i)) [0..(n-1)]
-    qs <- pair_sequence $ map (\(i,v) -> (i, printVal ff v)) ps
-    return ("[" ++ concatMap (\(i,pval) -> show i ++ "=" ++ pval ++ "; ") qs ++ "]")
+printVal :: Vec v => T.FullFormat -> Val v -> String
+printVal (T.FBool n bf) (BoolVal b) = space_pad n (if b then "1" else "0")
+printVal (T.FBit n m bf) (BVVal bs) = zero_pad m $ printNum bf bs
+printVal (T.FStruct n _ names ffs) (StructVal fields) =
+    let ps = zipWith (\(name,val) ff -> (name, printVal ff val)) fields (map ffs $ T.getFins n) in
+    "{ " ++ concatMap (\(name,pval) -> name ++ ":" ++ pval ++ "; ") ps ++ "}"
+printVal (T.FArray n k ff) (ArrayVal vals) =
+    let ps = map (\i -> (i, vector_index i vals)) [0..(n-1)] in
+    let qs = map (\(i,v) -> (i, printVal ff v)) ps in
+    "[" ++ concatMap (\(i,pval) -> show i ++ "=" ++ pval ++ "; ") qs ++ "]"
 printVal ff v = error $ "Cannot print expression with FullFormat " ++ (show ff) ++ "."
 
-sysIO :: Modes -> T.SysT Val -> IO ()
+sysIO :: forall v. Vec v => Modes -> T.SysT (Val v) -> IO ()
 sysIO modes T.Finish = do
     let no_print = no_print_mode modes
     let interactive = interactive_mode modes
@@ -64,8 +66,8 @@ sysIO modes (T.DispString msg) = do
 sysIO modes (T.DispExpr _ e ff) = do
     let no_print = no_print_mode modes
     let interactive = interactive_mode modes
-    v <- eval e
-    pval <- printVal ff v
+    let v = eval_Expr @v e
+    let pval = printVal ff v
     when (not no_print && not interactive) $ hPutStr stdout $ pval
 
 format_string :: String -> String
