@@ -89,3 +89,10 @@ eval_Expr (T.ReadArrayConst n _ a i) =
     vector_index j (arrayCoerce $ eval_Expr a)
 eval_Expr (T.BuildArray n _ exprs) =
     ArrayVal $ vector_of_list $ map (eval_Expr . exprs) $ T.getFins n
+eval_Expr (T.ToNative k e) = eval_Expr e
+eval_Expr (T.FromNative k e) = eval_Expr e
+
+
+
+
+
