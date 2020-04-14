@@ -2,6 +2,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-
   Haskell simulator for Kami modules.  Should be executed alongside extracted Haskell version of the Kami library.
@@ -9,6 +11,7 @@
 
 module Simulator.Simulator where
 
+import Simulator.Classes
 import Simulator.Environment
 import Simulator.Evaluate
 import Simulator.RegisterFile
@@ -34,21 +37,20 @@ get_rules (x:xs) rules = case lookup x rules of
         rest <- get_rules xs rules
         return ((x,a):rest)
 
-initialize :: Modes -> T.RegInitT -> IO (String,Val)
+initialize :: Vec v => Modes -> T.RegInitT -> IO (String,Val v)
 initialize _ (regName, (_, Just (T.NativeConst c))) = return (regName, unsafeCoerce c)
 initialize _ (regName, (_, Just (T.SyntaxConst _ c))) = do
-    v <- eval c
-    return (regName, v)
+    return (regName, eval_ConstT c)
 initialize modes (regName, (k, Nothing)) = do
     let debug = debug_mode modes
-    v <- (if debug then defVal_FK else randVal_FK) k
+    v <- (if debug then (pure . defVal_FK) else randVal_FK) k
     return (regName,v)
 
-simulate_action :: AbstractEnvironment a => [T.DefMethT] -> [String] -> Modes -> IORef a -> FileState -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> T.ActionT Val -> M.Map String Val -> IO ([String], [(String,Val)], [FileUpd] ,Val)
+simulate_action :: forall m a v e. (StringMap m, Array a, Vec v, AbstractEnvironment e) => [T.DefMethT] -> [String] -> Modes -> IORef e -> FileState m a v -> [(String, e -> Val v -> FileState m a v -> m (Val v) -> IO (e, Val v))] -> T.ActionT (Val v) -> m (Val v) -> IO ([String], [(String,Val v)], [FileUpd v] ,Val v)
 simulate_action defmeths methcalls modes envRef state meths act regs = sim methcalls act [] [] where
 
     sim mcs (T.MCall methName _ arg cont) updates fupdates = if methName `elem` mcs then error ("Method " ++ methName  ++ " called twice in same cycle.") else do
-        arg' <- eval arg
+        let arg' = eval_Expr arg
         case rf_methcall state methName arg' of
             Just (Nothing,v) -> do 
                 v' <- v
@@ -68,28 +70,28 @@ simulate_action defmeths methcalls modes envRef state meths act regs = sim methc
                                     sim (methName:mcs) (cont v) updates fupdates
 
     sim mcs (T.LetExpr _ e cont) updates fupdates = do
-        v <- eval e
-        sim mcs (cont $ unsafeCoerce $ (v :: Val)) updates fupdates
+        let v = eval_Expr e
+        sim mcs (cont $ unsafeCoerce $ (v :: Val v)) updates fupdates
 
     sim mcs (T.LetAction _ a cont) updates fupdates = do
         (mcs', updates', fupdates', v) <- sim mcs a updates fupdates
         sim mcs' (cont v) updates' fupdates'
 
     --using a default val for now
-    sim mcs (T.ReadNondet k cont) updates fupdates = sim mcs (cont $ unsafeCoerce $ defVal_FK k) updates fupdates
+    sim mcs (T.ReadNondet k cont) updates fupdates = sim mcs (cont $ unsafeCoerce $ defVal_FK @v k) updates fupdates
 
-    sim mcs (T.ReadReg regName _ cont) updates fupdates = case M.lookup regName regs of
+    sim mcs (T.ReadReg regName _ cont) updates fupdates = case map_lookup regName regs of
         Nothing -> error ("Register " ++ regName ++ " not found.")
         Just v -> sim mcs (cont $ unsafeCoerce v) updates fupdates
 
-    sim mcs (T.WriteReg regName _ e a) updates fupdates = case M.lookup regName regs of
+    sim mcs (T.WriteReg regName _ e a) updates fupdates = case map_lookup regName regs of
         Nothing -> error ("Register " ++ regName ++ " not found.")
         Just _ -> do
-            v <- eval e
+            let v = eval_Expr e
             sim mcs a ((regName, v):updates) fupdates
 
     sim mcs (T.IfElse e _ a1 a2 cont) updates fupdates = do
-        b <- eval e
+        let b = eval_Expr @v e
         let a = if boolCoerce b then a1 else a2
         (mcs',updates',fupdates',v) <- sim mcs a updates fupdates
         sim mcs' (cont v) updates' fupdates'
@@ -99,10 +101,10 @@ simulate_action defmeths methcalls modes envRef state meths act regs = sim methc
         sim mcs a updates fupdates
 
     sim mcs (T.Return e) updates fupdates = do
-        v <- eval e
+        let v = eval_Expr e
         return (mcs, updates, fupdates, v)
 
-simulate_module :: AbstractEnvironment a => Int -> ([T.RuleT] -> Str (IO T.RuleT)) -> IORef a -> [String] -> [(String, a -> Val -> FileState -> M.Map String Val -> IO (a, Val))] -> [T.RegFileBase] -> [String] -> T.BaseModule -> IO (M.Map String Val)
+simulate_module :: forall m a v e. (StringMap m, Array a, Vec v, AbstractEnvironment e) => Int -> ([T.RuleT] -> Str (IO T.RuleT)) -> IORef e -> [String] -> [(String, e -> Val v -> FileState m a v -> m (Val v) -> IO (e, Val v))] -> [T.RegFileBase] -> [String] -> T.BaseModule -> IO ()
 simulate_module _ _ _ _ _ _ _ (T.BaseRegFile _) = error "BaseRegFile encountered."
 simulate_module seed strategy envRef rulenames meths rfbs hiddenMeths (T.BaseMod init_regs rules defmeths) = do
     modes <- get_modes
@@ -113,7 +115,7 @@ simulate_module seed strategy envRef rulenames meths rfbs hiddenMeths (T.BaseMod
         Right rules' -> do
             state <- initialize_files modes rfbs
             regs <- mapM (initialize modes) init_regs
-            sim [] (strategy rules') (M.fromList regs) state  where
+            sim [] (strategy rules') (map_of_list regs) state  where
 
                 sim mcs (EndOfCycle rs) regs filestate = sim [] rs regs filestate
                 sim mcs (r :+ rs) regs filestate = do

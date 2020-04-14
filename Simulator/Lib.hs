@@ -5,6 +5,7 @@ module Simulator.Lib where
 
 import HaskellTarget as H
 
+import Simulator.Classes
 import Simulator.Print
 import Simulator.Util
 import Simulator.Value
@@ -22,10 +23,10 @@ import System.Exit (exitSuccess)
 import System.IO (isEOF)
 import System.Random (randomRIO)
 
-tt :: Val
+tt :: Val v
 tt = BVVal BV.nil
 
-getArgVal :: String -> Int -> IO Val
+getArgVal :: String -> Int -> IO (Val v)
 getArgVal name n = do
     args <- getArgs
 
@@ -34,7 +35,6 @@ getArgVal name n = do
     case find (\(x,y) -> x == name) ps of
         Just (_,y) -> return $ BVVal $ hex_to_bv n $ T.pack y
         Nothing -> error $ "Argument value " ++ name ++ " not supplied."
-
 
 -- printVal :: T.FullFormat -> Val -> IO String
 -- printVal (T.FBool n bf) (BoolVal b) = return $ space_pad n (if b then "1" else "0")
@@ -49,45 +49,43 @@ getArgVal name n = do
 -- printVal ff v = error $ "Cannot print expression with FullFormat " ++ (show ff) ++ "."
 
 
-ppr_bitformat :: H.BitFormat -> Val -> IO String
-ppr_bitformat bf (BoolVal b) = return $ if b then "1" else "0"
-ppr_bitformat bf (BVVal v) = return $ printNum bf v
-ppr_bitformat bf (StructVal fields) = do
-    ps <- pair_sequence $ map (\(name,val) -> (name, ppr_bitformat bf val)) fields
-    return ("{" ++ (concatMap (\(name,pval) -> name ++ ":" ++ pval ++ "; ") ps) ++ "}")
-ppr_bitformat bf (ArrayVal vals) = do
-    len <- arr_length vals
-    ps <- pair_sequence $ map (\i -> (i, MA.readArray vals i)) [0..(len-1)]
-    qs <- pair_sequence $ map (\(i,v) -> (i, ppr_bitformat bf v)) ps
-    return ("[" ++ concatMap (\(i,pval) -> show i ++ "=" ++ pval ++ "; ") qs ++ "]") 
+ppr_bitformat :: Vec v => H.BitFormat -> Val v -> String
+ppr_bitformat bf (BoolVal b) = if b then "1" else "0"
+ppr_bitformat bf (BVVal v) = printNum bf v
+ppr_bitformat bf (StructVal fields) =
+    let ps = map (\(name,val) -> (name, ppr_bitformat bf val)) fields in
+    ("{" ++ (concatMap (\(name,pval) -> name ++ ":" ++ pval ++ "; ") ps) ++ "}")
+ppr_bitformat bf (ArrayVal vals) =
+    let len = vector_length vals in
+    let ps = map (\i -> (i, vector_index i vals)) [0..(len-1)] in
+    let qs = map (\(i,v) -> (i, ppr_bitformat bf v)) ps in
+    ("[" ++ concatMap (\(i,pval) -> show i ++ "=" ++ pval ++ "; ") qs ++ "]") 
 
-ppr_bin :: Val -> IO String
+ppr_bin :: Vec v => Val v -> String
 ppr_bin = ppr_bitformat H.Binary
 
-ppr_hex :: Val -> IO String
+ppr_hex :: Vec v => Val v -> String
 ppr_hex = ppr_bitformat H.Hex
 
-ppr_dec :: Val -> IO String
+ppr_dec :: Vec v => Val v -> String
 ppr_dec = ppr_bitformat H.Decimal
 
 getRuleNames :: H.BaseModule -> [String]
 getRuleNames mod = map fst $ H.getRules mod
 
-print_reg :: M.Map String Val -> String -> IO()
+print_reg :: (StringMap m, Vec v) => m (Val v) -> String -> IO()
 print_reg regs regname =
-    case M.lookup regname regs of
+    case map_lookup regname regs of
         Just v -> do 
-            pval <- ppr_hex v
-            putStrLn pval
+            putStrLn $ ppr_hex v
         Nothing -> putStrLn $ "Register " ++ regname ++ " not found."
 
-print_file_reg :: FileState -> String -> Int -> IO()
+print_file_reg :: (StringMap m, Vec v, Array a) => FileState m a v -> String -> Int -> IO()
 print_file_reg state filename addr =
-    case M.lookup filename (arrs state) of
+    case map_lookup filename (arrs state) of
         Just arr -> do
-            v <- MA.readArray arr addr
-            pval <- ppr_hex v
-            putStrLn pval
+            v <- array_read addr arr
+            putStrLn $ ppr_hex v
         Nothing -> putStrLn $ "File " ++ filename ++ " not found."
 
 --generates rules randomly from the given list

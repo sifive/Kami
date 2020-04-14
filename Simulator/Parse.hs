@@ -13,6 +13,7 @@ import qualified Data.Text.IO as T
 import Control.Monad
 import Data.Text.Read (hexadecimal)
 
+import Simulator.Classes
 import Simulator.Util
 import Simulator.Value
 
@@ -27,14 +28,8 @@ readTok n txt = let txt' = T.filter (/= '_') txt in
         Just _ -> Value $ hex_to_bv n txt'
         Nothing -> error "Empty text chunk encountered."
 
-getToks :: Int -> T.Text -> [(Integer, BV.BV)]
-getToks n text = toks_to_addr_vals $ concat $ map ((map $ readTok n) . (filter (not . T.null)) . (T.split isSpace)) $ T.lines text
-
 word_of_bv :: BV.BV -> Integer
 word_of_bv = BV.nat
-
-expr_of_bv :: BV.BV -> H.Expr Val
-expr_of_bv v = H.Const (H.Bit $ BV.size v) $ H.ConstBit (BV.size v) $ word_of_bv v
 
 toks_to_addr_vals :: [Tok] -> [(Integer, BV.BV)]
 toks_to_addr_vals = go 0 where
@@ -42,27 +37,31 @@ toks_to_addr_vals = go 0 where
     go n ((Addr k):toks) = go k toks
     go n ((Value bs):toks) = (n,bs) : go (n+1) toks
 
-val_unpack :: H.Kind -> BV.BV -> IO Val
-val_unpack H.Bool v = return $ BoolVal $ v BV.@. 0
-val_unpack (H.Bit _) v = return $ BVVal v
-val_unpack (H.Array n k) v = do
-    vs <- mapM (val_unpack k) $ BV.split n v
-    liftM ArrayVal $ M.newListArray (0,n-1) vs
+getToks :: Int -> T.Text -> [(Integer, BV.BV)]
+getToks n text = toks_to_addr_vals $ concat $ map ((map $ readTok n) . (filter (not . T.null)) . (T.split isSpace)) $ T.lines text
+
+-- expr_of_bv :: Vec v => BV.BV -> H.Expr (Val v)
+-- expr_of_bv v = H.Const (H.Bit $ BV.size v) $ H.ConstBit (BV.size v) $ word_of_bv v
+
+val_unpack :: Vec v => H.Kind -> BV.BV -> Val v 
+val_unpack H.Bool v = BoolVal $ v BV.@. 0
+val_unpack (H.Bit _) v = BVVal v
+val_unpack (H.Array n k) v =
+    ArrayVal $ vector_of_list $ map (val_unpack k) $ BV.split n v
 val_unpack (H.Struct n kinds names) v =
     let names' = map names $ H.getFins n in
     let kinds' = map kinds $ H.getFins n in
-    let bvs = partition (map H.size kinds') v in do
-        ps <- pair_sequence $ zip names' (zipWith val_unpack kinds' bvs)
-        return $ StructVal ps
+    let bvs = partition (map H.size kinds') v in
+    StructVal $ zip names' $ zipWith val_unpack kinds' bvs
 
-parseHex :: Bool -> H.Kind -> Int -> FilePath -> IO (A.IOArray Int Val)
+parseHex :: (Array a, Vec v) => Bool -> H.Kind -> Int -> FilePath -> IO (a (Val v))
 parseHex isAscii k arrSize filepath
     | isAscii = do
         text <- T.readFile filepath
         let pairs = getToks (H.size k) text
-        v <- defVal k
-        v_init <- M.newArray (0,arrSize-1) v
-        val_pairs <- pair_sequence $ map (\(i,v) -> (fromIntegral i, val_unpack k v)) pairs
-        do_writes v_init val_pairs
+        let v = defVal k
+        v_init <- array_replicate arrSize v
+        let val_pairs = map (\(i,v) -> (fromIntegral i, val_unpack k v)) pairs
+        array_writes val_pairs v_init
         return v_init
     | otherwise = error "Binary not yet supported."
