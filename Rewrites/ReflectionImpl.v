@@ -823,7 +823,7 @@ Proof.
     * intros.
       simpl.
       autorewrite with KRSimplify in H.
-      apply KRSimplifyTopSound_RevImplProp in H.
+      apply KRSimplifyTopSound_ImplProp in H.
       simpl in H.
       inversion H; subst; clear H.
       apply IHe1 in H0.
@@ -834,13 +834,215 @@ Proof.
     * intros.
       simpl in H.
       autorewrite with KRSimplify.
-      apply KRSimplifyTopSound_ImplProp.
-  - simpl; split; unitSolve.
-  - simpl; split; unitSolve.
-  try (autorewrite with KRSimplify); try (simpl); try (rewrite IHe1); try (rewrite IHe2); try (rewrite IHe); try (autorewrite with KRSimplify); try (reflexivity).
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      inversion H; subst; clear H.
+      split.
+      ++ apply IHe1.
+         apply H0.
+      ++ apply IHe2.
+         apply H1.
+  - split.
+    * intros.
+      simpl.
+      autorewrite with KRSimplify in H.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      inversion H; subst; clear H.
+      + left.
+        apply IHe1.
+        apply H0.
+      + right.
+        apply IHe2.
+        apply H0.
+    * intros.
+      simpl in H.
+      autorewrite with KRSimplify.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      inversion H; subst; clear H.
+      + left.
+        apply IHe1.
+        apply H0.
+      + right.
+        apply IHe2.
+        apply H0.
+  - split.
+    * intros.
+      simpl.
+      autorewrite with KRSimplify in H.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      intro X.
+      apply IHe in X.
+      apply H in X.
+      inversion X.
+    * intros.
+      simpl in H.
+      autorewrite with KRSimplify.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      intro X.
+      apply IHe in X.
+      apply H in X.
+      inversion X.
+  - autorewrite with KRSimplify.
+    split.
+    * intros.
+      simpl.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      autorewrite with KRSimplify in H.
+      apply H.
+    * intros.
+      simpl in H.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      autorewrite with KRSimplify.
+      apply H.
+  - autorewrite with KRSimplify.
+    split.
+    * intros.
+      simpl.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      autorewrite with KRSimplify in H.
+      apply H.
+    * intros.
+      simpl in H.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      autorewrite with KRSimplify.
+      apply H.
+  - autorewrite with KRSimplify.
+    split.
+    * intros.
+      simpl.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      autorewrite with KRSimplify in H.
+      apply H.
+    * intros.
+      simpl in H.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      autorewrite with KRSimplify.
+      apply H.
+  - autorewrite with KRSimplify.
+    split.
+    * intros.
+      simpl.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      autorewrite with KRSimplify in H.
+      apply H.
+    * intros.
+      simpl in H.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      autorewrite with KRSimplify.
+      apply H.
+  - autorewrite with KRSimplify.
+    split.
+    * intros.
+      simpl.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      autorewrite with KRSimplify in H.
+      apply H.
+    * intros.
+      simpl in H.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      autorewrite with KRSimplify.
+      apply H.
+  - autorewrite with KRSimplify.
+    split.
+    * intros.
+      simpl.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      autorewrite with KRSimplify in H.
+      apply H.
+    * intros.
+      simpl in H.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      autorewrite with KRSimplify.
+      apply H.
+  - autorewrite with KRSimplify.
+    split.
+    * intros.
+      simpl.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      autorewrite with KRSimplify in H.
+      apply H.
+    * intros.
+      simpl in H.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      autorewrite with KRSimplify.
+      apply H.
+  - autorewrite with KRSimplify.
+    split.
+    * intros.
+      simpl.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      autorewrite with KRSimplify in H.
+      apply H.
+    * intros.
+      simpl in H.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      autorewrite with KRSimplify.
+      apply H.
+  - autorewrite with KRSimplify.
+    split.
+    * intros.
+      simpl.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      autorewrite with KRSimplify in H.
+      apply H.
+    * intros.
+      simpl in H.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      autorewrite with KRSimplify.
+      apply H.
+  - autorewrite with KRSimplify.
+    split.
+    * intros.
+      simpl.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      autorewrite with KRSimplify in H.
+      apply H.
+    * intros.
+      simpl in H.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      autorewrite with KRSimplify.
+      apply H.
+  - autorewrite with KRSimplify.
+    split.
+    * intros.
+      simpl.
+      apply KRSimplifyTopSound_ImplProp in H.
+      simpl in H.
+      autorewrite with KRSimplify in H.
+      apply H.
+    * intros.
+      simpl in H.
+      apply KRSimplifyTopSound_RevImplProp.
+      simpl.
+      autorewrite with KRSimplify.
+      apply H.
 Qed.
 
-Hint Rewrite KRSimplifySound_Prop : KRSimplify.
+Hint Rewrite KRSimplifySound_ImplProp : KRSimplify.
 
 (*Goal forall (a:ModuleElt) (b:list ModuleElt) c, app (cons a b) c=cons a (app b c).
   intros.
