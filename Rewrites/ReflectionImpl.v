@@ -1105,9 +1105,9 @@ Ltac KRSimplifyTac e tp :=
                 | (KRTypeElem KRElemBaseModule) => KRSimplifySound_BaseModule
                 | (KRTypeElem KRElemMod) => KRSimplifySound_Mod
                 | (KRTypeList (KRTypeElem KRElemMod)) => KRSimplifySound_list_Mod
-                | (KRTypeElem KRElemProp) => KRSimplifySound_Prop
+                | (KRTypeElem KRElemProp) => KRSimplifySound_ImplProp
                 end in
-  change e with (denote x);repeat (rewrite <- simplifySound;cbv [
+  change e with (denote x);repeat (rewrite <- simplifySound;try (repeat (decide equality));cbv [
                 sappend srev sdisjPrefix String.eqb Ascii.eqb Bool.eqb
                 KRSimplify_RegInitT KRSimplifyTop_RegInitT
                 KRSimplify_RegInitValT KRSimplifyTop_RegInitValT
@@ -1203,13 +1203,19 @@ Goal forall e, makeModule_regs []=e.
       KRSimplifyTac A (KRTypeList (KRTypeElem KRElemRegInitT))
   end.
 Abort.
+Goal forall x, x \/ True.
+  intros.
+  match goal with
+  | |- ?X => KRSimplifyTac X (KRTypeElem KRElemProp)
+  end.
+Abort.
 Goal forall proc_name, ~(( proc_name ++ "_" ++ "a")%string = (proc_name ++ "_" ++  "b")%string).
   intros.
   match goal with
   | |- ~ ?A => 
     let x := (ltac:(KRExprReify (~A) (KRTypeElem KRElemProp))) in change (~A) with (KRExprDenote_Prop x)
   end.
-  rewrite <- KRSimplifySound_Prop.
+  rewrite <- KRSimplifySound_ImplProp.
   cbv [
                 KRSimplify_RegInitT KRSimplifyTop_RegInitT
                 KRSimplify_RegInitValT KRSimplifyTop_RegInitValT
