@@ -1664,7 +1664,9 @@ Proof.
     reflexivity.
 Qed.
 
-Theorem sdisjPrefix_false': forall p1 p2 s1 s2,
+Hint Rewrite sappend_append : kami_rewrite_db.
+    
+(*Theorem sdisjPrefix_false': forall p1 p2 s1 s2,
     sdisjPrefix (srev s1) (srev s2)=true -> (p1++s1=p2++s2)%string -> False.
 Proof.
   intros p1 p2 s1 s2.
@@ -1677,14 +1679,25 @@ Proof.
     eapply sdisjPrefix_sappend_false.
     + apply H0.
     + apply H1.
-Qed.
+Qed.*)
 
 Theorem sdisjPrefix_false: forall p1 p2 s1 s2,
-    sdisjPrefix (srev s1) (srev s2)=true -> False=(p1++s1=p2++s2)%string.
-Admitted.
-
-Hint Rewrite sappend_append : kami_rewrite_db.
-    
+    sdisjPrefix (srev s1) (srev s2)=true -> (False <-> (p1++s1=p2++s2)%string).
+Proof.
+  intros p1 p2 s1 s2.
+  repeat (rewrite <- sappend_append).
+  assert ((p2++s2)%string=sappend p2 s2).
+  - rewrite <- sappend_append.
+    reflexivity.
+  - rewrite H.
+    intros.
+    split.
+    + intro X.
+      inversion X.
+    + eapply sdisjPrefix_sappend_false.
+      * apply H0.
+Qed.
+        
 Definition KRSimplifyTop_string (e: KRExpr_string) : KRExpr_string :=
   match e with
   | KRstring_append (KRConst_string a) (KRConst_string b) => KRConst_string ((sappend a b)%string)
@@ -1733,73 +1746,6 @@ Definition KRSimplifyTop_list_list_string (e: KRExpr_list_list_string) : KRExpr_
                                   end
    | e => e
    end.
-
-Definition KRSimplifyTop_Prop (e: KRExpr_Prop) : KRExpr_Prop :=
-  match e with
-  | KRDisjKey_RegInitT a b => match a with
-                              | KRApp_list_RegInitT x y => KRAnd_Prop (KRDisjKey_RegInitT x b) (KRDisjKey_RegInitT y b)
-                              | KRCons_list_RegInitT x y => KRAnd_Prop (KRNot_Prop (KRIn_string_Prop (KRfst_RegInitT_string x) (KRmap_RegInitT_string KRfst_RegInitT_string_Func b))) (KRDisjKey_RegInitT y b)
-                              | KRNil_list_RegInitT => KRTrue_Prop
-                              | _ => match b with
-                                     | KRApp_list_RegInitT x y => KRAnd_Prop (KRDisjKey_RegInitT a x) (KRDisjKey_RegInitT a y)
-                                     | KRCons_list_RegInitT x y => KRAnd_Prop (KRNot_Prop (KRIn_string_Prop (KRfst_RegInitT_string x) (KRmap_RegInitT_string KRfst_RegInitT_string_Func a))) (KRDisjKey_RegInitT a y)
-                                     | KRNil_list_RegInitT => KRTrue_Prop
-                                     | _ => KRDisjKey_RegInitT a b
-                                     end
-                              end
-  | KRDisjKey_DefMethT a b => match a with
-                              | KRApp_list_DefMethT x y => KRAnd_Prop (KRDisjKey_DefMethT x b) (KRDisjKey_DefMethT y b)
-                              | KRCons_list_DefMethT x y => KRAnd_Prop (KRNot_Prop (KRIn_string_Prop (KRfst_DefMethT_string x) (KRmap_DefMethT_string KRfst_DefMethT_string_Func b))) (KRDisjKey_DefMethT y b)
-                              | KRNil_list_DefMethT => KRTrue_Prop
-                              | _ => match b with
-                                     | KRApp_list_DefMethT x y => KRAnd_Prop (KRDisjKey_DefMethT a x) (KRDisjKey_DefMethT a y)
-                                     | KRCons_list_DefMethT x y => KRAnd_Prop (KRNot_Prop (KRIn_string_Prop (KRfst_DefMethT_string x) (KRmap_DefMethT_string KRfst_DefMethT_string_Func a))) (KRDisjKey_DefMethT a y)
-                                     | KRNil_list_DefMethT => KRTrue_Prop
-                                     | _ => KRDisjKey_DefMethT a b
-                                     end
-                              end
-  | KRDisjKey_Rule a b => match a with
-                          | KRApp_list_Rule x y => KRAnd_Prop (KRDisjKey_Rule x b) (KRDisjKey_Rule y b)
-                          | KRCons_list_Rule x y => KRAnd_Prop (KRNot_Prop (KRIn_string_Prop (KRfst_Rule_string x) (KRmap_Rule_string KRfst_Rule_string_Func b))) (KRDisjKey_Rule y b)
-                          | KRNil_list_Rule => KRTrue_Prop
-                          | _ => match b with
-                                 | KRApp_list_Rule x y => KRAnd_Prop (KRDisjKey_Rule a x) (KRDisjKey_Rule a y)
-                                 | KRCons_list_Rule x y => KRAnd_Prop (KRNot_Prop (KRIn_string_Prop (KRfst_Rule_string x) (KRmap_Rule_string KRfst_Rule_string_Func a))) (KRDisjKey_Rule a y)
-                                 | KRNil_list_Rule => KRTrue_Prop
-                                 | _ => KRDisjKey_Rule a b
-                                 end
-                          end
-  | KRAnd_Prop a KRTrue_Prop => a
-  | KRAnd_Prop a KRFalse_Prop => KRFalse_Prop
-  | KRAnd_Prop KRTrue_Prop a => a
-  | KRAnd_Prop KRFalse_Prop a => KRFalse_Prop
-  | KROr_Prop a KRTrue_Prop => KRTrue_Prop
-  | KROr_Prop a KRFalse_Prop => a
-  | KROr_Prop KRTrue_Prop a => KRTrue_Prop
-  | KROr_Prop KRFalse_Prop a => a
-  | KRNot_Prop (KRTrue_Prop) => KRFalse_Prop
-  | KRNot_Prop (KRFalse_Prop) => KRTrue_Prop
-  | KRNot_Prop (KRNot_Prop a) => a
-  | KRNot_Prop (KRAnd_Prop a b) => (KROr_Prop (KRNot_Prop a) (KRNot_Prop b))
-  | KRNot_Prop (KROr_Prop a b) => (KRAnd_Prop (KRNot_Prop a) (KRNot_Prop b))
-  | KRIn_string_Prop x (KRApp_list_string a b) => (KROr_Prop (KRIn_string_Prop x a) (KRIn_string_Prop x b))
-  | KRIn_string_Prop x (KRCons_list_string a b) => (KROr_Prop (KREq_string_Prop x a) (KRIn_string_Prop x b))
-  | KRIn_string_Prop x (KRNil_list_string) => KRFalse_Prop
-  | KRIn_RegInitT_Prop x (KRApp_list_RegInitT a b) => (KROr_Prop (KRIn_RegInitT_Prop x a) (KRIn_RegInitT_Prop x b))
-  | KRIn_RegInitT_Prop x (KRCons_list_RegInitT a b) => (KROr_Prop (KREq_RegInitT_Prop x a) (KRIn_RegInitT_Prop x b))
-  | KRIn_RegInitT_Prop x (KRNil_list_RegInitT) => KRFalse_Prop
-  | KRIn_Rule_Prop x (KRApp_list_Rule a b) => (KROr_Prop (KRIn_Rule_Prop x a) (KRIn_Rule_Prop x b))
-  | KRIn_Rule_Prop x (KRCons_list_Rule a b) => (KROr_Prop (KREq_Rule_Prop x a) (KRIn_Rule_Prop x b))
-  | KRIn_Rule_Prop x (KRNil_list_Rule) => KRFalse_Prop
-  | KRIn_DefMethT_Prop x (KRApp_list_DefMethT a b) => (KROr_Prop (KRIn_DefMethT_Prop x a) (KRIn_DefMethT_Prop x b))
-  | KRIn_DefMethT_Prop x (KRCons_list_DefMethT a b) => (KROr_Prop (KREq_DefMethT_Prop x a) (KRIn_DefMethT_Prop x b))
-  | KRIn_DefMethT_Prop x (KRNil_list_DefMethT) => KRFalse_Prop
-  | KREq_string_Prop (KRstring_append p (KRConst_string a)) (KRstring_append q (KRConst_string b)) => if sdisjPrefix (srev a) (srev b) then KRFalse_Prop else e
-  (*| KREq_string_Prop (KRstring_append (KRVar_string p) a) (KRstring_append (KRVar_string q) b) => if String.eqb p q then (KREq_string_Prop a b) else KREq_string_Prop (KRstring_append (KRVar_string p) a) (KRstring_append (KRVar_string q) b)
-  | KREq_string_Prop (KRVar_string a) (KRVar_string b) => if String.eqb a b then KRTrue_Prop else
-                                                            (KREq_string_Prop (KRVar_string a) (KRVar_string b))*)
-  | e => e
-  end.
 
 Definition KRSimplifyTop_RegFileBase (e: KRExpr_RegFileBase) : KRExpr_RegFileBase := e.
 
@@ -2117,25 +2063,6 @@ with KRSimplify_list_list_string(e: KRExpr_list_list_string) :=
                                        | e => e
                                        end).
 
-Fixpoint KRSimplify_Prop(p:KRExpr_Prop) :=
-       KRSimplifyTop_Prop (match p with
-                           | KRAnd_Prop a b => KRAnd_Prop (KRSimplify_Prop a) (KRSimplify_Prop b)
-                           | KROr_Prop a b => KROr_Prop (KRSimplify_Prop a) (KRSimplify_Prop b)
-                           | KRNot_Prop a => KRNot_Prop (KRSimplify_Prop a)
-                           | KRIn_string_Prop a b => KRIn_string_Prop (KRSimplify_string a) (KRSimplify_list_string b)
-                           | KRIn_RegInitT_Prop a b => KRIn_RegInitT_Prop (KRSimplify_RegInitT a) (KRSimplify_list_RegInitT b)
-                           | KRIn_DefMethT_Prop a b => KRIn_DefMethT_Prop (KRSimplify_DefMethT a) (KRSimplify_list_DefMethT b)
-                           | KRIn_Rule_Prop a b => KRIn_Rule_Prop (KRSimplify_Rule a) (KRSimplify_list_Rule b)
-                           | KRDisjKey_RegInitT a b => KRDisjKey_RegInitT (KRSimplify_list_RegInitT a) (KRSimplify_list_RegInitT b)
-                           | KRDisjKey_DefMethT a b => KRDisjKey_DefMethT (KRSimplify_list_DefMethT a) (KRSimplify_list_DefMethT b)
-                           | KRDisjKey_Rule a b => KRDisjKey_Rule (KRSimplify_list_Rule a) (KRSimplify_list_Rule b)
-                           | KREq_string_Prop a b => KREq_string_Prop (KRSimplify_string a) (KRSimplify_string b)
-                           | KREq_RegInitT_Prop a b => KREq_RegInitT_Prop (KRSimplify_RegInitT a) (KRSimplify_RegInitT b)
-                           | KREq_Rule_Prop a b => KREq_Rule_Prop (KRSimplify_Rule a) (KRSimplify_Rule b)
-                           | KREq_DefMethT_Prop a b => KREq_DefMethT_Prop (KRSimplify_DefMethT a) (KRSimplify_DefMethT b)
-                           | p => p
-                           end).
-
 (*********************************************************************************************************)
 
 Ltac match_KRExprType t :=
@@ -2229,127 +2156,6 @@ Ltac solve_KRSimplifyTopSound :=
   | _ => progress (repeat step_KRSimplifyTopSound)
   | V: ?T |- _ => match_KRExprType T;induction V;try reflexivity
   end.
-
-Theorem my_in_app_iff: forall A (a:A) (l1:list A) (l2:list A), (@In A a (l1++l2)) = (@In A a l1 \/ @In A a l2).
-Admitted.
-
-Hint Rewrite my_in_app_iff : kami_rewrite_db.
-
-Theorem my_DisjKey_Append1:
-  forall T Q (x:list (T*Q)) y z,
-  (DisjKey (x++y) z)=(DisjKey x z /\ DisjKey y z).
-Admitted.
-
-Hint Rewrite my_DisjKey_Append1 : kami_rewrite_db.
-
-Theorem my_DisjKey_Append2:
-    forall T Q (x:list (T*Q)) y z,
-           (DisjKey x (y++z))=(DisjKey x y /\ DisjKey x z).
-Admitted.
-
-Hint Rewrite my_DisjKey_Append2 : kami_rewrite_db.
-
-Theorem my_DisjKey_In_map2:
-  forall A B a (k:A) r l, @DisjKey A B a ((k,r)::l)=(~List.In k (List.map fst a) /\ (DisjKey a l)).
-Admitted.
-
-Hint Rewrite my_DisjKey_In_map2 : kami_rewrite_db.
-
-Theorem my_DisjKey_In_map1: forall A B b (k:A) r l,
-    (@DisjKey A B ((k,r)::l) b)=(~List.In k (List.map fst b) /\ (DisjKey l b)).
-Admitted.
-
-Hint Rewrite my_DisjKey_In_map1 : kami_rewrite_db.
-
-Theorem my_DisjKey_In_map_fst2: forall A B a (f:(A*B)) l,
-    @DisjKey A B a (f::l)=(~List.In (fst f) (List.map fst a) /\ (DisjKey a l)).
-Admitted.
-
-Hint Rewrite my_DisjKey_In_map_fst2 : kami_rewrite_db.
-
-Theorem my_DisjKey_In_map_fst1: forall A B b (f:(A*B)) l (W:forall (a1:A) (a2:A), {a1=a2}+{a1<>a2}),
-    @DisjKey A B (f::l) b=(~List.In (fst f) (List.map fst b) /\ (DisjKey l b)).
-Admitted.
-    
-Hint Rewrite my_DisjKey_In_map_fst1 : kami_rewrite_db.
-
-Theorem my_and_true1: forall p, (p /\ True)=p.
-Admitted.
-
-Hint Rewrite my_and_true1 : kami_rewrite_db.
-
-Theorem my_and_false1: forall p, (p /\ False)=False.
-Admitted.
-
-Hint Rewrite my_and_false1 : kami_rewrite_db.
-
-Theorem my_and_true2: forall p, (True /\ p )=p.
-Admitted.
-
-Hint Rewrite my_and_true2 : kami_rewrite_db.
-
-Theorem my_and_false2: forall p, (False /\ p)=False.
-Admitted.
-
-Hint Rewrite my_and_false2 : kami_rewrite_db.
-
-Theorem my_or_true1: forall p, (p \/ True)=True.
-Admitted.
-
-Hint Rewrite my_or_true1 : kami_rewrite_db.
-
-Theorem my_or_false1: forall p, (p \/ False)=p.
-Admitted.
-
-Hint Rewrite my_or_false1 : kami_rewrite_db.
-
-Theorem my_or_true2: forall p, (True \/ p )=True.
-Admitted.
-
-Hint Rewrite my_or_true2 : kami_rewrite_db.
-
-Theorem my_or_false2: forall p, (False \/ p)=p.
-Admitted.
-
-Hint Rewrite my_or_false2 : kami_rewrite_db.
-
-Theorem my_not_not: forall p, (~ (~ p))=p.
-Admitted.
-
-Hint Rewrite my_not_not : kami_rewrite_db.
-
-Theorem my_not_and_or: forall p q, (~ (p /\ q)) = ((~p) \/ (~q)).
-Admitted.
-
-Hint Rewrite my_not_and_or : kami_rewrite_db.
-
-Theorem my_not_or_and: forall p q, (~ (p \/ q)) = ((~p) /\ (~q)).
-Admitted.
-
-Hint Rewrite my_not_or_and : kami_rewrite_db.
-
-Theorem my_DisjKey_nil1 : forall A B (x:list (A*B)), DisjKey [] x=True.
-Admitted.
-
-Hint Rewrite my_DisjKey_nil1 : kami_rewrite_db.
-
-Theorem my_DisjKey_nil2 : forall A B (x:list (A*B)), DisjKey x []=True.
-Admitted.
-
-Hint Rewrite my_DisjKey_nil2 : kami_rewrite_db.
-
-Theorem my_not_true_false : (~ True) = False.
-Admitted.
-
-Hint Rewrite my_not_true_false : kami_rewrite_db.
-
-Theorem my_not_false_true : (~ False) = True.
-Admitted.
-
-Hint Rewrite my_not_false_true : kami_rewrite_db.
-
-Theorem my_eq_refl : forall A (a:A) (b:A), (a=b)=(b=a).
-Admitted.
 
 Scheme KRExpr_RegInitT_mut := Induction for KRExpr_RegInitT Sort Prop
   with KRExpr_Rule_mut := Induction for KRExpr_Rule Sort Prop
@@ -2466,36 +2272,6 @@ Ltac KRSimplifySound_unit :=
   | H: ?A |- ?A => apply H*)
   (*| |- context [match ?Q with _ => _ end ] => let R := fresh in (remember Q as R;destruct R; try reflexivity)*)
   end.
-
-Ltac KRSimplifySound_setup mut H H0 H1 :=
-  intros;
-  eapply (mut
-            (fun e : KRExpr_RegInitT => KRExprDenote_RegInitT e = KRExprDenote_RegInitT (KRSimplify_RegInitT e))
-            (fun e : KRExpr_Rule => KRExprDenote_Rule e = KRExprDenote_Rule (KRSimplify_Rule e))
-            (fun e : KRExpr_DefMethT => KRExprDenote_DefMethT e = KRExprDenote_DefMethT (KRSimplify_DefMethT e))
-            (fun e : KRExpr_ModuleElt => KRExprDenote_ModuleElt e = KRExprDenote_ModuleElt (KRSimplify_ModuleElt e))
-            (fun e : KRExpr_list_RegInitT => KRExprDenote_list_RegInitT e = KRExprDenote_list_RegInitT (KRSimplify_list_RegInitT e))
-            (fun e : KRExpr_list_Rule => KRExprDenote_list_Rule e = KRExprDenote_list_Rule (KRSimplify_list_Rule e))
-            (fun e : KRExpr_list_DefMethT => KRExprDenote_list_DefMethT e = KRExprDenote_list_DefMethT (KRSimplify_list_DefMethT e))
-            (fun e : KRExpr_list_ModuleElt => KRExprDenote_list_ModuleElt e = KRExprDenote_list_ModuleElt (KRSimplify_list_ModuleElt e))
-            (fun e : KRExpr_list_list_RegInitT => KRExprDenote_list_list_RegInitT e = KRExprDenote_list_list_RegInitT (KRSimplify_list_list_RegInitT e))
-            (fun e : KRExpr_list_list_Rule => KRExprDenote_list_list_Rule e = KRExprDenote_list_list_Rule (KRSimplify_list_list_Rule e))
-            (fun e : KRExpr_list_list_DefMethT => KRExprDenote_list_list_DefMethT e = KRExprDenote_list_list_DefMethT (KRSimplify_list_list_DefMethT e))
-            (fun e : KRExpr_list_list_ModuleElt => KRExprDenote_list_list_ModuleElt e = KRExprDenote_list_list_ModuleElt (KRSimplify_list_list_ModuleElt e))
-            (fun e : KRExpr_RegFileBase => KRExprDenote_RegFileBase e = KRExprDenote_RegFileBase (KRSimplify_RegFileBase e))
-            (fun e : KRExpr_list_RegFileBase => KRExprDenote_list_RegFileBase e = KRExprDenote_list_RegFileBase (KRSimplify_list_RegFileBase e))
-            (fun e : KRExpr_BaseModule => KRExprDenote_BaseModule e = KRExprDenote_BaseModule (KRSimplify_BaseModule e))
-            (fun e : KRExpr_Mod => KRExprDenote_Mod e = KRExprDenote_Mod (KRSimplify_Mod e))
-            (fun e : KRExpr_list_Mod => KRExprDenote_list_Mod e = KRExprDenote_list_Mod (KRSimplify_list_Mod e))
-            (fun e : KRExpr_CallWithSign => KRExprDenote_CallWithSign e = KRExprDenote_CallWithSign (KRSimplify_CallWithSign e))
-            (fun e : KRExpr_list_CallWithSign => KRExprDenote_list_CallWithSign e = KRExprDenote_list_CallWithSign (KRSimplify_list_CallWithSign e))
-            (fun e : KRExpr_list_list_CallWithSign => KRExprDenote_list_list_CallWithSign e = KRExprDenote_list_list_CallWithSign (KRSimplify_list_list_CallWithSign e))
-            (fun e : KRExpr_string => KRExprDenote_string e = KRExprDenote_string (KRSimplify_string e))
-            (fun e : KRExpr_list_string => KRExprDenote_list_string e = KRExprDenote_list_string (KRSimplify_list_string e))
-            (fun e : KRExpr_list_list_string => KRExprDenote_list_list_string e = KRExprDenote_list_list_string (KRSimplify_list_list_string e))
-            (fun e : KRExpr_Prop => KRExprDenote_Prop e = KRExprDenote_Prop (KRSimplify_Prop e))
-         );
-  try (intros;autorewrite with KRSimplify; autorewrite with KRSimplifyTopSound; simpl; try (rewrite <- H); try  (rewrite <- H0); try (rewrite <- H1); reflexivity);intros.
 
 Ltac KRSimplifySound_crunch :=
   match goal with

@@ -181,28 +181,3 @@ Qed.
 
 Hint Rewrite KRSimplifyTopSound_list_RegFileBase : KRSimplify.
 
-Theorem KRSimplifyTopSound_Prop: forall e,
-    KRExprDenote_Prop (KRSimplifyTop_Prop e)=KRExprDenote_Prop e.
-Proof.
-  solve_KRSimplifyTopSound;
-  solve_KRSimplifyTopSound;
-  repeat solve_contKRSimplifyTopSound.
-  - replace (KRExprDenote_string k=KRExprDenote_string k0) with (KRExprDenote_string k0=KRExprDenote_string k). reflexivity.
-    apply my_eq_refl.
-  - remember (sdisjPrefix (srev s) (srev s0)).
-    destruct b.
-    + simpl.
-      apply sdisjPrefix_false.
-      rewrite Heqb.
-      reflexivity.
-    + reflexivity.
-  - replace (KRExprDenote_RegInitT k=KRExprDenote_RegInitT k0) with (KRExprDenote_RegInitT k0=KRExprDenote_RegInitT k). reflexivity.
-    apply my_eq_refl.
-  - replace (KRExprDenote_Rule k=KRExprDenote_Rule k0) with (KRExprDenote_Rule k0=KRExprDenote_Rule k). reflexivity.
-    apply my_eq_refl.
-  - replace (KRExprDenote_DefMethT k=KRExprDenote_DefMethT k0) with (KRExprDenote_DefMethT k0=KRExprDenote_DefMethT k). reflexivity.
-    apply my_eq_refl.
-Qed.
-
-Hint Rewrite KRSimplifyTopSound_Prop : KRSimplify.
-
