@@ -54,7 +54,7 @@ Definition KRSimplifyTop_ImplProp (e: KRExpr_Prop) : KRExpr_Prop :=
   | KROr_Prop KRFalse_Prop a => a
   | KRNot_Prop (KRTrue_Prop) => KRFalse_Prop
   | KRNot_Prop (KRFalse_Prop) => KRTrue_Prop
-  | KRNot_Prop (KRNot_Prop a) => a
+  (*| KRNot_Prop (KRNot_Prop a) => a*)
   (*| KRNot_Prop (KRAnd_Prop a b) => (KROr_Prop (KRNot_Prop a) (KRNot_Prop b))
   | KRNot_Prop (KROr_Prop a b) => (KRAnd_Prop (KRNot_Prop a) (KRNot_Prop b))*)
   | KRIn_string_Prop x (KRApp_list_string a b) => (KROr_Prop (KRIn_string_Prop x a) (KRIn_string_Prop x b))
@@ -239,6 +239,12 @@ Ltac unitSolve :=
   | |- DisjKey _ (_::_) => apply DisjKey_Cons2; unitSolve
   | |- DisjKey (_++_) _ => apply DisjKey_Append1; unitSolve
   | |- DisjKey _ (_++_) => apply DisjKey_Append2; unitSolve
+  (*| H: DisjKey _ [] |- _ => inversion H; subst; clear H; unitSolve
+  | H: DisjKey [] _ |- _ => inversion H; subst; clear H; unitSolve
+  | H: DisjKey (_::_) _ |- _ => rewrite DisjKey_Cons1 in H; unitSolve
+  | H: DisjKey _ (_::_) |- _ => rewrite DisjKey_Cons2 in H; unitSolve
+  | H: DisjKey (_++_) _ |- _ => inversion H; subst; clear H; unitSolve
+  | H: DisjKey _ (_++_) |- _ => inversion H; subst; clear H; unitSolve*)
   | |- { _=_ }+{ _<>_ } => repeat (decide equality)
   | |- forall _,_ => intros; unitSolve
   end.
@@ -254,11 +260,6 @@ Proof.
     + simpl.
       intro X.
       apply X.
-    + simpl.
-      intro X.
-      simpl in H.
-      apply X in H.
-      inversion H.
   - destruct k0; try unitSolve.
     + simpl in H.
       simpl.
@@ -327,12 +328,516 @@ Proof.
   - destruct k; destruct k0; try unitSolve.
 Qed.
 
-Hint Rewrite KRSimplifyTopSound_Prop : KRSimplify.
+Theorem KRSimplifyTopSound_RevImplProp: forall e,
+    KRExprDenote_Prop e -> KRExprDenote_Prop (KRSimplifyTop_ImplProp e).
+Proof.
+  intros.
+  destruct e; try unitSolve.
+  - destruct e1; destruct e2; try (unitSolve).
+  - destruct e1; destruct e2; try (unitSolve).
+  - destruct e; try (unitSolve).
+    + simpl in H.
+      simpl.
+      apply H.
+      apply I.
+  - destruct k0; try unitSolve.
+    + simpl in H.
+      simpl.
+      inversion H; subst; clear H.
+      * left.
+        rewrite H0.
+        reflexivity.
+      * right.
+        apply H0.
+    + simpl in H.
+      simpl.
+      rewrite in_app in H.
+      try unitSolve.
+  - destruct k; destruct k0; try unitSolve; try (destruct k2; unitSolve).
+    destruct k2; try unitSolve.
+    destruct k0_2; try unitSolve.
+    simpl in H.
+    simpl.
+    remember (sdisjPrefix (srev s) (srev s0)).
+    destruct b.
+    * apply sdisjPrefix_false' in H. simpl in H.
+      ++ inversion H.
+      ++ rewrite Heqb.
+         reflexivity.
+    * simpl.
+      apply H.
+  - destruct k0; try unitSolve.
+    + simpl in H.
+      simpl.
+      inversion H; subst; clear H.
+      * left.
+        rewrite H0.
+        reflexivity.
+      * right.
+        apply H0.
+    + simpl in H.
+      simpl.
+      rewrite in_app in H.
+      try unitSolve.
+  - destruct k0; try unitSolve.
+    + simpl in H.
+      simpl.
+      inversion H; subst; clear H.
+      * left.
+        rewrite H0.
+        reflexivity.
+      * right.
+        apply H0.
+    + simpl in H.
+      simpl.
+      rewrite in_app in H.
+      try unitSolve.
+  - destruct k0; try unitSolve.
+    + simpl in H.
+      simpl.
+      inversion H; subst; clear H.
+      * left.
+        rewrite H0.
+        reflexivity.
+      * right.
+        apply H0.
+    + simpl in H.
+      simpl.
+      rewrite in_app in H.
+      try unitSolve.
+  - destruct k; destruct k0; try unitSolve.
+    + simpl in H; rewrite DisjKey_Cons2 in H; [simpl; apply H | repeat (decide equality)].
+    + simpl in H; rewrite DisjKey_Append2 in H; [simpl; apply H | repeat (decide equality)].
+    + simpl in H; rewrite DisjKey_Cons1 in H; [simpl; apply H | repeat (decide equality)].
+    + simpl in H. simpl. split.
+      * intro X.
+        inversion X.
+      * apply DisjKey_Cons1 in H.
+        inversion H; subst; clear H.
+        apply H1.
+        repeat (decide equality).
+    + simpl.
+      rewrite DisjKey_Cons2.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H.
+      rewrite DisjKey_Cons1 in H.
+      inversion H; subst; clear H.
+      simpl in H0.
+      inversion H1; subst; clear H1.
+      split.
+      * intro X.
+        inversion X; subst; clear X.
+        ++ rewrite H1 in H0.
+           simpl in H0.
+           apply H0.
+           left.
+           reflexivity.
+        ++ apply H.
+           apply H1.
+      * split.
+        ++ intro X.
+           apply H0.
+           right.
+           apply X.
+        ++ apply H2.
+      * repeat (decide equality).
+      * intros.
+        repeat (decide equality).
+      * intros.
+        repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      inversion H; subst; clear H.
+      split.
+      * apply H0.
+      * apply H1.
+      * intros.
+        repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      inversion H; subst; clear H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      inversion H; subst; clear H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      inversion H; subst; clear H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      inversion H; subst; clear H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H;try (repeat (decide equality)).
+      apply H.
+  - destruct k; destruct k0; try unitSolve.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      split.
+      * intro X.
+        inversion X.
+      * apply DisjKey_nil2.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      simpl in H.
+      inversion H; subst; clear H.
+      rewrite DisjKey_Cons1 in H1;try (repeat (decide equality)).
+      inversion H1; subst; clear H1.
+      split.
+      * intro X.
+        inversion X; subst; clear X.
+        ++ rewrite H1 in H0.
+           simpl in H0.
+           apply H0.
+           left.
+           reflexivity.
+        ++ apply H.
+           apply H1.
+      * rewrite DisjKey_Cons2; try (repeat (decide equality)).
+        split.
+        ++ intro X.
+           apply H0.
+           right.
+           apply X.
+        ++ apply H2.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H;try (repeat (decide equality)).
+      apply H.
+  - destruct k; destruct k0; try unitSolve.
+    + simpl in H; rewrite DisjKey_Cons2 in H; [simpl; apply H | repeat (decide equality)].
+    + simpl in H; rewrite DisjKey_Append2 in H; [simpl; apply H | repeat (decide equality)].
+    + simpl in H; rewrite DisjKey_Cons1 in H; [simpl; apply H | repeat (decide equality)].
+    + simpl in H. simpl. split.
+      * intro X.
+        inversion X.
+      * apply DisjKey_Cons1 in H.
+        inversion H; subst; clear H.
+        apply H1.
+        repeat (decide equality).
+    + simpl.
+      rewrite DisjKey_Cons2.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H.
+      rewrite DisjKey_Cons1 in H.
+      inversion H; subst; clear H.
+      simpl in H0.
+      inversion H1; subst; clear H1.
+      split.
+      * intro X.
+        inversion X; subst; clear X.
+        ++ rewrite H1 in H0.
+           simpl in H0.
+           apply H0.
+           left.
+           reflexivity.
+        ++ apply H.
+           apply H1.
+      * split.
+        ++ intro X.
+           apply H0.
+           right.
+           apply X.
+        ++ apply H2.
+      * repeat (decide equality).
+      * intros.
+        repeat (decide equality).
+      * intros.
+        repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append1 in H.
+      unitSolve.
+      repeat (decide equality).
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Cons2 in H;try (repeat (decide equality)).
+      apply H.
+    + simpl.
+      simpl in H.
+      rewrite DisjKey_Append2 in H;try (repeat (decide equality)).
+      apply H.
+Qed.
 
 Theorem KRSimplifySound_ImplProp: forall e,
-    KRExprDenote_Prop (KRSimplify_ImplProp e) -> KRExprDenote_Prop e.
+    KRExprDenote_Prop (KRSimplify_ImplProp e) <-> KRExprDenote_Prop e.
 Proof.
-    induction e; try (autorewrite with KRSimplify); try (simpl); try (rewrite IHe1); try (rewrite IHe2); try (rewrite IHe); try (autorewrite with KRSimplify); try (reflexivity).
+  induction e; try (simpl; split; unitSolve).
+  - split.
+    * intros.
+      simpl.
+      autorewrite with KRSimplify in H.
+      apply KRSimplifyTopSound_RevImplProp in H.
+      simpl in H.
+      inversion H; subst; clear H.
+      apply IHe1 in H0.
+      apply IHe2 in H1.
+      split.
+      ++ apply H0.
+      ++ apply H1.
+    * intros.
+      simpl in H.
+      autorewrite with KRSimplify.
+      apply KRSimplifyTopSound_ImplProp.
+  - simpl; split; unitSolve.
+  - simpl; split; unitSolve.
+  try (autorewrite with KRSimplify); try (simpl); try (rewrite IHe1); try (rewrite IHe2); try (rewrite IHe); try (autorewrite with KRSimplify); try (reflexivity).
 Qed.
 
 Hint Rewrite KRSimplifySound_Prop : KRSimplify.
