@@ -855,47 +855,44 @@ Section nat_string.
 
   Local Definition binary_encoding_list : list ascii := ["0"; "1"].
 
-  Definition nat_binary_string : nat -> string
+  Definition natToBinStr : nat -> string
     := nat_string 0 (decode_safe binary_encoding_list).
 
-  Definition nat_binary_string_inj
-    :  forall n m, nat_binary_string n = nat_binary_string m -> n = m
+  Definition natToBinStr_inj
+    :  forall n m, natToBinStr n = natToBinStr m -> n = m
     := ltac:(encoding_inj 0 ["0"; "1"]%list).
 
   Local Definition decimal_encoding_list : list ascii
     := ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"].
 
-  Definition nat_decimal_string : nat -> string
+  Definition natToDecStr : nat -> string
     := nat_string 8 (decode_safe decimal_encoding_list).
 
-  Definition nat_decimal_string_inj
-    :  forall n m, nat_decimal_string n = nat_decimal_string m -> n = m
+  Definition natToDecStr_inj
+    :  forall n m, natToDecStr n = natToDecStr m -> n = m
     := ltac:(encoding_inj 8 ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"]%list).
 
   Local Definition hex_encoding_list : list ascii
     := ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"; "A"; "B"; "C"; "D"; "E"; "F"].
 
-  Definition nat_hex_string : nat -> string
+  Definition natToHexStr : nat -> string
     := nat_string 14 (decode_safe hex_encoding_list).
 
-  Definition nat_hex_string_inj
-    :  forall n m, nat_hex_string n = nat_hex_string m -> n = m
+  Definition natToHexStr_inj
+    :  forall n m, natToHexStr n = natToHexStr m -> n = m
     := ltac:(encoding_inj 14 ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"; "A"; "B"; "C"; "D"; "E"; "F"]%list).
 
   Local Close Scope char_scope.
 
   Local Open Scope string_scope.
 
-  Goal (nat_hex_string 179 = "B3"). Proof. reflexivity. Qed.
-  Goal (nat_binary_string 179 = "10110011"). Proof. reflexivity. Qed.
+  Goal (natToHexStr 179 = "B3"). Proof. reflexivity. Qed.
+  Goal (natToDecStr 179 = "179"). Proof. reflexivity. Qed.
+  Goal (natToBinStr 179 = "10110011"). Proof. reflexivity. Qed.
 
   Local Close Scope string_scope.
 
   Local Close Scope list.
 
   Set Implicit Arguments.
-
-  Definition natToHexStr := nat_hex_string.
-
-  Definition natToHexStr_inj := nat_hex_string_inj.
 End nat_string.
