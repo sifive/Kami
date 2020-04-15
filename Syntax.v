@@ -2315,7 +2315,7 @@ Definition separateModHidesNoInline (m : Mod) :=
 
 
 
-
+(*
 Section Positive.
   Local Open Scope positive_scope.
   Fixpoint of_pos (p : positive) (rest : string) : string :=
@@ -2363,7 +2363,7 @@ End Positive.
 Definition AddIndexToName name idx := (name ++ "_" ++ natToHexStr idx)%string.
 
 Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) idxs.
-
+*)
 
 
 

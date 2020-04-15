@@ -3,7 +3,7 @@ Require Import RecordUpdate.RecordSet.
 Require Import Program.Wf.
 Require Import Wf_nat.
 Require Import BinNums.
-
+(*
 Definition natToHexStr (n : nat) : string :=
   match (BinNat.N.of_nat n) with
   | N0     => "0"
@@ -13,7 +13,7 @@ Definition natToHexStr (n : nat) : string :=
 Definition AddIndexToName name idx := (name ++ "_" ++ natToHexStr idx)%string.
 
 Definition AddIndicesToNames name idxs := List.map (fun x => AddIndexToName name x) idxs.
-
+*)
 (* Notation for normal mods *)
 Inductive ModuleElt: Type :=
 | MERegister (_ : RegInitT)
@@ -873,20 +873,20 @@ Section nat_string.
     := ltac:(encoding_inj 8 ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"]%list).
 
   Local Definition hex_encoding_list : list ascii
-    := ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"; "a"; "b"; "c"; "d"; "e"; "f"].
+    := ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"; "A"; "B"; "C"; "D"; "E"; "F"].
 
   Definition nat_hex_string : nat -> string
     := nat_string 14 (decode_safe hex_encoding_list).
 
   Definition nat_hex_string_inj
     :  forall n m, nat_hex_string n = nat_hex_string m -> n = m
-    := ltac:(encoding_inj 14 ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"; "a"; "b"; "c"; "d"; "e"; "f"]%list).
+    := ltac:(encoding_inj 14 ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"; "A"; "B"; "C"; "D"; "E"; "F"]%list).
 
   Local Close Scope char_scope.
 
   Local Open Scope string_scope.
 
-  Goal (nat_hex_string 179 = "b3"). Proof. reflexivity. Qed.
+  Goal (nat_hex_string 179 = "B3"). Proof. reflexivity. Qed.
   Goal (nat_binary_string 179 = "10110011"). Proof. reflexivity. Qed.
 
   Local Close Scope string_scope.
@@ -894,4 +894,8 @@ Section nat_string.
   Local Close Scope list.
 
   Set Implicit Arguments.
+
+  Definition natToHexStr := nat_hex_string.
+
+  Definition natToHexStr_inj := nat_hex_string_inj.
 End nat_string.
