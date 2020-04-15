@@ -886,7 +886,7 @@ Section nat_string.
 
   Local Open Scope string_scope.
 
-  Goal (natToHexStr 179 = "B3"). Proof. reflexivity. Qed.
+  (* Goal (natToHexStr 179 = "B3"). Proof. reflexivity. Qed. *)
   Goal (natToDecStr 179 = "179"). Proof. reflexivity. Qed.
   Goal (natToBinStr 179 = "10110011"). Proof. reflexivity. Qed.
 
@@ -895,4 +895,219 @@ Section nat_string.
   Local Close Scope list.
 
   Set Implicit Arguments.
+
 End nat_string.
+
+(* The following definitions are DEPRECATED. *)
+(*
+Section Positive.
+  Local Open Scope positive_scope.
+  Fixpoint of_pos (p : positive) (rest : string) : string :=
+    match p with
+    | 1 => String "1" rest
+    | 2 => String "2" rest
+    | 3 => String "3" rest
+    | 4 => String "4" rest
+    | 5 => String "5" rest
+    | 6 => String "6" rest
+    | 7 => String "7" rest
+    | 8 => String "8" rest
+    | 9 => String "9" rest
+    | 10 => String "A" rest
+    | 11 => String "B" rest
+    | 12 => String "C" rest
+    | 13 => String "D" rest
+    | 14 => String "E" rest
+    | 15 => String "F" rest
+    | p'~0~0~0~0 => of_pos p' (String "0" rest)
+    | p'~0~0~0~1 => of_pos p' (String "1" rest)
+    | p'~0~0~1~0 => of_pos p' (String "2" rest)
+    | p'~0~0~1~1 => of_pos p' (String "3" rest)
+    | p'~0~1~0~0 => of_pos p' (String "4" rest)
+    | p'~0~1~0~1 => of_pos p' (String "5" rest)
+    | p'~0~1~1~0 => of_pos p' (String "6" rest)
+    | p'~0~1~1~1 => of_pos p' (String "7" rest)
+    | p'~1~0~0~0 => of_pos p' (String "8" rest)
+    | p'~1~0~0~1 => of_pos p' (String "9" rest)
+    | p'~1~0~1~0 => of_pos p' (String "A" rest)
+    | p'~1~0~1~1 => of_pos p' (String "B" rest)
+    | p'~1~1~0~0 => of_pos p' (String "C" rest)
+    | p'~1~1~0~1 => of_pos p' (String "D" rest)
+    | p'~1~1~1~0 => of_pos p' (String "E" rest)
+    | p'~1~1~1~1 => of_pos p' (String "F" rest)
+    end.
+  Local Close Scope positive_scope.
+  Definition natToHexStr (n : nat) : string :=
+    match (BinNat.N.of_nat n) with
+    | N0     => "0"
+    | Npos p => of_pos p ""
+    end.
+End Positive.
+
+Definition AddIndexToName name idx := (name ++ "_" ++ natToHexStr idx)%string.
+
+Definition AddIndicesToNames name idxs := List.map (fun x => AddIndexToName name x) idxs.
+
+Fixpoint pos_length(x : positive) : nat :=
+  match x with
+  | xH => 0
+  | xI y => S (pos_length y)
+  | xO y => S (pos_length y)
+  end.
+
+Lemma string_lemma1 : forall str c d, (str <> "" -> str ++ (String c EmptyString) <> String d EmptyString)%string.
+Proof.
+  intros.
+  destruct str.
+  - elim H; reflexivity.
+  - destruct str; discriminate.
+Qed.
+
+Lemma string_lemma2 : forall str c str', (str ++ String c str' = (str ++ (String c "")) ++ str')%string.
+Proof.
+  destruct str'.
+  - rewrite append_nil; auto.
+  - rewrite <- append_assoc; auto.
+Qed.
+
+Lemma string_lemma3 : forall str str' c c', (str ++ String c "" = str' ++ String c' "")%string ->
+  c = c'.
+Proof.
+  induction str; intros.
+  - destruct str'.
+    + inversion H; auto.
+    + inversion H.
+      * destruct str'; discriminate.
+  - destruct str'.
+    + inversion H.
+      destruct str; discriminate.
+    + inversion H.
+      eapply IHstr.
+      exact H2.
+Qed.
+
+Lemma string_lemma4 : forall str1 str2 c c' str3, (str1 ++ (String c str3) = str2 ++ (String c' str3))%string
+ -> c = c'.
+Proof.
+  intros.
+  rewrite (string_lemma2 str1) in H.
+  rewrite (string_lemma2 str2) in H.
+  rewrite append_remove_suffix in H.
+  eapply string_lemma3.
+  exact H.
+Qed.
+
+Ltac pop_bits n x :=
+  match n with
+  | 0 => idtac
+  | S ?m => let y := fresh "y" in
+            let z := fresh "z" in
+  destruct x as [ y | z | ]; [ pop_bits m y | pop_bits m z | idtac ]
+  end.
+
+Lemma of_pos_suff_aux : forall n x suff, pos_length x = n -> of_pos x suff = (of_pos x "" ++ suff)%string.
+Proof.
+  intro n.
+  induction n using (well_founded_induction lt_wf).
+  intros.
+  pop_bits 4 x; simpl;
+  match goal with
+  | |- of_pos ?p (String ?c ?suff) = (of_pos ?p (String ?c EmptyString) ++ ?suff)%string =>
+      assert (pos_length p < n) as pf by (simpl in H0; lia);
+      rewrite (H _ pf _ (String c suff) eq_refl);
+      rewrite (H _ pf _ (String c EmptyString) eq_refl);
+      apply string_lemma2
+  | _ => reflexivity
+  end.
+Qed.
+
+Lemma of_pos_suff : forall x suff, of_pos x suff = (of_pos x "" ++ suff)%string.
+Proof.
+  intros; eapply of_pos_suff_aux.
+  reflexivity.
+Qed.
+
+Lemma of_pos_ne : forall x, of_pos x "" <> "".
+Proof.
+  pop_bits 4 x;
+  try discriminate;
+  try (simpl;
+       rewrite of_pos_suff;
+       destruct (of_pos _ "");
+       discriminate).
+Qed.
+
+Lemma of_pos_nz : forall x, of_pos x "" <> "0".
+Proof.
+  pop_bits 4 x;
+  try discriminate;
+  try (simpl; rewrite of_pos_suff; apply string_lemma1; apply of_pos_ne).
+Qed.
+
+Lemma of_pos_lemma1 : forall p q str c c', of_pos p (String c str) = of_pos q (String c' str) -> c = c'.
+Proof.
+  intros.
+  rewrite (of_pos_suff p), (of_pos_suff q) in H.
+  exact (string_lemma4 _ _ _ _ _ H).
+Qed.
+
+Lemma length_append : forall str str', (String.length (str ++ str') = String.length str + String.length str')%string.
+Proof.
+  induction str; intros.
+  - auto.
+  - simpl.
+    rewrite IHstr; auto.
+Qed.
+
+Lemma of_pos_lemma2 : forall p str c d, of_pos p (String c str) <> String d str.
+Proof.
+  intros; rewrite of_pos_suff; intro.
+  apply (f_equal String.length) in H.
+  rewrite length_append in H.
+  simpl in H.
+  destruct (of_pos p "") eqn:G.
+  - exact (of_pos_ne _ G).
+  - simpl in H; lia.
+Qed.
+
+Lemma of_pos_inj_aux : forall n str x y, pos_length x = n -> of_pos x str = of_pos y str -> x = y.
+Proof.
+  intro n.
+  induction n using (well_founded_induction lt_wf); intros str x y lenx of_pos_eq.
+  pop_bits 4 x; pop_bits 4 y; simpl in *;
+   match goal with
+   | |- ?x = ?x => reflexivity
+   | [ _ : of_pos ?p (String ?c ?str) = of_pos ?q (String ?c ?str) |- _ ]
+      => assert (pos_length p < n) as pf by (simpl in lenx; lia);
+         rewrite (H _ pf _ _ _ eq_refl of_pos_eq); reflexivity
+   | [ H : of_pos ?p (String ?c str) = of_pos ?q (String ?d str) |- _ ] => discriminate (of_pos_lemma1 _ _ _ _ _ H)
+   | [ H : of_pos ?p (String ?c ?str) = String ?d ?str |- _ ] => elim (of_pos_lemma2 _ _ H)
+   | [ H : String ?d ?str = of_pos ?p (String ?c ?str) |- _ ] => symmetry in H; elim (of_pos_lemma2 _ _ H)
+   | _ => discriminate
+   end.
+Qed.
+
+Lemma of_pos_inj : forall str x y, of_pos x str = of_pos y str -> x = y.
+Proof.
+  intros.
+  eapply of_pos_inj_aux.
+  reflexivity.
+  exact H.
+Qed.
+
+Lemma natToHexStr_inj :
+  forall n m,
+    natToHexStr n = natToHexStr m ->
+    n = m.
+Proof.
+  intros n m Hnm.
+  unfold natToHexStr in Hnm.
+  destruct n,m; simpl in Hnm.
+  - reflexivity.
+  - symmetry in Hnm; elim (of_pos_nz _ Hnm).
+  - elim (of_pos_nz _ Hnm).
+  - f_equal.
+    apply SuccNat2Pos.inj.
+    eapply of_pos_inj; exact Hnm.
+Qed.
+*)
