@@ -1,4 +1,5 @@
 Require Import Kami.All.
+Require Import Kami.Lib.NatStr.
 Require Import String.
 
 Section TestNative.

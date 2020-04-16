@@ -2,6 +2,7 @@ Require Import Compare_dec List String Streams FinFun.
 Import ListNotations Fin2Restrict.
 
 Require Import Kami.AllNotations.
+Require Import Kami.Lib.NatStr.
 
 Require Import Kami.Simulator.CoqSim.Misc.
 Require Import Kami.Simulator.CoqSim.TransparentProofs.

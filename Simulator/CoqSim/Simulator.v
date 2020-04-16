@@ -8,6 +8,7 @@ Require Import Kami.Simulator.CoqSim.RegisterFile.
 Require Import Kami.Simulator.CoqSim.Eval.
 
 Require Import Kami.AllNotations.
+Require Import Kami.Lib.NatStr.
 Import Kami.Simulator.CoqSim.HaskellTypes.Notations.
 
 Section EvalAction.
