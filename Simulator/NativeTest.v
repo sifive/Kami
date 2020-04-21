@@ -1,5 +1,4 @@
 Require Import Kami.All.
-Require Import Kami.Lib.NatStr.
 Require Import String.
 
 Section TestNative.
@@ -36,7 +35,7 @@ Definition testNativeModule :=
     (* prints counter *)
     with Rule "count" := (
       ReadN x : int <- "count";
-      System [DispString _ ("Count: " ++ (natToDecStr x) ++ "\n")%string];
+      System [DispString _ ("Count: " ++ (natToHexStr x) ++ "\n")%string];
       Retv)
 
     (* appends A if count is even, else B*)
