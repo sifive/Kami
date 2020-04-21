@@ -5,8 +5,6 @@
  *)
 Require Import Kami.AllNotations.
 Require Import List.
-Require Import Vector.
-Import VectorNotations.
 Import ListNotations.
 Require Import Kami.Notations.
 

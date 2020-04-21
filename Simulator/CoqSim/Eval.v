@@ -48,7 +48,7 @@ Fixpoint print_Val(k : Kind)(ff : FullFormat k) : eval_Kind k -> string :=
   | FBool n _ => fun x => pad_with " " n (if x then "1" else "0")
   | FBit n m bf => fun x => pad_with "0" m (print_BF bf x)
   | FStruct n fk fs ffs => fun x => ("{ " ++ String.concat "; " (v_to_list (vmap (fun '(str1,str2) => str1 ++ ":" ++ str2) (add_strings fs (tup_to_vec _ (fun i => print_Val (ffs i)) x)))) ++ "; }")%string
-  | FArray n k' ff' => fun x => ("[" ++ String.concat "; " (List.map (fun i => nat_decimal_string (f2n i) ++ "=" ++ print_Val ff' (vector_index i x)) (getFins n)) ++ "; ]")%string
+  | FArray n k' ff' => fun x => ("[" ++ String.concat "; " (List.map (fun i => natToDecStr (f2n i) ++ "=" ++ print_Val ff' (vector_index i x)) (getFins n)) ++ "; ]")%string
   end.
 
 (* for checkpointing *)

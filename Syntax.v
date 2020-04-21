@@ -2309,68 +2309,6 @@ Definition separateModHidesNoInline (m : Mod) :=
   let '(hides, (rfs, mods)) := separateMod m in
   (hides, (rfs, getFlat (mergeSeparatedBaseMod mods))).
 
-
-
-
-
-
-
-
-Section Positive.
-  Local Open Scope positive_scope.
-  Fixpoint of_pos (p : positive) (rest : string) : string :=
-    match p with
-    | 1 => String "1" rest
-    | 2 => String "2" rest
-    | 3 => String "3" rest
-    | 4 => String "4" rest
-    | 5 => String "5" rest
-    | 6 => String "6" rest
-    | 7 => String "7" rest
-    | 8 => String "8" rest
-    | 9 => String "9" rest
-    | 10 => String "A" rest
-    | 11 => String "B" rest
-    | 12 => String "C" rest
-    | 13 => String "D" rest
-    | 14 => String "E" rest
-    | 15 => String "F" rest
-    | p'~0~0~0~0 => of_pos p' (String "0" rest)
-    | p'~0~0~0~1 => of_pos p' (String "1" rest)
-    | p'~0~0~1~0 => of_pos p' (String "2" rest)
-    | p'~0~0~1~1 => of_pos p' (String "3" rest)
-    | p'~0~1~0~0 => of_pos p' (String "4" rest)
-    | p'~0~1~0~1 => of_pos p' (String "5" rest)
-    | p'~0~1~1~0 => of_pos p' (String "6" rest)
-    | p'~0~1~1~1 => of_pos p' (String "7" rest)
-    | p'~1~0~0~0 => of_pos p' (String "8" rest)
-    | p'~1~0~0~1 => of_pos p' (String "9" rest)
-    | p'~1~0~1~0 => of_pos p' (String "A" rest)
-    | p'~1~0~1~1 => of_pos p' (String "B" rest)
-    | p'~1~1~0~0 => of_pos p' (String "C" rest)
-    | p'~1~1~0~1 => of_pos p' (String "D" rest)
-    | p'~1~1~1~0 => of_pos p' (String "E" rest)
-    | p'~1~1~1~1 => of_pos p' (String "F" rest)
-    end.
-  Local Close Scope positive_scope.
-  Definition natToHexStr (n : nat) : string :=
-    match (BinNat.N.of_nat n) with
-    | N0     => "0"
-    | Npos p => of_pos p ""
-    end.
-End Positive.
-
-Definition AddIndexToName name idx := (name ++ "_" ++ natToHexStr idx)%string.
-
-Definition AddIndicesToNames name idxs := map (fun x => AddIndexToName name x) idxs.
-
-
-
-
-
-
-
-
 (* Helper functions for struct - Gallina versions of getters and setters *)
 
 Local Definition option_bind
