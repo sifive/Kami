@@ -758,9 +758,38 @@ Proof.
       reflexivity.
 Qed.
 
+  Theorem getRegisters_makeModule_MERegister: forall a b, getRegisters (makeModule ((MERegister a)::b))=a::getRegisters (makeModule b).
+Proof.
+    simpl.
+    intros.
+    reflexivity.
+Qed.
+
+Theorem getRegisters_makeModule_MERule: forall a b, getRegisters (makeModule ((MERule a)::b))=getRegisters (makeModule b).
+Proof.
+    simpl.
+    intros.
+    reflexivity.
+Qed.
+
+Theorem getRegisters_makeModule_Registers: forall a b, getRegisters (makeModule ((Registers a)++b))=a++getRegisters (makeModule b).
+Proof.
+    simpl.
+    intros.
+    induction a.
+    + simpl.
+      reflexivity.
+    + simpl.
+      rewrite IHa.
+      reflexivity.
+Qed.
+
 Hint Rewrite getAllRegisters_makeModule_MERegister
              getAllRegisters_makeModule_Registers
-           getAllRegisters_makeModule_MERule : kami_rewrite_db.
+             getAllRegisters_makeModule_MERule
+             getRegisters_makeModule_Registers
+             getRegisters_makeModule_MERegister
+             getRegisters_makeModule_MERule : kami_rewrite_db.
 
 Theorem in_app: forall T (x:T) (a:List.list T) (b:List.list T), (List.In x (a++b)) <-> (List.In x a)\/(List.In x b).
 Proof.
@@ -889,6 +918,49 @@ Proof.
 Qed.
 
 Hint Rewrite getAllRules_makeModule_Registers : kami_rewrite_db.
+
+Lemma getRules_makeModule_append: forall a b, getRules (makeModule (a++b))=getRules (makeModule a)++getRules (makeModule b).
+Proof.
+    induction a.
+    + reflexivity.
+    + intros.
+      destruct a.
+      - apply IHa.
+      - unfold makeModule.
+        simpl.
+        simpl in IHa.
+        rewrite IHa.
+        reflexivity.
+      - apply IHa.
+Qed.
+
+Hint Rewrite getRules_makeModule_append : kami_rewrite_db.
+
+Lemma getRules_makeModule_MERegister: forall a b, getRules (makeModule ((MERegister a)::b))=getRules (makeModule b).
+Proof.
+    simpl.
+    reflexivity.
+Qed.
+
+Hint Rewrite getRules_makeModule_MERegister : kami_rewrite_db.
+
+Lemma getRules_makeModule_MERule: forall a b, getRules (makeModule ((MERule a)::b))=a::(getRules (makeModule b)).
+Proof.
+    simpl.
+    reflexivity.
+Qed.
+
+Hint Rewrite getRules_makeModule_MERule : kami_rewrite_db.
+
+Lemma getRules_makeModule_Registers: forall a, getRules (makeModule (Registers a))=[].
+Proof.
+    induction a.
+    + reflexivity.
+    + simpl.
+      apply IHa.
+Qed.
+
+Hint Rewrite getRules_makeModule_Registers : kami_rewrite_db.
 
 Hint Rewrite map_app : kami_rewrite_db.
 
