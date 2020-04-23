@@ -67,8 +67,6 @@ Fixpoint find_dups_aux{X}(acc ps : list (string * X)) : list (string * X * X) :=
 
 Definition find_dups{X} : list (string * X) -> list (string * X * X) := find_dups_aux [].
 
-Local Definition test := [("a", 5); ("b", 156); ("c", 3); ("a", 4); ("d", 46); ("b", 75)].
-
 Definition WfBaseModule_unit(m : BaseModule) :=
      map (fun '(s,x1,x2) => DuplicateMethod s (* (projT1 x1) (projT1 x2) *)) (find_dups (getMethods m))
   ++ map (fun '(s,x1,x2) => DuplicateRegister s (projT1 x1) (projT1 x2)) (find_dups (getRegisters m))
@@ -503,3 +501,29 @@ Proof.
 Qed.
 
 End Proofs.
+
+Section ParametricTheorems.
+
+Lemma WfActionT_unit_new : forall {k}(regs : list RegInitT)(a : forall ty, ActionT ty k), WfActionT_unit regs (a _) = [] ->
+  forall ty, WfActionT_new regs (a ty).
+Proof.
+Admitted.
+
+Lemma WfBaseModule_unit_new : forall b : BaseModule, WfBaseModule_unit b = [] -> forall ty, WfBaseModule_new ty b.
+Proof.
+Admitted.
+
+Lemma WfConcatActionT_unit_new : forall {k}(a : forall ty, ActionT ty k)(m : Mod),
+  WfConcatActionT_unit (a _) m = [] -> forall ty, WfConcatActionT_new (a ty) m.
+Proof.
+Admitted.
+
+Lemma WfConcat_unit_new : forall m1 m2, WfConcat_unit m1 m2 = [] -> forall ty, WfConcat_new ty m1 m2.
+Proof.
+Admitted.
+
+Lemma WfMod_unit_new : forall m, WfMod_unit m = [] -> forall ty, WfMod_new ty m.
+Proof.
+Admitted.
+
+End ParametricTheorems.
