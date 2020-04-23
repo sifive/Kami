@@ -9582,5 +9582,43 @@ Proof.
     rewrite in_map_iff; exists x; split; auto.
 Qed.
 
+Lemma WfExpand' ty k (a : ActionT ty k):
+  forall r1 r2,
+    SubList r1 r2 ->
+    WfActionT r1 a ->
+    WfActionT r2 a.
+Proof.
+  induction a; intros; (inv H1||inv H0); EqDep_subst; econstructor; eauto.
+  - rewrite in_map_iff in H7; dest; inv H1; specialize (H0 _ H2).
+    rewrite in_map_iff; exists x; split; auto.
+  - rewrite in_map_iff in H7; dest; inv H0; specialize (H _ H1).
+    rewrite in_map_iff; exists x; split; auto.
+Qed.
+
+Lemma WfExpand_new ty k (a : ActionT ty k):
+  forall r1 r2,
+    NoDup (map fst r2) ->
+    SubList r1 r2 ->
+    WfActionT_new r1 a ->
+    WfActionT_new r2 a.
+Proof.
+  induction a; simpl in *; intros; dest; try split; eauto.
+  - destruct lookup eqn:G; try contradiction.
+    destruct s.
+    apply lookup_In in G; dest; subst.
+    specialize (SubList_map (fun x => (fst x, projT1 (snd x))) H1) as P.
+    specialize (P _ G).
+    specialize (In_lookup _ _ _ H0 P) as TMP; dest; subst.
+    rewrite H4; split; auto; intros.
+    eapply H; eauto.
+  - destruct lookup eqn:G; try contradiction.
+    destruct s.
+    apply lookup_In in G; dest; subst.
+    specialize (SubList_map (fun x => (fst x, projT1 (snd x))) H0) as P.
+    specialize (P _ G).
+    specialize (In_lookup _ _ _ H P) as TMP; dest; subst.
+    rewrite H3; split; auto; intros.
+    eapply IHa; eauto.
+Qed.
 (* End Basic Properties *)
 

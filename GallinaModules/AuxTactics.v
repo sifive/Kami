@@ -581,7 +581,7 @@ Ltac normalize_key_concl :=
   repeat normalize_key_concl1;
   repeat normalize_key_concl2;
   cbn [fst];
-  repeat (solve_keys || my_simpl_solver).
+  repeat (my_simpl_solver || solve_keys).
 
 Ltac normal_solver :=
   repeat my_simplifier
