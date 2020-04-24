@@ -9570,19 +9570,6 @@ Proof.
 Qed.
 
 Lemma WfExpand ty k (a : ActionT ty k):
-  forall  (m1 m2 : BaseModule),
-    SubList (getRegisters m1) (getRegisters m2) ->
-    WfActionT (getRegisters m1) a ->
-    WfActionT (getRegisters m2) a.
-Proof.
-  induction a; intros; (inv H1||inv H0); EqDep_subst; econstructor; eauto.
-  - rewrite in_map_iff in H7; dest; inv H1; specialize (H0 _ H2).
-    rewrite in_map_iff; exists x; split; auto.
-  - rewrite in_map_iff in H7; dest; inv H0; specialize (H _ H1).
-    rewrite in_map_iff; exists x; split; auto.
-Qed.
-
-Lemma WfExpand' ty k (a : ActionT ty k):
   forall r1 r2,
     SubList r1 r2 ->
     WfActionT r1 a ->
