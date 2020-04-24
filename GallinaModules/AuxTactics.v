@@ -535,7 +535,9 @@ Ltac my_simpl_solver :=
   | [H1 : key_not_In ?s ?l |- ~In ?s (map fst ?l)]
       => rewrite <- key_not_In_fst; apply H1
   | [H1 : key_not_In ?s ?l, H2 : In ?s (map fst ?l) |- _]
-      => exfalso; rewrite key_not_In_fst in H1; contradiction
+    => exfalso; rewrite key_not_In_fst in H1; contradiction
+  | [H1 : ?a <> ?b |- ?b <> ?a]
+    => apply (not_eq_sym H1)
   end.
 
 Ltac or_unify :=
@@ -579,7 +581,7 @@ Ltac normalize_key_concl :=
   repeat normalize_key_concl1;
   repeat normalize_key_concl2;
   cbn [fst];
-  repeat (solve_keys || my_simpl_solver).
+  repeat (my_simpl_solver || solve_keys).
 
 Ltac normal_solver :=
   repeat my_simplifier
@@ -699,25 +701,25 @@ Ltac doUpdRegs_red :=
       rewrite (proj2 (String.eqb_eq (fst r1) (fst r2)) H)
     | H : fst ?r2 = fst ?r1
       |- context [fst ?r1 =? fst ?r2] =>
-      rewrite eqb_sym, (proj2 (String.eqb_eq (fst r2) (fst r1)) H)
+      apply eq_sym in H; rewrite (proj2 (String.eqb_eq (fst r1) (fst r2)) H)
     | H : fst ?r1 <> fst ?r2
       |- context [fst ?r1 =? fst ?r2] =>
       rewrite (proj2 (String.eqb_neq (fst r1) (fst r2)) H)
     | H : fst ?r2 <> fst ?r1
       |- context [fst ?r1 =? fst ?r2] =>
-      rewrite eqb_sym, (proj2 (String.eqb_neq (fst r2) (fst r1)) H) 
+      apply not_eq_sym in H; rewrite (proj2 (String.eqb_neq (fst r1) (fst r2)) H) 
     | H : ?a = ?b
       |- context [?a =? ?b] =>
       rewrite (proj2 (String.eqb_eq a b) H)
     | H : ?b = ?a
       |- context [?a =? ?b] =>
-      rewrite eqb_sym, (proj2 (String.eqb_eq b a) H)
+      apply eq_sym in H; rewrite (proj2 (String.eqb_eq a b) H)
     | H : ?a <> ?b
       |- context [?a =? ?b] =>
       rewrite (proj2 (String.eqb_neq a b) H)
     | H : ?b <> ?a
       |- context [?a =? ?b] =>
-      rewrite eqb_sym, (proj2 (String.eqb_neq b a) H)
+      apply not_eq_sym in H; rewrite (proj2 (String.eqb_neq a b) H)
     end.
 
 Ltac extractGKAs :=
