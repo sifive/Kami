@@ -33,7 +33,7 @@ Fixpoint all_left_Fin{n} : forall {X Y : Fin.t n -> Type}, (forall i : Fin.t n, 
                         | inr _ => None
                         end
   end.
-
+(* 
 Definition coerce_Const_Bool : ConstT Bool -> bool.
 Proof.
   intro c.
@@ -41,20 +41,48 @@ Proof.
   exact b.
 Defined.
 
+Definition coerce_Const_Bit{n} : ConstT (Bit n) -> word n.
+Proof.
+  intro c.
+  dependent destruction c.
+  exact w.
+Defined. *)
+
 Definition back_to_Expr{ty k}(s : ConstT k + Expr ty (SyntaxKind k)) : Expr ty (SyntaxKind k) :=
   match s with
   | inl c => Const ty c
   | inr e => e
   end.
 
+Fixpoint wrap_ConstT{k} : type k -> ConstT k:=
+  match k return type k -> ConstT k with
+  | Bool => ConstBool
+  | Bit n => @ConstBit n
+  | Struct n ks fs => fun c => ConstStruct ks fs (fun i => wrap_ConstT (c i))
+  | Array n k => fun c => ConstArray (fun i => wrap_ConstT (c i))
+  end.
+
 Definition squash_CABool{ty}(xs : list (ConstT Bool  + Expr ty (SyntaxKind Bool)))(op : CABoolOp) :
   ConstT Bool + Expr ty (SyntaxKind Bool) :=
   match all_left_list xs with
   | None => inr (CABool op (map back_to_Expr xs))
-  | Some cs => inl (ConstBool (evalCABool op (map coerce_Const_Bool cs)))
+  | Some cs => inl (ConstBool (evalCABool op (map (@evalConstT _) cs)))
   end.
 
-Search _ (Fin.t _ -> bool).
+Definition squash_CABit{ty n}(xs : list (ConstT (Bit n) + Expr ty (SyntaxKind (Bit n))))(op : CABitOp) : ConstT (Bit n) + Expr ty (SyntaxKind (Bit n)) :=
+  match all_left_list xs with
+  | None => inr (CABit op (map back_to_Expr xs))
+  | Some cs => inl (ConstBit (evalCABit op (map (@evalConstT _) cs)))
+  end.
+
+Check evalKorOp.
+
+
+Definition squash_Kor{ty k}(xs : list (ConstT k + Expr ty (SyntaxKind k))) : ConstT k + Expr ty (SyntaxKind k) :=
+  match all_left_list xs with
+  | None => inr (Kor (map back_to_Expr xs))
+  | Some cs => inl (wrap_ConstT (evalKorOp _ (map (@evalConstT _) cs) (evalConstT (getDefaultConst k))))
+  end.
 
 Fixpoint Const_eqb{k} : ConstT k -> ConstT k -> bool.
 Proof.
@@ -163,7 +191,7 @@ Admitted.
 
 (* simplifies subexpressions which are composed entirely of constants and does branch elim
    when a predicate is constant *)
-Fixpoint simplify_consts{ty k}(e : Expr ty (SyntaxKind k)) : ConstT k + Expr ty (SyntaxKind k).
+Fixpoint simplify_consts{ty k}(e : Expr ty (SyntaxKind k)){struct e} : ConstT k + Expr ty (SyntaxKind k).
 Proof.
   dependent destruction e.
   (* Var *)
@@ -172,24 +200,31 @@ Proof.
   - exact (inl c).
   (* UniBool *)
   - destruct (simplify_consts _ _ e) eqn:G.
-    + dependent destruction c.
-      destruct u eqn:U.
-      exact (inl (ConstBool (negb b))).
+    + exact (inl (ConstBool (evalUniBool u (evalConstT c)))).
     + exact (inr (UniBool u e0)).
   (* CABool *)
   - exact (squash_CABool (map (simplify_consts _ _) l) c).
   (* UniBit *)
-  - admit.
+  - destruct (simplify_consts _ _ e) eqn:G.
+    + exact (inl (ConstBit (evalUniBit u (evalConstT c)))).
+    + exact (inr (UniBit u e0)).
   (* CABit *)
-  - admit.
+  - exact (squash_CABit (map (simplify_consts _ _) l) c).
   (* BinBit *)
-  - admit.
+  - destruct (simplify_consts _ _ e1) eqn:G1; destruct (simplify_consts _ _ e2) eqn:G2.
+    + exact (inl (ConstBit (evalBinBit b (evalConstT c) (evalConstT c0)))).
+    + exact (inr (BinBit b (Const ty c) e)).
+    + exact (inr (BinBit b e (Const ty c))).
+    + exact (inr (BinBit b e e0)).
   (* BinBitBool *)
-  - admit.
+  - destruct (simplify_consts _ _ e1) eqn:G1; destruct (simplify_consts _ _ e2) eqn:G2.
+    + exact (inl (ConstBool (evalBinBitBool b (evalConstT c) (evalConstT c0)))).
+    + exact (inr (BinBitBool b (Const ty c) e)).
+    + exact (inr (BinBitBool b e (Const ty c))).
+    + exact (inr (BinBitBool b e e0)).
   (* ITE *)
   - destruct (simplify_consts _ _ e1) eqn:G1.
-    + dependent destruction c.
-      exact (simplify_consts _ _ (if b then e2 else e3)).
+    + exact (simplify_consts _ _ (if (evalConstT c) then e2 else e3)).
     + exact (inr (ITE e (back_to_Expr (simplify_consts _ _ e2))
                         (back_to_Expr (simplify_consts _ _ e3)))).
   (* Eq *)
@@ -200,24 +235,34 @@ Proof.
     + exact (inr (Eq e e0)).
   (* ReadStruct *)
   - destruct (simplify_consts _ _ e) eqn:G.
-    + dependent destruction c.
-      exact (inl (fv i)).
+    + exact (inl (wrap_ConstT (evalConstT c i))).
     + exact (inr (ReadStruct e0 i)).
   (* BuildStruct *)
   - destruct (all_left_Fin (fun i => simplify_consts _ _ (fv i))).
     + exact (inl (ConstStruct _ _ c)).
     + exact (inr (BuildStruct _ _ (fun i => back_to_Expr (simplify_consts _ _ (fv i))))).
   (* ReadArray *)
-  - admit.
+  - destruct (simplify_consts _ _ e1) eqn:G1; destruct (simplify_consts _ _ e2) eqn:G2.
+    + destruct (lt_dec (Z.to_nat (wordVal _ (evalConstT c0))) n).
+      * exact (inl (wrap_ConstT (evalConstT c (Fin.of_nat_lt l)))).
+      * exact (inl (getDefaultConst _)).
+    + exact (inr (ReadArray (Const ty c) e)).
+    + exact (inr (ReadArray e (Const ty c))).
+    + exact (inr (ReadArray e e0)).
   (* ReadArrayConst *)
-  - admit.
+  - destruct (simplify_consts _ _ e) eqn:G.
+    + exact (inl (wrap_ConstT (evalConstT c t))).
+    + exact (inr (ReadArrayConst e0 t)).
   (* BuildArray *)
-  - admit.
+  - destruct (all_left_Fin (fun i => simplify_consts _ _ (e i))).
+    + exact (inl (ConstArray c)).
+    + exact (inr (BuildArray (fun i => back_to_Expr (simplify_consts _ _ (e i))))).
   (* Kor *)
-  - admit.
-  (* ToNative *)
-  - admit.
-Admitted.
+  - exact (squash_Kor (map (simplify_consts _ _) l)).
+  (* FromNative *)
+  - exact (inr (FromNative _ e)).
+Admitted. (* FIXME *)
+
 
 End Constants.
 
