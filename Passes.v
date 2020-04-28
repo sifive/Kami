@@ -269,9 +269,6 @@ Fixpoint simplify_consts_aux{ty k}(e : Expr ty k) : result ty k :=
 Definition simplify_consts{ty k}(e : Expr ty (SyntaxKind k)) : ConstT k + Expr ty (SyntaxKind k) :=
   simplify_consts_aux e.
 
-Check isEq.
-Check 
-
 End Constants.
 
 Section AssocComConstantSquashing.
