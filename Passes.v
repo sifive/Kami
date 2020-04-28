@@ -226,7 +226,7 @@ Fixpoint simplify_consts_aux{ty k}(e : Expr ty k) : result ty k :=
   | ITE k e1 e2 e3 => match k return Expr ty k -> Expr ty k -> result ty k with
                       | SyntaxKind k' => fun e2 e3 => match simplify_consts_aux e1 with
                                                       | inl c => simplify_consts_aux (if evalConstT c then e2 else e3)
-                                                      | inr e' => inr (ITE e' (back_to_Expr (simplify_consts_aux e2)) (back_to_Expr (simplify_consts_aux e2)))
+                                                      | inr e' => inr (ITE e' (back_to_Expr (simplify_consts_aux e2)) (back_to_Expr (simplify_consts_aux e3)))
                                                       end
                       | NativeKind _ _ => fun _ _ => tt
                       end e2 e3
