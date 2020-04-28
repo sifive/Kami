@@ -75,9 +75,6 @@ Definition squash_CABit{ty n}(xs : list (ConstT (Bit n) + Expr ty (SyntaxKind (B
   | Some cs => inl (ConstBit (evalCABit op (map (@evalConstT _) cs)))
   end.
 
-Check evalKorOp.
-
-
 Definition squash_Kor{ty k}(xs : list (ConstT k + Expr ty (SyntaxKind k))) : ConstT k + Expr ty (SyntaxKind k) :=
   match all_left_list xs with
   | None => inr (Kor (map back_to_Expr xs))
@@ -189,80 +186,91 @@ Proof.
       rewrite H1; reflexivity.
 Admitted.
 
-(* simplifies subexpressions which are composed entirely of constants and does branch elim
-   when a predicate is constant *)
-Fixpoint simplify_consts{ty k}(e : Expr ty (SyntaxKind k)){struct e} : ConstT k + Expr ty (SyntaxKind k).
-Proof.
-  dependent destruction e.
-  (* Var *)
-  - exact (inr (Var _ _ f)).
-  (* Const *)
-  - exact (inl c).
-  (* UniBool *)
-  - destruct (simplify_consts _ _ e) eqn:G.
-    + exact (inl (ConstBool (evalUniBool u (evalConstT c)))).
-    + exact (inr (UniBool u e0)).
-  (* CABool *)
-  - exact (squash_CABool (map (simplify_consts _ _) l) c).
-  (* UniBit *)
-  - destruct (simplify_consts _ _ e) eqn:G.
-    + exact (inl (ConstBit (evalUniBit u (evalConstT c)))).
-    + exact (inr (UniBit u e0)).
-  (* CABit *)
-  - exact (squash_CABit (map (simplify_consts _ _) l) c).
-  (* BinBit *)
-  - destruct (simplify_consts _ _ e1) eqn:G1; destruct (simplify_consts _ _ e2) eqn:G2.
-    + exact (inl (ConstBit (evalBinBit b (evalConstT c) (evalConstT c0)))).
-    + exact (inr (BinBit b (Const ty c) e)).
-    + exact (inr (BinBit b e (Const ty c))).
-    + exact (inr (BinBit b e e0)).
-  (* BinBitBool *)
-  - destruct (simplify_consts _ _ e1) eqn:G1; destruct (simplify_consts _ _ e2) eqn:G2.
-    + exact (inl (ConstBool (evalBinBitBool b (evalConstT c) (evalConstT c0)))).
-    + exact (inr (BinBitBool b (Const ty c) e)).
-    + exact (inr (BinBitBool b e (Const ty c))).
-    + exact (inr (BinBitBool b e e0)).
-  (* ITE *)
-  - destruct (simplify_consts _ _ e1) eqn:G1.
-    + exact (simplify_consts _ _ (if (evalConstT c) then e2 else e3)).
-    + exact (inr (ITE e (back_to_Expr (simplify_consts _ _ e2))
-                        (back_to_Expr (simplify_consts _ _ e3)))).
-  (* Eq *)
-  - destruct (simplify_consts _ _ e1) eqn:G1; destruct (simplify_consts _ _ e2) eqn:G2.
-    + exact (inl (ConstBool (Const_eqb c c0))).
-    + exact (inr (Eq (Const ty c) e)).
-    + exact (inr (Eq e (Const ty c))).
-    + exact (inr (Eq e e0)).
-  (* ReadStruct *)
-  - destruct (simplify_consts _ _ e) eqn:G.
-    + exact (inl (wrap_ConstT (evalConstT c i))).
-    + exact (inr (ReadStruct e0 i)).
-  (* BuildStruct *)
-  - destruct (all_left_Fin (fun i => simplify_consts _ _ (fv i))).
-    + exact (inl (ConstStruct _ _ c)).
-    + exact (inr (BuildStruct _ _ (fun i => back_to_Expr (simplify_consts _ _ (fv i))))).
-  (* ReadArray *)
-  - destruct (simplify_consts _ _ e1) eqn:G1; destruct (simplify_consts _ _ e2) eqn:G2.
-    + destruct (lt_dec (Z.to_nat (wordVal _ (evalConstT c0))) n).
-      * exact (inl (wrap_ConstT (evalConstT c (Fin.of_nat_lt l)))).
-      * exact (inl (getDefaultConst _)).
-    + exact (inr (ReadArray (Const ty c) e)).
-    + exact (inr (ReadArray e (Const ty c))).
-    + exact (inr (ReadArray e e0)).
-  (* ReadArrayConst *)
-  - destruct (simplify_consts _ _ e) eqn:G.
-    + exact (inl (wrap_ConstT (evalConstT c t))).
-    + exact (inr (ReadArrayConst e0 t)).
-  (* BuildArray *)
-  - destruct (all_left_Fin (fun i => simplify_consts _ _ (e i))).
-    + exact (inl (ConstArray c)).
-    + exact (inr (BuildArray (fun i => back_to_Expr (simplify_consts _ _ (e i))))).
-  (* Kor *)
-  - exact (squash_Kor (map (simplify_consts _ _) l)).
-  (* FromNative *)
-  - exact (inr (FromNative _ e)).
-Admitted. (* FIXME *)
+Definition result ty (k : FullKind) : Type :=
+  match k with
+  | SyntaxKind k' => ConstT k' + Expr ty (SyntaxKind k')
+  | NativeKind _ _ => unit
+  end.
 
+Check Kor.
+
+Fixpoint simplify_consts_aux{ty k}(e : Expr ty k) : result ty k :=
+  match e in Expr _ k' return result ty k' with
+  | Var k x => match k return fullType ty k -> result ty k  with
+               | SyntaxKind k' => fun x => inr (Var ty (SyntaxKind k') x)
+               | NativeKind _ _ => fun _ => tt
+               end x
+  | Const _ c => inl c
+  | UniBool o e' => match simplify_consts_aux  e' with
+                    | inl c => inl (ConstBool (evalUniBool o (evalConstT c)))
+                    | inr e'' => inr (UniBool o e'')
+                    end
+  | CABool o es => squash_CABool (map simplify_consts_aux es) o
+  | UniBit n1 n2 o e => match simplify_consts_aux e with
+                        | inl c => (inl (ConstBit (evalUniBit o (evalConstT c))))
+                        | inr e' => inr (UniBit o e')
+                        end
+  | CABit n o es => squash_CABit (map simplify_consts_aux es) o
+  | BinBit n1 n2 n3 o e1 e2 => match simplify_consts_aux e1, simplify_consts_aux e2 with
+                               | inl c1 , inl c2  => inl (ConstBit (evalBinBit o (evalConstT c1) (evalConstT c2)))
+                               | inl c1 , inr e2' => inr (BinBit o (Const ty c1) e2')
+                               | inr e1', inl c2  => inr (BinBit o e1' (Const ty c2))
+                               | inr e1', inr e2' => inr (BinBit o e1' e2')
+                               end
+  | BinBitBool n1 n2 o e1 e2 => match simplify_consts_aux e1, simplify_consts_aux e2 with
+                               | inl c1 , inl c2  => inl (ConstBool (evalBinBitBool o (evalConstT c1) (evalConstT c2)))
+                               | inl c1 , inr e2' => inr (BinBitBool o (Const ty c1) e2')
+                               | inr e1', inl c2  => inr (BinBitBool o e1' (Const ty c2))
+                               | inr e1', inr e2' => inr (BinBitBool o e1' e2')
+                               end
+  | ITE k e1 e2 e3 => match k return Expr ty k -> Expr ty k -> result ty k with
+                      | SyntaxKind k' => fun e2 e3 => match simplify_consts_aux e1 with
+                                                      | inl c => simplify_consts_aux (if evalConstT c then e2 else e3)
+                                                      | inr e' => inr (ITE e' (back_to_Expr (simplify_consts_aux e2)) (back_to_Expr (simplify_consts_aux e2)))
+                                                      end
+                      | NativeKind _ _ => fun _ _ => tt
+                      end e2 e3
+  | Eq k e1 e2 => match simplify_consts_aux e1, simplify_consts_aux e2 with
+                  | inl c1, inl c2   => inl (ConstBool (Const_eqb c1 c2))
+                  | inl c1, inr e2'  => inr (Eq (Const ty c1) e2')
+                  | inr e1', inl c2  => inr (Eq e1' (Const ty c2))
+                  | inr e1', inr e2' => inr (Eq e1' e2')
+                  end
+  | ReadStruct n fk fs e i => match simplify_consts_aux e with
+                              | inl c => inl (wrap_ConstT (evalConstT c i))
+                              | inr e' => inr (ReadStruct e' i)
+                              end
+  | BuildStruct n fk fs fv => match all_left_Fin (fun i => simplify_consts_aux (fv i)) with
+                              | Some c => inl (ConstStruct _ _ c)
+                              | None => inr (BuildStruct _ _ (fun i => back_to_Expr (simplify_consts_aux (fv i))))
+                              end
+  | ReadArray n m k e1 e2 => match simplify_consts_aux e1, simplify_consts_aux e2 with
+                             | inl c1, inl c2 => match lt_dec (Z.to_nat (wordVal _ (evalConstT c2))) n with
+                                                 | left pf => inl (wrap_ConstT (evalConstT c1 (Fin.of_nat_lt pf)))
+                                                 | _ => inl (getDefaultConst _)
+                                                 end
+                             | inl c1, inr e2' => inr (ReadArray (Const ty c1) e2')
+                             | inr e1', inl c2 => inr (ReadArray e1' (Const ty c2))
+                             | inr e1', inr e2' => inr (ReadArray e1' e2')
+                             end
+  | ReadArrayConst n k e i => match simplify_consts_aux e with
+                              | inl c => inl (wrap_ConstT (evalConstT c i))
+                              | inr e' => inr (ReadArrayConst e' i)
+                              end
+  | BuildArray n k es => match all_left_Fin (fun i => simplify_consts_aux (es i)) with
+                         | Some c => inl (ConstArray c)
+                         | None => inr (BuildArray (fun i => back_to_Expr (simplify_consts_aux (es i))))
+                         end
+  | Kor k es => squash_Kor (map simplify_consts_aux es)
+  | ToNative k e => tt
+  | FromNative k e => inr (FromNative k e)
+  end.
+
+Definition simplify_consts{ty k}(e : Expr ty (SyntaxKind k)) : ConstT k + Expr ty (SyntaxKind k) :=
+  simplify_consts_aux e.
+
+Check isEq.
+Check 
 
 End Constants.
 
