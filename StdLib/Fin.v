@@ -320,3 +320,30 @@ Definition fin_case (n : nat)
   | inl u => match u with tt => fun _ f1 _ => f1 end
   | inr j => fun _ _ fs => fs j
   end.
+
+(* TODO: LLEE: replace the fin_dep_destruct tactic from EclecticLib. *)
+
+Lemma Fin_cast_lemma : forall (n m : nat) (i : Fin n) (H H0 : n = m), cast i H = cast i H0.
+Proof.
+  intros n m i H H0.
+  rewrite (proof_irrelevance (n = m) H H0).
+  reflexivity.
+Qed.
+
+Lemma fin_to_nat_cast : forall (n : nat) (i: Fin n) (m : nat) (H: n = m),
+  proj1_sig (to_nat (cast i H)) = proj1_sig (to_nat i).
+Proof.
+  induction n as [|n].
+  + exact (case0 (fun i => forall m H, proj1_sig (to_nat (cast i H)) = proj1_sig (to_nat i))).
+  + destruct i as [i|j].
+    - destruct m as [|m].
+      * intro H; contradict H; exact (Nat.neq_succ_0 n).
+      * intro H; reflexivity.
+    - destruct m as [|m].
+      * intro H; contradict H; exact (Nat.neq_succ_0 n).
+      * intro H.
+        simpl.
+        exact (f_equal S (IHn j m (Nat.succ_inj n m H))).
+Qed.
+
+
