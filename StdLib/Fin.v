@@ -209,4 +209,114 @@ Proof.
   + contradiction.
 Qed.
 
-Definition cast {n} (i: Fin n) {m} (H : n = m) : Fin m := eq_rect n Fin i m H.
+Local Fixpoint cast_aux {n} {m} : n = m -> Fin n -> Fin m :=
+  match n, m with
+  | 0, m     => fun _ => case0 (fun _ => Fin m)
+  | S n, 0   => fun (H : S n = 0) _ => False_rect (Fin 0) (Nat.neq_succ_0 n H)
+  | S n, S m =>
+    fun (H : S n = S m) i =>
+      match i with
+      | inl _ => @F1 m
+      | inr j => FS (cast_aux (Nat.succ_inj n m H) j)
+      end
+  end.
+
+Definition cast {n} (i: Fin n) {m} (H : n = m) : Fin m := cast_aux H i.
+
+Lemma cast_eq {n} : forall (i : Fin n) (H : n = n), i = cast i H.
+Proof.
+  induction n.
+  + exact (case0 (fun i => forall H : 0 = 0, i = cast i H)).
+  + induction i as [i|j].
+    - intro H; simpl; destruct i; reflexivity.
+    - intro H. 
+      exact (f_equal (@inr unit (Fin n)) (IHn j (Nat.succ_inj n n H))).
+Qed.
+
+Fixpoint Fin_foldr {A : Type} (n : nat) (init : A) : forall (f : Fin n -> A -> A), A :=
+  match n with
+  | 0 => fun _ => init
+  | S n => fun f => f F1 (Fin_foldr n init (fun i => f (FS i)))
+  end.
+
+Fixpoint nth_Fin {A : Type} (xs : list A) : Fin (length xs) -> A :=
+  match xs with
+  | [] => case0 (fun _ => A)
+  | x :: xs =>
+    fun i =>
+      match i with
+      | inl _ => x
+      | inr j => nth_Fin xs j
+      end
+  end.
+
+Definition nth_Fin' {A : Type} (xs : list A) {n : nat} (H : n = length xs) (i : Fin n) : A :=
+  nth_Fin xs (cast i H).
+
+Fixpoint nth_Fin'' {A : Type} (xs : list A) : forall n : nat, n <= length xs -> Fin n -> A :=
+  match xs as ys return forall n, n <= length ys -> Fin n -> A with
+  | [] =>
+    fun n (H : n <= 0) (i : Fin n) =>
+      let Heq : n = 0 := eq_sym (Le.le_n_0_eq n H) in
+      case0 (fun _ => A) (cast i Heq)
+  | y :: ys =>
+    fun n =>
+      match n as m return m <= length (y :: ys) -> Fin m -> A with
+      | 0 => fun _ => case0 (fun _ => A)
+      | S m =>
+        fun (H : S m <= S (length ys)) (i : Fin (S m)) =>
+          match i with
+          | inl _ => y
+          | inr j => nth_Fin'' ys m (le_S_n _ _ H) j
+          end
+      end
+  end.
+
+Lemma nth_Fin'_nth {A : Type} : forall (n : nat) (default : A) (i : Fin n) (xs : list A) (H : n = length xs), 
+  nth_Fin' xs H i = nth (proj1_sig (to_nat i)) xs default.
+Proof.
+  induction n.
+  + exact (fun default => case0 (fun i => forall xs (H : 0 = length xs), nth_Fin' xs H i = nth (proj1_sig (to_nat i)) xs default)).
+  + intro default.
+    destruct i as [i|j].
+    - destruct i.
+      destruct xs as [|x xs].
+      * exact (fun Hcontr => False_ind _ (Nat.neq_succ_0 _ Hcontr)).
+      * intro H.
+        unfold nth_Fin'.
+        simpl.
+        reflexivity.
+    - destruct xs as [|x xs].
+      * intro H.
+        contradict H.
+        exact (Nat.neq_succ_0 n).
+      * intro H.
+        unfold nth_Fin'.
+        simpl.
+        unfold nth_Fin' in IHn.
+        exact (IHn default j xs (Nat.succ_inj n (length xs) H)).
+Qed.
+
+Lemma nth_Fin_nth {A : Type} (default : A) : forall (xs : list A) (i : Fin (length xs)),
+  nth_Fin xs i = nth (proj1_sig (to_nat i)) xs default.
+Proof.
+  induction xs.
+  + exact (case0 (fun i => nth_Fin [] i = nth (proj1_sig (to_nat i)) [] default)).
+  + destruct i as [i|j].
+    - reflexivity.
+    - exact (IHxs j).
+Qed.
+
+Definition fin_case (n : nat)
+  (i : Fin (S n)) : forall
+  (F : Fin (S n) -> Type)
+  (f1 : F F1)
+  (fs : forall j, F (FS j)), F i :=
+  match i return
+    forall F : Fin (S n) -> Type,
+      F (@inl unit (Fin n) tt) ->
+      (forall j : Fin n, F (@FS n j)) ->
+      F i with
+  | inl u => match u with tt => fun _ f1 _ => f1 end
+  | inr j => fun _ _ fs => fs j
+  end.
