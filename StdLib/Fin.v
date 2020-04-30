@@ -415,7 +415,7 @@ Fixpoint getFinsBound n m : list (Fin m) :=
     end
   end.
 
-Definition mapOrFins (n : nat) (i : Fin n) := fold_left (fun acc x => i = x \/ acc) (getFins n) False.
+Definition mapOrFins {n : nat} (i : Fin n) := fold_left (fun acc x => i = x \/ acc) (getFins n) False.
 
 Lemma getFins_length : forall n, length (getFins n) = n.
 Proof.
@@ -433,6 +433,20 @@ Proof.
     - simpl. right. exact (in_map FS (getFins n) j (IH j)).
 Qed.
 
-Lemma getFins_nth_error : forall n (i: Fin.t n),
-  let i' := proj1_sig (Fin.to_nat i) in
-  nth_error (getFins n) i' = Some i.
+Lemma getFins_nth_error : forall {n} (i : Fin n),
+  nth_error (getFins n) (proj1_sig (to_nat i)) = Some i.
+Proof.
+  induction n as [|n IH].
+  + exact (case0 (fun i => nth_error (getFins 0) (proj1_sig (to_nat i)) = Some i)).
+  + destruct i as [u|j].
+    - destruct u; reflexivity.
+    - simpl; exact (@map_nth_error _ _ FS (proj1_sig (to_nat j)) (getFins n) j (IH j)).
+Qed.
+
+Lemma getFins_nth {A : Type} : forall n (default : Fin n) (i : Fin n),
+  nth (proj1_sig (to_nat i)) (getFins n) default = i.
+Proof.
+  intros.
+  apply nth_error_nth.
+  apply getFins_nth_error.
+Qed.
