@@ -404,3 +404,35 @@ Fixpoint getFins (n : nat) : list (Fin n) :=
   | 0 => []
   | S m => F1 :: map FS (getFins m)
   end.
+
+Fixpoint getFinsBound n m : list (Fin m) :=
+  match n with
+  | 0 => []
+  | S n =>
+    match m with
+    | 0 => []
+    | S m => F1 :: map FS (getFinsBound n m)
+    end
+  end.
+
+Definition mapOrFins (n : nat) (i : Fin n) := fold_left (fun acc x => i = x \/ acc) (getFins n) False.
+
+Lemma getFins_length : forall n, length (getFins n) = n.
+Proof.
+  induction n as [|n IH].
+  + reflexivity.
+  + simpl; rewrite map_length; rewrite IH; reflexivity.
+Qed.
+
+Lemma getFins_all : forall n (i : Fin n), In i (getFins n).
+Proof.
+  induction n as [|n IH].
+  + exact (case0 (fun i => In i (getFins 0))).
+  + destruct i as [u|j].
+    - destruct u; left; reflexivity.
+    - simpl. right. exact (in_map FS (getFins n) j (IH j)).
+Qed.
+
+Lemma getFins_nth_error : forall n (i: Fin.t n),
+  let i' := proj1_sig (Fin.to_nat i) in
+  nth_error (getFins n) i' = Some i.
