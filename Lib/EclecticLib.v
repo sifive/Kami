@@ -3538,8 +3538,6 @@ Section FifoProps.
     rewrite <- (Z.mod_small _ _ P), Zminus_mod_idemp_l; reflexivity.
   Qed.
 
-(* TODO: LLEE: port this lemma over after talking with TJ. *)
-(*
   Lemma listSnoc (val : A) :
     cutLen <> Z.of_nat size ->
     snoc val specList
@@ -3641,7 +3639,9 @@ Section FifoProps.
           -- rewrite H in P4.
              assert (enqP1 - deqP1 = Z.of_nat m)%Z as P5 by lia.
              rewrite P5, Z.mod_small in l; try lia.
-    - assert (length (convertToList (fun i : t size => if Kami.StdLib.Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)) = size) as P.
+        * rewrite <- (Nat2Z.id m), <- Z2Nat.inj_lt in l; lia.
+        * rewrite <- (Nat2Z.id m), <- Z2Nat.inj_lt in l; lia.
+    - assert (length (convertToList (fun i : Fin size => if Kami.StdLib.Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)) = size) as P.
         { unfold convertToList, list_arr.
           rewrite map_length, getFins_length; reflexivity.
         }
@@ -3678,7 +3678,7 @@ Section FifoProps.
         rewrite <- P0 at 1.
         rewrite list_arr_correct_simple, Fineqb_refl; reflexivity.
   Qed.
-*) 
+
 End FifoProps.
 
 Lemma app_emptyb {A : Type} (l1 l2 : list A) :
