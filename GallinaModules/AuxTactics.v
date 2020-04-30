@@ -670,30 +670,30 @@ Ltac goal_body :=
     => eapply SemActionExpand;[| apply H; sublist_sol]
   end.
 
-Ltac doUpdRegs_red :=  
-  repeat 
-    (match goal with
-     | [ |- context [ doUpdRegs nil _]] => rewrite doUpdRegs_nil
-     | [ |- context [ doUpdReg nil _]] => rewrite doUpdReg_nil
-     | |- context [ oneUpdRegs ?r ?o ] =>
-       let TMP := fresh "H" in
-       assert (TMP : ~ In (fst r) (map fst o));
-       [ repeat
-           match goal with
-           | |- context [ map fst (doUpdRegs _ _) ] => rewrite doUpdRegs_preserves_keys
-           end; (solve_keys || my_simpl_solver)
-       | rewrite (oneUpdRegs_notIn _ _ TMP); clear TMP ]
-     | |- context [ doUpdReg ?u ?r ] =>
-       let TMP := fresh "H" in
-       assert (TMP : ~ In (fst r) (map fst u));
-       [ repeat
-           match goal with
-           | |- context [ map fst (doUpdRegs _ _) ] => rewrite doUpdRegs_preserves_keys
-           end; (solve_keys || my_simpl_solver)
-       | rewrite (doUpdReg_notIn _ _ TMP); clear TMP ]; cbn[fst]
-     end);
-  repeat
-    match goal with
+Ltac doUpdRegs_red1 :=
+  match goal with
+  | [ |- context [ doUpdRegs nil _]] => rewrite doUpdRegs_nil
+  | [ |- context [ doUpdReg nil _]] => rewrite doUpdReg_nil
+  | |- context [ oneUpdRegs ?r ?o ] =>
+    let TMP := fresh "H" in
+    assert (TMP : ~ In (fst r) (map fst o));
+    [ repeat
+        match goal with
+        | |- context [ map fst (doUpdRegs _ _) ] => rewrite doUpdRegs_preserves_keys
+        end; (solve_keys || my_simpl_solver)
+    | rewrite (oneUpdRegs_notIn _ _ TMP); clear TMP ]
+  | |- context [ doUpdReg ?u ?r ] =>
+    let TMP := fresh "H" in
+    assert (TMP : ~ In (fst r) (map fst u));
+    [ repeat
+        match goal with
+        | |- context [ map fst (doUpdRegs _ _) ] => rewrite doUpdRegs_preserves_keys
+        end; (solve_keys || my_simpl_solver)
+    | rewrite (doUpdReg_notIn _ _ TMP); clear TMP ]; cbn[fst]
+  end.
+
+Ltac doUpdRegs_red2 :=
+  match goal with
     | |- context [oneUpdReg _ _ ] => cbv [oneUpdReg fst]
     | [|- context [?a =? ?a]] => rewrite eqb_refl 
     | H : fst ?r1 = fst ?r2
@@ -721,6 +721,43 @@ Ltac doUpdRegs_red :=
       |- context [?a =? ?b] =>
       apply not_eq_sym in H; rewrite (proj2 (String.eqb_neq a b) H)
     end.
+
+Ltac doUpdRegs_red3 :=
+  match goal with
+    | |- context [doUpdReg _ _ ] => cbv [doUpdReg findReg fst]
+    | [|- context [?a =? ?a]] => rewrite eqb_refl 
+    | H : fst ?r1 = fst ?r2
+      |- context [fst ?r1 =? fst ?r2] =>
+      rewrite (proj2 (String.eqb_eq (fst r1) (fst r2)) H)
+    | H : fst ?r2 = fst ?r1
+      |- context [fst ?r1 =? fst ?r2] =>
+      apply eq_sym in H; rewrite (proj2 (String.eqb_eq (fst r1) (fst r2)) H)
+    | H : fst ?r1 <> fst ?r2
+      |- context [fst ?r1 =? fst ?r2] =>
+      rewrite (proj2 (String.eqb_neq (fst r1) (fst r2)) H)
+    | H : fst ?r2 <> fst ?r1
+      |- context [fst ?r1 =? fst ?r2] =>
+      apply not_eq_sym in H; rewrite (proj2 (String.eqb_neq (fst r1) (fst r2)) H) 
+    | H : ?a = ?b
+      |- context [?a =? ?b] =>
+      rewrite (proj2 (String.eqb_eq a b) H)
+    | H : ?b = ?a
+      |- context [?a =? ?b] =>
+      apply eq_sym in H; rewrite (proj2 (String.eqb_eq a b) H)
+    | H : ?a <> ?b
+      |- context [?a =? ?b] =>
+      rewrite (proj2 (String.eqb_neq a b) H)
+    | H : ?b <> ?a
+      |- context [?a =? ?b] =>
+      apply not_eq_sym in H; rewrite (proj2 (String.eqb_neq a b) H)
+     end.
+
+Ltac doUpdRegs_red := repeat (
+                          match goal with
+                          | _ => doUpdRegs_red1
+                          | _ => doUpdRegs_red2
+                          | _ => doUpdRegs_red3
+                          end).
 
 Ltac extractGKAs :=
   let var := fresh "x" in
