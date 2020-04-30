@@ -150,6 +150,83 @@ Section Phoas.
   | FromNative k: Expr (@NativeKind (type k) (evalConstT (getDefaultConst k))) ->
                   Expr (SyntaxKind k).
 
+
+  Fixpoint Expr_ind2 (P : forall f : FullKind, Expr f -> Prop)
+       (Hvar : forall (k : FullKind) (f : fullType k), P k (Var k f))
+       (Hconst : forall (k : Kind) (c : ConstT k), P (SyntaxKind k) (Const c))
+       (Hunibool : forall (u : UniBoolOp) (e : Expr (SyntaxKind Bool)),
+        P (SyntaxKind Bool) e -> P (SyntaxKind Bool) (UniBool u e))
+       (Hcabool : forall (c : CABoolOp) (l : list (Expr (SyntaxKind Bool))), Forall (P _) l ->
+        P (SyntaxKind Bool) (CABool c l))
+       (Hunibit : forall (n1 n2 : nat) (u : UniBitOp n1 n2) (e : Expr (SyntaxKind (Bit n1))),
+        P (SyntaxKind (Bit n1)) e -> P (SyntaxKind (Bit n2)) (UniBit u e))
+       (Hcabit : forall (n : nat) (c : CABitOp) (l : list (Expr (SyntaxKind (Bit n)))), Forall (P _) l ->
+        P (SyntaxKind (Bit n)) (CABit c l))
+       (Hbinbit : forall (n1 n2 n3 : nat) (b : BinBitOp n1 n2 n3) (e : Expr (SyntaxKind (Bit n1))),
+        P (SyntaxKind (Bit n1)) e ->
+        forall e0 : Expr (SyntaxKind (Bit n2)),
+        P (SyntaxKind (Bit n2)) e0 -> P (SyntaxKind (Bit n3)) (BinBit b e e0))
+       (Hbinbitbool : forall (n1 n2 : nat) (b : BinBitBoolOp n1 n2) (e : Expr (SyntaxKind (Bit n1))),
+        P (SyntaxKind (Bit n1)) e ->
+        forall e0 : Expr (SyntaxKind (Bit n2)),
+        P (SyntaxKind (Bit n2)) e0 -> P (SyntaxKind Bool) (BinBitBool b e e0))
+       (Hite : forall (k : FullKind) (e : Expr (SyntaxKind Bool)),
+        P (SyntaxKind Bool) e ->
+        forall e0 : Expr k, P k e0 -> forall e1 : Expr k, P k e1 -> P k (ITE e e0 e1))
+       (Heq : forall (k : Kind) (e : Expr (SyntaxKind k)),
+        P (SyntaxKind k) e ->
+        forall e0 : Expr (SyntaxKind k),
+        P (SyntaxKind k) e0 -> P (SyntaxKind Bool) (Eq e e0))
+       (Hreadstruct : forall (n : nat) (fk : t n -> Kind) (fs : t n -> string)
+          (e : Expr (SyntaxKind (Struct fk fs))),
+        P (SyntaxKind (Struct fk fs)) e ->
+        forall i : t n, P (SyntaxKind (fk i)) (ReadStruct e i))
+       (Hbuildstruct : forall (n : nat) (fk : t n -> Kind) (fs : t n -> string)
+          (fv : forall i : t n, Expr (SyntaxKind (fk i))),
+        (forall i : t n, P (SyntaxKind (fk i)) (fv i)) ->
+        P (SyntaxKind (Struct fk fs)) (BuildStruct fk fs fv))
+       (Hreadarray : forall (n m : nat) (k : Kind) (e : Expr (SyntaxKind (Array n k))),
+        P (SyntaxKind (Array n k)) e ->
+        forall e0 : Expr (SyntaxKind (Bit m)),
+        P (SyntaxKind (Bit m)) e0 -> P (SyntaxKind k) (ReadArray e e0))
+       (Hreadarrayconst : forall (n : nat) (k : Kind) (e : Expr (SyntaxKind (Array n k))),
+        P (SyntaxKind (Array n k)) e -> forall t : t n, P (SyntaxKind k) (ReadArrayConst e t))
+       (Hbuildarray : forall (n : nat) (k : Kind) (e : t n -> Expr (SyntaxKind k)),
+        (forall t : t n, P (SyntaxKind k) (e t)) -> P (SyntaxKind (Array n k)) (BuildArray e))
+       (Hkor : forall (k : Kind) (l : list (Expr (SyntaxKind k))), Forall (P _) l -> P (SyntaxKind k) (Kor l))
+       (Htonative : forall (k : Kind) (e : Expr (SyntaxKind k)),
+        P (SyntaxKind k) e -> P (NativeKind (evalConstT Default)) (ToNative e))
+       (Hfromnative : forall (k : Kind) (e : Expr (NativeKind (evalConstT Default))),
+        P (NativeKind (evalConstT Default)) e -> P (SyntaxKind k) (FromNative k e))(f17 : FullKind)(e : Expr f17) : P f17 e.
+  Proof.
+    destruct e.
+    - apply Hvar.
+    - apply Hconst.
+    - apply Hunibool; apply Expr_ind2; auto.
+    - apply Hcabool; induction l; constructor.
+      + apply Expr_ind2; auto.
+      + auto.
+    - apply Hunibit; apply Expr_ind2; auto.
+    - apply Hcabit; induction l; constructor.
+      + apply Expr_ind2; auto.
+      + auto.
+    - apply Hbinbit; apply Expr_ind2; auto.
+    - apply Hbinbitbool; apply Expr_ind2; auto.
+    - apply Hite; apply Expr_ind2; auto.
+    - apply Heq; apply Expr_ind2; auto.
+    - apply Hreadstruct; apply Expr_ind2; auto.
+    - apply Hbuildstruct; intro; apply Expr_ind2; auto.
+    - apply Hreadarray; apply Expr_ind2; auto.
+    - apply Hreadarrayconst; apply Expr_ind2; auto.
+    - apply Hbuildarray; intro; apply Expr_ind2; auto.
+    - apply Hkor; induction l; constructor.
+      + apply Expr_ind2; auto.
+      + auto.
+    - apply Htonative; apply Expr_ind2; auto.
+    - apply Hfromnative; apply Expr_ind2; auto.
+  Qed.
+
+
   Definition UpdateArray n m k (e: Expr (SyntaxKind (Array n k)))
              (i: Expr (SyntaxKind (Bit m)))
              (v: Expr (SyntaxKind k)) :=

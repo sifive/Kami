@@ -1,7 +1,5 @@
 Require Import Kami.Syntax Program.
 
-Axiom cheat : forall {X},X.
-
 Section Constants.
 
 Fixpoint all_left_list{X Y}(zs : list (X + Y)) : option (list X) :=
@@ -14,13 +12,20 @@ Fixpoint all_left_list{X Y}(zs : list (X + Y)) : option (list X) :=
   | inr _ :: _ => None
   end.
 
-Definition FinFunc_cons{n}{X : Fin.t (S n) -> Type}(x : X F1)(f : forall i, X (FS i)) : forall i, X i.
+Lemma all_left_list_correct : forall {X Y}(zs : list (X + Y))(xs : list X),
+  all_left_list zs = Some xs -> zs = map inl xs.
 Proof.
-  intro i.
-  dependent destruction i.
-  - exact x.
-  - exact (f i).
-Defined.
+  induction zs; intros.
+  - inversion H; reflexivity.
+  - simpl in H.
+    + destruct a.
+      * destruct (all_left_list zs) eqn:G.
+        ** inversion H.
+           simpl; f_equal.
+           apply IHzs; auto.
+        ** discriminate.
+      * discriminate.
+Qed.
 
 Fixpoint all_left_Fin{n} : forall {X Y : Fin.t n -> Type}, (forall i : Fin.t n, X i + Y i) -> option (forall i, X i) :=
   match n return forall X Y : Fin.t n -> Type, (forall i : Fin.t n, X i + Y i) -> option (forall i, X i) with
@@ -28,25 +33,32 @@ Fixpoint all_left_Fin{n} : forall {X Y : Fin.t n -> Type}, (forall i : Fin.t n, 
   | S m => fun X Y f => match f F1 with
                         | inl x => match @all_left_Fin m (fun i => X (FS i)) (fun i => Y (FS i)) (fun i => f (FS i)) with
                                    | None => None
-                                   | Some g => Some (FinFunc_cons x g)
+                                   | Some g => Some (fun i => fin_case i _ x g)
                                    end
                         | inr _ => None
                         end
   end.
-(* 
-Definition coerce_Const_Bool : ConstT Bool -> bool.
-Proof.
-  intro c.
-  dependent destruction c.
-  exact b.
-Defined.
 
-Definition coerce_Const_Bit{n} : ConstT (Bit n) -> word n.
+Lemma all_left_Fin_correct{n} : forall {X Y : Fin.t n -> Type}(f : forall i, X i + Y i)(g : forall i, X i),
+  all_left_Fin f = Some g -> forall i, f i = inl (g i).
 Proof.
-  intro c.
-  dependent destruction c.
-  exact w.
-Defined. *)
+  induction n; intros.
+  - dependent destruction i.
+  - dependent destruction i.
+    + simpl in H.
+      destruct (f F1).
+      * destruct all_left_Fin.
+        ** inversion H; reflexivity.
+        ** discriminate.
+      * discriminate.
+    + apply (IHn (fun i => X (FS i)) (fun i => Y (FS i)) (fun i => f (FS i)) (fun i => g (FS i))).
+      simpl in H.
+      destruct (f F1).
+      * destruct all_left_Fin.
+        ** inversion H; reflexivity.
+        ** discriminate.
+      * discriminate.
+Qed.
 
 Definition back_to_Expr{ty k}(s : ConstT k + Expr ty (SyntaxKind k)) : Expr ty (SyntaxKind k) :=
   match s with
@@ -61,6 +73,19 @@ Fixpoint wrap_ConstT{k} : type k -> ConstT k:=
   | Struct n ks fs => fun c => ConstStruct ks fs (fun i => wrap_ConstT (c i))
   | Array n k => fun c => ConstArray (fun i => wrap_ConstT (c i))
   end.
+
+Lemma eval_wrap : forall {k}(x : type k), evalConstT (wrap_ConstT x) = x.
+Proof.
+  induction k; intro.
+  - reflexivity.
+  - reflexivity.
+  - simpl; apply functional_extensionality_dep.
+    intro.
+    apply H.
+  - simpl; apply functional_extensionality.
+    intro.
+    apply IHk.
+Qed.
 
 Definition squash_CABool{ty}(xs : list (ConstT Bool  + Expr ty (SyntaxKind Bool)))(op : CABoolOp) :
   ConstT Bool + Expr ty (SyntaxKind Bool) :=
@@ -81,118 +106,11 @@ Definition squash_Kor{ty k}(xs : list (ConstT k + Expr ty (SyntaxKind k))) : Con
   | Some cs => inl (wrap_ConstT (evalKorOp _ (map (@evalConstT _) cs) (evalConstT (getDefaultConst k))))
   end.
 
-Fixpoint Const_eqb{k} : ConstT k -> ConstT k -> bool.
-Proof.
-  destruct k; intros c1 c2;
-  dependent destruction c1;
-  dependent destruction c2.
-  - exact (Bool.eqb b b0).
-  - exact (weqb w w0).
-  - exact (Fin_forallb (fun i => Const_eqb (k i) (fv i) (fv0 i))).
-  - exact (Fin_forallb (fun i => Const_eqb k (fk i) (fk0 i))).
-Defined.
-
-Lemma weqb_refl : forall (n : nat)(x : word n), weqb x x = true.
-Proof.
-  intros.
-  destruct (weqb x x) eqn:G.
-  - reflexivity.
-  - elim (weqb_false _ _ G eq_refl).
-Qed.
-
-Lemma Const_eqb_correct : forall (k : Kind)(c1 c2 : ConstT k), Const_eqb c1 c2 = true <-> c1 = c2.
-Proof.
-  dependent induction c1; dependent destruction c2.
-  - split; intro.
-    + destruct (eqb_true_iff b b0).
-      rewrite (H0 H); reflexivity.
-    + inversion H; apply eqb_true_iff; auto.
-  - split; intro.
-    + rewrite (weqb_true _ _ H); reflexivity.
-    + rewrite H.
-      apply weqb_refl.
-  - split; intro.
-    + f_equal.
-      apply functional_extensionality_dep.
-      intro.
-      simpl in H0.
-      unfold simplification_existT1 in H0.
-      unfold solution_left in H0.
-      unfold eq_rect_r in H0.
-      unfold eq_rect in H0.
-      unfold eq_sym in H0.
-      unfold f_equal in H0.
-      unfold simplification_existT2 in H0.
-      assert (Eqdep.EqdepTheory.inj_pair2 nat (fun n => t n -> string) n fs fs eq_refl = eq_refl).
-      admit.
-      rewrite H1 in H0.
-      assert (Eqdep.EqdepTheory.inj_pair2 nat (fun n => t n -> Kind) n fk fk eq_refl = eq_refl).
-      admit.
-      rewrite H2 in H0.
-      rewrite H1 in H0.
-      rewrite H2 in H0.
-      simpl.
-      Search _ Fin_forallb.
-      rewrite Fin_forallb_correct in H0.
-      apply H.
-      apply H0.
-    + simpl.
-      unfold simplification_existT1.
-      unfold solution_left.
-      unfold eq_rect_r.
-      unfold eq_rect.
-      unfold eq_sym.
-      unfold f_equal.
-      unfold simplification_existT2.
-      assert (Eqdep.EqdepTheory.inj_pair2 nat (fun n0 => t n0 -> string) n fs fs eq_refl = eq_refl).
-      admit.
-      rewrite H1.
-      assert (Eqdep.EqdepTheory.inj_pair2 nat (fun n0 => t n0 -> Kind) n fk fk eq_refl = eq_refl).
-      admit.
-      rewrite H2.
-      rewrite H1.
-      rewrite H2.
-      rewrite Fin_forallb_correct.
-      intro.
-      apply H.
-      inversion H0.
-      assert (fv = fv0).
-      admit.
-      rewrite H3; reflexivity.
-  - split; intro.
-    + f_equal.
-      apply functional_extensionality.
-      intro.
-      simpl in H0.
-      unfold solution_left in H0.
-      unfold eq_rect_r in H0.
-      unfold eq_rect in H0.
-      unfold eq_sym in H0.
-      unfold f_equal in H0.
-      rewrite Fin_forallb_correct in H0.
-      apply H.
-      apply H0.
-    + simpl.
-      unfold solution_left.
-      unfold eq_rect_r.
-      unfold eq_rect.
-      unfold eq_sym.
-      unfold f_equal.
-      rewrite Fin_forallb_correct.
-      intro.
-      apply H.
-      assert (fk = fk0).
-      admit.
-      rewrite H1; reflexivity.
-Admitted.
-
 Definition result ty (k : FullKind) : Type :=
   match k with
   | SyntaxKind k' => ConstT k' + Expr ty (SyntaxKind k')
   | NativeKind _ _ => unit
   end.
-
-Check Kor.
 
 Fixpoint simplify_consts_aux{ty k}(e : Expr ty k) : result ty k :=
   match e in Expr _ k' return result ty k' with
@@ -231,7 +149,7 @@ Fixpoint simplify_consts_aux{ty k}(e : Expr ty k) : result ty k :=
                       | NativeKind _ _ => fun _ _ => tt
                       end e2 e3
   | Eq k e1 e2 => match simplify_consts_aux e1, simplify_consts_aux e2 with
-                  | inl c1, inl c2   => inl (ConstBool (Const_eqb c1 c2))
+                  | inl c1, inl c2   => inl (ConstBool (getBool (isEq _ (evalConstT c1) (evalConstT c2))))
                   | inl c1, inr e2'  => inr (Eq (Const ty c1) e2')
                   | inr e1', inl c2  => inr (Eq e1' (Const ty c2))
                   | inr e1', inr e2' => inr (Eq e1' e2')
@@ -266,14 +184,311 @@ Fixpoint simplify_consts_aux{ty k}(e : Expr ty k) : result ty k :=
   | FromNative k e => inr (FromNative k e)
   end.
 
-Definition simplify_consts{ty k}(e : Expr ty (SyntaxKind k)) : ConstT k + Expr ty (SyntaxKind k) :=
-  simplify_consts_aux e.
+Lemma Forall_eq_map : forall {X Y}(f g : X -> Y)(xs : list X),
+  Forall (fun x => f x = g x) xs -> map f xs = map g xs.
+Proof.
+  induction xs; intros.
+  - reflexivity.
+  - simpl.
+    inversion H.
+    pose (IHxs H3); congruence.
+Qed.
+
+Lemma map_compose : forall {X Y Z}(g : Y -> Z)(f : X -> Y)(xs : list X),
+  map (compose g f) xs = map g (map f xs).
+Proof.
+  induction xs.
+  - reflexivity.
+  - simpl.
+    rewrite IHxs; reflexivity.
+Qed.
+
+Lemma simplify_consts_aux_correct : forall {k}(e : Expr type k),
+  match k return (Expr type k -> result type k -> Prop) with
+  | SyntaxKind k' => fun e r => evalExpr e = match r with
+                                             | inl c => evalConstT c
+                                             | inr e' => evalExpr e'
+                                             end
+  | NativeKind _ _ => fun _ _ => True
+  end e (simplify_consts_aux e).
+Proof.
+  intros.
+  apply (@Expr_ind2 type (fun k e' =>
+  match k as k0 return (Expr type k0 -> result type k0 -> Prop) with
+| SyntaxKind k' =>
+    fun (e0 : Expr type (SyntaxKind k')) (r : result type (SyntaxKind k')) =>
+    evalExpr e0 = match r with
+                  | inl c => evalConstT c
+                  | inr e' => evalExpr e'
+                  end
+| @NativeKind t c =>
+    fun (_ : Expr type (NativeKind c)) (_ : result type (NativeKind c)) => True
+end e' (simplify_consts_aux e'))); intros.
+  - destruct k0.
+    + simpl; reflexivity.
+    + exact I.
+  - simpl; reflexivity.
+  - simpl.
+    destruct (simplify_consts_aux e0); simpl; congruence.
+  - simpl.
+    unfold squash_CABool.
+    destruct all_left_list eqn:G.
+    + simpl.
+      pose (all_left_list_correct _ G).
+      f_equal.
+      unfold simplify_consts_aux.
+      pose (Forall_eq_map (@evalExpr (SyntaxKind Bool)) _ H) as pf.
+      simpl fullType in pf.
+      rewrite pf.
+      assert ((fun (e' : Expr type (SyntaxKind Bool)) => match simplify_consts_aux e' with
+                        | inl c0 => evalConstT c0
+                        | inr e0' => evalExpr e0'
+                        end) = compose (fun (x : result type (SyntaxKind Bool)) => match x with
+                                                 | inl c0 => evalConstT c0
+                                                 | inr e0' => evalExpr e0'
+                                                 end)
+                                                  simplify_consts_aux) by (unfold compose; reflexivity).
+     simpl type in H0.
+     rewrite H0.
+     rewrite map_compose.
+     simpl result.
+     rewrite e0.
+     rewrite <- map_compose.
+     unfold compose.
+     reflexivity.
+    + simpl.
+      f_equal.
+      repeat rewrite <- map_compose.
+      unfold compose.
+      unfold back_to_Expr.
+      clear G.
+      induction l.
+      * reflexivity.
+      * simpl.
+        inversion H.
+        rewrite H2.
+        destruct (simplify_consts_aux a) eqn:G1.
+        ** simpl; f_equal.
+           apply IHl; auto.
+        ** f_equal.
+           apply IHl; auto.
+  - simpl.
+    destruct (simplify_consts_aux e0); simpl; congruence.
+  - simpl.
+    unfold squash_CABit.
+    destruct all_left_list eqn:G.
+    + simpl.
+      pose (all_left_list_correct _ G).
+      f_equal.
+      unfold simplify_consts_aux.
+      pose (Forall_eq_map (@evalExpr (SyntaxKind (Bit n))) _ H) as pf.
+      simpl fullType in pf.
+      rewrite pf.
+      assert ((fun (e' : Expr type (SyntaxKind (Bit n))) => match simplify_consts_aux e' with
+                        | inl c0 => evalConstT c0
+                        | inr e0' => evalExpr e0'
+                        end) = compose (fun (x : result type (SyntaxKind (Bit n))) => match x with
+                                                 | inl c0 => evalConstT c0
+                                                 | inr e0' => evalExpr e0'
+                                                 end)
+                                                  simplify_consts_aux) by (unfold compose; reflexivity).
+     simpl type in H0.
+     rewrite H0.
+     rewrite map_compose.
+     simpl result.
+     rewrite e0.
+     rewrite <- map_compose.
+     unfold compose.
+     reflexivity.
+    + simpl.
+      f_equal.
+      repeat rewrite <- map_compose.
+      unfold compose.
+      unfold back_to_Expr.
+      clear G.
+      induction l.
+      * reflexivity.
+      * simpl.
+        inversion H.
+        rewrite H2.
+        destruct (simplify_consts_aux a) eqn:G1.
+        ** simpl; f_equal.
+           apply IHl; auto.
+        ** f_equal.
+           apply IHl; auto.
+  - simpl.
+    destruct (simplify_consts_aux e0); destruct (simplify_consts_aux e1); simpl; congruence.
+  - simpl.
+    destruct (simplify_consts_aux e0); destruct (simplify_consts_aux e1); simpl; congruence.
+  - destruct k0.
+    + simpl.
+      destruct (simplify_consts_aux e0).
+      * rewrite H.
+        destruct (evalConstT c).
+        ** destruct (simplify_consts_aux e1); auto.
+        ** destruct (simplify_consts_aux e2); auto.
+      * simpl.
+        rewrite H.
+        unfold back_to_Expr.
+        destruct (simplify_consts_aux e1); destruct (simplify_consts_aux e2);
+        simpl; rewrite H1; rewrite H0; reflexivity.
+    + exact I.
+  - simpl.
+    unfold getBool.
+    destruct isEq; destruct (simplify_consts_aux e0); destruct (simplify_consts_aux e1).
+    + destruct isEq.
+      * reflexivity.
+      * congruence.
+    + simpl.
+      destruct isEq.
+      * reflexivity.
+      * congruence.
+    + simpl.
+      destruct isEq.
+      * reflexivity.
+      * congruence.
+    + simpl.
+      destruct isEq.
+      * reflexivity.
+      * congruence.
+    + simpl.
+      destruct isEq.
+      * congruence.
+      * reflexivity.
+    + simpl.
+      destruct isEq.
+      * congruence.
+      * reflexivity.
+    + simpl.
+      destruct isEq.
+      * congruence.
+      * reflexivity.
+    + simpl.
+      destruct isEq.
+      * congruence.
+      * reflexivity.
+  - simpl.
+    destruct (simplify_consts_aux e0).
+    + rewrite <- H.
+      symmetry; apply eval_wrap.
+    + simpl; congruence.
+  - simpl.
+    apply functional_extensionality_dep.
+    intro.
+    destruct all_left_Fin eqn:G.
+    + simpl.
+      pose (all_left_Fin_correct _ G x).
+      simpl in e0.
+      pose (H x).
+      rewrite e0 in e1; auto.
+    + simpl.
+      destruct simplify_consts_aux eqn:G1;
+      pose (H x) as Hx; rewrite G1 in Hx; simpl; auto.
+  - simpl.
+    destruct (simplify_consts_aux e0); destruct (simplify_consts_aux e1).
+    + rewrite H0.
+      destruct lt_dec.
+      * rewrite eval_wrap; congruence.
+      * reflexivity.
+    + simpl.
+      rewrite H0.
+      destruct lt_dec.
+      * congruence.
+      * reflexivity.
+    + simpl.
+      rewrite H0.
+      destruct lt_dec.
+      * congruence.
+      * reflexivity.
+    + simpl.
+      rewrite H0.
+      destruct lt_dec.
+      * congruence.
+      * reflexivity.
+  - simpl.
+    destruct (simplify_consts_aux e0).
+    + rewrite eval_wrap; congruence.
+    + simpl; congruence.
+  - simpl.
+    apply functional_extensionality.
+    intro.
+    destruct all_left_Fin eqn:G.
+    + pose (all_left_Fin_correct _ G x).
+      simpl in e1.
+      pose (H x).
+      rewrite e1 in e2.
+      simpl; auto.
+    + simpl.
+      unfold back_to_Expr.
+      destruct (simplify_consts_aux (e0 x)) eqn:G1;
+      pose (H x) as Hx; rewrite G1 in Hx; auto.
+  - simpl.
+    unfold squash_Kor.
+    destruct all_left_list eqn:G.
+    + rewrite eval_wrap.
+      pose (all_left_list_correct _ G).
+      f_equal.
+      pose (Forall_eq_map (@evalExpr (SyntaxKind k0)) _ H) as pf.
+      simpl fullType in pf.
+      rewrite pf.
+      assert ((fun (e' : Expr type (SyntaxKind k0)) => match simplify_consts_aux e' with
+                        | inl c0 => evalConstT c0
+                        | inr e0' => evalExpr e0'
+                        end) = compose (fun (x : result type (SyntaxKind k0)) => match x with
+                                                 | inl c0 => evalConstT c0
+                                                 | inr e0' => evalExpr e0'
+                                                 end)
+                                                  simplify_consts_aux) by (unfold compose; reflexivity).
+     simpl type in H0.
+     rewrite H0.
+     rewrite map_compose.
+     simpl result.
+     rewrite e0.
+     rewrite <- map_compose.
+     unfold compose.
+     reflexivity.
+    + simpl.
+      f_equal.
+      repeat rewrite <- map_compose.
+      unfold compose.
+      clear G.
+      induction l.
+      * reflexivity.
+      * simpl.
+        inversion H.
+        destruct (simplify_consts_aux a).
+        ** simpl; rewrite H2.
+           f_equal.
+           apply IHl; auto.
+        ** simpl; rewrite H2.
+           f_equal.
+           apply IHl; auto.
+  - exact I.
+  - reflexivity.
+Qed.
+
+Definition simplify_consts{ty k}(e : Expr ty (SyntaxKind k)) : Expr ty (SyntaxKind k) :=
+  match simplify_consts_aux e with
+  | inl c => Const ty c
+  | inr e' => e'
+  end.
+
+Lemma simplify_consts_correct : forall {k}(e : Expr type (SyntaxKind k)), evalExpr (simplify_consts e) = evalExpr e.
+Proof.
+  intros.
+  unfold simplify_consts.
+  pose (simplify_consts_aux_correct e) as pf.
+  simpl in pf.
+  rewrite pf.
+  clear pf.
+  destruct (simplify_consts_aux e); reflexivity.
+Qed.
 
 End Constants.
 
-Section AssocComConstantSquashing.
-
 (* putting this in mothballs for now *)
+(*
+Section AssocComConstantSquashing.
 
 Inductive Binop := AndOp | OrOp | XorOp.
 
@@ -318,7 +533,7 @@ Admitted.
 
 End AssocComConstantSquashing.
 
-
+*)
 
 
 
