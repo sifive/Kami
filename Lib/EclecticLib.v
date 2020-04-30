@@ -2155,7 +2155,7 @@ Theorem div2_minus_2 : forall n k,
     -> Nat.div2 (n - 2 * k) = Nat.div2 n - k.
   induction n as [n] using strong; intros.
 
-  do 2 (destruct n; simpl in *; intuition; repeat rewrite untimes2 in *).
+  do 2 (destruct n; simpl in *; intuition; repeat rewrite untimes2 in * ).
         destruct k; simpl in *; intuition.
 
         destruct k; simpl in *; intuition.
@@ -3136,7 +3136,7 @@ Proof.
   apply IHm; lia.
 Qed.
 
-Lemma Fineqb_refl {m} (n : t m) :
+Lemma Fineqb_refl {m} (n : Fin m) :
   Kami.StdLib.Fin.eqb n n = true.
 Proof.
   rewrite Kami.StdLib.Fin.eqb_eq; reflexivity.
@@ -3217,12 +3217,13 @@ Proof.
 Qed.
 
 Lemma list_arr_length {A : Type} n :
-  forall (arr : t n -> A),
+  forall (arr : Fin n -> A),
     n = length (list_arr arr).
 Proof.
   unfold list_arr; intros.
   rewrite map_length, getFins_length; reflexivity.
 Qed.
+
 Lemma firstn_map {A B: Type} (l : list A) (f : A -> B):
   forall n,
     firstn n (map f l) = map f (firstn n l).
@@ -3536,7 +3537,9 @@ Section FifoProps.
     }
     rewrite <- (Z.mod_small _ _ P), Zminus_mod_idemp_l; reflexivity.
   Qed.
-  
+
+(* TODO: LLEE: port this lemma over after talking with TJ. *)
+(*
   Lemma listSnoc (val : A) :
     cutLen <> Z.of_nat size ->
     snoc val specList
@@ -3566,7 +3569,7 @@ Section FifoProps.
                     (firstn (Z.to_nat cutLen)
                             (rotateList (Z.to_nat deq)
                                         (convertToList
-                                           (fun i : t size =>
+                                           (fun i : Fin size =>
                                               if Kami.StdLib.Fin.eqb i (of_nat_lt enq_lt_size)
                                               then val else implArray i)))) m
                   <> None) as G1.
@@ -3581,7 +3584,7 @@ Section FifoProps.
         { unfold convertToList.
           rewrite <- list_arr_length; reflexivity.
         }
-        assert (length (convertToList (fun i : t size => if Kami.StdLib.Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)) = size) as P0.
+        assert (length (convertToList (fun i : Fin size => if Kami.StdLib.Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)) = size) as P0.
         { unfold convertToList.
           rewrite <- list_arr_length; reflexivity.
         }
@@ -3675,7 +3678,7 @@ Section FifoProps.
         rewrite <- P0 at 1.
         rewrite list_arr_correct_simple, Fineqb_refl; reflexivity.
   Qed.
-  
+*) 
 End FifoProps.
 
 Lemma app_emptyb {A : Type} (l1 l2 : list A) :
