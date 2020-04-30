@@ -1,4 +1,4 @@
-Require Import Bool String Ascii List Streams.
+Require Import Bool String Ascii List.
 Require Import Lt.
 Require Import Nat.
 Require Import PeanoNat.
@@ -346,4 +346,61 @@ Proof.
         exact (f_equal S (IHn j m (Nat.succ_inj n m H))).
 Qed.
 
+Fixpoint map_length_red {A B : Type} (f : A -> B) (xs : list A) :=
+  match xs return length (map f xs) = length xs with
+  | [] => ltac:(reflexivity)
+  | y :: ys =>
+    f_equal_nat nat S
+      (length (map f ys))
+      (length ys)
+      (map_length_red f ys)
+  end.
 
+Lemma nth_Fin_map2 (A B : Type) (f : A -> B) (F : B -> Type) :
+  forall (xs : list A)
+    (i : Fin (Datatypes.length (map f xs))),
+  F (f (nth_Fin xs (cast i (map_length_red f xs)))) -> F (nth_Fin (map f xs) i).
+Proof.
+  induction xs as [|x xs IH].
+  + exact (case0 (fun i => F (f (nth_Fin [] (cast i (map_length_red f [])))) -> F (nth_Fin (map f []) i))).
+  + destruct i as [i|j].
+    - exact (id).
+    - simpl. 
+      rewrite <- (Fin_cast_lemma (length (map f xs)) (length xs) j (map_length_red f xs)
+        (Nat.succ_inj (length (map f xs))
+          (length xs)
+          (f_equal_nat nat S (Datatypes.length (map f xs))
+            (Datatypes.length xs) (map_length_red f xs)))).
+      exact (IH j).
+Qed.
+
+Fixpoint Fin_forallb {n} : (Fin n -> bool) -> bool :=
+  match n with
+  | 0   => fun _ => true
+  | S n => fun f => f F1 && Fin_forallb (fun i => f (FS i))
+  end.
+
+Lemma Fin_forallb_correct {n} :
+  forall f : Fin n -> bool,
+    Fin_forallb f = true <-> forall i, f i = true.
+Proof.
+  induction n as [|n].
+  + intro f; split; intro H.
+    - exact (case0 (fun i => f i = true)).
+    - unfold Fin_forallb; reflexivity.
+  + intro f; split; intro H.
+    destruct i as [u|j].
+    - destruct u; simpl; unfold Fin_forallb in H; exact (proj1 (andb_prop (f F1) _ H)).
+    - unfold Fin_forallb in H.
+      fold (@Fin_forallb n (fun i : Fin n => f (FS i))) in H.
+      exact (proj1 (IHn (fun i => f (FS i))) (proj2 (andb_prop _ _ H)) j).
+    - simpl; apply (andb_true_intro); split.
+      * exact (H F1).
+      * exact (proj2 (IHn (fun i => f (FS i))) (fun i => H (FS i))).
+Qed.
+
+Fixpoint getFins (n : nat) : list (Fin n) := 
+  match n with
+  | 0 => []
+  | S m => F1 :: map FS (getFins m)
+  end.
