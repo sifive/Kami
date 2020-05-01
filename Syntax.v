@@ -1,4 +1,6 @@
-Require Export Bool Ascii String Kami.StdLib.Fin List FunctionalExtensionality Psatz PeanoNat.
+Require Export Bool Ascii String List FunctionalExtensionality Psatz PeanoNat.
+Require Export Kami.StdLib.Fin.
+Require Export Kami.StdLib.Vector.
 Require Export Kami.Lib.VectorFacts Kami.Lib.EclecticLib.
 
 Require Export Kami.Lib.Word Kami.Lib.WordProperties.
@@ -323,6 +325,12 @@ Section Phoas.
       end; abstract lia.
     Defined.
     
+    Fixpoint sumSizes' {n}: (Fin n -> nat) -> nat :=
+      match n return (Fin n -> nat) -> nat with
+      | 0 => fun _ => 0
+      | S m => fun sizes => sumSizes' (fun x => sizes (FS x)) + sizes F1
+      end.
+
     Fixpoint sumSizesMsbs {n} : forall i: Fin n, (Fin n -> nat) -> nat :=
       match n as m return forall i : Fin m, (Fin m -> nat) -> nat with
       | 0 => case0 (fun i => (Fin 0 -> nat) -> nat)
@@ -336,32 +344,55 @@ Section Phoas.
           end
       end.
 
-    Lemma helper_sumSizes n : forall (i: Fin n),
-      forall (sizes: Fin n -> nat), sumSizes sizes = (sumSizes sizes - (sumSizesMsbs i sizes + sizes i)) + sizes i + sumSizesMsbs i sizes.
+    Lemma sumSizesMsbsLt {n} : forall (sizes : Fin n -> nat) (i : Fin n), sumSizesMsbs i sizes + sizes i <= sumSizes sizes.
     Proof.
       induction n as [|m IH].
-      + exact (case0 (fun i => forall sizes : Fin 0 -> nat, sumSizes sizes = sumSizes sizes - (sumSizesMsbs i sizes + sizes i) + sizes i + sumSizesMsbs i sizes)).
-      + destruct i as [u|j]; intro sizes.
-        - destruct u; simpl. unfold F1.
-
-SearchPattern (_ - _ = 0).
-SearchAbout "minus".
-SearchPattern (_ + _ - _ = _).
-
-          rewrite (f_equal2_plus (sizes (inl tt)) (sizes (inl tt)) (sumSizes (fun x : Fin m => sizes (FS x)) + sizes F1) 
-          rewrite (f_equal (plus (
-SearchPattern ((_ - _) = _). (* minus_plus: forall n m : nat, n + m - n = m *)
-          
-
-      induction i; simpl; intros; auto.
-      - lia.
-      - specialize (IHi (fun x => sizes (FS x))).
-        lia.
+      + exact (fun sizes => case0 (fun i => sumSizesMsbs i sizes + sizes i <= sumSizes sizes)).
+      + intro sizes; destruct i as [u|j].
+        - destruct u; simpl; unfold F1; exact (le_plus_r (sumSizes (fun j : Fin m => sizes (FS j))) (sizes F1)).
+        - simpl.
+          rewrite <- (Nat.add_assoc
+            (sumSizesMsbs j (fun k : Fin m => sizes (FS k)))
+            (sizes F1)
+            (sizes (inr j : Fin (S m)))).
+          rewrite (Nat.add_comm
+            (sizes F1)
+            (sizes (inr j : Fin (S m)))).
+          rewrite (Nat.add_assoc
+            (sumSizesMsbs j (fun k : Fin m => sizes (FS k)))
+            (sizes (inr j : Fin (S m)))
+            (sizes F1)).
+          apply (plus_le_compat_r
+            (sumSizesMsbs j (fun k : Fin m => sizes (FS k)) + sizes (inr j))
+            (sumSizes (fun k : Fin m => sizes (FS k)))
+            (sizes F1)).
+          exact (IH (fun k : Fin m => sizes (FS k)) j).
+      Qed.
+            
+    Lemma helper_sumSizes n : forall (i: Fin n),
+      forall (sizes: Fin n -> nat),
+        sumSizes sizes =
+        (sumSizes sizes - (sumSizesMsbs i sizes + sizes i)) + sizes i + sumSizesMsbs i sizes.
+    Proof.
+      intros i sizes.
+      rewrite (Nat.add_comm _ (sumSizesMsbs i sizes)).
+      rewrite (Nat.add_comm _ (sizes i)).
+      rewrite (Nat.add_assoc
+        (sumSizesMsbs i sizes)
+        (sizes i)
+        _).
+      rewrite (le_plus_minus_r
+        (sumSizesMsbs i sizes + sizes i)
+        (sumSizes sizes)
+        (sumSizesMsbsLt sizes i)). 
+      reflexivity.
     Qed.
     
     Lemma helper_array n (i: Fin n):
       forall size_k,
-        n * size_k = (proj1_sig (to_nat i) * size_k) + size_k + (n * size_k - ((proj1_sig (to_nat i) * size_k) + size_k)) .
+        n * size_k =
+          (proj1_sig (to_nat i) * size_k) + size_k +
+          (n * size_k - ((proj1_sig (to_nat i) * size_k) + size_k)) .
     Proof.
       induction i; simpl; intros; auto.
       - lia.
@@ -370,7 +401,7 @@ SearchPattern ((_ - _) = _). (* minus_plus: forall n m : nat, n + m - n = m *)
         rewrite IHi at 1.
         lia.
     Qed.
-
+*)
     Fixpoint unpack (k: Kind): Expr (SyntaxKind (Bit (size k))) -> Expr (SyntaxKind k) :=
       match k return Expr (SyntaxKind (Bit (size k))) -> Expr (SyntaxKind k) with
       | Bool => fun e => Eq e (Const (WO~1)%word)
