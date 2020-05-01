@@ -1418,20 +1418,7 @@ Proof.
   - rewrite andb_true_iff; split; auto.
     apply Nat.eqb_refl.
 Qed.
-(*
-Lemma Kind_decb_refl : forall k, Kind_decb k k = true.
-Proof.
-  induction k; simpl; auto.
-  - apply Nat.eqb_refl.
-  -
-    rewrite silly_lemma_true with (pf := (Nat.eqb_refl _)) by apply Nat.eqb_refl.
-    rewrite andb_true_iff; split; rewrite Fin_forallb_correct; intros.
-    + rewrite (hedberg Nat.eq_dec _ eq_refl); simpl; apply H.
-    + rewrite (hedberg Nat.eq_dec _ eq_refl); simpl; apply String.eqb_refl.
-  - rewrite andb_true_iff; split; auto.
-    apply Nat.eqb_refl.
-Qed.
-*)
+
 Lemma Kind_decb_eq : forall k1 k2, Kind_decb k1 k2 = true <-> k1 = k2.
 Proof.
   induction k1; intros; destruct k2; split; intro; try (reflexivity || discriminate).
@@ -1440,13 +1427,19 @@ Proof.
   - destruct (n =? n0)%nat eqn:G.
     + simpl in H0.
       rewrite (@silly_lemma_true bool (n =? n0)%nat _ _ G) in H0 by auto.
-      pose proof G.
+      pose proof G. (* <=== *)
       rewrite Nat.eqb_eq in H1 by auto.
       rewrite andb_true_iff in H0; destruct H0 as [G1 G2]; rewrite Fin_forallb_correct in G1,G2; subst.
       rewrite (hedberg Nat.eq_dec _ eq_refl) in G1,G2; simpl in *.
       setoid_rewrite H in G1.
       setoid_rewrite String.eqb_eq in G2.
-      f_equal; extensionality i; auto.
+      f_equal; extensionality i.
+      * rewrite (G1 i).
+        rewrite <- (cast_eq i (eq_refl)).
+        reflexivity.
+      * rewrite (G2 i).
+        rewrite <- (cast_eq i (eq_refl)).
+        reflexivity.
     + simpl in H0.
       rewrite silly_lemma_false in H0; try discriminate; auto.
   - rewrite H0; apply Kind_decb_refl.
