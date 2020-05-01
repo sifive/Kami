@@ -17,6 +17,20 @@ Definition FS {n : nat} (i : Fin n) : Fin (S n) := @inr unit (Fin n) i.
 
 Definition case0 (F : Fin 0 -> Type) (x : Fin 0) : F x := Empty_set_rect F x.
 
+
+Definition caseS' {n : nat} (p : Fin (S n)) : forall (P : Fin (S n) -> Type) 
+                                                     (P1 : P F1)
+                                                     (PS : forall (p : Fin n), P (FS p)), P p.
+Proof.
+  destruct p.
+  - intros; destruct u; exact P1.
+  - intros; apply PS.
+Defined.
+
+Definition caseS (P: forall {n}, Fin (S n) -> Type)
+  (P1: forall n, @P n F1) (PS : forall {n} (p: Fin n), P (FS p))
+  {n} (p: Fin (S n)) : P p := caseS' p P (P1 n) PS.
+
 Lemma FS_inj : forall n (i j: Fin n) (H: FS i = FS j), i = j.
 Proof.
   intro n.
