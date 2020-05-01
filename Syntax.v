@@ -394,14 +394,22 @@ Section Phoas.
           (proj1_sig (to_nat i) * size_k) + size_k +
           (n * size_k - ((proj1_sig (to_nat i) * size_k) + size_k)) .
     Proof.
-      induction i; simpl; intros; auto.
-      - lia.
-      - case_eq (to_nat i); simpl; intros.
-        rewrite H in *; simpl in *.
-        rewrite IHi at 1.
-        lia.
+      intro size_k.
+      set (Hlt :=
+        @mult_le_compat_r
+         (S (proj1_sig (to_nat i)))
+         n
+         size_k
+         (proj2_sig (to_nat i))
+        : S (proj1_sig (to_nat i)) * size_k <= n * size_k).
+      simpl in Hlt.
+      rewrite (Nat.add_comm size_k (proj1_sig (to_nat i) * size_k)) in Hlt.
+      rewrite (le_plus_minus_r
+        (proj1_sig (to_nat i) * size_k + size_k)
+        (n * size_k) Hlt).
+      reflexivity.
     Qed.
-*)
+
     Fixpoint unpack (k: Kind): Expr (SyntaxKind (Bit (size k))) -> Expr (SyntaxKind k) :=
       match k return Expr (SyntaxKind (Bit (size k))) -> Expr (SyntaxKind k) with
       | Bool => fun e => Eq e (Const (WO~1)%word)
