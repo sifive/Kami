@@ -1,5 +1,6 @@
 Require Export List String Ascii BinInt BinNat.
 Require Export Kami.Syntax Kami.Compiler.CompilerSimple Kami.Compiler.Compiler Kami.Compiler.Rtl Kami.LibStruct Kami.Compiler.UnverifiedIncompleteCompiler.
+Require Export Kami.StdLib.Fin.
 
 Require Import Kami.Notations.
 
@@ -41,7 +42,7 @@ Extract Constant getFins => "(\n -> Prelude.map ((,) (n Prelude.- 1)) [0..(n Pre
 Extract Constant Fin.to_nat => "(\_ (_,i) -> i)".
 Extract Constant Fin.cast => "(\_ x _ -> x)".
 Extract Constant Fin.of_nat_lt => "(\i n -> (n Prelude.- 1,i))".
-Extract Constant Fin_eq_dec => "(\_ x y -> x Prelude.== y)".
+Extract Constant Fin.eq_dec => "(\_ x y -> x Prelude.== y)".
 Extract Inlined Constant getBool => "Prelude.id".
 Extract Inlined  Constant String.append => "(Prelude.++)".
 Extract Constant ZToWord => "(\n x -> Prelude.mod x (2 Prelude.^ n))".
@@ -73,7 +74,7 @@ Extract Inlined Constant Z.modulo => "Prelude.mod".
 Extract Inlined Constant N.succ_pos => "(\x -> x Prelude.+ 1)".
 Extract Inlined Constant N.add => "(Prelude.+)".
 Extract Inlined Constant N.sub => "(Prelude.-)".
-Extract Inlined Constant N.mul => "(Prelude.*)".
+Extract Inlined Constant N.mul => "(Prelude.* )".
 Extract Inlined Constant N.eqb => "(Prelude.==)".
 Extract Inlined Constant N.ltb => "(Prelude.<)".
 Extract Inlined Constant N.of_nat => "Prelude.toInteger".
