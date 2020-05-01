@@ -1,7 +1,8 @@
-Require Export Bool Ascii String List FunctionalExtensionality Psatz PeanoNat.
+Require Export Bool Ascii String FunctionalExtensionality Psatz PeanoNat.
 Require Export Kami.StdLib.Fin.
 Require Export Kami.StdLib.Vector.
 Require Export Kami.Lib.VectorFacts Kami.Lib.EclecticLib.
+Require Export List.
 
 Require Export Kami.Lib.Word Kami.Lib.WordProperties.
 Export ListNotations.
@@ -327,7 +328,7 @@ Section Phoas.
     
     Fixpoint sumSizesMsbs {n} : forall i: Fin n, (Fin n -> nat) -> nat :=
       match n as m return forall i : Fin m, (Fin m -> nat) -> nat with
-      | 0 => case0 (fun i => (Fin 0 -> nat) -> nat)
+      | 0 => Fin.case0 (fun i => (Fin 0 -> nat) -> nat)
       | S m =>
         fun i =>
           match i with
@@ -341,7 +342,7 @@ Section Phoas.
     Lemma sumSizesMsbsLt {n} : forall (sizes : Fin n -> nat) (i : Fin n), sumSizesMsbs i sizes + sizes i <= sumSizes sizes.
     Proof.
       induction n as [|m IH].
-      + exact (fun sizes => case0 (fun i => sumSizesMsbs i sizes + sizes i <= sumSizes sizes)).
+      + exact (fun sizes => Fin.case0 (fun i => sumSizesMsbs i sizes + sizes i <= sumSizes sizes)).
       + intro sizes; destruct i as [u|j].
         - destruct u; simpl; unfold F1; exact (le_plus_r (sumSizes (fun j : Fin m => sizes (FS j))) (sizes F1)).
         - simpl.
@@ -576,7 +577,7 @@ Definition getRegFileRegisters m :=
                                         end
                        | RFFile isAscii isArg file offset size init => Some (SyntaxConst (ConstArray init))
                        end) :: match readers with
-                               | Async _ => nil
+                               | Async _ => []
                                | Sync isAddr read =>
                                  if isAddr
                                  then map (fun x => (readRegName x, existT RegInitValT (SyntaxKind (Bit (Nat.log2_up IdxNum)))
@@ -1486,7 +1487,7 @@ Proof.
   - induction n.
     + left.
       extensionality x.
-      apply case0.
+      apply Fin.case0.
       apply x.
     + destruct (IHn (fun i => k (FS i)) (fun i => X (FS i)) (fun i => s (FS i))
                     (fun i => e1 (FS i)) (fun i => e2 (FS i))).
@@ -1501,7 +1502,7 @@ Proof.
   - induction n.
     + left.
       extensionality x.
-      apply case0.
+      apply Fin.case0.
       apply x.
     + simpl in *.
       destruct (IHn (fun i => e1 (FS i)) (fun i => e2 (FS i))).
@@ -2384,7 +2385,7 @@ Local Definition option_bind
 Local Notation "X >>- F" := (option_bind X F) (at level 85, only parsing).
 
 Fixpoint struct_get_field_index'
-         (name: string) n
+         (name: string) {n}
   := match n return
          forall (get_name : Fin n -> string),
                 option (Fin n)
@@ -2393,7 +2394,7 @@ Fixpoint struct_get_field_index'
      | S m => fun get_name =>
        if String.eqb (get_name F1) name
        then Some F1
-       else match struct_get_field_index' name _ (fun i => get_name (FS i)) with
+       else match struct_get_field_index' name (fun i => get_name (FS i)) with
             | Some i => Some (FS i)
             | None => None
             end
@@ -2534,7 +2535,6 @@ Hint Unfold
      Datatypes.fst
      Datatypes.snd
      String.append
-     EclecticLib.nth_Fin
   : KamiDb.
 (* TODO
    + PUAR: Linux/Certikos
