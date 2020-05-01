@@ -356,7 +356,7 @@ Fixpoint map_length_red {A B : Type} (f : A -> B) (xs : list A) :=
       (map_length_red f ys)
   end.
 
-Lemma nth_Fin_map2 (A B : Type) (f : A -> B) (F : B -> Type) :
+Lemma nth_Fin_map2 {A B : Type} (f : A -> B) (F : B -> Type) :
   forall (xs : list A)
     (i : Fin (Datatypes.length (map f xs))),
   F (f (nth_Fin xs (cast i (map_length_red f xs)))) -> F (nth_Fin (map f xs) i).

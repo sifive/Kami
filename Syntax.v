@@ -325,12 +325,6 @@ Section Phoas.
       end; abstract lia.
     Defined.
     
-    Fixpoint sumSizes' {n}: (Fin n -> nat) -> nat :=
-      match n return (Fin n -> nat) -> nat with
-      | 0 => fun _ => 0
-      | S m => fun sizes => sumSizes' (fun x => sizes (FS x)) + sizes F1
-      end.
-
     Fixpoint sumSizesMsbs {n} : forall i: Fin n, (Fin n -> nat) -> nat :=
       match n as m return forall i : Fin m, (Fin m -> nat) -> nat with
       | 0 => case0 (fun i => (Fin 0 -> nat) -> nat)
@@ -388,7 +382,7 @@ Section Phoas.
       reflexivity.
     Qed.
     
-    Lemma helper_array n (i: Fin n):
+    Lemma helper_array {n} (i: Fin n):
       forall size_k,
         n * size_k =
           (proj1_sig (to_nat i) * size_k) + size_k +
@@ -422,7 +416,7 @@ Section Phoas.
                         _
                         (ConstExtract
                            _ _ (sumSizesMsbs i (fun j => size (fk j)))
-                           (@castBits _ _ (helper_sumSizes i (fun j => size (fk j))) e)))
+                           (@castBits _ _ (helper_sumSizes n i (fun j => size (fk j))) e)))
       | Array n k =>
         fun e =>
           BuildArray
@@ -448,7 +442,7 @@ Section Phoas.
     match k return FullFormat k with
     | Bool => FBool 1 Hex
     | Bit n => FBit n ((n+3)/4) Hex
-    | Struct n fk fs => FStruct fk fs (fun i => fullFormatHex (fk i))
+    | Struct n fk fs => FStruct n fk fs (fun i => fullFormatHex (fk i))
     | Array n k => FArray n (fullFormatHex k)
     end.
 
@@ -456,7 +450,7 @@ Section Phoas.
     match k return FullFormat k with
     | Bool => FBool 1 Binary
     | Bit n => FBit n n Binary
-    | Struct n fk fs => FStruct fk fs (fun i => fullFormatBinary (fk i))
+    | Struct n fk fs => FStruct n fk fs (fun i => fullFormatBinary (fk i))
     | Array n k => FArray n (fullFormatBinary k)
     end.
 
@@ -464,7 +458,7 @@ Section Phoas.
     match k return FullFormat k with
     | Bool => FBool 1 Decimal
     | Bit n => FBit n 0 Decimal
-    | Struct n fk fs => FStruct fk fs (fun i => fullFormatDecimal (fk i))
+    | Struct n fk fs => FStruct n fk fs (fun i => fullFormatDecimal (fk i))
     | Array n k => FArray n (fullFormatDecimal k)
     end.
 
@@ -1408,10 +1402,23 @@ Proof.
     | _,_ => false
     end).
   destruct (Nat.eqb n m) eqn:G.
-  exact (Fin_forallb (fun i => Kind_decb (ks i) (ks' (Fin_cast i (mk_eq _ _ G)))) && Fin_forallb (fun i => String.eqb (fs i) (fs' (Fin_cast i (mk_eq _ _ G))))).
+  exact (Fin_forallb (fun i => Kind_decb (ks i) (ks' (Fin.cast i (mk_eq _ _ G)))) && Fin_forallb (fun i => String.eqb (fs i) (fs' (Fin.cast i (mk_eq _ _ G))))).
   exact false.
 Defined.
 
+Lemma Kind_decb_refl : forall k, Kind_decb k k = true.
+Proof.
+  induction k; simpl; auto.
+  - apply Nat.eqb_refl.
+  -
+    rewrite silly_lemma_true with (pf := (Nat.eqb_refl _)) by apply Nat.eqb_refl.
+    rewrite andb_true_iff; split; rewrite Fin_forallb_correct; intros.
+    + rewrite (hedberg Nat.eq_dec _ eq_refl); simpl; rewrite <- (cast_eq i (eq_refl n)); apply H.
+    + rewrite (hedberg Nat.eq_dec _ eq_refl); simpl; rewrite <- (cast_eq i (eq_refl n)); apply String.eqb_refl.
+  - rewrite andb_true_iff; split; auto.
+    apply Nat.eqb_refl.
+Qed.
+(*
 Lemma Kind_decb_refl : forall k, Kind_decb k k = true.
 Proof.
   induction k; simpl; auto.
@@ -1424,7 +1431,7 @@ Proof.
   - rewrite andb_true_iff; split; auto.
     apply Nat.eqb_refl.
 Qed.
-
+*)
 Lemma Kind_decb_eq : forall k1 k2, Kind_decb k1 k2 = true <-> k1 = k2.
 Proof.
   induction k1; intros; destruct k2; split; intro; try (reflexivity || discriminate).
