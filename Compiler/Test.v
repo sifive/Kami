@@ -2,6 +2,7 @@ Require Import Kami.Extraction.
 Require Import BinNat.
 Import FinFun.Fin2Restrict.
 Require Import Kami.AllNotations.
+Require Import Kami.StdLib.Fin.
 
 Class toString (X : Type) := {
   to_string : X -> string
@@ -71,16 +72,16 @@ Definition Counter := Bit 2.
 Definition init_val : word Xlen := Xlen 'h"e".
 
 (* mask = {true; false; false; false; true} *)
-Definition mask_func1 : Fin.t num -> bool := fun (i : Fin.t num) =>
+Definition mask_func1 : Fin num -> bool := fun (i : Fin num) =>
   match i with
-  | F1 _ => true
-  | FS _ (F1 _) => false
-  | FS _ (FS _ (F1 _)) => false
-  | FS _ (FS _ (FS _ (F1 _))) => false
+  | inl _ => true
+  | inr (inl _) => false
+  | inr (inr (inl _)) => false
+  | inr (inr (inr (inl _))) => false
   | _ => true
-  end.
+ end.
 
-Definition mask_func2 : Fin.t num -> bool := fun i => negb (mask_func1 i).
+Definition mask_func2 : Fin num -> bool := fun i => negb (mask_func1 i).
 
 Definition mask1 : ConstT (Array num Bool) := ConstArray mask_func1.
 Definition mask2 : ConstT (Array num Bool) := ConstArray mask_func2.
@@ -114,42 +115,44 @@ Qed.
 
 (*good masks*)
 
-Lemma mask1_under_true : exists (i : Fin.t num), mask_func1 i = true /\ f2n i < num - (write_index - read_under_index).
+Definition f2n {n : nat} (i : Fin n) := proj1_sig (Fin.to_nat i).
+
+Lemma mask1_under_true : exists (i : Fin num), mask_func1 i = true /\ f2n i < num - (write_index - read_under_index).
 Proof.
   exists F1; simpl; auto.
 Qed.
 
-Lemma mask1_under_false : exists (i : Fin.t num), mask_func1 i = false /\ f2n i < num - (write_index - read_under_index).
+Lemma mask1_under_false : exists (i : Fin num), mask_func1 i = false /\ f2n i < num - (write_index - read_under_index).
 Proof.
   exists (FS F1); simpl; auto.
 Qed.
 
-Lemma mask1_over_true : exists (i : Fin.t num), mask_func1 i = true /\ f2n i > (read_over_index - write_index).
+Lemma mask1_over_true : exists (i : Fin num), mask_func1 i = true /\ f2n i > (read_over_index - write_index).
 Proof.
   exists (FS (FS (FS (FS F1)))); unfold f2n; simpl; auto.
 Qed.
 
-Lemma mask1_over_false : exists (i : Fin.t num), mask_func1 i = false /\ f2n i > (read_over_index - write_index).
+Lemma mask1_over_false : exists (i : Fin num), mask_func1 i = false /\ f2n i > (read_over_index - write_index).
 Proof.
   exists (FS (FS (FS F1))); unfold f2n; simpl; auto.
 Qed.
 
-Lemma mask2_under_true : exists (i : Fin.t num), mask_func2 i = true /\ f2n i < num - (write_index - read_under_index).
+Lemma mask2_under_true : exists (i : Fin num), mask_func2 i = true /\ f2n i < num - (write_index - read_under_index).
 Proof.
   exists (FS F1); simpl; auto.
 Qed.
 
-Lemma mask2_under_false : exists (i : Fin.t num), mask_func2 i = false /\ f2n i < num - (write_index - read_under_index).
+Lemma mask2_under_false : exists (i : Fin num), mask_func2 i = false /\ f2n i < num - (write_index - read_under_index).
 Proof.
   exists F1; simpl; auto.
 Qed.
 
-Lemma mask2_over_true : exists (i : Fin.t num), mask_func2 i = true /\ f2n i > (read_over_index - write_index).
+Lemma mask2_over_true : exists (i : Fin num), mask_func2 i = true /\ f2n i > (read_over_index - write_index).
 Proof.
   exists (FS (FS (FS F1))); unfold f2n; simpl; auto.
 Qed.
 
-Lemma mask2_over_false : exists (i : Fin.t num), mask_func2 i = false /\ f2n i > (read_over_index - write_index).
+Lemma mask2_over_false : exists (i : Fin num), mask_func2 i = false /\ f2n i > (read_over_index - write_index).
 Proof.
   exists (FS (FS (FS (FS F1)))); unfold f2n; simpl; auto.
 Qed.
@@ -275,7 +278,7 @@ Definition expected_read_over(val : word Xlen) : ConstT (Array num Data) :=
     ConstArray (fun i => if f2n i <? num - (read_over_index - write_index) then val else init_val).
 
 (*translations*)
-Definition read_under_Fin_to_write_Fin(i : Fin.t num) : Fin.t num.
+Definition read_under_Fin_to_write_Fin(i : Fin num) : Fin num.
 Proof.
   refine (@of_nat_lt (f2n i - (write_index - read_under_index)) num _).
   unfold f2n.
@@ -283,7 +286,7 @@ Proof.
   simpl; lia.
 Defined.
 
-Definition read_over_Fin_to_write_Fin(i : Fin.t num)(pf : (f2n i < num - (read_over_index - write_index))%nat) : Fin.t num.
+Definition read_over_Fin_to_write_Fin(i : Fin num)(pf : (f2n i < num - (read_over_index - write_index))%nat) : Fin num.
 Proof.
   refine (@of_nat_lt (f2n i + (read_over_index - write_index)) num _).
   unfold f2n.
@@ -296,19 +299,19 @@ Proof.
   lia.
 Defined.
 
-Definition expected_read_under_masked(mask_val non_mask_val : word Xlen)(mf nmf : Fin.t num -> bool) : ConstT (Array num Data) :=
+Definition expected_read_under_masked(mask_val non_mask_val : word Xlen)(mf nmf : Fin num -> bool) : ConstT (Array num Data) :=
   ConstArray (fun i => if f2n i <? write_index - read_under_index then init_val else
     if mf (read_under_Fin_to_write_Fin i) then mask_val else 
     if nmf (read_under_Fin_to_write_Fin i) then non_mask_val else init_val).
 
-Definition expected_read_over_masked(mask_val non_mask_val : word Xlen)(mf nmf : Fin.t num -> bool) : ConstT (Array num Data) :=
+Definition expected_read_over_masked(mask_val non_mask_val : word Xlen)(mf nmf : Fin num -> bool) : ConstT (Array num Data) :=
   ConstArray (fun i => match Compare_dec.le_lt_dec (num - (read_over_index - write_index)) (f2n i) with
                        | left _ => init_val
                        | right pf => if mf (read_over_Fin_to_write_Fin i pf) then mask_val else
                                      if nmf (read_over_Fin_to_write_Fin i pf) then non_mask_val else init_val
                        end).
 
-Definition expected_read_ot_mt(write_val old_val : word Xlen)(wmf omf : Fin.t num -> bool)(ot : OverlapType)(mt : MaskType) :=
+Definition expected_read_ot_mt(write_val old_val : word Xlen)(wmf omf : Fin num -> bool)(ot : OverlapType)(mt : MaskType) :=
   match ot,mt with
   | Over,IsWrMask => expected_read_over_masked write_val old_val wmf omf
   | Over,NotIsWrMask => expected_read_over write_val

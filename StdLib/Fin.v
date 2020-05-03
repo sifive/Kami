@@ -56,6 +56,8 @@ Fixpoint to_nat {n : nat} : forall (i : Fin n), {m : nat | m < n} :=
       end
   end.
 
+Definition f2n {n : nat} (i : Fin n) := proj1_sig (to_nat i).
+
 Goal proj1_sig (@to_nat 1 F1) = 0. Proof. reflexivity. Qed.
 
 Goal proj1_sig (@to_nat 4 F1) = 0. Proof. reflexivity. Qed.
@@ -370,23 +372,62 @@ Fixpoint map_length_red {A B : Type} (f : A -> B) (xs : list A) :=
       (map_length_red f ys)
   end.
 
-Lemma nth_Fin_map2 {A B : Type} (f : A -> B) (F : B -> Type) :
-  forall (xs : list A)
-    (i : Fin (Datatypes.length (map f xs))),
-  F (f (nth_Fin xs (cast i (map_length_red f xs)))) -> F (nth_Fin (map f xs) i).
-Proof.
-  induction xs as [|x xs IH].
-  + exact (case0 (fun i => F (f (nth_Fin [] (cast i (map_length_red f [])))) -> F (nth_Fin (map f []) i))).
-  + destruct i as [i|j].
-    - exact (id).
-    - simpl. 
-      rewrite <- (Fin_cast_lemma (length (map f xs)) (length xs) j (map_length_red f xs)
-        (Nat.succ_inj (length (map f xs))
-          (length xs)
-          (f_equal_nat nat S (Datatypes.length (map f xs))
-            (Datatypes.length xs) (map_length_red f xs)))).
-      exact (IH j).
-Qed.
+Fixpoint nth_Fin_map2_aux {A B : Type} (f : A -> B) (F : B -> Type) (xs : list A) :
+  forall (i : Fin (length (map f xs)))
+    (j : Fin (length xs)),
+  f2n i = f2n j ->
+  F (f (nth_Fin xs j)) ->
+  F (nth_Fin (map f xs) i) :=
+  match xs return
+    forall (i : Fin (length (map f xs)))
+      (j : Fin (length xs)),
+    f2n i = f2n j ->
+    F (f (nth_Fin xs j)) ->
+    F (nth_Fin (map f xs) i) with
+  | [] => case0 (fun i => _)
+  | y :: ys =>
+    fun (i : Fin (length (map f (y :: ys))))
+      (j : Fin (length (y :: ys))) =>
+      match i as k return
+        @f2n (length (map f (y :: ys))) k = @f2n (length (y :: ys)) j ->
+        F (f (nth_Fin (y :: ys) j)) ->
+        F (nth_Fin (map f (y :: ys)) k) with
+      | inl u =>
+        match j as k return
+          f2n (inl u : Fin (length (map f (y :: ys)))) = @f2n (length (y :: ys)) k ->
+          F (f (nth_Fin (y :: ys) k)) ->
+          F (nth_Fin (map f (y :: ys)) (inl u : Fin (length (map f (y :: ys))))) with
+        | inl v =>
+          match u, v with
+          | tt, tt =>
+            fun _ (x : F (f (nth_Fin (y :: ys) (inl tt : Fin (length (y :: ys)))))) => x
+          end
+        | inr _ => fun H : 0 = S _ => False_rect _ (Nat.neq_0_succ _ H)
+        end
+      | inr a =>
+        match j as k return
+          f2n (inr a : Fin (length (map f (y :: ys)))) = @f2n (length (y :: ys)) k ->
+          F (f (nth_Fin (y :: ys) k)) ->
+          F (nth_Fin (map f (y :: ys)) (inr a : Fin (length (map f (y :: ys))))) with
+        | inl _ => fun H : S _ = 0 => False_rect _ (Nat.neq_succ_0 _ H)
+        | inr b =>
+          fun H =>
+            nth_Fin_map2_aux f F ys
+              (a : Fin (length (map f ys)))
+              (b : Fin (length ys))
+              (Nat.succ_inj _ _ H)
+        end
+      end
+  end.
+
+Definition nth_Fin_map2 {A B : Type} (f : A -> B) (F : B -> Type) (xs : list A) (i : Fin (length (map f xs))) :
+  F (f (nth_Fin xs (cast i (map_length_red f xs)))) ->
+  F (nth_Fin (map f xs) i) :=
+  nth_Fin_map2_aux f F xs i (cast i (map_length_red f xs))
+    (eq_sym (fin_to_nat_cast
+      (length (map f xs)) i
+      (length xs)
+      (map_length_red f xs))).
 
 Fixpoint Fin_forallb {n} : (Fin n -> bool) -> bool :=
   match n with
