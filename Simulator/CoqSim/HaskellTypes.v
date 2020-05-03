@@ -1,5 +1,6 @@
 Require Extraction.
-Require Import String Fin.
+Require Import String.
+Require Import Kami.StdLib.Fin.
 Require Import Kami.All.
 Require Import Kami.Simulator.CoqSim.Misc.
 
@@ -32,11 +33,11 @@ Extract Constant map_of_list => "Data.Map.Strict.fromList".
 
 Parameter Vector : nat -> Type -> Type.
 
-Parameter vector_index : forall {X n}, Fin.t n -> Vector n X -> X.
+Parameter vector_index : forall {X n}, Fin n -> Vector n X -> X.
 Parameter vector_map : forall {X Y n}, (X -> Y) -> Vector n X -> Vector n Y.
 Parameter vector_eq : forall {X n}, (X -> X -> bool) -> Vector n X -> Vector n X -> bool.
 Parameter vector_to_list : forall {X n}, Vector n X -> list X.
-Parameter make_vector : forall {X n}, (Fin.t n -> X) -> Vector n X.
+Parameter make_vector : forall {X n}, (Fin n -> X) -> Vector n X.
 Parameter vector_slice : forall {X n} (i m : nat),  Vector n X -> Vector m X.
 Parameter vector_updates : forall {X n}, Vector n X -> list (nat * X) -> Vector n X.
 
@@ -99,7 +100,7 @@ Extract Constant bv_srl => "(\_ _ -> Data.BitVector.shr)".
 Extract Constant bv_sra => "(\_ _ -> Data.BitVector.ashr)".
 Extract Constant bv_concat => "(\_ _ -> (Data.BitVector.#))".
 Extract Constant bv_add => "(\_ -> Prelude.foldr (Prelude.+) 0)".
-Extract Constant bv_mul => "(\_ -> Prelude.foldr (Prelude.*) 1)".
+Extract Constant bv_mul => "(\_ -> Prelude.foldr (Prelude.* ) 1)".
 Extract Constant bv_band => "(\n -> Prelude.foldr (Data.Bits..&.) (Data.BitVector.ones n))".
 Extract Constant bv_bor => "(\n -> Prelude.foldr (Data.Bits..|.) (Data.BitVector.zeros n))".
 Extract Constant bv_bxor => "(\n -> Prelude.foldr Data.Bits.xor (Data.BitVector.zeros n))".
