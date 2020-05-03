@@ -190,7 +190,7 @@ Proof.
     - destruct (IHn f f0) as [Heq|Hneq].
       * exact (left _ (f_equal (@inr unit (Fin n)) Heq)).
       * right; intro Heq; injection Heq; exact (Hneq).
-Qed.
+Defined.
 
 Definition eqb {n m} (i : Fin n) (j : Fin m) : bool :=
   match Nat.eq_dec n m with
