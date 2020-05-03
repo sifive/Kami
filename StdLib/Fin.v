@@ -323,7 +323,7 @@ Proof.
     - exact (IHxs j).
 Qed.
 
-Definition fin_case (n : nat)
+Definition fin_case {n : nat}
   (i : Fin (S n)) : forall
   (F : Fin (S n) -> Type)
   (f1 : F F1)

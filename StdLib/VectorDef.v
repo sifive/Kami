@@ -71,7 +71,7 @@ Definition const {A} (a:A) := nat_rect _ [] (fun n x => cons _ a n x).
 Fixpoint nth {n X} : Vec X n -> Fin n -> X :=
   match n with
   | 0 => fun _ => Fin.case0 _
-  | S m => fun v i => fin_case _ i _ (fst v) (fun j => nth (snd v) j)
+  | S m => fun v i => fin_case i _ (fst v) (fun j => nth (snd v) j)
   end.
 
 (** An equivalent definition of [nth]. *)
