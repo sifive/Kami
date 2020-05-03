@@ -72,13 +72,17 @@ Proof.
       pose (proj1 (Fin_forallb_correct _) H0).
       rewrite (hedberg Nat.eq_dec _ eq_refl) in e.
       simpl in e.
-      apply e.
+      specialize e with i.
+      rewrite <- (cast_eq i (eq_refl)) in e.
+      exact e.
       apply String_eqb_eq2.
       apply andb_true_iff in H0; destruct H0.
       pose (proj1 (Fin_forallb_correct _) H1).
       rewrite (hedberg Nat.eq_dec _ eq_refl) in e.
       simpl in e.
-      apply e.
+      specialize e with i.
+      rewrite <- (cast_eq i (eq_refl)) in e.
+      exact e.
     + simpl in H0.
       rewrite (@silly_lemma_false) in H0 by auto; discriminate.
   - rewrite H0; apply Kind_decb_refl.
