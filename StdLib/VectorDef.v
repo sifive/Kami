@@ -1,3 +1,4 @@
+Require Import String.
 Require Import Kami.StdLib.Fin.
 Require Import Arith_base.
 Import EqNotations.
@@ -273,14 +274,29 @@ End SCANNING.
 Section VECTORLIST.
 (** * vector <=> list functions *)
 
-Fixpoint of_list {A} (l : list A) : Vec A (length l) :=
-match l as l' return Vec A (length l') with
+Fixpoint of_list {A} (l : list A) : Vec A (List.length l) :=
+match l as l' return Vec A (List.length l') with
   |Datatypes.nil => []
   |(h :: tail)%list => (h :: (of_list tail))
 end.
 
 Definition to_list {A}{n} (v : Vec A n) : list A :=
 Eval cbv delta beta in fold_right (fun h H => Datatypes.cons h H) v Datatypes.nil.
+
+Fixpoint add_indices_aux{n X} : nat -> Vec X n -> Vec (nat * X) n :=
+  match n return nat -> Vec X n -> Vec (nat * X) n with
+  | 0 => fun _ _ => tt
+  | S m => fun acc '(x,xs) => ((acc,x), add_indices_aux (S acc) xs)
+  end.
+
+Definition add_indices{n X} : Vec X n -> Vec (nat * X) n := add_indices_aux 0.
+
+Fixpoint add_strings{n X} : (Fin n -> string) -> Vec X n -> Vec (string * X) n :=
+  match n return (Fin n -> string) -> Vec X n -> Vec (string * X) n with
+  | 0 => fun _ _ => tt
+  | S m => fun strs '(x,xs) => ((strs Fin.F1,x),add_strings (fun j => strs (Fin.FS j)) xs)
+  end.
+
 End VECTORLIST.
 
 Module VectorNotations.
