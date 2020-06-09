@@ -4,7 +4,7 @@ Require Import Kami.Tutorial.TacticsEx.
 (* Example of how to extract a module to be used by the Haskell simulator *)
 
 Definition IncrMod : BaseModule := IncrementerImpl 5 "test".
-
+(*
 Separate Extraction
 
   getFins
@@ -27,3 +27,4 @@ Separate Extraction
   unpack
 
   IncrMod.
+*)
