@@ -26,7 +26,7 @@ deriving instance Show T.BitFormat
 deriving instance Show T.RegFileReaders
 deriving instance Show T.RegFileBase
 
-show_finfun :: Show a => Int -> (CustomExtract.EFin -> a) -> String
+show_finfun :: Show a => Int -> (T.Fin -> a) -> String
 show_finfun n f = "{ " ++ intercalate " ; " (map (show . f) $ T.getFins n) ++ " }"
 
 instance Show T.FullFormat where
@@ -66,10 +66,10 @@ instance Show (T.Expr ty) where
   show (T.BinBitBool n m o e1 e2) = "BinBitBool " ++ show n ++ " " ++ show m ++ " " ++ show o ++ " " ++ show e1 ++ " " ++ show e2
   show (T.ITE fk e1 e2 e3) = "ITE " ++ show fk ++ " " ++ show e1 ++ " " ++ show e2 ++ " " ++ show e3
   show (T.Eq k e1 e2) = "Eq " ++ show k ++ " " ++ show e1 ++ " " ++ show e2
-  show (T.ReadStruct n fk fs e i) = "ReadStruct " ++ show n ++ " " ++ show_finfun n fk ++ " " ++ show_finfun n fs ++ " " ++ show e ++ " " ++ show i
+  show (T.ReadStruct n fk fs e i) = "ReadStruct " ++ show n ++ " " ++ show_finfun n fk ++ " " ++ show_finfun n fs ++ " " ++ show e ++ " " ++ show (T.to_nat n i)
   show (T.BuildStruct n fk fs fe) = "BuildStruct " ++ show n ++ " " ++ show_finfun n fk ++ " " ++ show_finfun n fs ++ " " ++ show_finfun n fe
   show (T.ReadArray n m k e1 e2) = "ReadArray " ++ show n ++ " " ++ show m ++ " " ++ show e1 ++ " " ++ show e2
-  show (T.ReadArrayConst n k e i) = "ReadArrayConst " ++ show n ++ " " ++ show k ++ " " ++ show e ++ " " ++ show i
+  show (T.ReadArrayConst n k e i) = "ReadArrayConst " ++ show n ++ " " ++ show k ++ " " ++ show e ++ " " ++ show (T.to_nat n i)
   show (T.BuildArray n k f) = "BuildArray " ++ show n ++ " " ++ show k ++ " " ++ show_finfun n f
 
 deriving instance Show T.SyncRead

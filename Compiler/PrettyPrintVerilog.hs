@@ -10,21 +10,16 @@ import Control.Monad.State.Lazy
 import qualified Data.Map.Lazy as H
 import Debug.Trace
 import Numeric
+import Specif
 
 log2_up :: Int -> Int
 log2_up = ceiling . (logBase 2) . fromIntegral
-
-intToFin :: Int -> Int -> (Int,Int)
-intToFin = (,)
 
 ppDealSize0 :: T.Kind -> String -> String -> String
 ppDealSize0 ty def str = if T.size ty == 0 then def else str
 
 ppVecLen :: Int -> String
 ppVecLen n = "[" ++ show (n-1) ++ ":0]"
-
-finToInt :: (Int,Int) -> Int
-finToInt = snd
 
 deformat :: String -> String
 deformat = concatMap (\c -> if c == '\n' then "\\n" else c:[])
@@ -197,7 +192,7 @@ ppRtlExpr who e =
         return $ ppDealSize0 k "0" (new ++ '[' : xidx ++ "]")
     T.ReadArrayConst n k vec idx ->
       do
-        let xidx = finToInt idx
+        let xidx = T.to_nat n idx -- finToInt idx
         xvec <- ppRtlExpr who vec
         new <- optionAddToTrunc who (T.Array n k) vec
         return $ ppDealSize0 k "0" (new ++ '[' : show xidx ++ "]")
