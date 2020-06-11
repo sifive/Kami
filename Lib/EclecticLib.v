@@ -59,8 +59,13 @@ Proof.
   exists x; split; [auto | rewrite H; auto].
 Qed. *)
 
+(*
+  Accepts one argument: v : Fin (S n); and destructs v into two
+  cases where v = F1 and another where v = FS.
+*)
 Ltac fin_dep_destruct v :=
-  pattern v; apply fin_case; clear v; intros.
+  (* pattern v; apply fin_case; clear v; intros. *)
+  simpl in v; destruct v as [i|y]; [destruct i|idtac].
 
 Definition UIP(X : Type) := forall (x y : X)(p q : x = y), p = q.
 
