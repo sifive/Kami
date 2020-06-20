@@ -5,6 +5,7 @@ Require Import Coq.Sorting.Permutation.
 Require Import Coq.Sorting.PermutEq.
 Require Import RelationClasses Setoid Morphisms.
 Require Import ZArith.
+Require Import Kami.StdLib.Fin.
 
 Definition filterRegs f m (o: RegsT) :=
   filter (fun x => f (getBool (in_dec string_dec (fst x) (map fst (getAllRegisters m))))) o.
@@ -498,13 +499,12 @@ Section evalExpr.
     repeat f_equal.
   Qed.
 
-  Lemma fin_to_nat_bound : forall n (x: Fin.t n), proj1_sig (Fin.to_nat x) < n.
+  Lemma fin_to_nat_bound : forall {n} (x: Fin n), proj1_sig (Fin.to_nat x) < n.
   Proof.
-    induction x; cbn; try lia.
-    destruct (Fin.to_nat x); cbn in *; lia.
+    intros n x. exact (proj2_sig (Fin.to_nat x)).
   Qed.
 
-  Lemma fin_to_word_id : forall n (i : Fin.t n),
+  Lemma fin_to_word_id : forall {n} (i : Fin n),
     wordToNat (natToWord (Nat.log2_up n) (proj1_sig (Fin.to_nat i))) = proj1_sig (Fin.to_nat i).
   Proof.
     intros.
@@ -6716,12 +6716,12 @@ Proof.
 Qed.
 
 Lemma arr_nth_Fin' {A : Type} :
-  forall m (arr : t m -> A),
-    arr = (nth_Fin' _ (list_arr_length arr)).
+  forall m (arr : Fin m -> A),
+    arr = (nth_Fin' _ (list_arr_length m arr)).
 Proof.
   intros.
   apply functional_extensionality; intros.
-  rewrite (nth_Fin'_nth (arr x)).
+  rewrite (nth_Fin'_nth m (arr x)).
   rewrite <- nth_default_eq, <- list_arr_correct.
   destruct lt_dec.
   - specialize (of_nat_to_nat_inv x) as P.

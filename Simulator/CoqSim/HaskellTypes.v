@@ -1,7 +1,8 @@
 Require Extraction.
-Require Import String Fin.
+Require Import String.
 Require Import Kami.All.
 Require Import Kami.Simulator.CoqSim.Misc.
+Require Import Kami.StdLib.Fin.
 
 Extraction Language Haskell.
 
@@ -32,22 +33,26 @@ Extract Constant map_of_list => "Data.Map.Strict.fromList".
 
 Parameter Vector : nat -> Type -> Type.
 
-Parameter vector_index : forall {X n}, Fin.t n -> Vector n X -> X.
+Parameter vector_index_aux : forall {X n}, nat -> Vector n X -> X.
+
+Definition vector_index {X n} (p : Fin n) : Vector n X -> X :=
+  vector_index_aux (proj1_sig (Fin.to_nat p)).
+
 Parameter vector_map : forall {X Y n}, (X -> Y) -> Vector n X -> Vector n Y.
 Parameter vector_eq : forall {X n}, (X -> X -> bool) -> Vector n X -> Vector n X -> bool.
 Parameter vector_to_list : forall {X n}, Vector n X -> list X.
-Parameter make_vector : forall {X n}, (Fin.t n -> X) -> Vector n X.
+Parameter make_vector : forall {X n}, (Fin n -> X) -> Vector n X.
 Parameter vector_slice : forall {X n} (i m : nat),  Vector n X -> Vector m X.
 Parameter vector_updates : forall {X n}, Vector n X -> list (nat * X) -> Vector n X.
 
-Fixpoint Fin_to_list{X n} : (Fin.t n -> X) -> list X :=
+Fixpoint Fin_to_list{X n} : (Fin n -> X) -> list X :=
   match n with
-  | 0 => fun _ => nil
-  | S m => fun f => cons (f Fin.F1) (Fin_to_list (fun i => f (Fin.FS i)))
+  | 0 => fun _ => List.nil
+  | S m => fun f => List.cons (f F1) (Fin_to_list (fun i => f (FS i)))
   end.
 
 Extract Constant Vector "a" => "Data.Vector.Vector a".
-Extract Constant vector_index => "(\_ (n,i) v -> v Data.Vector.! i)".
+Extract Constant vector_index_aux => "(\_ i v -> v Data.Vector.! i)".
 Extract Constant vector_map => "(\_ -> Data.Vector.map)".
 Extract Constant vector_eq => "(\_ eqb v1 v2 -> Data.Vector.foldr (Prelude.&&) Prelude.True (Data.Vector.zipWith eqb v1 v2))".
 Extract Constant vector_to_list => "(\ _ -> Data.Vector.toList)".
@@ -99,7 +104,7 @@ Extract Constant bv_srl => "(\_ _ -> Data.BitVector.shr)".
 Extract Constant bv_sra => "(\_ _ -> Data.BitVector.ashr)".
 Extract Constant bv_concat => "(\_ _ -> (Data.BitVector.#))".
 Extract Constant bv_add => "(\_ -> Prelude.foldr (Prelude.+) 0)".
-Extract Constant bv_mul => "(\_ -> Prelude.foldr (Prelude.*) 1)".
+Extract Constant bv_mul => "(\_ -> Prelude.foldr (Prelude.* ) 1)".
 Extract Constant bv_band => "(\n -> Prelude.foldr (Data.Bits..&.) (Data.BitVector.ones n))".
 Extract Constant bv_bor => "(\n -> Prelude.foldr (Data.Bits..|.) (Data.BitVector.zeros n))".
 Extract Constant bv_bxor => "(\n -> Prelude.foldr Data.Bits.xor (Data.BitVector.zeros n))".

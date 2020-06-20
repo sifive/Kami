@@ -1,5 +1,4 @@
-Require Import Compare_dec List String Streams FinFun.
-Import ListNotations Fin2Restrict.
+Require Import Compare_dec String Streams.
 
 Require Import Kami.AllNotations.
 
@@ -8,6 +7,10 @@ Require Import Kami.Simulator.CoqSim.TransparentProofs.
 Require Import Kami.Simulator.CoqSim.HaskellTypes.
 Import Kami.Simulator.CoqSim.HaskellTypes.Notations.
 Require Import Program.
+Require Import Kami.StdLib.Fin.
+Require Import Kami.StdLib.Vector.
+Require Import List.
+Import ListNotations.
 
 Section Eval.
 
@@ -47,8 +50,17 @@ Fixpoint print_Val(k : Kind)(ff : FullFormat k) : eval_Kind k -> string :=
   match ff with
   | FBool n _ => fun x => pad_with " " n (if x then "1" else "0")
   | FBit n m bf => fun x => pad_with "0" m (print_BF bf x)
-  | FStruct n fk fs ffs => fun x => ("{ " ++ String.concat "; " (v_to_list (vmap (fun '(str1,str2) => str1 ++ ":" ++ str2) (add_strings fs (tup_to_vec _ (fun i => print_Val (ffs i)) x)))) ++ "; }")%string
-  | FArray n k' ff' => fun x => ("[" ++ String.concat "; " (List.map (fun i => natToDecStr (f2n i) ++ "=" ++ print_Val ff' (vector_index i x)) (getFins n)) ++ "; ]")%string
+  | FStruct n fk fs ffs => fun x : Tuple (fun i : Fin n => eval_Kind (fk i)) =>
+    ("{ " ++
+      String.concat "; "
+        (Vector.to_list
+          (Vector.map
+            (fun '(str1,str2) => str1 ++ ":" ++ str2)
+            (Vector.add_strings fs
+              (tup_to_vec _ (fun i : Fin n => @print_Val (fk i) (ffs i)) x)))) ++
+     "; }")%string
+  | FArray n k' ff' => fun x =>
+    ("[" ++ String.concat "; " (List.map (fun i => natToDecStr (f2n i) ++ "=" ++ print_Val ff' (vector_index i x)) (getFins n)) ++ "; ]")%string
   end.
 
 (* for checkpointing *)
@@ -56,7 +68,7 @@ Fixpoint print_Val2(k : Kind)(ff : FullFormat k) : eval_Kind k -> string :=
   match ff with
   | FBool n _ => fun x => pad_with " " n (if x then "tt" else "ff")
   | FBit n m bf => fun x => pad_with "0" m (print_BF bf x)
-  | FStruct n fk fs ffs => fun x => (("{ " ++ String.concat " ; " (v_to_list ((tup_to_vec _ (fun i => print_Val2 (ffs i)) x)))) ++ " }")%string
+  | FStruct n fk fs ffs => fun x => (("{ " ++ String.concat " ; " (Vector.to_list ((tup_to_vec _ (fun i => print_Val2 (ffs i)) x)))) ++ " }")%string
   | FArray n k' ff' => fun x => ("[ " ++ String.concat " ; " (List.map (fun i => print_Val2 ff' (vector_index i x)) (getFins n)) ++ " ]")%string
   end.
 
@@ -88,8 +100,8 @@ Definition default_val_FK(k : FullKind) : eval_FK k :=
   | NativeKind T t => t
   end.
 
-Fixpoint rand_tuple{n} : forall ts : Fin.t n -> Type, (forall i, IO (ts i)) -> IO (Tuple ts) :=
-  match n with
+Fixpoint rand_tuple{n} : forall ts : Fin n -> Type, (forall i, IO (ts i)) -> IO (Tuple ts) :=
+  match n as m return forall ts : Fin m -> Type, (forall i, IO (ts i)) -> IO (Tuple ts) with
   | 0 => fun _ _ => ret tt
   | S m => fun ts mxs => (
       do x <- mxs Fin.F1;
@@ -146,10 +158,10 @@ Definition eval_BinBit{m n p}(op : BinBitOp m n p) : BV m -> BV n -> BV p :=
 
 Definition eval_CABit{n}(op : CABitOp) : list (BV n) -> BV n :=
   match op with
-  | Add => bv_add
   | Mul => bv_mul
   | Band => bv_band
   | Bxor => bv_bxor
+  | Add => bv_add
   end.
 
 Definition eval_BinBitBool{m n}(op : BinBitBoolOp m n) : BV m -> BV n -> bool :=
@@ -206,22 +218,21 @@ Fixpoint eval_Expr{k}(e : Expr eval_Kind k) : eval_FK k :=
   | @FromNative _ k' e'  => eval_KindFromType (eval_Expr e')
   end.
 
-Fixpoint get_chunk_struct{n} : forall (f : Fin.t n -> nat)(v : BV (sumSizes f))(i : Fin.t n), BV (f i) :=
+Fixpoint get_chunk_struct{n} : forall (f : Fin n -> nat)(v : BV (sumSizes f))(i : Fin n), BV (f i) :=
   match n with
-  | 0 => fun f _ i => case0 (fun j => BV (f j)) i
+  | 0 => fun f _ i => Fin.case0 (fun j => BV (f j)) i
   | _ => fun f v i => fin_case _ (fun j => BV (f j)) (bv_trunc_msb v) (fun j => get_chunk_struct (fun k => f (FS k)) (bv_trunc_lsb v) j)
   end.
 
-Fixpoint get_chunk_array{n} : forall (k : nat)(v : BV (n * k))(i : Fin.t n), BV k.
-  refine match n with
-  | 0 => fun _ _ i => case0 _ i
-  | S m => fun k v i => _
+Fixpoint get_chunk_array{n} : forall (k : nat)(v : BV (n * k))(i : Fin n), BV k :=
+  match n with
+  | 0 => fun _ _ i => Fin.case0 _ i
+  | S m => fun k (v : BV ((S m) * k)) (i : Fin (S m)) =>
+    match i with
+    | inl _ => @bv_trunc_lsb k (m * k) v
+    | inr j => @get_chunk_array m k (@bv_trunc_msb k (m * k) v) j
+    end
   end.
-Proof.
-  dependent destruction i.
-  - exact (bv_trunc_lsb v).
-  - exact (get_chunk_array _ _ (bv_trunc_msb v) i).
-Defined.
 
 Fixpoint val_unpack(k : Kind) : BV (size k) -> eval_Kind k :=
   match k return BV (size k) -> eval_Kind k with

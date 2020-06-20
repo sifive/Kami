@@ -60,7 +60,7 @@ Section SemSimple.
                    (HisAddr : isAddr = false)
                    (HWriteMap : Sem_RmeSimple
                                   (UpdRegRME readReg pred
-                                             (BuildArray (fun i : Fin.t num =>
+                                             (BuildArray (fun i : Fin num =>
                                                             ReadArray
                                                               arr
                                                               (CABit Add (Var type (SyntaxKind _) (evalExpr idx) ::
@@ -137,7 +137,7 @@ Section SemSimple.
                             (HIn :  In (dataArray, (existT _ (SyntaxKind (Array idxNum Data)) regVal)) updatedRegs)
                             cont calls val contArray
                             (HContArray : contArray =
-                                          BuildArray (fun i : Fin.t num =>
+                                          BuildArray (fun i : Fin num =>
                                                         ReadArray
                                                           (Var type _ regVal)
                                                           (CABit Add (Var type (SyntaxKind _) (evalExpr idx) ::
@@ -177,7 +177,7 @@ Section SemSimple.
                                    (HRegVal2 : In (dataArray, existT _ (SyntaxKind (Array idxNum Data)) regVal) updatedRegs)
                                    (contArray : Expr type (SyntaxKind (Array num Data)))
                                    (HContArray : contArray =
-                                                 BuildArray (fun i : Fin.t num =>
+                                                 BuildArray (fun i : Fin num =>
                                                                ReadArray
                                                                  (Var type _ regVal)
                                                                  (CABit Add (Var type (SyntaxKind _) idx ::

@@ -4,6 +4,7 @@ Require Import Coq.Arith.Div2.
 Require Import Coq.NArith.NArith.
 Require Import Arith_base.
 Require Import Arith Coq.ZArith.Znat Psatz.
+Require Import Kami.StdLib.Fin.
 
 Import ListNotations.
 
@@ -58,117 +59,13 @@ Proof.
   exists x; split; [auto | rewrite H; auto].
 Qed. *)
 
-Fixpoint Fin_t_foldr
-         (A : Type)
-         (n : nat)
-         (init : A)
-  := match n return
-           forall (f : Fin.t n -> A -> A), A
-     with
-     | 0 => fun _ => init
-     | S m => fun f => f Fin.F1 (Fin_t_foldr m init (fun i => f (Fin.FS i)))
-     end.
-
-Section nth_Fin.
-  Variable A: Type.
-  Fixpoint nth_Fin (ls: list A): Fin.t (length ls) -> A :=
-    match ls return Fin.t (length ls) -> A with
-    | nil => fun pf => Fin.case0 _ pf
-    | x :: xs => fun i =>
-                   match i in Fin.t n return n = length (x :: xs) -> A with
-                   | Fin.F1 _ => fun _ => x
-                   | Fin.FS _ y => fun pf =>
-                                     nth_Fin xs
-                                             match eq_add_S _ _ pf in _ = Y return Fin.t Y with
-                                             | eq_refl => y
-                                             end
-                   end eq_refl
-    end.
-
-  Definition nth_Fin' (ls: list A) n (pf: n = length ls) (i: Fin.t n): A :=
-    nth_Fin ls (Fin.cast i pf).
-
-  Fixpoint nth_Fin'' (ls: list A) n (pf: n <= length ls) {struct ls} : Fin.t n -> A.
-  Proof.
-    refine(
-    match ls return (n <= length ls) -> Fin.t n -> A with
-    | nil => fun pf i => Fin.case0 _ (Fin.cast i _)
-    | x :: xs => fun pf i =>
-       match i in Fin.t m return m <= length (x :: xs) -> A with
-       | Fin.F1 _ => fun _ => x
-       | Fin.FS _ z => fun pf => nth_Fin'' xs _ _ z
-       end _
-    end _).
-    all: cbn in *; abstract omega.
-  Defined.
-
-  Lemma nth_Fin'_nth : forall n d (i: Fin.t n) (xs: list A) (len_eq: n = length xs),
-    let i' := proj1_sig (Fin.to_nat i) in
-    nth_Fin' xs len_eq i = nth i' xs d.
-  Proof.
-    induction n; cbn; intros *; try easy.
-    destruct xs; cbn in *; try easy.
-    inversion len_eq.
-    destruct i eqn:?; cbn; auto.
-    destruct (Fin.to_nat _) eqn:?; cbn.
-    assert (n0 = n); subst.
-    { inversion len_eq; subst; auto. }
-    specialize (IHn d t xs (f_equal pred len_eq)).
-    rewrite Heqs in IHn; cbn in IHn; auto.
-  Qed.
-
-  Lemma nth_Fin_nth : forall d (xs: list A) (i: Fin.t (length xs)),
-    let i' := proj1_sig (Fin.to_nat i) in
-    nth_Fin xs i = nth i' xs d.
-  Proof.
-    cbn; intros.
-    rewrite <- (nth_Fin'_nth _ _ _ eq_refl).
-    unfold nth_Fin'; f_equal.
-    clear; induction i; cbn; auto.
-    rewrite <- IHi; auto.
-  Qed.
-End nth_Fin.
-
-Definition fin_case n x :
-  forall (P : Fin.t (S n) -> Type),
-    P Fin.F1 ->
-    (forall y, P (Fin.FS y)) ->
-    P x :=
-  match x in Fin.t n0
-     return
-       forall P,
-         match n0 return (Fin.t n0 -> (Fin.t n0 -> Type) -> Type) with
-           | 0 => fun _ _ => False
-           | S m => fun x P => P Fin.F1 -> (forall x0, P (Fin.FS x0)) -> P x
-         end x P
-  with
-    | Fin.F1 _ => fun _ H1 _ => H1
-    | Fin.FS _ _ => fun _ _ HS => HS _
-  end.
-
+(*
+  Accepts one argument: v : Fin (S n); and destructs v into two
+  cases where v = F1 and another where v = FS.
+*)
 Ltac fin_dep_destruct v :=
-  pattern v; apply fin_case; clear v; intros.
-
-Lemma Fin_cast_lemma : forall m n i (p q : m = n),
-  Fin.cast i p = Fin.cast i q.
-Proof.
-  intros.
-  rewrite (UIP_nat _ _ p q); reflexivity.
-Defined.
-
-Lemma fin_to_nat_cast : forall n (i: Fin.t n) m (Heq: n = m),
-  proj1_sig (Fin.to_nat (Fin.cast i Heq)) = proj1_sig (Fin.to_nat i).
-Proof.
-  induction n; cbn; intros *; try easy.
-  destruct m; try easy.
-  assert (n = m) by auto.
-  destruct i eqn:?; cbn; auto.
-  assert (n0 = n) by (subst; auto); subst.
-  specialize (IHn t m eq_refl).
-  destruct (Fin.to_nat t) eqn:?; cbn in *.
-  rewrite <- (Fin_cast_lemma _ eq_refl).
-  destruct (Fin.to_nat (Fin.cast t eq_refl)) eqn:?; cbn in *; auto.
-Qed.
+  (* pattern v; apply fin_case; clear v; intros. *)
+  simpl in v; destruct v as [i|y]; [destruct i|idtac].
 
 Definition UIP(X : Type) := forall (x y : X)(p q : x = y), p = q.
 
@@ -202,76 +99,6 @@ Proof.
   contradiction.
   contradiction.
 Defined.
-
-Definition map_length_red := 
-  (fun (A B : Type) (f : A -> B) (l : list A) =>
-     list_ind (fun l0 : list A => Datatypes.length (map f l0) = Datatypes.length l0) eq_refl
-              (fun (a : A) (l0 : list A) (IHl : Datatypes.length (map f l0) = Datatypes.length l0) =>
-                 f_equal_nat nat S (Datatypes.length (map f l0)) (Datatypes.length l0) IHl) l)
-  : forall (A B : Type) (f : A -> B) (l : list A), Datatypes.length (map f l) = Datatypes.length l.
-  
-Section nth_Fin_map2.
-  Variable A B: Type.
-  Variable g: A -> B.
-  Variable f: B -> Type.
-
-  Fixpoint nth_Fin_map2 (ls: list A):
-    forall (p : Fin.t (length (map g ls)))
-           (val: f (g (nth_Fin ls (Fin.cast p (map_length_red g ls))))),
-      f (nth_Fin (map g ls) p).
-    refine
-      match ls return forall (p : Fin.t (length (map g ls)))
-                             (val: f (g (nth_Fin ls (Fin.cast p (map_length_red g ls))))),
-          f (nth_Fin (map g ls) p) with
-      | nil => fun i _ => Fin.case0 (fun j => f (nth_Fin (map g nil) j)) i
-      | x :: xs => fun p => _
-      end.
-    fin_dep_destruct p.
-    + exact val.
-    + apply (nth_Fin_map2 xs y).
-      match goal with
-      | |- f (g (nth_Fin xs (Fin.cast y ?P))) => 
-        rewrite (hedberg eq_nat_dec P (f_equal Init.Nat.pred (map_length_red g (x :: xs))))
-      end.
-      exact val.
-  Defined.
-End nth_Fin_map2.
-
-Section Fin.
-
-Fixpoint Fin_forallb{n} : (Fin.t n -> bool) -> bool :=
-  match n return (Fin.t n -> bool) -> bool with
-  | 0 => fun _ => true
-  | S m => fun p => p Fin.F1 && Fin_forallb (fun i => p (Fin.FS i))
-  end.
-
-Lemma Fin_forallb_correct{n} : forall p : Fin.t n -> bool,
-  Fin_forallb p = true <-> forall i, p i = true.
-Proof.
-  induction n; intros; split; intros.
-  apply (Fin.case0 (fun i => p i = true)).
-  reflexivity.
-  simpl in H.
-  fin_dep_destruct i.
-  destruct (p F1); [auto|discriminate].
-  apply (IHn (fun j => p (FS j))).
-  destruct (p F1); [auto|discriminate].
-  simpl.
-  apply andb_true_intro; split.
-  apply H.
-  apply IHn.
-  intro; apply H.
-Qed.
-
-Definition Fin_cast : forall m n, Fin.t m -> m = n -> Fin.t n :=
-  fun m n i pf => match pf in _ = y return Fin.t y with
-                  | eq_refl => i
-                  end.
-
-End Fin.
-
-
-
 
 Lemma inversionPair A B (a1 a2: A) (b1 b2: B):
   (a1, b1) = (a2, b2) ->
@@ -346,27 +173,6 @@ Ltac existT_destruct dec :=
     apply (Eqdep_dec.eq_dep_eq_dec dec) in H;
     subst
   end.
-
-Fixpoint Fin_eq_dec n a {struct a}: forall (b: Fin.t n), {a = b} + {a <> b}.
-Proof.
-  refine
-    match a in Fin.t n return forall b: Fin.t n, {a = b} + {a <> b} with
-    | Fin.F1 _ => fun b => match b with
-                           | Fin.F1 _ => left eq_refl
-                           | _ => right _
-                           end
-    | Fin.FS _ x => fun b => match b in Fin.t (S m) return forall x: Fin.t m, (forall y: Fin.t m, {x = y} + {x <> y}) -> {Fin.FS x = b} + {Fin.FS x <> b}  with
-                             | Fin.F1 _ => fun _ _ => right _
-                             | Fin.FS _ y => fun _ f =>
-                                               match f y with
-                                               | left eq1 => left (f_equal Fin.FS eq1)
-                                               | right neq => right _
-                                               end
-                             end x (Fin_eq_dec _ x)
-    end; intro; clear Fin_eq_dec; try (abstract discriminate).
-  abstract (injection H; intros; existT_destruct Nat.eq_dec; tauto).
-Defined.
-
 
 Section fold_left_right.
   Variable A B: Type.
@@ -584,62 +390,16 @@ Proof.
   induction n; destruct xs; cbn; try easy; eauto.
 Qed.
 
-Fixpoint getFins n :=
-  match n return list (Fin.t n) with
-  | 0 => nil
-  | S m => Fin.F1 :: map Fin.FS (getFins m)
-  end.
-
-Fixpoint getFinsBound m n: list (Fin.t n) :=
-  match m return (list (Fin.t n)) with
-  | 0 => nil
-  | S k => match n with
-           | 0 => nil
-           | S n' => Fin.F1 :: map Fin.FS (getFinsBound k n')
-           end
-  end.
-
-Definition mapOrFins n (x: Fin.t n) := fold_left (fun a b => x = b \/ a) (getFins n) False.
-
-Lemma getFins_length : forall n, length (getFins n) = n.
-Proof.
-  induction n; cbn; auto.
-  rewrite map_length; auto.
-Qed.
-
-Lemma getFins_all : forall n (i: Fin.t n), In i (getFins n).
-Proof.
-  induction i; cbn; auto using in_map.
-Qed.
-
-Lemma getFins_nth_error : forall n (i: Fin.t n),
-  let i' := proj1_sig (Fin.to_nat i) in
-  nth_error (getFins n) i' = Some i.
-Proof.
-  induction i; cbn in *; auto.
-  destruct (Fin.to_nat i); cbn in *.
-  apply map_nth_error; auto.
-Qed.
-
-Lemma getFins_nth : forall n d (i: Fin.t n),
-  let i' := proj1_sig (Fin.to_nat i) in
-  nth i' (getFins n) d = i.
-Proof.
-  intros.
-  apply nth_error_nth.
-  apply getFins_nth_error.
-Qed.
-
 Section Arr.
   Variable A: Type.
   Variable def: A.
 
-  Definition list_arr n (arr : Fin.t n -> A):= map arr (getFins n).
+  Definition list_arr {n} (arr : Fin n -> A):= map arr (getFins n).
   
   Lemma list_arr_correct :
-    forall n (arr : Fin.t n -> A)(i: nat),
+    forall n (arr : Fin n -> A)(i: nat),
       match lt_dec i n with
-      | left pf => arr (Fin.of_nat_lt pf)
+      | left pf => arr (of_nat_lt pf)
       | right _ => def
       end = nth_default def (list_arr arr) i.
   Proof.
@@ -661,8 +421,8 @@ Section Arr.
   Qed.
       
   Lemma list_arr_correct_simple :
-    forall n (arr : Fin.t n -> A) i,
-      nth_error (list_arr arr) (proj1_sig (Fin.to_nat i)) = Some (arr i).
+    forall n (arr : Fin n -> A) i,
+      nth_error (list_arr arr) (proj1_sig (to_nat i)) = Some (arr i).
   Proof.
     intros.
     unfold list_arr; apply map_nth_error.
@@ -723,15 +483,23 @@ Proof.
   induction ls; simpl; auto.
 Qed.
 
-Lemma mapOrFins_true n: forall (x: Fin.t n), mapOrFins x.
+Lemma mapOrFins_true n: forall (i: Fin n), mapOrFins i.
 Proof.
-  induction x; unfold mapOrFins in *; simpl; intros.
-  - apply fold_left_or_init; auto.
-  - rewrite fold_left_map.
-    eapply (@fold_left_or_impl _ (fun b => x = b) (getFins n) _ False (Fin.FS x = Fin.F1 \/ False)); try tauto; congruence.
+  induction n as [|n IH].
+  + exact (case0 (fun i => mapOrFins i)).
+  + destruct i as [u|j]; unfold mapOrFins; simpl.
+    - apply (fold_left_or_init);
+      left; destruct u; reflexivity.
+    - rewrite fold_left_map.
+      unfold mapOrFins in IH.
+      exact (fold_left_or_impl
+        (fun k : Fin n => j = k)
+        (getFins n)
+        (fun k : Fin n => inr j = FS k)
+        (False_ind (inr j = F1 \/ False))
+        (fun (k : Fin n) (H : j = k) => ltac:(rewrite H; reflexivity))
+        (IH j)).
 Qed.
-
-
 
 Lemma list_split A B C (f: A -> C) (g: B -> C): forall l l1 l2,
     map f l = map g l1 ++ map g l2 ->
@@ -2392,7 +2160,7 @@ Theorem div2_minus_2 : forall n k,
     -> Nat.div2 (n - 2 * k) = Nat.div2 n - k.
   induction n as [n] using strong; intros.
 
-  do 2 (destruct n; simpl in *; intuition; repeat rewrite untimes2 in *).
+  do 2 (destruct n; simpl in *; intuition; repeat rewrite untimes2 in * ).
         destruct k; simpl in *; intuition.
 
         destruct k; simpl in *; intuition.
@@ -3373,10 +3141,10 @@ Proof.
   apply IHm; lia.
 Qed.
 
-Lemma Fineqb_refl {m} (n : t m) :
-  Fin.eqb n n = true.
+Lemma Fineqb_refl {m} (n : Fin m) :
+  Kami.StdLib.Fin.eqb n n = true.
 Proof.
-  rewrite Fin.eqb_eq; reflexivity.
+  rewrite Kami.StdLib.Fin.eqb_eq; reflexivity.
 Qed.
 
 Lemma Nat_mod_congr a b c :
@@ -3454,12 +3222,13 @@ Proof.
 Qed.
 
 Lemma list_arr_length {A : Type} n :
-  forall (arr : t n -> A),
+  forall (arr : Fin n -> A),
     n = length (list_arr arr).
 Proof.
   unfold list_arr; intros.
   rewrite map_length, getFins_length; reflexivity.
 Qed.
+
 Lemma firstn_map {A B: Type} (l : list A) (f : A -> B):
   forall n,
     firstn n (map f l) = map f (firstn n l).
@@ -3609,21 +3378,21 @@ Proof.
   - destruct l; auto; discriminate.
 Qed.
 
-Lemma Fin_eqb_neq {n : nat} (p q : Fin.t n):
-  Fin.eqb p q = false <-> p <> q.
+Lemma Fin_eqb_neq {n : nat} (p q : Fin n):
+  Kami.StdLib.Fin.eqb p q = false <-> p <> q.
 Proof.
   red; split; repeat intro.
-  - rewrite <- Fin.eqb_eq in H0; rewrite H0 in H; discriminate.
-  - destruct Fin.eqb eqn:G; auto.
+  - rewrite <- Kami.StdLib.Fin.eqb_eq in H0; rewrite H0 in H; discriminate.
+  - destruct Kami.StdLib.Fin.eqb eqn:G; auto.
     exfalso.
-    rewrite Fin.eqb_eq in G; contradiction.
+    rewrite Kami.StdLib.Fin.eqb_eq in G; contradiction.
 Qed.
 
 Section FifoProps.
   Variable size : nat.
   Local Notation lgSize := (Nat.log2_up size).
   Variable A : Type.
-  Variable implArray : Fin.t size -> A.
+  Variable implArray : Fin size -> A.
 
   Variable enqP1 deqP1 : Z.
   Variable enqP1Bnd : (0 <= enqP1 < 2 ^ Z.of_nat (lgSize + 1))%Z.
@@ -3632,7 +3401,7 @@ Section FifoProps.
   Local Notation deq := (deqP1 mod (2 ^ (Z.of_nat lgSize)))%Z.
   Local Notation cutLen := ((enqP1 - deqP1) mod (2 ^ (Z.of_nat (lgSize + 1))))%Z.
   
-  Definition convertToList {n} (kamiArray : Fin.t n -> A) := @list_arr A n kamiArray.
+  Definition convertToList {n} (kamiArray : Fin n -> A) := @list_arr A n kamiArray.
 
   Local Notation specList := (firstn (Z.to_nat cutLen)
                                       (rotateList (Z.to_nat deq) (convertToList implArray))).
@@ -3685,7 +3454,7 @@ Section FifoProps.
   
   Lemma hdCorrect :
     enqP1 <> deqP1 ->
-    hd_error specList = Some (implArray (Fin.of_nat_lt deq_lt_size)).
+    hd_error specList = Some (implArray (of_nat_lt deq_lt_size)).
   Proof.
     intros.
     rewrite hd_firstn.
@@ -3773,13 +3542,13 @@ Section FifoProps.
     }
     rewrite <- (Z.mod_small _ _ P), Zminus_mod_idemp_l; reflexivity.
   Qed.
-  
+
   Lemma listSnoc (val : A) :
     cutLen <> Z.of_nat size ->
     snoc val specList
     = firstn (Z.to_nat ((enqP1 + 1 - deqP1) mod 2 ^ Z.of_nat (lgSize + 1)))
               (rotateList (Z.to_nat deq) (convertToList
-              (fun i => if (Fin.eqb i (Fin.of_nat_lt enq_lt_size)) then val else implArray i))).
+              (fun i => if (Kami.StdLib.Fin.eqb i (of_nat_lt enq_lt_size)) then val else implArray i))).
   Proof.
     intros HNotFull.
     rewrite cutLen_succ, Z2Nat.inj_add; auto; try lia;
@@ -3803,8 +3572,8 @@ Section FifoProps.
                     (firstn (Z.to_nat cutLen)
                             (rotateList (Z.to_nat deq)
                                         (convertToList
-                                           (fun i : t size =>
-                                              if Fin.eqb i (of_nat_lt enq_lt_size)
+                                           (fun i : Fin size =>
+                                              if Kami.StdLib.Fin.eqb i (of_nat_lt enq_lt_size)
                                               then val else implArray i)))) m
                   <> None) as G1.
           { intro G1; rewrite G1 in G0; discriminate. }
@@ -3818,7 +3587,7 @@ Section FifoProps.
         { unfold convertToList.
           rewrite <- list_arr_length; reflexivity.
         }
-        assert (length (convertToList (fun i : t size => if Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)) = size) as P0.
+        assert (length (convertToList (fun i : Fin size => if Kami.StdLib.Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)) = size) as P0.
         { unfold convertToList.
           rewrite <- list_arr_length; reflexivity.
         }
@@ -3831,9 +3600,9 @@ Section FifoProps.
         unfold convertToList.
         repeat rewrite list_arr_correct_simple.
         f_equal.
-        destruct Fin.eqb eqn:G; auto.
+        destruct Kami.StdLib.Fin.eqb eqn:G; auto.
         exfalso.
-        rewrite Fin.eqb_eq in G.
+        rewrite Kami.StdLib.Fin.eqb_eq in G.
         assert (proj1_sig (to_nat (of_nat_lt P1)) = proj1_sig (to_nat (of_nat_lt enq_lt_size))).
         { rewrite G; auto. }
         repeat rewrite to_nat_of_nat in H; simpl in H.
@@ -3875,7 +3644,9 @@ Section FifoProps.
           -- rewrite H in P4.
              assert (enqP1 - deqP1 = Z.of_nat m)%Z as P5 by lia.
              rewrite P5, Z.mod_small in l; try lia.
-    - assert (length (convertToList (fun i : t size => if Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)) = size) as P.
+        * rewrite <- (Nat2Z.id m), <- Z2Nat.inj_lt in l; lia.
+        * rewrite <- (Nat2Z.id m), <- Z2Nat.inj_lt in l; lia.
+    - assert (length (convertToList (fun i : Fin size => if Kami.StdLib.Fin.eqb i (of_nat_lt enq_lt_size) then val else implArray i)) = size) as P.
         { unfold convertToList, list_arr.
           rewrite map_length, getFins_length; reflexivity.
         }
@@ -3912,7 +3683,7 @@ Section FifoProps.
         rewrite <- P0 at 1.
         rewrite list_arr_correct_simple, Fineqb_refl; reflexivity.
   Qed.
-  
+
 End FifoProps.
 
 Lemma app_emptyb {A : Type} (l1 l2 : list A) :

@@ -65,6 +65,8 @@ Local Ltac finish_append :=
 Ltac discharge_append :=
   simpl; unfold getBool in *; process_append; finish_append.
 
+(* TODO: LLEE: *)
+(*
 Goal forall (a b c: string),
   (a ++ "a" <> a ++ "b"
   /\ a ++ "a" ++ b <> c ++ "b" ++ b
@@ -73,7 +75,7 @@ Goal forall (a b c: string),
   /\ (a ++ "a") ++ b <> a ++ "b" ++ a
   /\ (a ++ (b ++ "b")) ++ "c" <> (a ++ b) ++ "d")%string.
 Proof. intuition idtac; discharge_append. Qed.
-
+*)
 Ltac discharge_DisjKey :=
   repeat match goal with
          | |- DisjKey _ _ =>

@@ -1,5 +1,4 @@
 Require Import String.
-Require Import FinFun.
 
 Require Import Kami.AllNotations.
 Require Import Kami.Syntax.
@@ -8,6 +7,9 @@ Require Import Kami.Simulator.CoqSim.Misc.
 Require Import Kami.Simulator.CoqSim.Eval.
 Require Import Kami.Simulator.CoqSim.HaskellTypes.
 Import Kami.Simulator.CoqSim.HaskellTypes.Notations.
+Require Import Kami.StdLib.Vector.
+Require Import Kami.StdLib.Fin.
+Require Import List.
 
 Section RegFile.
 
@@ -100,10 +102,10 @@ Defined.
 
 Definition file_writes_mask(file : RegFile)(i : nat)(mask : Val (Array (chunk_size file) Bool))(vals : Val (Array (chunk_size file) (kind file))) : list (nat * Val (kind file)) :=
   let mask_indices := filter (fun i => vector_index i mask) (getFins _) in
-    map (fun j => (i + Fin2Restrict.f2n j, vector_index j vals)) mask_indices.
+    map (fun j => (i + Fin.f2n j, vector_index j vals)) mask_indices.
 
 Definition file_writes_no_mask(file : RegFile)(i : nat)(vals : Val (Array (chunk_size file) (kind file))) : list (nat * Val (kind file)) :=
-  map (fun j => (i + Fin2Restrict.f2n j, vector_index j vals)) (getFins _).
+  map (fun j => (i + Fin.f2n j, vector_index j vals)) (getFins _).
 
 Definition void_nil : {k : Kind & Val k} :=
   existT _ (Bit 0) (nat_to_bv 0).
@@ -119,8 +121,8 @@ Proof.
   * exact (error "Kind mismatch.").
 Defined.
 
-Fixpoint Tup_lookup{n} : forall (i : Fin.t n)(ks : Fin.t n -> Kind), Tuple (fun i => Val (ks i)) -> {k : Kind & Val k} :=
-  match n return forall (i : Fin.t n)(ks : Fin.t n -> Kind), Tuple (fun i => Val (ks i)) -> {k : Kind & Val k} with
+Fixpoint Tup_lookup{n} : forall (i : Fin n)(ks : Fin n -> Kind), Tuple (fun i => Val (ks i)) -> {k : Kind & Val k} :=
+  match n return forall (i : Fin n)(ks : Fin n -> Kind), Tuple (fun i => Val (ks i)) -> {k : Kind & Val k} with
   | 0 => fun i => case0 _ i
   | S m => fun i ks X => fin_case i _ (existT _ (ks F1) (fst X)) (fun j => (Tup_lookup  j _ (snd X)))
   end.

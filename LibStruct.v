@@ -1,4 +1,5 @@
 Require Import Kami.Syntax Kami.Notations.
+Require Import Kami.StdLib.Fin.
 
 (* TODO: move to KamiStdLib? *)
 Definition extractArbitraryRange ty sz (inst: Bit sz ## ty) (range: nat * nat):
@@ -27,14 +28,14 @@ Definition nullStruct: Kind :=
 
 Fixpoint BuildStructActionCont
          (ty: Kind -> Type) k
-         n:
-  forall (kinds : Fin.t n -> Kind)
-                        (names : Fin.t n -> string)
+         {n}:
+  forall (kinds : Fin n -> Kind)
+                        (names : Fin n -> string)
                         (acts  : forall i, ActionT ty (kinds i))
                         (cont: (forall i, Expr ty (SyntaxKind (kinds i))) -> ActionT ty k),
     ActionT ty k :=
-  match n return forall (kinds : Fin.t n -> Kind)
-                        (names : Fin.t n -> string)
+  match n return forall (kinds : Fin n -> Kind)
+                        (names : Fin n -> string)
                         (acts  : forall i, ActionT ty (kinds i))
                         (cont  : (forall i, Expr ty (SyntaxKind (kinds i))) ->
                                  ActionT ty k), ActionT ty k with
@@ -48,24 +49,22 @@ Fixpoint BuildStructActionCont
                  (fun i => acts (Fin.FS i))
                  (fun exps =>
                     cont (fun i =>
-                            match i in Fin.t (S m) return
-                                  forall (ks:
-                                            Fin.t (S m) -> Kind),
-                                    ty (ks Fin.F1) ->
-                                    (forall i: Fin.t m, Expr ty (SyntaxKind (ks (Fin.FS i)))) ->
-                                    Expr ty (SyntaxKind (ks i))
-                            with
-                            | Fin.F1 _ => fun ks next exps => #next
-                            | Fin.FS _ j => fun ks next exps => exps j
+                            match i return
+                              forall ks : Fin (S m) -> Kind,
+                                ty (ks Fin.F1) ->
+                                (forall j : Fin m, Expr ty (SyntaxKind (ks (Fin.FS j)))) ->
+                                Expr ty (SyntaxKind (ks i)) with
+                            | inl u => match u with tt => fun ks next exps => #next end
+                            | inr j => fun ks next exps => exps j
                             end kinds next exps))
 end.
 
-Definition BuildStructAction ty n (kinds: Fin.t n -> Kind) (names: Fin.t n -> string) (acts: forall i, ActionT ty (kinds i)) :=
+Definition BuildStructAction ty n (kinds: Fin n -> Kind) (names: Fin n -> string) (acts: forall i, ActionT ty (kinds i)) :=
   BuildStructActionCont kinds names acts (fun x => Return (BuildStruct kinds names x)).
 
 Lemma WfConcatActionT_BuildStructActionCont:
  forall m k n kinds names acts cont,
-   (forall (i:Fin.t n), WfConcatActionT (acts i) m) ->
+   (forall (i:Fin n), WfConcatActionT (acts i) m) ->
    (forall x, WfConcatActionT (cont x) m) ->
    @WfConcatActionT type k (@BuildStructActionCont type k
                                               n kinds names acts cont) m.

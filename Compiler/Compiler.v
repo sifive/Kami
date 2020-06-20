@@ -1,4 +1,5 @@
 Require Import Kami.StateMonad Kami.Syntax Kami.Properties Kami.PProperties Kami.PPlusProperties Kami.Notations Kami.Lib.EclecticLib.
+Require Import Kami.StdLib.Fin.
 Import Word.Notations.
 
 Require Import ZArith.
@@ -277,7 +278,7 @@ Section Compile.
   Proof.
     split; intros.
     - unfold SyncRead_eqb in H.
-      repeat (apply andb_prop in H; dest; rewrite String.eqb_eq in *).
+      repeat (apply andb_prop in H; dest; rewrite String.eqb_eq in * ).
       destruct r, r'; simpl in *; subst; auto.
     - rewrite H.
       unfold SyncRead_eqb; repeat rewrite eqb_refl; auto.
@@ -595,7 +596,7 @@ Section Semantics.
                      (HIn :  In (dataArray, (existT _ (SyntaxKind (Array idxNum Data)) regVal)) updatedRegs)
                      cont calls val contArray
                      (HContArray : contArray =
-                                   BuildArray (fun i : Fin.t num =>
+                                   BuildArray (fun i : Fin num =>
                                                  ReadArray
                                                    (Var type _ regVal)
                                                    (CABit Add (Var type (SyntaxKind _) (evalExpr idx) ::
@@ -663,7 +664,7 @@ Section Semantics.
                             (HRegVal : In (dataArray, (existT _ (SyntaxKind (Array idxNum Data)) regV)) updatedRegs)
                             (HWriteMap : WfRegMapExpr
                                            (UpdRegMap readRegName pred
-                                                      (BuildArray (fun i : Fin.t num =>
+                                                      (BuildArray (fun i : Fin num =>
                                                                      ReadArray
                                                                        (Var type _ regV)
                                                                        (CABit Add (Var type (SyntaxKind _) (evalExpr idx) ::
@@ -682,7 +683,7 @@ Section Semantics.
                            (HRegVal2 : In (dataArray, existT _ (SyntaxKind (Array idxNum Data)) regVal) updatedRegs)
                            (contArray : Expr type (SyntaxKind (Array num Data)))
                            (HContArray : contArray =
-                                         BuildArray (fun i : Fin.t num =>
+                                         BuildArray (fun i : Fin num =>
                                                        ReadArray
                                                          (Var type _ regVal)
                                                          (CABit Add (Var type (SyntaxKind _) idx ::
@@ -816,7 +817,7 @@ Section EActionT_Semantics.
                   (cont : type (Array num Data) -> EActionT type retK)
                   (contArray : Expr type (SyntaxKind (Array num Data)))
                   (HContArray : contArray =
-                                BuildArray (fun i : Fin.t num =>
+                                BuildArray (fun i : Fin num =>
                                               ReadArray
                                                 (Var type _ regV)
                                                 (CABit Add (Var type (SyntaxKind _) (evalExpr idx) ::
@@ -878,7 +879,7 @@ Section EActionT_Semantics.
                          (HANewUml : anewUml =
                                      (UmUpd (readRegName, existT _ _
                                                                (evalExpr
-                                                                  (BuildArray (fun i : Fin.t num =>
+                                                                  (BuildArray (fun i : Fin num =>
                                                      ReadArray
                                                        (Var type _ regV)
                                                        (CABit Add (Var type (SyntaxKind _) (evalExpr idx) ::
@@ -893,7 +894,7 @@ Section EActionT_Semantics.
                         (HRegVal2 : In (dataArray, existT _ (SyntaxKind (Array idxNum Data)) regVal) o)
                         (contArray : Expr type (SyntaxKind (Array num Data)))
                         (HContArray : contArray =
-                                      BuildArray (fun i : Fin.t num =>
+                                      BuildArray (fun i : Fin num =>
                                                        ReadArray
                                                          (Var type _ regVal)
                                                          (CABit Add (Var type (SyntaxKind _) idx ::

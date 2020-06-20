@@ -1,4 +1,5 @@
 Require Import Kami.StateMonad Kami.Syntax Kami.Properties Kami.PProperties Kami.PPlusProperties Kami.Lib.EclecticLib Kami.Notations Kami.Compiler.Compiler.
+Require Import Kami.StdLib.Fin.
 Import Word.Notations.
 
 Require Import ZArith.
@@ -1396,7 +1397,7 @@ Proof.
                                              existT (fullType type) (SyntaxKind (Array idxNum Data))
                                                     (evalExpr
                                                        (fold_left
-                                                          (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                                          (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                                              (IF ReadArrayConst mask0 i then newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i))) <- ReadArrayConst val i] else newArr)%kami_expr)
                                                           (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0))
                            (r,
@@ -1405,7 +1406,7 @@ Proof.
                                   existT (fullType type) (SyntaxKind (Array idxNum Data))
                                          (evalExpr
                                             (fold_left
-                                               (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                               (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                                   (IF ReadArrayConst mask0 i then newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i))) <- ReadArrayConst val i] else newArr)%kami_expr)
                                                (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
@@ -1414,7 +1415,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
-                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                    (IF ReadArrayConst mask0 i then newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i))) <- ReadArrayConst val i] else newArr)%kami_expr)
                                 (getFins num) (Var type (SyntaxKind (Array idxNum Data)) regVal))))::x).
       repeat split; auto.
@@ -1444,7 +1445,7 @@ Proof.
                                              existT (fullType type) (SyntaxKind (Array idxNum Data))
                                                     (evalExpr
                                                        (fold_left
-                                                          (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                                          (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                                              (newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i))) <- ReadArrayConst val i])%kami_expr) (getFins num)
                                                           (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0))
                            (r,
@@ -1453,7 +1454,7 @@ Proof.
                                   existT (fullType type) (SyntaxKind (Array idxNum Data))
                                          (evalExpr
                                             (fold_left
-                                               (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                               (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                                   (newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i))) <- ReadArrayConst val i])%kami_expr) (getFins num)
                                                (Var type (SyntaxKind (Array idxNum Data)) regVal))))]) :: tl upds0)) as P0.
       { unfold WfRegMapExpr in *; dest; split; auto; constructor. }
@@ -1462,7 +1463,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
-                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                    (newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i))) <- ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regVal))))::x).
       repeat split; auto.
@@ -1532,7 +1533,7 @@ Proof.
                                              existT (fullType type) (SyntaxKind (Array num Data))
                                                     (evalExpr
                                                        (BuildArray
-                                                          (fun i : Fin.t num =>
+                                                          (fun i : Fin num =>
                                                              (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                                                     Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type (natToWord (Nat.log2_up idxNum)(proj1_sig (to_nat i)))])%kami_expr))))])
                                          :: tl upds0))
@@ -1542,7 +1543,7 @@ Proof.
                                   existT (fullType type) (SyntaxKind (Array num Data))
                                          (evalExpr
                                             (BuildArray
-                                               (fun i : Fin.t num =>
+                                               (fun i : Fin num =>
                                                   (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                                          Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i)))])%kami_expr))))])
                               :: tl upds0)) as P0.
@@ -1551,7 +1552,7 @@ Proof.
       exists (UmUpd (readReg, existT (fullType type) (SyntaxKind (Array num Data))
                                    (evalExpr
                                       (BuildArray
-                                         (fun i : Fin.t num =>
+                                         (fun i : Fin num =>
                                             (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                                    Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) + Const type (natToWord (Nat.log2_up idxNum)
                                                 (proj1_sig (to_nat i)))])%kami_expr))))::x).
@@ -2564,7 +2565,7 @@ Proof.
            rewrite  (getKindAttr_map_fst _ _ (prevPrevRegsTrue H2)) in H4; contradiction.
         -- rewrite in_app_iff; auto.
     + reflexivity.
-Qed.          
+Qed.
 
 Lemma PriorityUpds_exist o (HNoDup : NoDup (map fst o)):
   forall upds
@@ -3031,7 +3032,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
-                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                    (IF ReadArrayConst mask0 i
                                     then newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i))) <-
                                                                ReadArrayConst val i] else newArr)%kami_expr) 
@@ -3048,7 +3049,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
-                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                    (newArr @[ idx + Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i))) <-
                                                           ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
@@ -3075,7 +3076,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array num Data))
                           (evalExpr
                              (BuildArray
-                                (fun i : Fin.t num =>
+                                (fun i : Fin num =>
                                    (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                           Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) +
                                           Const type (natToWord (Nat.log2_up idxNum) (proj1_sig (to_nat i)))])%kami_expr)))) :: x); split; auto.
@@ -3199,7 +3200,7 @@ Proof.
                               existT (fullType type) (SyntaxKind (Array rfIdxNum rfData))
                                      (evalExpr
                                         (fold_left
-                                           (fun (newArr : Expr type (SyntaxKind (Array rfIdxNum rfData))) (i : Fin.t rfNum) =>
+                                           (fun (newArr : Expr type (SyntaxKind (Array rfIdxNum rfData))) (i : Fin rfNum) =>
                                               (IF ReadArrayConst (ReadStruct e (Fin.FS (Fin.FS Fin.F1))) i
                                                then newArr @[
                                                              ReadStruct e Fin.F1 + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
@@ -3237,7 +3238,7 @@ Proof.
                               existT (fullType type) (SyntaxKind (Array rfIdxNum rfData))
                                      (evalExpr
                                         (fold_left
-                                           (fun (newArr : Expr type (SyntaxKind (Array rfIdxNum rfData))) (i : Fin.t rfNum) =>
+                                           (fun (newArr : Expr type (SyntaxKind (Array rfIdxNum rfData))) (i : Fin rfNum) =>
                                               (newArr @[ ReadStruct e Fin.F1 + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                                      ReadArrayConst (ReadStruct e (Fin.FS Fin.F1)) i])%kami_expr) 
                                            (getFins rfNum) (Var type (SyntaxKind (Array rfIdxNum rfData)) regV))))) :: nil); simpl in *.
@@ -3383,7 +3384,7 @@ Proof.
       specialize (H _ _ _ P0 _ HIn _ _ _ HESemAction); dest.
       exists (UmMeth (x, existT SignT (Bit (Nat.log2_up rfIdxNum), Array rfNum rfData) (evalExpr e, (evalExpr
                                                                                                       (BuildArray
-                                                                                                         (fun i : Fin.t rfNum =>
+                                                                                                         (fun i : Fin rfNum =>
                                                                                                             (Var type (SyntaxKind (Array rfIdxNum rfData)) regV @[
                                                                                                                    Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) (evalExpr e) +
                                                                                                                    Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))))::x0); split.
@@ -3537,7 +3538,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
-                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                    (IF ReadArrayConst mask0 i
                                     then newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                ReadArrayConst val i] else newArr)%kami_expr) 
@@ -3558,7 +3559,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
-                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                    (newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                           ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regV))))::x0); split; auto.
@@ -3593,7 +3594,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array num Data))
                           (evalExpr
                              (BuildArray
-                                (fun i : Fin.t num =>
+                                (fun i : Fin num =>
                                    (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                           Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) +
                                           Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))) :: x0); split; auto.
@@ -3876,7 +3877,7 @@ Proof.
                                           (Var type (SyntaxKind (Array rfNum rfData))
                                                (evalExpr
                                                   (BuildArray
-                                                     (fun i0 : Fin.t rfNum =>
+                                                     (fun i0 : Fin rfNum =>
                                                         (Var type (SyntaxKind (Array rfIdxNum rfData)) regV @[
                                                                Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) (evalExpr e) +
                                                                Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i0))))])%kami_expr))))))]); simpl; repeat intro; auto.
@@ -4042,7 +4043,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
-                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                    (IF ReadArrayConst mask0 i
                                     then newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                ReadArrayConst val i] else newArr)%kami_expr) 
@@ -4063,7 +4064,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
-                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                    (newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                           ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
@@ -4098,7 +4099,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array num Data))
                           (evalExpr
                              (BuildArray
-                                (fun i : Fin.t num =>
+                                (fun i : Fin num =>
                                    (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                           Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) +
                                           Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))) :: x); split; auto.
@@ -4265,7 +4266,7 @@ Proof.
                                         (Var type (SyntaxKind (Array rfNum rfData))
                                              (evalExpr
                                                 (BuildArray
-                                                   (fun i0 : Fin.t rfNum =>
+                                                   (fun i0 : Fin rfNum =>
                                                       (Var type (SyntaxKind (Array rfIdxNum rfData)) regV @[
                                                              Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) (evalExpr e) +
                                                              Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i0))))])%kami_expr))))))]).
@@ -4404,7 +4405,7 @@ Proof.
        specialize (H _ _ _ _ _ P0 HIn _ _ _ HESemAction); dest.
        exists (UmMeth (meth, existT SignT (Void, Array rfNum rfData) (WO, (evalExpr
                                                                             (BuildArray
-                                                                               (fun i : Fin.t rfNum =>
+                                                                               (fun i : Fin rfNum =>
                                                                                   (Var type (SyntaxKind (Array rfIdxNum rfData)) regVal @[
                                                                                          Var type (SyntaxKind (Bit (Nat.log2_up rfIdxNum))) idx +
                                                                                          Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))))::x); split.
@@ -4571,7 +4572,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
-                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                    (IF ReadArrayConst mask0 i
                                     then newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                                ReadArrayConst val i] else newArr)%kami_expr) 
@@ -4592,7 +4593,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array idxNum Data))
                           (evalExpr
                              (fold_left
-                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin.t num) =>
+                                (fun (newArr : Expr type (SyntaxKind (Array idxNum Data))) (i : Fin num) =>
                                    (newArr @[ idx + Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i)))) <-
                                                           ReadArrayConst val i])%kami_expr) (getFins num)
                                 (Var type (SyntaxKind (Array idxNum Data)) regV))))::x); split; auto.
@@ -4627,7 +4628,7 @@ Proof.
                    existT (fullType type) (SyntaxKind (Array num Data))
                           (evalExpr
                              (BuildArray
-                                (fun i : Fin.t num =>
+                                (fun i : Fin num =>
                                    (Var type (SyntaxKind (Array idxNum Data)) regV @[
                                           Var type (SyntaxKind (Bit (Nat.log2_up idxNum))) (evalExpr idx) +
                                           Const type (ZToWord _ (Z.of_nat (proj1_sig (Fin.to_nat i))))])%kami_expr)))) :: x); split; auto.

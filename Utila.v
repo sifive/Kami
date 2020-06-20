@@ -3,6 +3,7 @@
   expressions.
  *)
 Require Import Kami.Syntax Kami.Notations Kami.LibStruct.
+Require Import Kami.StdLib.Fin.
 Require Import List.
 Import Word.Notations.
 Require Import Kami.Lib.EclecticLib.
@@ -1305,7 +1306,7 @@ Section utila.
       rewrite map_map, <- IHxs; auto.
     Qed.
 
-    Lemma list_to_array_id : forall n (xs: ArrTy type n) (i: Fin.t n),
+    Lemma list_to_array_id : forall n (xs: ArrTy type n) (i: Fin n),
       let i' := Fin.cast i (array_to_list_len xs) in
       (evalExpr (list_to_array (array_to_list xs))) i' = (evalExpr xs) i.
     Proof.
@@ -1313,7 +1314,7 @@ Section utila.
       unfold array_to_list, array_to_list'.
       erewrite nth_Fin_nth.
       rewrite map_nth; cbn.
-      rewrite fin_to_nat_cast, getFins_nth; auto.
+      rewrite fin_to_nat_cast, (@getFins_nth (Expr type (SyntaxKind A))); auto.
       Unshelve.
       auto.
     Qed.
@@ -1330,7 +1331,7 @@ Section utila.
       unfold array_to_list; intros; apply array_to_list'_forall.
     Qed.
 
-    Lemma array_to_list_nth {ty} : forall n (xs: ArrTy ty n) (i: Fin.t n) i',
+    Lemma array_to_list_nth {ty} : forall n (xs: ArrTy ty n) (i: Fin n) i',
       i' = proj1_sig (Fin.to_nat i) ->
       nth_error (array_to_list xs) i' = Some (ReadArrayConst xs i).
     Proof.
@@ -1372,7 +1373,7 @@ Section utila.
       - induction ys; constructor; inv Hall; auto.
     Qed.
 
-    Definition fin_to_bit {ty n} (i: Fin.t n) : Bit (Nat.log2_up n) @# ty :=
+    Definition fin_to_bit {ty n} (i: Fin n) : Bit (Nat.log2_up n) @# ty :=
       Const _ (natToWord _ (proj1_sig (Fin.to_nat i))).
 
     Definition array_forall_except {ty n}
